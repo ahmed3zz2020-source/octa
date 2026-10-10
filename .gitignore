@@ -1,0 +1,8 @@
+# ملفات محلية
+*.log
+.DS_Store
+node_modules/
+
+# ⚠️ مايحطش أي secrets هنا
+.env
+.env.*
