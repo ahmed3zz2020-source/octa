@@ -374,19 +374,50 @@
       .catch(function () { S.live = false; renderLiveDot(); });
   }
 
+  /* 📢 شريط حالة السوق */
+  function renderMktNote() {
+    const n = document.getElementById('scMktNote');
+    if (!n) return;
+    const st = mkt();
+    const txt = n.querySelector('.txt');
+    if (!txt) return;
+
+    n.classList.toggle('open', !!st.open);
+
+    if (st.open) {
+      txt.innerHTML = '✅ السوق مفتوح دلوقتي — الأسعار بتتحدث كل ' +
+        Math.round(st.p / 1000) + ' ثانية';
+    } else if (st.t === 'عطلة') {
+      txt.innerHTML = '😴 السوق مقفول (عطلة أسبوعية) — الأسعار آخر سعر رسمي من آخر جلسة تداول';
+    } else {
+      txt.innerHTML = '⏸️ السوق مقفول دلوقتي — الأسعار آخر سعر رسمي.<br>' +
+        '<b style="color:#ffc078">أول ما السوق يفتح بيحدّث نفسه لوحده</b> ' +
+        (st.nextAt ? '(' + st.nextAt + ')' : '');
+    }
+  }
+
   /* 🕐 العدّاد: حالة السوق + آخر تحديث */
   function renderLiveDot() {
+    renderMktNote();
+    /* ① حالة السوق — خانة مستقلة */
+    const m = document.getElementById('scMkt');
+    if (m) {
+      const st = mkt();
+      m.textContent = st.e + ' ' + st.t;
+      m.style.color = st.open ? '#7dd3a8' : '#ffc078';
+      m.title = st.open
+        ? 'السوق مفتوح — الأسعار بتتحدث لحظياً'
+        : 'السوق مقفول — الأسعار آخر سعر رسمي من آخر جلسة';
+    }
+
+    /* ② آخر تحديث */
     const el = document.getElementById('scUpd');
     if (!el) return;
     const st = mkt();
     const dot = S.live ? '🟢' : '⚪';
     const t = S.lastQ || '…';
-    el.innerHTML = '<span class="sc-upd">'
-      + '<b style="color:' + (S.live ? st.c : '#868e96') + '">' + st.e + ' ' + st.t + '</b>'
-      + ' <span style="opacity:.6">·</span> '
-      + '<span>' + dot + ' ' + t + '</span>'
-      + (st.nextAt ? ' <span style="opacity:.55">· بعده: ' + st.nextAt + '</span>' : '')
-      + '</span>';
+    el.textContent = dot + ' ' + t;
+    el.title = S.live ? 'بنحدّث كل دقيقة' : 'بنحدّث كل ١٥ دقيقة وأنا السوق مقفول';
   }
 
   /* ══════════════ الرندر ══════════════ */

@@ -802,3 +802,40 @@ html[data-dev="1"] .octa-devbar::after {
     padding: 12px 14px !important;
   }
 }
+
+/* 🕐 حالة السوق — تحت العناوين */
+.sc-hd-n b {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+#scMkt {
+  transition: color .3s ease;
+}
+@media (max-width: 480px) {
+  .sc-hd-n { font-size: .68rem !important; }
+  .sc-hd-n span { padding: 5px 7px !important; }
+}
+
+/* 📢 شريط حالة السوق فوق الجدول */
+.sc-mkt-note {
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 14px; margin: 10px 0;
+  background: rgba(255, 192, 120, .07);
+  border: 1px solid rgba(255, 192, 120, .22);
+  border-radius: 10px;
+  font-size: .82rem; line-height: 1.7; color: var(--muted);
+}
+.sc-mkt-note .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #ffc078; flex: 0 0 auto;
+  animation: octaPulse 2s infinite;
+}
+.sc-mkt-note.open {
+  background: rgba(125, 211, 168, .07);
+  border-color: rgba(125, 211, 168, .22);
+}
+.sc-mkt-note.open .dot { background: #51cf66; }
+@keyframes octaPulse { 0%,100% { opacity:1 } 50% { opacity:.35 } }
+@media (max-width: 480px) {
+  .sc-mkt-note { font-size: .78rem; padding: 9px 12px; }
+}
