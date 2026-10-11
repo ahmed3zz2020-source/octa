@@ -1,0 +1,13 @@
+{
+  "name": "octa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "🐙 OCTA — منصة تحليل أسهم عربية (مصر/أمريكا/السعودية/الإمارات)",
+  "scripts": {
+    "deploy": "npx wrangler deploy",
+    "dev": "npx wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "^3.114.0"
+  }
+}

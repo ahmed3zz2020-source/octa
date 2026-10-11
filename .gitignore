@@ -1,8 +1,12 @@
+# Cloudflare Workers — لا تُرفع
+node_modules/
+.wrangler/
+
 # ملفات محلية
 *.log
 .DS_Store
-node_modules/
-
-# ⚠️ مايحطش أي secrets هنا
 .env
 .env.*
+
+# ⛔ أسرار — ما تحطش هنا أبداً
+# التوكن في Railway Variables فقط
