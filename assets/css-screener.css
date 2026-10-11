@@ -493,19 +493,26 @@ body.light .sv-wrap { border-color: #d8e0e8; }
 
 /* ── شبكة المصطلحات ── */
 .sv-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px;
 }
 .sv-g {
   background: var(--bg); border: 1px solid var(--line);
-  border-radius: 9px; padding: 10px 12px;
+  border-radius: 11px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 9px;
 }
 .sv-g b {
-  display: block; font: 800 .78rem/1.45 system-ui, sans-serif;
-  color: var(--gold); margin-bottom: 3px;
+  display: block; font: 800 .86rem/1.5 system-ui, sans-serif;
+  color: var(--gold); margin: 0;
+}
+/* سطر «يعني إيه؟» — لازم سطر لوحده */
+.sv-g span b {
+  display: block; font: 700 .76rem/1.6 system-ui, sans-serif;
+  color: #7dd3a8; margin: 0 0 5px;
 }
 .sv-g span {
-  font: 400 .76rem/1.65 system-ui, sans-serif; color: var(--muted);
+  font: 400 .8rem/1.85 system-ui, sans-serif; color: var(--muted);
 }
+.sv-g span br { display: block; content: ''; margin-top: 3px; }
 
 /* ── نصيحة ── */
 .sv-tip {

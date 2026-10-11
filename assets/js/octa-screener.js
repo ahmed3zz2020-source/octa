@@ -809,8 +809,24 @@
     return '';
   }
 
-  const gl = (t, d) =>
-    '<div class="sv-g"><b>' + esc(t) + '</b><span>' + esc(d) + '</span></div>';
+  /* gl — الكارت: العنوان + الشرح
+     ملاحظة: الوصف د (d) مسموح فيه HTML (b/br) عشان «يعني إيه؟» يبان سطر لوحده
+     بس لازم نهرّب أي نص جاي من الداتا — عشان كده بنعمل split */
+  const gl = (t, d) => {
+    let desc = String(d == null ? '' : d);
+    /* نسمح بـ <b> و <br> بس — أي تاج تاني بيتشال بالكامل */
+    if (/<(b|br)[\s/>]/i.test(desc)) {
+      desc = esc(desc)
+        .replace(/&lt;b&gt;/gi, '<b>').replace(/&lt;\/b&gt;/gi, '</b>')
+        .replace(/&lt;br\s*\/?&gt;/gi, '<br>');
+      /* حما إضافية: نشيل أي on* handler أو javascript: */
+      desc = desc.replace(/on[a-z]+\s*=\s*(['"])?[^'"\s>]+\1/gi, '');
+      desc = desc.replace(/javascript\s*:/gi, '');
+    } else {
+      desc = esc(desc);
+    }
+    return '<div class="sv-g"><b>' + esc(t) + '</b><span>' + desc + '</span></div>';
+  };
 
   const abR = (a, b) => '<div class="sv-ab-r"><b>' + esc(a) + '</b><span>' + esc(b) + '</span></div>';
 
