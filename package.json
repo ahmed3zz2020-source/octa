@@ -5,9 +5,10 @@
   "description": "🐙 OCTA — منصة تحليل أسهم عربية (مصر/أمريكا/السعودية/الإمارات)",
   "scripts": {
     "deploy": "npx wrangler deploy",
-    "dev": "npx wrangler dev"
+    "dev": "npx wrangler dev",
+    "build": "echo \"no build needed — static assets\""
   },
   "devDependencies": {
-    "wrangler": "^3.114.0"
+    "wrangler": "3.114.14"
   }
 }
