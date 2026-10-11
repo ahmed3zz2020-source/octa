@@ -4,9 +4,10 @@
   "private": true,
   "description": "🐙 OCTA — منصة تحليل أسهم عربية (مصر/أمريكا/السعودية/الإمارات)",
   "scripts": {
-    "deploy": "npx wrangler deploy",
-    "dev": "npx wrangler dev",
-    "build": "rm -rf dist && mkdir -p dist && cp index.html *.json dist/ && cp -r assets dist/assets && cp -r data dist/data && rm -f dist/package*.json"
+    "bump": "node bump-cache.js",
+    "build": "npm run bump && rm -rf dist && mkdir -p dist && cp index.html *.json dist/ && cp -r assets dist/assets && cp -r data dist/data && rm -f dist/package*.json",
+    "deploy": "npm run build && wrangler deploy",
+    "dev": "wrangler dev"
   },
   "devDependencies": {
     "wrangler": "3.114.14"
