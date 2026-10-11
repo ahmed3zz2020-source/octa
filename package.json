@@ -6,7 +6,7 @@
   "scripts": {
     "deploy": "npx wrangler deploy",
     "dev": "npx wrangler dev",
-    "build": "echo \"no build needed — static assets\""
+    "build": "rm -rf dist && mkdir -p dist && cp index.html *.json dist/ && cp -r assets dist/assets && cp -r data dist/data && rm -f dist/package*.json"
   },
   "devDependencies": {
     "wrangler": "3.114.14"

@@ -2,6 +2,9 @@
 node_modules/
 .wrangler/
 
+# البناء (ينتج تلقائياً)
+dist/
+
 # ملفات محلية
 *.log
 .DS_Store
