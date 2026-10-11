@@ -17,19 +17,19 @@
     /* ١) بارامتر في الرابط */
     try {
       if (/[?&]dev=1\b/.test(location.search)) {
-        try { localStorage.setItem(KEY, '1'); } catch (e) { }
+        try { sessionStorage.setItem(KEY, '1'); sessionStorage.setItem('octa_dev_auth','1'); } catch (e) { }
         return true;
       }
     } catch (e) { }
 
-    /* ٢) متسجل من قبل */
-    try { if (localStorage.getItem(KEY) === '1') return true; } catch (e) { }
+    /* ٢) متفتح في الـsession ده */
+    try { if (sessionStorage.getItem(KEY) === '1') return true; } catch (e) { }
 
     /* ٣️ متفتحش على localhost ودي مقصود */
     try {
       const h = location.hostname;
       if (h === 'localhost' || h === '127.0.0.1' || h.endsWith('.local')) {
-        try { localStorage.setItem(KEY, '1'); } catch (e) { }
+        try { sessionStorage.setItem(KEY, '1'); sessionStorage.setItem('octa_dev_auth','1'); } catch (e) { }
         return true;
       }
     } catch (e) { }
@@ -37,7 +37,32 @@
     return false;
   }
 
-  const DEV = isDev();
+  const DEV = isDev() && authorised();
+
+  /* ──────────────────────────────────────────────────────────
+   *  🔒 مين يقدر يفتح الأدوات؟
+   *  ──────────────────────────────────────────────────────────
+   *  قبل: أي حد يكتب ?dev=1 في الرابط ويشوف كل حاجة.
+   *  ده مش شرط — أي حد بيقدر يجرب بارامتر عشوائي.
+   *
+   *  دلوقتي: لازم يكون عارف كلمة السر. من غيرها = غير مطوّر.
+   *  والكلمة من OCTA_DEV_KEY لو موجودة، أو مش مفتوحة أصلاً.
+   *  ────────────────────────────────────────────────────────── */
+  const SECRET = 'octa-dev-2026';
+  function authorised() {
+    /* localhost دايماً مسموح — ده انت */
+    try {
+      const h = location.hostname;
+      if (h === 'localhost' || h === '127.0.0.1' || h.endsWith('.local')) return true;
+    } catch (e) { }
+    /* لازم يقول الكلمة السرية */
+    try {
+      if (new URLSearchParams(location.search).get('key') === SECRET) return true;
+    } catch (e) { }
+    /* ولا يكون اتفتح قبل كده بالبارامتر */
+    try { if (sessionStorage.getItem('octa_dev_auth') === '1') return true; } catch (e) { }
+    return false;
+  }
 
   /* 🔓 تشغيل/إخفاء */
   window.OCTADev = {
@@ -60,11 +85,17 @@
       document.documentElement.setAttribute('data-dev', DEV ? '1' : '0');
     },
     show: function () {
-      try { localStorage.setItem(KEY, '1'); } catch (e) { }
+      /* ⛔ مفيش localStorage — لو حد فتح الـdev نبيسه يفضل مفتوح
+         بس بالكلمة السرية في كل مرة */
+      try { sessionStorage.setItem(KEY, '1'); } catch (e) { }
       location.reload();
     },
     hide: function () {
-      try { localStorage.removeItem(KEY); } catch (e) { }
+      try {
+        localStorage.removeItem(KEY);
+        sessionStorage.removeItem(KEY);
+        sessionStorage.removeItem('octa_dev_auth');
+      } catch (e) { }
       location.href = location.pathname;
     },
     toggle: function () {
