@@ -34,10 +34,10 @@
   <title>OCTA | منصة البورصة المصرية الذكية</title>
   <link rel="icon" type="image/png" href="assets/octa-logo.png">
   <!-- CSS → assets/octa.css -->
-<link rel="stylesheet" href="assets/octa.css?v=2026107979">
-  <link rel="stylesheet" href="assets/css-decide.css?v=2026107979">
-  <link rel="stylesheet" href="assets/css-screener.css?v=2026107979">
-  <link rel="stylesheet" href="assets/css-chart.css?v=2026107979">
+<link rel="stylesheet" href="assets/octa.css?v=2026109648">
+  <link rel="stylesheet" href="assets/css-decide.css?v=2026109648">
+  <link rel="stylesheet" href="assets/css-screener.css?v=2026109648">
+  <link rel="stylesheet" href="assets/css-chart.css?v=2026109648">
   <meta name="octa-auto-test" content="1">
 </head>
 <body>
@@ -915,34 +915,11 @@
 
 <!-- JS → assets/js/octa-core.js -->
 
-<script data-minimax-analytics="minimax-website-analytics-v1">(function(){
-"use strict";
-var t="eyJ2IjoxLCJraWQiOiJwcmUtdXMtMjAyNjA4MTUtdjEiLCJiaXpfaWQiOiJNYXZpcyIsIm5vZGVfaWQiOiI0NTAzOTExMjQ4MjQxNDAiLCJpc3N1ZWRfYXQiOjE3OTE1MTE2MTY4MzF9.KihiPK0OHW-eQB4weURHCB2N73OLzGfOo5m4HgLSbCk",u="https://agent.minimax.io/minimax-cloud/api/v1/website-traffic/page-views",last="";
-function path(){
-var h=window.location.hash||"",p=h.indexOf("#!")===0?h.slice(2):h.indexOf("#/")===0?h.slice(1):(window.location.pathname||"/");
-p=p.split(/[?#]/,1)[0]||"/";
-if(p.charAt(0)!=="/")p="/"+p;
-p=p.replace(/\/+/g,"/").replace(/%([0-9a-fA-F]{2})/g,function(_,x){var c=String.fromCharCode(parseInt(x,16));return /[A-Za-z0-9._~-]/.test(c)?c:"%"+x.toUpperCase();});
-if(p.length>1)p=p.replace(/\/+$/,"");
-return p||"/";
-}
-function send(){
-var p=path();if(p===last)return;last=p;
-var b="v=1&t="+encodeURIComponent(t)+"&p="+encodeURIComponent(p),ok=false;
-try{if(navigator.sendBeacon){ok=navigator.sendBeacon(u,new Blob([b],{type:"application/x-www-form-urlencoded;charset=UTF-8"}));}}catch(e){}
-if(!ok){try{fetch(u,{method:"POST",body:b,keepalive:true,mode:"no-cors",credentials:"omit",headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"}});}catch(e){}}
-}
-["pushState","replaceState"].forEach(function(n){var f=history[n];if(!f)return;history[n]=function(){var r=f.apply(this,arguments);setTimeout(send,0);return r;};});
-window.addEventListener("popstate",send);window.addEventListener("hashchange",send);send();
-})();</script>
+<!-- REMOVED: MiniMax page-view tracker. It POSTed the path of
+     every page to agent.minimax.io on every visitor. -->
+<!-- REMOVED: script -->
 <!-- CSS → assets/octa.css -->
-<div id="minimax-floating-ball">
-  <div class="minimax-ball-content">
-    <div class="minimax-logo-wave"></div>
-    <span class="minimax-ball-text">Created by MiniMax Agent</span>
-  </div>
-  <div class="minimax-close-icon">×</div>
-</div>
+<!-- REMOVED: floating ball -->
 <!-- JS → assets/js/octa-pages.js -->
 
     <!-- ════════ PHASE 18: لوحة التحكم ════════ -->
@@ -1031,18 +1008,18 @@ window.addEventListener("popstate",send);window.addEventListener("hashchange",se
     </div>
   </div>
 
-<script src="assets/js/octa-api.js?v=2026107979"></script>
-<script src="assets/js/octa-config.js?v=2026107979"></script>
-<script src="assets/js/octa-core.js?v=2026107979"></script>
-<script src="assets/js/octa-dev.js?v=2026107979"></script>
-<script src="assets/js/octa-clock.js?v=2026107979"></script>
-<script src="assets/js/octa-screener.js?v=2026107979"></script>
-<script src="assets/js/octa-chart.js?v=2026107979"></script>
-<script src="assets/js/octa-pages.js?v=2026107979"></script>
-<script src="assets/js/octa-app.js?v=2026107979"></script>
-<script src="assets/js/octa-filters.js?v=2026107979"></script>
-<script src="assets/js/octa-watch.js?v=2026107979"></script>
-<script src="assets/js/octa-decide.js?v=2026107979"></script>
+<script src="assets/js/octa-api.js?v=2026109648"></script>
+<script src="assets/js/octa-config.js?v=2026109648"></script>
+<script src="assets/js/octa-core.js?v=2026109648"></script>
+<script src="assets/js/octa-dev.js?v=2026109648"></script>
+<script src="assets/js/octa-clock.js?v=2026109648"></script>
+<script src="assets/js/octa-screener.js?v=2026109648"></script>
+<script src="assets/js/octa-chart.js?v=2026109648"></script>
+<script src="assets/js/octa-pages.js?v=2026109648"></script>
+<script src="assets/js/octa-app.js?v=2026109648"></script>
+<script src="assets/js/octa-filters.js?v=2026109648"></script>
+<script src="assets/js/octa-watch.js?v=2026109648"></script>
+<script src="assets/js/octa-decide.js?v=2026109648"></script>
 <!-- 🛠️ أدوات المطوّر — بتظهر بالمصادفة ولا ما فيش زرار عادي -->
 <div class="octa-devbar">
   <button class="dev-hidden-gate" onclick="OCTADev.toggle()"
