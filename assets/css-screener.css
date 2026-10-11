@@ -631,3 +631,10 @@ html[data-dev="1"] .octa-devbar::after {
 .sv-exa b {
   color: var(--gold);
 }
+
+/* كارتات الشرح — سطر تاني فاضي قبل <br> */
+.sv-grid > div > span b {
+  display: inline-block;
+  color: var(--gold);
+  margin-bottom: 2px;
+}
