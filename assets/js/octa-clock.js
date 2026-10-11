@@ -17,13 +17,13 @@
 
   /* ⏱️ كل حالة بتاخد period بالثواني + لون + إيموجي */
   var STATES = {
-    preOpen:    { e: '🔎', c: '#ffd43b', p: 15000, open: false, live: true,  t: 'حجم كبير' },
-    disc:       { e: '🟡', c: '#ffd43b', p: 20000, open: true,  live: true,  t: 'استكشافية' },
-    cont:       { e: '🟢', c: '#51cf66', p: 15000, open: true,  live: true,  t: 'تداول مستمر' },
-    closeAuc:   { e: '⚡', c: '#ffa94d', p: 8000,  open: true,  live: true,  t: 'مزاد الإغلاق' },
-    closePrice: { e: '🔔', c: '#ff8787', p: 8000,  open: true,  live: true,  t: 'سعر الإغلاق' },
-    pre:        { e: '🔵', c: '#4dabf7', p: 120000, open: false, live: false, t: 'قبل الافتتاح' },
-    post:       { e: '🌙', c: '#868e96', p: 300000, open: false, live: false, t: 'بعد الإغلاق' },
+    preOpen:    { e: '🔎', c: '#ffd43b', p: 8000, open: false, live: true,  t: 'حجم كبير' },
+    disc:       { e: '🟡', c: '#ffd43b', p: 8000, open: true,  live: true,  t: 'استكشافية' },
+    cont:       { e: '🟢', c: '#51cf66', p: 5000, open: true,  live: true,  t: 'تداول مستمر' },
+    closeAuc:   { e: '⚡', c: '#ffa94d', p: 4000,  open: true,  live: true,  t: 'مزاد الإغلاق' },
+    closePrice: { e: '🔔', c: '#ff8787', p: 4000,  open: true,  live: true,  t: 'سعر الإغلاق' },
+    pre:        { e: '🔵', c: '#4dabf7', p: 60000, open: false, live: false, t: 'قبل الافتتاح' },
+    post:       { e: '🌙', c: '#868e96', p: 60000, open: false, live: false, t: 'بعد الإغلاق' },
     closed:     { e: '🔴', c: '#868e96', p: 900000, open: false, live: false, t: 'عطلة' },
   };
 
