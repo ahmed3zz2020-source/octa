@@ -307,7 +307,47 @@ const CALCS = {
   }
 };
 
+/* ══════════════════════════════════════════════════════════════
+   📊 تتبع الاستخدام — نعرف الناس بتعمل إيه فعلاً
+   ──────────────────────────────────────────────────────────────
+   بيبعت لنا اسم الصفحة أو اسم السهم — مش IP ولا إيميل.
+   الهدف: نعرف نطوّر إيه الأول، مش نراقب الناس.
+   ══════════════════════════════════════════════════════════════ */
+function octaTrack(event, page, label) {
+  try {
+    // ⛔ مبنعتش لو المستخدم رفض التتبع
+    if (localStorage.getItem('octa_no_track') === '1') return;
+    // ⛔ مبنعتش في التطوير — عشان الأرقام تنضف
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
+
+    var body = JSON.stringify({
+      event: event || 'page_view',
+      page: String(page || '').slice(0, 32),
+      label: String(label || '').slice(0, 24),
+      uid: (window.OCTA_USER_ID || '')
+    });
+    // ⛔ no-cors + بدون بيانات حساسة
+    fetch(OCTA_API + '/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body,
+      keepalive: true,
+      mode: 'cors'
+    }).catch(function () { });
+  } catch (e) { }
+}
+
+/* إخفاء/إظهار شريط التتبع — عشان المستخدم يقدر يوقف التتبع */
+function octaTrackConsent(on) {
+  try {
+    if (on === false) localStorage.setItem('octa_no_track', '1');
+    else localStorage.removeItem('octa_no_track');
+  } catch (e) { }
+}
+
 function switchPage(id) {
+  // 📊 نسجّل فتح الصفحة — عشان نعرف الصفحات الأكثر استخدامًا
+  octaTrack('page_view', id);
   // ملاحظة: صفحة «الأسهم» بقت مستقلة (285 سهم) — التحويل القديم للبحث اتشال
   // if (id === 'stocks') id = 'search';
 
