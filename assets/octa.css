@@ -4662,3 +4662,112 @@ body{margin:0;padding:0 10px 50px;
   .au-bar { font-size: .7rem; padding: 5px 10px; top: 8px; left: 8px; }
   .au-box { padding: 22px 16px 18px; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   🚪 بوابة الدخول
+   ══════════════════════════════════════════════════════════════ */
+#gate {
+  background: var(--bg, #0b0e14) !important;
+}
+.gt-box {
+  width: 100%;
+  max-width: 400px;
+  padding: 30px 26px 24px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card, #141821);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, .5);
+}
+.gt-logo {
+  font-size: 3.2rem;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+.gt-h {
+  margin: 0 0 5px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -.4px;
+}
+.gt-sub {
+  margin: 0 0 22px;
+  font-size: .85rem;
+  color: var(--muted);
+}
+.gt-in {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  font-size: .9rem;
+  font-family: inherit;
+  color: var(--text);
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  outline: none;
+  text-align: right;
+}
+.gt-in:focus { border-color: var(--gold); }
+.gt-txt {
+  margin: 0 0 13px;
+  font-size: .82rem;
+  color: var(--muted);
+  line-height: 1.75;
+}
+.gt-msg {
+  min-height: 1.4em;
+  margin: 9px 0;
+  font-size: .79rem;
+  line-height: 1.7;
+}
+.gt-go {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 13px;
+  font-size: .93rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: #0d1117;
+  background: var(--gold);
+  border: none;
+  border-radius: 11px;
+  cursor: pointer;
+}
+.gt-go:disabled { opacity: .55; cursor: wait; }
+.gt-go.alt {
+  margin-top: 9px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+  font-weight: 600;
+}
+.gt-back {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px;
+  font-size: .78rem;
+  font-family: inherit;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.gt-back:hover { color: var(--gold); }
+.gt-note {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+  font-size: .71rem;
+  color: var(--muted);
+  opacity: .85;
+  line-height: 1.8;
+}
+@media (max-width: 480px) {
+  .gt-box { padding: 24px 18px 20px; }
+  .gt-h { font-size: 1.3rem; }
+  .gt-logo { font-size: 2.7rem; }
+}
