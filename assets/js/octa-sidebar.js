@@ -12,11 +12,14 @@
 
   /* ── المجموعات ──
      مرتبة حسب اللي المستثمر بيدور عليه، مش حسب الترتيب القديم */
+  /* ⚠️ الـsidebar بيقرأ من ALL_TOOLS (ال15) — مش من الـtoolbar (8).
+     الشاشة الرئيسية = 8، والقائمة = كل حاجة. */
   const GROUPS = [
-    { id:'g1', n:'الأساسيات', i:'📌', tools:['decide','verdict','pick','bestpick'] },
-    { id:'g2', n:'الأدوات',   i:'🛠️', tools:['filter','screener','stocks','search','compare'] },
-    { id:'g3', n:'البيانات',  i:'📊', tools:['dividends','news','octasearch'] },
-    { id:'g4', n:'التعلّم',   i:'🎓', tools:['academy','engine','arms','calc'] },
+    { id:'g0', n:'الشاشة الرئيسية', i:'⭐', tools:['stocks','arms','engine','octasearch','dividends','pick','filter','screener'] },
+    { id:'g1', n:'القرارات',      i:'🎯', tools:['decide','verdict','bestpick'] },
+    { id:'g2', n:'المقارنة والبحث', i:'⚖️', tools:['compare'] },
+    { id:'g3', n:'أدوات',        i:'🧮', tools:['calc'] },
+    { id:'g4', n:'محتوى',        i:'📰', tools:['news','academy'] },
   ];
 
   /* ⛌ الافتراضي كان مقفول — أول مرة المستخدم بيفتح الموقع
@@ -25,6 +28,13 @@
 let OPEN = localStorage.getItem('octa_sidebar') !== '0';
 
   function allTools(){
+    /* ⛔ الـtoolbar دلوقتي 8 أدوات بس، بس الـsidebar عايز الـ15.
+       فبنقرأ من ALL_TOOLS مباشرة — المصدر واحد ومكانه واحد. */
+    try {
+      if (typeof ALL_TOOLS !== 'undefined' && ALL_TOOLS.length) {
+        return ALL_TOOLS.map(t => ({ id:t.id, i:t.i, n:t.n, d:t.d, modal:t.modal }));
+      }
+    } catch (e) {}
     const el = document.getElementById('toolbar');
     if (!el) return [];
     return Array.from(el.querySelectorAll('.tool-btn')).map(b => ({
