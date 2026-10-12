@@ -229,7 +229,39 @@
       }
     } catch (e) { }
 
+    // ── عنده توكن؟ يفتح على طول ──
+    // بدون ده، أي refresh بيرجّعك لشاشة الدخول
+    // حتى لو متسجل دخول فعلاً.
+    if (token()) {
+      shut();
+      verify();
+      return;
+    }
+
     welcome();
     open();
   });
+
+  /* التأكد إن التوكن لسه صالح — لو مش كده نرجع للب��ابة */
+  function verify() {
+    var t = token();
+    if (!t) { welcome(); open(); return; }
+    fetch(apiBase() + '/api/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + t }
+    }).then(function (r) {
+      if (r.status === 401) {
+        try {
+          localStorage.removeItem('octa_token');
+          localStorage.removeItem('octa_user');
+          window.OCTA_USER_ID = '';
+        } catch (e) { }
+        welcome();
+        open();
+      }
+      return null;
+    }).catch(function () {
+      // ⛔ الشبكة مش متاحة — مش معناها التوكن غلط.
+      //    نسيبه زي ما هو وما نعملش logout بالغلط.
+    });
+  }
 })();
