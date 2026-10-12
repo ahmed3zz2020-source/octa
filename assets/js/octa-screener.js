@@ -877,7 +877,16 @@
      *    فطلع «(RSI)» كـ «(' RSI')» — علامات غلط.
      *    كلمة إنجليزية لازم تبدأ بحرف وتخلص قبل أي رمز غير إنجليزي.
      */
-    const RE = /\b[A-Za-z][A-Za-z0-9]*(?:[./][A-Za-z0-9]+)*\b/g;
+    /*
+     * الـregex بياخد الكلمة مع الأقواس اللي حواليها (اختيارياً).
+     * ده مهم: «(RSI)» بتتفلو كوحدة واحدة. لو لفّينا الكلمة لوحدها
+     * والأقواس برّه، المتصفح بيرتّب الأقواس على ناحية وتسبب
+     * «(RSI )أو» و«(OCTA» ناقصة.
+     *
+     * (?<![\w])|(?![\w]) — بنمنع الكلمة من جوه كلمة تانية،
+     * وtrim() عشان المسافات جوه الأقواس ماتبقاش جوه الـbdi.
+     */
+    const RE = /[\(\[]?\s*([A-Za-z][A-Za-z0-9]*(?:[.\/][A-Za-z0-9]+)*)\s*[\)\]]?/g;
     /* ['<tag>' | '&entity;' | 'نص'] — الـcapture بيخليهم يتقروا منفصلين.
        (?:amp;)? عشان كيان زي «&gt;» بعد الـescape بيبقى «&amp;gt;» */
     return String(text)
@@ -886,7 +895,17 @@
         if (!part) return '';
         const c = part.charAt(0);
         if (c === '<' || c === '&') return part;   /* تاج أو كيان — نلمسهوش */
-        return part.replace(RE, '<bdi>$&</bdi>');
+        /*
+         * ⛔ الكلمة لازم تكون «مستقلة» — يعني surrounded بمسافة أو
+         *    حد الجملة. لو ملزوقة بحرف عربي على جنبها (زي «تunderlying»)
+         *    نسيبها زي ما هي بدل ما نقطعها في النص.
+         */
+        return part.replace(RE, function (m, off, str) {
+          const before = off > 0 ? str[off - 1] : ' ';
+          const after = (off + m.length < str.length) ? str[off + m.length] : ' ';
+          if (/[\u0600-\u06FF]/.test(before) || /[\u0600-\u06FF]/.test(after)) return m;
+          return '<bdi>' + m.trim() + '</bdi>';
+        });
       })
       .join('');
   }
