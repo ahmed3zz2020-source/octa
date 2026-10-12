@@ -19,7 +19,10 @@
     { id:'g4', n:'التعلّم',   i:'🎓', tools:['academy','engine','arms','calc'] },
   ];
 
-  let OPEN = localStorage.getItem('octa_sidebar') === '1';
+  /* ⛌ الافتراضي كان مقفول — أول مرة المستخدم بيفتح الموقع
+   مش بيشوف الـsidebar خالص، واللي بيتعلمه إن «مفيش حاجة دي».
+   دلوقتي: مفتوح افتراضياً إلا لو المستخدم قفله بنفسه. */
+let OPEN = localStorage.getItem('octa_sidebar') !== '0';
 
   function allTools(){
     const el = document.getElementById('toolbar');
