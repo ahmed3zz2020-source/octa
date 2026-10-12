@@ -843,8 +843,29 @@
   /* gl — الكارت: العنوان + الشرح
      ملاحظة: الوصف د (d) مسموح فيه HTML (b/br) عشان «يعني إيه؟» يبان سطر لوحده
      بس لازم نهرّب أي نص جاي من الداتا — عشان كده بنعمل split */
+  /* ──────────────────────────────────────────────────────────
+   *  عزل النص الإنجليزي عن العربي
+   *  ──────────────────────────────────────────────────────────
+   *  المشكلة: سطر فيه عربي + إنجليزي بيتلخبط. القارئ
+   *  مش بعرف فين الجملة العربية خلصت والإنجليزي بدأ.
+   *
+   *  الحل: <bdi> — وسم HTML قياسي بيقول للمتصفح
+   *  «تعامل مع النص ده ككتلة مستقلة»، فالترتيب
+   *  العربي يفضل سليم.
+   *
+   *  مش بنمسح الكلمة — بنخليها واضحة ومنظمة.
+   * ────────────────────────────────────────────────────────── */
+  function isolateLatin(text) {
+    /* أي كلمة إنجليزية أو اختصار (2-15 حرف) أو رقم عشرى */
+    return String(text).replace(
+      /([A-Za-z][A-Za-z0-9._/-]{1,14}(?:\s[A-Z][A-Za-z0-9._/-]{0,10})?|\d+\.\d+|\d+%)/g,
+      '<bdi>$1</bdi>'
+    );
+  }
+
   const gl = (t, d) => {
     let desc = String(d == null ? '' : d);
+    let ttl = String(t == null ? '' : t);
     /* نسمح بـ <b> و <br> بس — أي تاج تاني بيتشال بالكامل */
     if (/<(b|br)[\s/>]/i.test(desc)) {
       desc = esc(desc)
@@ -853,10 +874,11 @@
       /* حما إضافية: نشيل أي on* handler أو javascript: */
       desc = desc.replace(/on[a-z]+\s*=\s*(['"])?[^'"\s>]+\1/gi, '');
       desc = desc.replace(/javascript\s*:/gi, '');
+      desc = isolateLatin(desc);
     } else {
-      desc = esc(desc);
+      desc = isolateLatin(esc(desc));
     }
-    return '<div class="sv-g"><b>' + esc(t) + '</b><span>' + desc + '</span></div>';
+    return '<div class="sv-g"><b>' + isolateLatin(esc(ttl)) + '</b><span>' + desc + '</span></div>';
   };
 
   const abR = (a, b) => '<div class="sv-ab-r"><b>' + esc(a) + '</b><span>' + esc(b) + '</span></div>';
