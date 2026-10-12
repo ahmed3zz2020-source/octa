@@ -301,6 +301,13 @@ td.sn {
   padding: 15px 17px; cursor: pointer; user-select: none;
   font: 800 .86rem system-ui, sans-serif; color: var(--gold);
 }
+/* ⚠️ القاعدة الناقدة: من غيرها المحتوى بيفضل مخفي حتى لو الكارت
+   اتفتح. الـJS بيحط .open على الأب، بس مافيش قاعدة بتقول
+   «اظهر الابن» — فالكارت بيتفتح في_INTERFACE بس ما بيملاش.
+   ⛔ دي آخر حاجة كانت بتخلي المستخدم يقفل «مفيش حاجة بتتغير». */
+.sv-about.open .sv-about-b { display: block !important; }
+.sv-about:not(.open) .sv-about-b { display: none !important; }
+.sv-about.open { height: auto !important; }
 .sv-about-h:hover { background: rgba(255,255,255,.02); }
 .sv-about-h b { font-size: .8rem; }
 .sv-about-b { padding: 0 17px 17px; }
