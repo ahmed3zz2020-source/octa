@@ -1064,7 +1064,7 @@ document.addEventListener('click', e => {
 });
 
 
-// ============ 🐙 OCTA AI ENGINE (Gemini) ============
+// ============ 🐙 OCTA ANALYSIS ENGINE ============
 let AI_LOADING = false;
 
 function renderAiLoading(code) {
@@ -1075,7 +1075,7 @@ function renderAiLoading(code) {
       <div style="text-align:center;padding:30px 16px;">
         <div style="font-size:2.6rem;animation:pulse 1.4s ease-in-out infinite;">🐙</div>
         <div style="color:var(--sec2);font-weight:800;margin-top:12px;">OCTA بيفكّر في ${code}...</div>
-        <div style="color:var(--muted);font-size:0.84rem;margin-top:6px;">Gemini AI بيحلل 8 محاور</div>
+        <div style="color:var(--muted);font-size:0.84rem;margin-top:6px;">محرك OCTA بيحلل ٨ محاور</div>
       </div>`;
   }
   if (dec) dec.innerHTML = '';
@@ -1125,7 +1125,7 @@ function renderAiError(code, msg) {
         <button onclick="AI_LOADING=false; fetchAiAnalysis('${code}')" style="margin-top:12px;background:rgba(212,175,55,0.2);color:var(--gold);padding:8px 18px;border-radius:100px;border:1px solid var(--gold);font-weight:700;font-size:0.82rem;cursor:pointer;">🔄 جرّب تاني</button>
       </div>`;
   }
-  if (dec) dec.innerHTML = `<div style="text-align:center;color:var(--muted);font-size:0.8rem;padding:10px;">🤖 تحليل Gemini بياخد ثواني — استنى أو اضغط Retry</div>`;
+  if (dec) dec.innerHTML = `<div style="text-align:center;color:var(--muted);font-size:0.8rem;padding:10px;">⏳ محرك OCTA بيحلل — استنى — استنى أو اضغط Retry</div>`;
 }
 
 function renderAiResult(code, d) {
@@ -1146,7 +1146,7 @@ function renderAiResult(code, d) {
     source: 'AI'
   }));
 
-  // السعر الحقيقي من TradingView/LIVE_PRICES إن وُجد، وإلا سعر Gemini
+  // السعر الحقيقي من TradingView/LIVE_PRICES إن وُجد، وإلا سعر محرك OCTA
   const live = LIVE_PRICES[code];
   const price = (live && live.price > 0) ? live.price : d.price;
   const change = (live && live.price > 0) ? live.change : d.change;
@@ -1155,7 +1155,7 @@ function renderAiResult(code, d) {
 }
 
 function renderEngine() {
-  // شغّل تحليل Gemini للسهم الحالي
+  // شغّل تحليل محرك OCTA للسهم الحالي
   const code = currentEngineSymbol;
   if (code) {
     fetchAiAnalysis(code);
@@ -1184,7 +1184,7 @@ function analyzeStock(code) {
   const titleEl = document.querySelector('.engine-title');
   const subEl = document.querySelector('.engine-sub');
   if (titleEl) titleEl.textContent = `تحليل سهم: ${code}`;
-  if (subEl) subEl.textContent = `${name} • EGX:${code} • تحليل Gemini AI`;
+  if (subEl) subEl.textContent = `${name} • EGX:${code} • تحليل محرك OCTA`;
   currentEngineSymbol = code;
   renderEngine();
   if (typeof loadEngineTVWidgets === 'function') loadEngineTVWidgets(code);
@@ -2342,7 +2342,7 @@ const ENGINE_AXES = [
 function loadEngineTVWidgets(symbol) {
   console.log('📊 loadEngineTVWidgets:', symbol);
   currentEngineSymbol = symbol;
-  // اجيب الأسعار الأول (عشان ندمجها) — وبعدين شغّل Gemini
+  // اجيب الأسعار الأول (عشان ندمجها) — وبعدين شغّل محرك OCTA
   fetchLivePrices().then(() => fetchAiAnalysis(symbol));
   const tvSymbol = 'EGX:' + symbol;
   // Clean previous
@@ -2394,7 +2394,7 @@ function updateEnginePriceBox(symbol) {
   chg.textContent = 'EGX:' + symbol;
   chg.className = 'price-change up';
 
-  // الـ 8 محاور — من Gemini AI (مش hash عشوائي)
+  // الـ 8 محاور — من محرك OCTA AI (مش hash عشوائي)
   fetchAiAnalysis(symbol);
 }
 
@@ -2506,7 +2506,7 @@ function renderEngineBars(scores, finalScore, extra) {
     </div>` : ''}
 
     <div style="color:var(--muted);font-size:0.72rem; text-align:center;">
-      🤖 تحليل Gemini AI (${d.model || 'gemini'})${d.cached ? ' • مُخزّن' : ''} • ${d.sector || ''}
+      🤖 تحليل محرك OCTA (${d.model || 'octa'})${d.cached ? ' • مُخزّن' : ''} • ${d.sector || ''}
     </div>
   `;
 }

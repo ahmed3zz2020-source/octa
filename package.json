@@ -5,7 +5,7 @@
   "description": "🐙 OCTA — منصة تحليل أسهم عربية (مصر/أمريكا/السعودية/الإمارات)",
   "scripts": {
     "bump": "node bump-cache.js",
-    "build": "npm run bump && rm -rf dist && mkdir -p dist && cp index.html *.json dist/ && cp -r assets dist/assets && cp -r data dist/data && cp -r docs dist/docs && rm -f dist/package*.json",
+    "build": "npm run bump && rm -rf dist && mkdir -p dist && cp index.html *.json dist/ && cp -r assets dist/assets && cp -r data dist/data && rm -f dist/package*.json",
     "deploy": "npm run build && wrangler deploy",
     "dev": "wrangler dev"
   },
