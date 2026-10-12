@@ -493,6 +493,10 @@ function buildToolbar(){
       <span class="tb-i">${t.i}</span><span class="tb-n">${t.n}</span>
     </button>`
   ).join('');
+
+  /* 🧰 العدّاد على زرار الطي — المستخدم يعرف قد إيه أداة قبل ما يفتح */
+  const c = document.getElementById('mtCount');
+  if (c) c.textContent = String(list.length);
 }
 
 /* ══════ لوحة الترتيب ══════ */
