@@ -6,7 +6,10 @@ const now = String(Date.now()).slice(-8);
 const stamp = `2026${new Date().toISOString().slice(5, 7).replace('-', '')}${now.slice(-4)}`;
 
 // 1) الـmarker جوه السكربت
-h = h.replace(/BUILD = 'v=' \+ '[^']*'/, `BUILD = 'v=${stamp}'`);
+// ⛔ الـregex القديم كان بيتوقع 'v=' + 'xxx' بس الكود كاتبه
+//    'v=2026101806' + 'dd' — يعني ماكانش بيلقط.
+//    دلوقتي بنمسح أي قيمة وندّيله الرقم الجديد.
+h = h.replace(/var BUILD = '[^']*'(\s*\+\s*'[^']*')?;/, `var BUILD = 'v=${stamp}';`);
 
 // 2) كل الـquery strings في الوسوم
 h = h.replace(/(\?v=)[0-9a-zA-Z]+/g, `$1${stamp}`);
