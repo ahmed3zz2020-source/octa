@@ -746,7 +746,7 @@ function renderDashboard(d) {
 
     '<div class="dash-grid" style="grid-template-columns:1fr 1fr">' +
       '<div class="why-box"><div class="dash-h">🎯 توزيع القرارات</div>' +
-        dist(d.decisions || {}, {'تجميع':'buy','شراء':'buy','احتفظ':'hold','بيع':'sell','تجنّب':'sell'}) + '</div>' +
+        dist(d.decisions || {}, {'إشارة إيجابية':'buy','شراء':'buy','إشارة محايدة':'hold','إشارة سلبية':'sell','إشارة سلبية':'sell'}) + '</div>' +
       '<div class="why-box"><div class="dash-h">⚠️ توزيع المخاطر</div>' +
         dist(d.risk_levels || {}, {'منخفض':'low','متوسط':'mid','مرتفع':'high','مرتفع جداً':'vhigh'}) + '</div>' +
     '</div>' +
@@ -1615,10 +1615,10 @@ function initVerdictCard(){
 
 /* ══════════ كارت قرار OCTA — القرار الحي للسوق ككل ══════════ */
 const VC_DEC = {
-  'تجميع':  { c:'#16c79a', bg:'rgba(22,199,154,.16)' },
+  'إشارة إيجابية':  { c:'#16c79a', bg:'rgba(22,199,154,.16)' },
   'شراء':   { c:'#16c79a', bg:'rgba(22,199,154,.16)' },
-  'احتفظ':  { c:'#4dabf7', bg:'rgba(77,171,247,.16)' },
-  'بيع':    { c:'#ff8a80', bg:'rgba(255,82,82,.16)' },
+  'إشارة محايدة':  { c:'#4dabf7', bg:'rgba(77,171,247,.16)' },
+  'إشارة سلبية':    { c:'#ff8a80', bg:'rgba(255,82,82,.16)' },
   'تجنب':   { c:'#ff5252', bg:'rgba(255,82,82,.16)' }
 };
 const VC_AXES = [
@@ -1633,8 +1633,8 @@ function buildOctaVerdictCard(d, results) {
   const ax  = (d && d.axis_average) || {};
   const h   = (d && d.health) || {};
 
-  const cnt = { 'تجميع': dec['تجميع'] || dec['شراء'] || 0, 'احتفظ': dec['احتفظ'] || 0, 'بيع': dec['بيع'] || 0 };
-  const tot = cnt['تجميع'] + cnt['احتفظ'] + cnt['بيع'];
+  const cnt = { 'إشارة إيجابية': dec['إشارة إيجابية'] || dec['شراء'] || 0, 'إشارة محايدة': dec['إشارة محايدة'] || 0, 'إشارة سلبية': dec['إشارة سلبية'] || 0 };
+  const tot = cnt['إشارة إيجابية'] + cnt['إشارة محايدة'] + cnt['إشارة سلبية'];
 
   // القرار العام = نص النتيجة النهائية
   const final = Number(ax.final != null ? ax.final : 0);
@@ -1654,13 +1654,13 @@ function buildOctaVerdictCard(d, results) {
   let dist = '';
   if (tot > 0) {
     dist = '<div class="vc-dist">' +
-      '<i style="width:' + (cnt['تجميع']/tot*100) + '%;background:#16c79a"></i>' +
-      '<i style="width:' + (cnt['احتفظ']/tot*100) + '%;background:#4dabf7"></i>' +
-      '<i style="width:' + (cnt['بيع']/tot*100) + '%;background:#ff5252"></i>' +
+      '<i style="width:' + (cnt['إشارة إيجابية']/tot*100) + '%;background:#16c79a"></i>' +
+      '<i style="width:' + (cnt['إشارة محايدة']/tot*100) + '%;background:#4dabf7"></i>' +
+      '<i style="width:' + (cnt['إشارة سلبية']/tot*100) + '%;background:#ff5252"></i>' +
     '</div><div class="vc-legend">' +
-      '<span>🟢 تجميع <b style="color:#16c79a">' + cnt['تجميع'] + '</b></span>' +
-      '<span>🔵 احتفظ <b style="color:#4dabf7">' + cnt['احتفظ'] + '</b></span>' +
-      '<span>🔴 بيع <b style="color:#ff8a80">' + cnt['بيع'] + '</b></span>' +
+      '<span>🟢 تجميع <b style="color:#16c79a">' + cnt['إشارة إيجابية'] + '</b></span>' +
+      '<span>🔵 احتفظ <b style="color:#4dabf7">' + cnt['إشارة محايدة'] + '</b></span>' +
+      '<span>🔴 بيع <b style="color:#ff8a80">' + cnt['إشارة سلبية'] + '</b></span>' +
       '<span>· الإجمالي <b>' + tot + '</b></span>' +
     '</div>';
   }
@@ -1957,7 +1957,7 @@ async function armTechnical(box) {
 
   box.innerHTML =
     '<div class="ic-grid" style="--ac:#22c55e">' +
-    ic('🎯', 'تركيب فني إيجابي', 'أسهم قرارها "تجميع" من التحليل الفني',
+    ic('🎯', 'تركيب فني إيجابي', 'أسهم قرارها "إشارة إيجابية" من التحليل الفني',
       `<span>${setups.length} سهم</span>`,
       icRows(setups)) +
 
@@ -4113,8 +4113,8 @@ function renderBullBear(dash, ticker) {
   const dec = dash.decisions || {};
   const aa = dash.axis_average || {};
   const total = Object.values(dec).reduce((a,b)=>a+b,0) || 1;
-  const bulls = (dec['تجميع']||0) + (dec['احتفظ']||0) * 0.5;
-  const bears = (dec['بيع']||0) + (dec['غير كافٍ']||0) * 0.3 + (dec['تجنّب']||0) * 0.7;
+  const bulls = (dec['إشارة إيجابية']||0) + (dec['إشارة محايدة']||0) * 0.5;
+  const bears = (dec['إشارة سلبية']||0) + (dec['غير كافٍ']||0) * 0.3 + (dec['إشارة سلبية']||0) * 0.7;
   const sentimentPart = (bulls - bears) / total;
   const pricePart = ((aa.final || 50) - 50) / 50;
   const safetyPart = ((aa.safety || 50) - 50) / 50;

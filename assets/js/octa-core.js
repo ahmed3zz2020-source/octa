@@ -963,10 +963,10 @@ function octaTop(){
   if (!top.length) { box.innerHTML = '<div class="os-empty">مفيش أسهم في القسم ده.</div>'; return; }
   box.innerHTML = top.map(s => {
     const col = octaCol(s.score >= CFG.th.safe ? 1 : (s.score >= CFG.th.mid ? 0 : -1));
-    const dc = s.decision.includes('تجميع')||s.decision.includes('شراء') ? 'var(--sec)'
-             : s.decision.includes('بيع')||s.decision.includes('تجنّب') ? 'var(--red2)' : 'var(--sec2)';
-    const dbg = s.decision.includes('تجميع')||s.decision.includes('شراء') ? 'rgba(22,199,154,.16)'
-             : s.decision.includes('بيع')||s.decision.includes('تجنّب') ? 'rgba(255,82,82,.16)' : 'rgba(77,171,247,.16)';
+    const dc = s.decision.includes('إشارة إيجابية')||s.decision.includes('شراء') ? 'var(--sec)'
+             : s.decision.includes('إشارة سلبية')||s.decision.includes('إشارة سلبية') ? 'var(--red2)' : 'var(--sec2)';
+    const dbg = s.decision.includes('إشارة إيجابية')||s.decision.includes('شراء') ? 'rgba(22,199,154,.16)'
+             : s.decision.includes('إشارة سلبية')||s.decision.includes('إشارة سلبية') ? 'rgba(255,82,82,.16)' : 'rgba(77,171,247,.16)';
     return '<div class="os-card" onclick="octaPick(\'' + s.code + '\')">' +
       '<div class="os-c-code">' + octaEsc(s.code) + '</div>' +
       '<div class="os-c-name">' + octaEsc(s.name) + '</div>' +
@@ -2464,9 +2464,9 @@ function renderEngineBars(scores, finalScore, extra) {
   const d = extra.d;
   const DEC_MAP = {
     'شراء': { icon: '✅', cls: '#16c79a' },
-    'تجميع': { icon: '🟡', cls: '#f4d03f' },
-    'احتفظ': { icon: '🔵', cls: '#4dabf7' },
-    'بيع': { icon: '🔴', cls: '#ff8a80' },
+    'إشارة إيجابية': { icon: '🟡', cls: '#f4d03f' },
+    'إشارة محايدة': { icon: '🔵', cls: '#4dabf7' },
+    'إشارة سلبية': { icon: '🔴', cls: '#ff8a80' },
     'تجنب': { icon: '⛔', cls: '#ff5252' }
   };
   const decMeta = DEC_MAP[d.decision] || { icon: '🐙', cls: '#d4af37' };

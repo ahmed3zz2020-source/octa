@@ -54,7 +54,7 @@ const FILTERS={
   egypt:[
     {id:'all',  t:'الكل {n}'},
     {id:'buy',  t:'تجميع / شراء'},
-    {id:'hold', t:'احتفظ'},
+    {id:'hold', t:'إشارة محايدة'},
     {id:'sell', t:'بيع / تجنّب'},
     {id:'high', t:'أعلى نتيجة'},
     {id:'safe', t:'الأكثر أمانًا'},
@@ -63,7 +63,7 @@ const FILTERS={
   us:[
     {id:'all',   t:'الكل'},
     {id:'buy',   t:'تجميع / شراء'},
-    {id:'hold',  t:'احتفظ'},
+    {id:'hold',  t:'إشارة محايدة'},
     {id:'sell',  t:'بيع / تجنّب'},
     {id:'high',  t:'أعلى نتيجة'},
     {id:'safe',  t:'الأكثر أمانًا'},
@@ -179,9 +179,9 @@ function scoreUS(d){
 }
 function verdictOf(x){
   if(x>=65)return['تجميع / شراء','b-buy'];
-  if(x>=50)return['احتفظ','b-hold'];
+  if(x>=50)return['إشارة محايدة','b-hold'];
   if(x>=40)return['متابعة / متردد','b-hold'];
-  return['تجنّب','b-sell'];
+  return['إشارة سلبية','b-sell'];
 }
 
 /* ══════════ الرسم ══════════ */
@@ -876,7 +876,7 @@ function scoreUSFull(d){
 
 function recTxt(r){
   return r>0.5?'شراء قوي' : r>0.2?'شراء' : r>0.05?'شراء محايد' : r> -0.05?'محايد'
-    : r> -0.2?'بيع' : r> -0.5?'بيع' : 'بيع قوي';
+    : r> -0.2?'إشارة سلبية' : r> -0.5?'إشارة سلبية' : 'بيع قوي';
 }
 const W_US_FEEL=10;
 
@@ -1946,7 +1946,7 @@ async function pickAuto(){
   let list = [];
   try {
     const r = await fetch(OCTA_API + '/api/rank?limit=10&decision='
-      + encodeURIComponent('تجميع') + '&_=' + Date.now())
+      + encodeURIComponent('إشارة إيجابية') + '&_=' + Date.now())
       .then(x => x.ok ? x.json() : null).catch(() => null);
     if (r && r.results && r.results.length){
       list = r.results.slice(0, 5).map(function(x){

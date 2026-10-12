@@ -268,7 +268,7 @@
      '<div class="dc-dist">' + Object.keys(D.market.dist).map(function (k) {
         const n = D.market.dist[k];
         const w = (n / D.market.total * 100).toFixed(0);
-        return'<span class="dc-dt' + (k ==='تجميع' ?'good' : k ==='بيع' ?'bad' :'') +'">' +
+        return'<span class="dc-dt' + (k ==='إشارة إيجابية' ?'good' : k ==='إشارة سلبية' ?'bad' :'') +'">' +
           esc(k) +' <b>' + n +'</b> <i>' + w +'%</i></span>';
       }).join('') +'</div>' +
    '</div>';
