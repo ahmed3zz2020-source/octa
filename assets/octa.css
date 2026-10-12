@@ -4915,46 +4915,32 @@ body.sb-open .sb-scrim { display: block; }
 @media (min-width: 1100px) { .sb-toggle { display: inline-flex; } }
 
 
+
 /* ══════════════════════════════════════════════════════════════
-   🧰 صف الأدوات — مفتوح، مضغوط، وصغير
+   🧰 صف الأدوات — مفتوح دايماً + عمودين فوقه
    ══════════════════════════════════════════════════════════════
-   القرار: العنوان اتشال. الزرارين بقوا كروت واحد صغير على الشمال.
-   الشريط مفتوح دايماً (الطي بيفضل متاح لمن حب يوفّر المساحة).
+   القرار: الأدوات هي الوصول السريع — فتفضل مفتوحة دايماً.
+   والعمود الفاضي اللي جنبها اتقضى: ☰ فوق و⚙️ تحته في عمود واحد.
    ══════════════════════════════════════════════════════════════ */
 
-/* ── كروت الزرارين — شمال الشريط، ارتفاع 30px بس ── */
+/* ── العمود: ☰ فوق · ⚙️ تحته ── */
 .tb-head {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 10px 3px;
+  padding: 5px 10px 4px;
   border-bottom: 1px solid var(--line);
 }
-
-.tb-fold {
+.tb-col {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 4px;
-  padding: 4px 9px;
-  font-family: inherit;
-  font-size: .9rem;
-  color: var(--gold);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  cursor: pointer;
-  transition: background .14s, border-color .14s;
+  width: 30px;
 }
-.tb-fold:hover { background: rgba(212, 175, 55, .1); border-color: rgba(212, 175, 55, .3); }
-
-/* ☰ و ⚙️ — نفس الارتفاع والتوازي بتاع 🧰 بالظبط */
 .tb-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 30px;
-  height: 30px;
-  font-size: 1rem;
+  height: 28px;
+  font-size: .95rem;
   color: var(--muted);
   background: transparent;
   border: 1px solid var(--line);
@@ -4963,55 +4949,25 @@ body.sb-open .sb-scrim { display: block; }
   transition: border-color .14s, color .14s;
 }
 .tb-btn:hover { border-color: var(--gold); color: var(--gold); }
-.tb-fold .tb-f-c {
-  font-size: .7rem;
-  transition: transform .22s cubic-bezier(.4, 0, .2, 1);
-}
-body:not(.m-tools-open) .tb-fold { opacity: .5; }
-body:not(.m-tools-open) .tb-fold .tb-f-c { transform: rotate(-90deg); }
 
-.toolbar-wrap .tool-cfg {
-  display: flex !important;
-  position: static;
-  width: 28px;
-  height: 28px;
-  align-items: center;
-  justify-content: center;
-  font-size: .9rem;
-  color: var(--muted);
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  cursor: pointer;
-  transition: border-color .14s, color .14s;
-}
-.toolbar-wrap .tool-cfg:hover { border-color: var(--gold); color: var(--gold); }
-
-/* ── الشريط — مفتوح افتراضياً، مضغوط ── */
+/* ── الشريط: مفتوح دايماً، مضغوط ── */
 .toolbar-wrap .toolbar {
   max-height: 400px;
   overflow-x: auto;
   overflow-y: hidden;
   padding: 6px 10px !important;
-  transition: max-height .24s cubic-bezier(.4, 0, .2, 1), padding .24s;
-}
-body:not(.m-tools-open) .toolbar-wrap .toolbar {
-  max-height: 0;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
 }
 
-/* ── الأزرار جواها — أصغر、高度 أقل ── */
+/* ── الأزرار جواها ── */
 .toolbar-wrap .tool-btn {
   padding: 6px 10px !important;
   font-size: .74rem !important;
   gap: 4px !important;
 }
 .toolbar-wrap .tool-btn .tb-i { font-size: .95rem !important; }
-.toolbar-wrap .tool-btn .tb-n { font-size: .74rem !important; }
 
 @media (max-width: 768px) {
-  .tb-head { padding: 4px 8px 2px; }
+  .tb-head { padding: 4px 8px 3px; }
   .toolbar-wrap .toolbar { padding: 5px 8px !important; }
   .toolbar-wrap .tool-btn { padding: 7px 9px !important; }
 }
