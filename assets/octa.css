@@ -4914,92 +4914,87 @@ body.sb-open .sb-scrim { display: block; }
    دلوقتي: ظاهر دايماً — بس على الديسكتوب بيفتح الشاشة-Rh side. */
 @media (min-width: 1100px) { .sb-toggle { display: inline-flex; } }
 
+
 /* ══════════════════════════════════════════════════════════════
-   🧰 صف الأدوات — بيتقفل عشان مياخدش ارتفاع
+   🧰 صف الأدوات — مفتوح، مضغوط، وصغير
    ══════════════════════════════════════════════════════════════
-   كان مقفول على الموبايل بس. دلوقتي على كل المقاسات —
-   الص��ف كان بياخد 70px من الشاشة الأولانية وهي أهم شاش��.
+   القرار: العنوان اتشال. الزرارين بقوا كروت واحد صغير على الشمال.
+   الشريط مفتوح دايماً (الطي بيفضل متاح لمن حب يوفّر المساحة).
    ══════════════════════════════════════════════════════════════ */
 
-/* الزر — في كل المقاسات */
-.m-tools-btn {
-  display: flex !important;
+/* ── كروت الزرارين — شمال الشريط، ارتفاع 30px بس ── */
+.tb-head {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  width: calc(100% - 24px);
-  margin: 6px 12px;
-  padding: 9px 13px;
-  font-family: inherit;
-  font-size: .82rem;
-  font-weight: 700;
-  text-align: start;
-  color: var(--muted);
-  background: var(--pri2);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  cursor: pointer;
-  transition: border-color .16s, color .16s;
+  gap: 5px;
+  padding: 5px 10px 3px;
+  border-bottom: 1px solid var(--line);
 }
-.m-tools-btn:hover { border-color: var(--gold); color: var(--gold); }
-.m-tools-btn .mt-i { flex: 1 1 auto; }
-.m-tools-btn .mt-c {
-  flex: 0 0 auto;
+
+.tb-fold {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  font-family: inherit;
   font-size: .9rem;
+  color: var(--gold);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background .14s, border-color .14s;
+}
+.tb-fold:hover { background: rgba(212, 175, 55, .1); border-color: rgba(212, 175, 55, .3); }
+.tb-fold .tb-f-c {
+  font-size: .7rem;
   transition: transform .22s cubic-bezier(.4, 0, .2, 1);
 }
-.m-tools-btn .mt-n {
-  flex: 0 0 auto;
-  min-width: 22px;
-  padding: 1px 7px;
-  font-size: .68rem;
-  text-align: center;
-  color: #0d1117;
-  background: var(--gold);
-  border-radius: 999px;
-}
-body.m-tools-open .m-tools-btn { border-color: rgba(212, 175, 55, .4); color: var(--gold); }
-body.m-tools-open .m-tools-btn .mt-c { transform: rotate(180deg); }
+body:not(.m-tools-open) .tb-fold { opacity: .5; }
+body:not(.m-tools-open) .tb-fold .tb-f-c { transform: rotate(-90deg); }
 
-/* الشريط — مقفول افتراضياً */
-.toolbar-wrap .toolbar {
-  max-height: 0;
-  overflow: hidden;
-  padding: 0 !important;
-  order: 2;
-  transition: max-height .28s cubic-bezier(.4, 0, .2, 1);
-}
-body.m-tools-open .toolbar-wrap .toolbar {
-  max-height: 210px;
-  overflow-x: auto;
-  overflow-y: auto;
-  padding: 2px 12px 10px !important;
-}
-
-/* ⚙️ ترتيب الأدوات — جنب الزر على اليمين */
 .toolbar-wrap .tool-cfg {
   display: flex !important;
-  position: absolute;
-  top: 6px;
-  inset-inline-end: 12px;
-  width: 36px;
-  height: 36px;
+  position: static;
+  width: 28px;
+  height: 28px;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  font-size: .9rem;
   color: var(--muted);
-  background: var(--pri2);
+  background: transparent;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 7px;
   cursor: pointer;
-  z-index: 2;
+  transition: border-color .14s, color .14s;
 }
 .toolbar-wrap .tool-cfg:hover { border-color: var(--gold); color: var(--gold); }
 
-/* ⛔ على الموبايل كان فيه قواعد قديمة بتلغي كل ده — نشيلها */
+/* ── الشريط — مفتوح افتراضياً، مضغوط ── */
+.toolbar-wrap .toolbar {
+  max-height: 400px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 10px !important;
+  transition: max-height .24s cubic-bezier(.4, 0, .2, 1), padding .24s;
+}
+body:not(.m-tools-open) .toolbar-wrap .toolbar {
+  max-height: 0;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ── الأزرار جواها — أصغر、高度 أقل ── */
+.toolbar-wrap .tool-btn {
+  padding: 6px 10px !important;
+  font-size: .74rem !important;
+  gap: 4px !important;
+}
+.toolbar-wrap .tool-btn .tb-i { font-size: .95rem !important; }
+.toolbar-wrap .tool-btn .tb-n { font-size: .74rem !important; }
+
 @media (max-width: 768px) {
-  .m-tools-btn { margin: 6px 10px; width: calc(100% - 20px); }
-  .toolbar-wrap .tool-cfg { inset-inline-end: 10px; top: 6px; }
-  body.m-tools-open .toolbar-wrap .toolbar { max-height: 190px; padding: 2px 10px 10px !important; }
-  .m-tools-btn { padding: 11px 13px; font-size: .86rem; }
-  .toolbar-wrap .tool-cfg { width: 40px; height: 40px; top: 8px; }
+  .tb-head { padding: 4px 8px 2px; }
+  .toolbar-wrap .toolbar { padding: 5px 8px !important; }
+  .toolbar-wrap .tool-btn { padding: 7px 9px !important; }
 }

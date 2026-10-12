@@ -2678,6 +2678,16 @@ function toggleMobileTools(){
   if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 
+/* 🧰 الشريط مفتوح افتراضياً — العنوان اتشال والطي اختياري */
+document.documentElement.classList.add('m-tools-open');
+document.addEventListener('DOMContentLoaded', function () {
+  if (!document.body.classList.contains('m-tools-open')) {
+    document.body.classList.add('m-tools-open');
+  }
+  const b = document.getElementById('mToolsBtn');
+  if (b) b.setAttribute('aria-expanded', 'true');
+});
+
 /* الهيدر يختفى لما تنزل ويفضل لما طلّع — مساح·· بتوفر */
 (function initMobileHeader(){
   if (!('ontouchstart' in window)) return;
