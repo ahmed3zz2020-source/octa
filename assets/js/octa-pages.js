@@ -96,7 +96,7 @@ function openTradingView(code, name) {
 
   const cfg = {
     symbol: 'EGX:' + code,
-    width: '<span class="flt-ltr">100%</span>', height: 520, locale: 'ar',
+    width: '100%', height: 520, locale: 'ar',
     colorTheme: 'dark', isTransparent: true,
     interval: 'D', timezone: 'Africa/Cairo',
     theme: 'dark', style: '1', autosize: true,

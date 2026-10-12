@@ -40,6 +40,9 @@ const big=n=>{if(n==null||isNaN(n))return'—';const a=Math.abs(n);
 const cls=v=>v>=CFG.th.safe?'g':(v>=CFG.th.mid?'m':'b');
 
 /* ══════════ الحالة ══════════ */
+// ⛔ الافتراضي المصري — الموقع كله عن البورصة المصرية.
+//    لو اتغير لـus، صفحات زي «أفضل فرصة» بتطلع أسهم أمريكية
+//    (AAPL/MSFT) في مشروع مفروض كله مصري.
 let MK='egypt';
 let DATA={egypt:null,us:null};
 let FILTER='all';

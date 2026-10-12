@@ -1560,7 +1560,7 @@ function updateCompareTVWidgets(stocks) {
       script.setAttribute('data-cmp-tv', `cmp${idx}`);
       script.innerHTML = JSON.stringify({
         symbol: 'EGX:' + stock.code,
-        width: '<span class="flt-ltr">100%</span>',
+        width: '100%',
         height: 180,
         locale: 'ar',
         dateRange: '1D',
@@ -2233,17 +2233,17 @@ function searchStock(query) {
     `;
     
     setTimeout(() => injectWidget('sr-symbol-info-' + tvSymbol, 'embed-widget-mini-symbol-overview.js', {
-      symbol: tvSymbol, width: '<span class="flt-ltr">100%</span>', height: 280, locale: 'ar', dateRange: '1D',
+      symbol: tvSymbol, width: '100%', height: 280, locale: 'ar', dateRange: '1D',
       colorTheme: 'dark', isTransparent: true, autosize: true
     }, 'sr1'), 100);
     
     setTimeout(() => injectWidget('sr-tech-analysis-' + tvSymbol, 'embed-widget-technical-analysis.js', {
-      symbol: tvSymbol, width: '<span class="flt-ltr">100%</span>', height: 480, locale: 'ar', colorTheme: 'dark', isTransparent: true,
+      symbol: tvSymbol, width: '100%', height: 480, locale: 'ar', colorTheme: 'dark', isTransparent: true,
       interval: '1D', showIntervalTabs: true
     }, 'sr2'), 250);
     
     setTimeout(() => injectWidget('sr-advanced-chart-' + tvSymbol, 'embed-widget-advanced-chart.js', {
-      symbol: tvSymbol, width: '<span class="flt-ltr">100%</span>', height: 600, locale: 'ar', colorTheme: 'dark', isTransparent: true,
+      symbol: tvSymbol, width: '100%', height: 600, locale: 'ar', colorTheme: 'dark', isTransparent: true,
       autosize: true, interval: 'D', timezone: 'Africa/Cairo', theme: 'dark', style: '1',
       withdateranges: true, hide_side_toolbar: false, allow_symbol_change: true,
       details: false, hotlist: false, calendar: false,
@@ -2284,17 +2284,17 @@ function loadBestPickWidgets(symbol) {
   document.querySelectorAll('script[data-bp]').forEach(s => s.remove());
   
   setTimeout(() => injectWidget('bp-symbol-info', 'embed-widget-mini-symbol-overview.js', {
-    symbol: tvSymbol, width: '<span class="flt-ltr">100%</span>', height: 280, locale: 'ar', dateRange: '1D',
+    symbol: tvSymbol, width: '100%', height: 280, locale: 'ar', dateRange: '1D',
     colorTheme: 'dark', isTransparent: true, autosize: true
   }, '1'), 50);
   
   setTimeout(() => injectWidget('bp-tech-analysis', 'embed-widget-technical-analysis.js', {
-    symbol: tvSymbol, width: '<span class="flt-ltr">100%</span>', height: 480, locale: 'ar', colorTheme: 'dark', isTransparent: true,
+    symbol: tvSymbol, width: '100%', height: 480, locale: 'ar', colorTheme: 'dark', isTransparent: true,
     interval: '1D', showIntervalTabs: true
   }, '2'), 150);
   
   setTimeout(() => injectWidget('bp-advanced-chart', 'embed-widget-advanced-chart.js', {
-    symbol: tvSymbol, width: '<span class="flt-ltr">100%</span>', height: 600, locale: 'ar', colorTheme: 'dark', isTransparent: true,
+    symbol: tvSymbol, width: '100%', height: 600, locale: 'ar', colorTheme: 'dark', isTransparent: true,
     autosize: true, interval: 'D', timezone: 'Africa/Cairo', theme: 'dark', style: '1',
     withdateranges: true, hide_side_toolbar: false, allow_symbol_change: true,
     details: false, hotlist: false, calendar: false,
@@ -2354,19 +2354,19 @@ function loadEngineTVWidgets(symbol) {
 
   // Mini Symbol Overview widget (السعر + الشارت + التغير)
   setTimeout(() => injectEngineWidget('engine-tv-symbol-info', 'embed-widget-mini-symbol-overview.js', {
-    symbol: tvSymbol, width: '<span class="flt-ltr">100%</span>', height: 180, locale: 'ar', dateRange: '1D',
+    symbol: tvSymbol, width: '100%', height: 180, locale: 'ar', dateRange: '1D',
     colorTheme: 'dark', isTransparent: true, autosize: true
   }, 'sym'), 50);
 
   // technical analysis widget
   setTimeout(() => injectEngineWidget('engine-tv-tech-analysis', 'embed-widget-technical-analysis.js', {
-    symbol: tvSymbol, width: '<span class="flt-ltr">100%</span>', height: 480, locale: 'ar', colorTheme: 'dark', isTransparent: true,
+    symbol: tvSymbol, width: '100%', height: 480, locale: 'ar', colorTheme: 'dark', isTransparent: true,
     interval: '1D', showIntervalTabs: true
   }, 'tech'), 150);
 
   // advanced chart
   setTimeout(() => injectEngineWidget('engine-tv-advanced-chart', 'embed-widget-advanced-chart.js', {
-    symbol: tvSymbol, width: '<span class="flt-ltr">100%</span>', height: 600, locale: 'ar', colorTheme: 'dark', isTransparent: true,
+    symbol: tvSymbol, width: '100%', height: 600, locale: 'ar', colorTheme: 'dark', isTransparent: true,
     autosize: true, interval: 'D', timezone: 'Africa/Cairo', theme: 'dark', style: '1',
     withdateranges: true, hide_side_toolbar: false, allow_symbol_change: true,
     details: false, hotlist: false, calendar: false,
