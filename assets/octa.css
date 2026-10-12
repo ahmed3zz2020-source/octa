@@ -4916,30 +4916,53 @@ body.sb-open .sb-scrim { display: block; }
 
 
 
+
 /* ══════════════════════════════════════════════════════════════
-   🧰 صف الأدوات — مفتوح دايماً + عمودين فوقه
+   🧰 صف الأدوات — أفقي، مفتوح، والزرارين في آخره
    ══════════════════════════════════════════════════════════════
-   القرار: الأدوات هي الوصول السريع — فتفضل مفتوحة دايماً.
-   والعمود الفاضي اللي جنبها اتقضى: ☰ فوق و⚙️ تحته في عمود واحد.
+   الصف كله صف واحد: الأدوات على اليمين تزح، و☰ ⚙️ ملزومين
+   في آخر الصف على نفس الارتفاع بالظبط.
    ══════════════════════════════════════════════════════════════ */
 
-/* ── العمود: ☰ فوق · ⚙️ تحته ── */
-.tb-head {
-  padding: 5px 10px 4px;
-  border-bottom: 1px solid var(--line);
-}
-.tb-col {
+.toolbar-wrap { padding: 0; position: relative; }
+
+.tb-row {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-top: 1px solid var(--line);
+}
+
+/* الأدوات — مرنة وبتاخد الباقي */
+.tb-row .toolbar {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0 !important;
+  scrollbar-width: none;
+}
+.tb-row .toolbar::-webkit-scrollbar { display: none; }
+
+/* الزرارين — ملزومين في الآخر، نفس الارتفاع */
+.tb-btns {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
   gap: 4px;
-  width: 30px;
+  padding-inline-start: 6px;
+  border-inline-start: 1px solid var(--line);
 }
 .tb-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 30px;
-  height: 28px;
+  height: 30px;
   font-size: .95rem;
   color: var(--muted);
   background: transparent;
@@ -4950,24 +4973,20 @@ body.sb-open .sb-scrim { display: block; }
 }
 .tb-btn:hover { border-color: var(--gold); color: var(--gold); }
 
-/* ── الشريط: مفتوح دايماً، مضغوط ── */
-.toolbar-wrap .toolbar {
-  max-height: 400px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 6px 10px !important;
+/* الأزرار جوا الشريط */
+.tb-row .tool-btn {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-size: .74rem;
+  white-space: nowrap;
 }
-
-/* ── الأزرار جواها ── */
-.toolbar-wrap .tool-btn {
-  padding: 6px 10px !important;
-  font-size: .74rem !important;
-  gap: 4px !important;
-}
-.toolbar-wrap .tool-btn .tb-i { font-size: .95rem !important; }
+.tb-row .tool-btn .tb-i { font-size: .95rem; }
 
 @media (max-width: 768px) {
-  .tb-head { padding: 4px 8px 3px; }
-  .toolbar-wrap .toolbar { padding: 5px 8px !important; }
-  .toolbar-wrap .tool-btn { padding: 7px 9px !important; }
+  .tb-row { padding: 4px 8px; gap: 4px; }
+  .tb-row .tool-btn { padding: 7px 9px; }
+  .tb-btn { width: 32px; height: 32px; }
 }
