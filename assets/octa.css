@@ -4946,6 +4946,23 @@ body.sb-open .sb-scrim { display: block; }
   transition: background .14s, border-color .14s;
 }
 .tb-fold:hover { background: rgba(212, 175, 55, .1); border-color: rgba(212, 175, 55, .3); }
+
+/* ☰ و ⚙️ — نفس الارتفاع والتوازي بتاع 🧰 بالظبط */
+.tb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  font-size: 1rem;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: border-color .14s, color .14s;
+}
+.tb-btn:hover { border-color: var(--gold); color: var(--gold); }
 .tb-fold .tb-f-c {
   font-size: .7rem;
   transition: transform .22s cubic-bezier(.4, 0, .2, 1);

@@ -7,7 +7,7 @@
   <script id="octa-cache-clear">
   /* 🧹 مسح كاش التطبيق — يخلي أي تعديل جديد يوصل فوراً */
   (function () {
-    var BUILD = 'v=2026105827';
+    var BUILD = 'v=2026105477';
     var KEY = 'octa_build_v1';
     try {
       var prev = localStorage.getItem(KEY);
@@ -32,11 +32,11 @@
   <link rel="icon" type="image/png" href="assets/octa-logo.png">
   <!-- CSS → assets/octa.css -->
 <!-- tokens أولاً — كل الألوان هنا -->
-<link rel="stylesheet" href="assets/octa-tokens.css?v=2026105827">
-<link rel="stylesheet" href="assets/octa.css?v=2026105827">
-  <link rel="stylesheet" href="assets/css-decide.css?v=2026105827">
-  <link rel="stylesheet" href="assets/css-screener.css?v=2026105827">
-  <link rel="stylesheet" href="assets/css-chart.css?v=2026105827">
+<link rel="stylesheet" href="assets/octa-tokens.css?v=2026105477">
+<link rel="stylesheet" href="assets/octa.css?v=2026105477">
+  <link rel="stylesheet" href="assets/css-decide.css?v=2026105477">
+  <link rel="stylesheet" href="assets/css-screener.css?v=2026105477">
+  <link rel="stylesheet" href="assets/css-chart.css?v=2026105477">
 </head>
 <body>
 
@@ -117,13 +117,14 @@
 
     <!-- ══════════ شريط الأدوات والفلاتر (من الرابط القديم — زي ما هو) ══════════ -->
     <div class="toolbar-wrap">
-      <!-- ⚙️ⓘ الزرارين جنب بعض — كروت واحد مضغوط -->
+      <!-- ☰ 🧰 ⚙️ — صف واحد، كلهم على الشمال بنفس الارتفاع -->
       <div class="tb-head">
+        <button class="tb-btn" onclick="sbToggle()" title="القائمة الجانبية">☰</button>
         <button class="tb-fold" id="mToolsBtn" onclick="toggleMobileTools()"
                 aria-expanded="true" aria-controls="toolbar" title="طيّ / فتح الأدوات">
           <span class="tb-f-i">🧰</span><span class="tb-f-c">▾</span>
         </button>
-        <button class="tool-cfg" id="toolCfg" onclick="openToolEditor()" title="رتّب الأدوات">⚙️</button>
+        <button class="tb-btn tool-cfg" id="toolCfg" onclick="openToolEditor()" title="رتّب الأدوات">⚙️</button>
       </div>
 
       <div class="toolbar" id="toolbar"></div>
@@ -1034,22 +1035,22 @@
     </div>
   </div>
 
-<script src="assets/js/octa-api.js?v=2026105827"></script>
-<script src="assets/js/octa-config.js?v=2026105827"></script>
-<script src="assets/js/octa-core.js?v=2026105827"></script>
-<script src="assets/js/octa-stats.js?v=2026105827"></script>
-<script src="assets/js/octa-auth.js?v=2026105827"></script>
-<script src="assets/js/octa-gate.js?v=2026105827"></script>
-<script src="assets/js/octa-sidebar.js?v=2026105827"></script>
-<script src="assets/js/octa-dev.js?v=2026105827"></script>
-<script src="assets/js/octa-clock.js?v=2026105827"></script>
-<script src="assets/js/octa-screener.js?v=2026105827"></script>
-<script src="assets/js/octa-chart.js?v=2026105827"></script>
-<script src="assets/js/octa-pages.js?v=2026105827"></script>
-<script src="assets/js/octa-app.js?v=2026105827"></script>
-<script src="assets/js/octa-filters.js?v=2026105827"></script>
-<script src="assets/js/octa-watch.js?v=2026105827"></script>
-<script src="assets/js/octa-decide.js?v=2026105827"></script>
+<script src="assets/js/octa-api.js?v=2026105477"></script>
+<script src="assets/js/octa-config.js?v=2026105477"></script>
+<script src="assets/js/octa-core.js?v=2026105477"></script>
+<script src="assets/js/octa-stats.js?v=2026105477"></script>
+<script src="assets/js/octa-auth.js?v=2026105477"></script>
+<script src="assets/js/octa-gate.js?v=2026105477"></script>
+<script src="assets/js/octa-sidebar.js?v=2026105477"></script>
+<script src="assets/js/octa-dev.js?v=2026105477"></script>
+<script src="assets/js/octa-clock.js?v=2026105477"></script>
+<script src="assets/js/octa-screener.js?v=2026105477"></script>
+<script src="assets/js/octa-chart.js?v=2026105477"></script>
+<script src="assets/js/octa-pages.js?v=2026105477"></script>
+<script src="assets/js/octa-app.js?v=2026105477"></script>
+<script src="assets/js/octa-filters.js?v=2026105477"></script>
+<script src="assets/js/octa-watch.js?v=2026105477"></script>
+<script src="assets/js/octa-decide.js?v=2026105477"></script>
 <!-- 🛠️ أدوات المطوّر — بتظهر بالمصادفة ولا ما فيش زرار عادي -->
 <div class="octa-devbar">
   <button class="dev-hidden-gate" onclick="OCTADev.toggle()"
