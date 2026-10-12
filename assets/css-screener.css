@@ -198,7 +198,7 @@ td.sv-idw {
 .sv-code b { color: var(--gold); font-weight: 900; font-size: .8rem; }
 
 .sv-cur { font-style: normal; color: var(--muted); font-size: .63rem; font-weight: 600; }
-td.up { color: #7dd3a8; }
+td.up { color: var(--up); }
 td.dn { color: #e8a0a0; }
 
 /* التوصية الفنية */
@@ -206,7 +206,7 @@ td.dn { color: #e8a0a0; }
   display: inline-block; padding: 3px 10px; border-radius: 6px;
   font: 800 .7rem system-ui, sans-serif; white-space: nowrap;
 }
-.sv-tv.sbuy  { background: rgba(125,211,168,.2); color: #7dd3a8; }
+.sv-tv.sbuy  { background: rgba(125,211,168,.2); color: var(--up); }
 .sv-tv.buy   { background: rgba(125,211,168,.13); color: #9fd6c4; }
 .sv-tv.neutral{ background: rgba(139,158,176,.14); color: var(--muted); }
 .sv-tv.sell  { background: rgba(232,160,160,.13); color: #e8a0a0; }
@@ -214,7 +214,7 @@ td.dn { color: #e8a0a0; }
 .sv-tv.na    { background: transparent; color: var(--muted); opacity: .5; }
 
 /* شرائح */
-td.gg { color: #7dd3a8; }
+td.gg { color: var(--up); }
 td.gm { color: #9fd6c4; }
 td.ym { color: #d9b877; }
 td.rm { color: #e8a0a0; }
@@ -252,10 +252,10 @@ td.sn {
   display: inline-block; min-width: 32px; padding: 3px 7px;
   border-radius: 7px; font: 900 .74rem system-ui, sans-serif;
 }
-.sv-badge.gg { background: rgba(125,211,168,.16); color: #7dd3a8; }
+.sv-badge.gg { background: rgba(125,211,168,.16); color: var(--up); }
 .sv-badge.gm { background: rgba(159,214,196,.13); color: #9fd6c4; }
 .sv-badge.ym { background: rgba(217,184,119,.13); color: #d9b877; }
-.sv-tv.dg { background: rgba(125,211,168,.16); color: #7dd3a8; }
+.sv-tv.dg { background: rgba(125,211,168,.16); color: var(--up); }
 .sv-tv.db { background: rgba(232,160,160,.13); color: #e8a0a0; }
 .sv-tv.dk { background: rgba(212,175,55,.13); color: var(--gold); }
 
@@ -334,7 +334,7 @@ td.sn {
   background: rgba(125,211,168,.07); border: 1px solid rgba(125,211,168,.2);
   font: 500 .8rem/1.75 system-ui, sans-serif; color: var(--muted);
 }
-.sv-ab-tip b { color: #7dd3a8; }
+.sv-ab-tip b { color: var(--up); }
 
 /* ══════════════════════════════════════════════════════════════
    📱 موبايل
@@ -507,7 +507,7 @@ body.light .sv-wrap { border-color: #d8e0e8; }
 /* سطر «يعني إيه؟» — لازم سطر لوحده */
 .sv-g span b {
   display: block; font: 700 .76rem/1.6 system-ui, sans-serif;
-  color: #7dd3a8; margin: 0 0 5px;
+  color: var(--up); margin: 0 0 5px;
 }
 .sv-g span {
   font: 400 .8rem/1.85 system-ui, sans-serif; color: var(--muted);
@@ -520,7 +520,7 @@ body.light .sv-wrap { border-color: #d8e0e8; }
   background: rgba(125,211,168,.07); border: 1px solid rgba(125,211,168,.22);
   font: 500 .81rem/1.8 system-ui, sans-serif; color: var(--muted);
 }
-.sv-tip b { color: #7dd3a8; }
+.sv-tip b { color: var(--up); }
 
 /* ── تحذير ── */
 .sv-warn {
@@ -684,7 +684,7 @@ html[data-dev="1"] .octa-devbar::after {
     font-size: .9rem !important;
     line-height: 1.7 !important;
     font-weight: 700 !important;
-    color: #7dd3a8 !important;
+    color: var(--up) !important;
     margin: 0 0 10px !important;
     padding-bottom: 8px !important;
     border-bottom: 1px solid rgba(125, 211, 168, .25) !important;
