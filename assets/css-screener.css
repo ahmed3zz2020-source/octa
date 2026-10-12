@@ -499,10 +499,21 @@ body.light .sv-wrap { border-color: #d8e0e8; }
   background: var(--bg); border: 1px solid var(--line);
   border-radius: 11px; padding: 14px 16px;
   display: flex; flex-direction: column; gap: 9px;
+  /* ⛔ من غير ده المتصفح بيرتب النص من الشمال
+     والصف كله بيتقلب على الشاشة */
+  direction: rtl;
+  text-align: right;
+  /* ⛔⛌ ممنوع unicode-bidi:plaintext هنا (شهر 2026-10-12 اتشال)
+     plaintext = «أول حرف قوي في الفقرة يحدد اتجاهها».
+     فلو أول كلمة لاتينية (b / br اللي كانت بتتسرّب من التاجات)
+     الفقرة كلها بتتقلب LTR والعربي بيتقرا مقلوب.
+     الاتجاه عندنا معلوم وثابت (RTL) — فبنحدده صراحةً. */
+  unicode-bidi: isolate;
 }
 .sv-g b {
   display: block; font: 800 .86rem/1.5 system-ui, sans-serif;
   color: var(--gold); margin: 0;
+  direction: rtl; text-align: right; unicode-bidi: isolate;
 }
 /* سطر «يعني إيه؟» — لازم سطر لوحده */
 .sv-g span b {
@@ -511,6 +522,7 @@ body.light .sv-wrap { border-color: #d8e0e8; }
 }
 .sv-g span {
   font: 400 .8rem/1.85 system-ui, sans-serif; color: var(--muted);
+  direction: rtl; text-align: right; unicode-bidi: isolate;
 }
 .sv-g span br { display: block; content: ''; margin-top: 3px; }
 
@@ -839,3 +851,72 @@ html[data-dev="1"] .octa-devbar::after {
 @media (max-width: 480px) {
   .sc-mkt-note { font-size: .78rem; padding: 9px 12px; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   🔧 اتجاه النص — كتلة توحيد (2026-10-12)
+   ──────────────────────────────────────────────────────────────
+   الكارت ده فيه قواعد مكرّرة (`.sv-about` و `.sv-ab-*` متعرفة
+   مرتين في نفس الملف)، فالتعريفات abajo في الآخر وبتغلب أي
+   تعريف سابق مهما كان.
+
+   📌 القاعدة: في صفحة RTL معروفة، `direction: rtl` صراحةً —
+   وممنوع `plaintext`/`auto`. دي بتخلي أول حرف قوي في كل فقرة
+   يقرر الاتجاه، وأي كلمة لاتينية بتتسرّب في الأول بتقلّب السطر.
+   ══════════════════════════════════════════════════════════════ */
+.sv-about,
+.sv-about-b,
+.sv-diff,
+.sv-dc,
+.sv-ab-sec,
+.sv-ab-tbl,
+.sv-ab-r,
+.sv-grid,
+.sv-g,
+.sv-ex,
+.sv-plain,
+.sv-tip,
+.sv-warn,
+.sv-ex-sum,
+.sc-mkt-note {
+  direction: rtl;
+  text-align: right;
+  unicode-bidi: isolate;
+}
+
+/* العناوين والنصوص الغنية جوّه الكارت — اتجاه ثابت، ومفيش plaintext */
+.sv-about-h,
+.sv-dh,
+.sv-db,
+.sv-dl li,
+.sv-ab-t,
+.sv-ab-note,
+.sv-ab-tip,
+.sv-g > b,
+.sv-g > span,
+.sv-g > span > b,
+.sv-exq,
+.sv-exa,
+.sv-exa b,
+.sv-ab-r > b,
+.sv-ab-r > span {
+  direction: rtl;
+  text-align: right;
+  unicode-bidi: isolate;
+}
+
+/* الكلمات اللاتينية جوّه النص العربي (bdi) — معزولة كده بطبيعتها
+   ومتحطّمةش ولا بتأثر على اتجاه الفقرة */
+.sv-g bdi,
+.sv-exa bdi,
+.sv-ab-r bdi,
+.sv-dl bdi,
+.sv-about bdi {
+  unicode-bidi: isolate;
+}
+
+/* ⚠️ حارس: لو تاج اتسرّب فجأة، يظهر — بدل ما يبتلع النص بصمت */
+.sv-g bdi:empty { display: none; }
+
+/* القوائم النقطية: العلامة على يمين السطر مش شمال */
+.sv-dl { padding-inline-start: 0; }
+.sv-dl li { text-align: right; }

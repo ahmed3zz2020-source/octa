@@ -626,7 +626,7 @@
 
   function aboutBox() {
     const lv = S.lvl || 'start';
-    return '<div class="sv-about' + (S.aboutOpen ? ' open' : '') + '">' +
+    return '<div class="sv-about' + (S.aboutOpen ? ' open' : '') + '" dir="rtl">' +
       '<div class="sv-about-h" onclick="scAbout()">' +
         '<span>❓ كل الفلاتر دي بتعمل إيه؟</span><b>' + (S.aboutOpen ? '▲' : '▼') + '</b>' +
       '</div>' +
@@ -857,14 +857,38 @@
    * ────────────────────────────────────────────────────────── */
   function isolateLatin(text) {
     /*
-     * ⛌ الـregex القديم كان بيبلع الـquote اللي قبل الكلمة،
-     *    فطلع «(RSI)» كـ «(' RSI')» — علامات غلط.
+     * ⛌ الخلل الحقيقي (اتصلّح هنا):
+     *   الدالة دي كانت بتلفّ أي كلمة إنجليزية بـ <bdi> على
+     *   النص كما هو. لكن `gl()` بيبعتها على نص **فيه تاج HTML**
+     *   (`<b>` و `<br>` بعد الـescape). فالـregex كان بيلتقط
+     *   **اسم التاج نفسه**:
+     *       <b>  →  <bdi>b</bdi>>      /t<ajax مبظوم>/
+     *       </b> →  <bdi>b</bdi>>      /نفس الحاجة/
+     *       <br> →  <bdi>br</bdi>>     /نفس الحاجة/
+     *   النتيجة: التاج اتدمّر + حروف لاتينية زفت (b / br) ظهرت
+     *   في أول الفقرة. ولأن الـCSS كان `unicode-bidi:plaintext`
+     *   (= أول حرف قوي يحدد اتجاه الفقرة) — الحرف القوي الأول بقى
+     *   لاتيني، فالفقرة كلها اتقلبت LTR والعربي اتقرا مقلوب.
      *
-     * الحل: كلمة إنجليزية لازم تبدأ بحرف وتخلص قبل أي رمز
-     * غير إنجليزي. والرقم العشرى لوحده.
+     * الحل: نقسّم النص لـ chunks، ونلفّ اللاتيني في chunk النص بس.
+     * التاجات (<?>) وكيانات HTML (&gt; &lt; &amp; …) بتعدي زي ما هي.
+     *
+     * ⛌ والـregex القديم كان كمان بيبلع الـquote اللي قبل الكلمة،
+     *    فطلع «(RSI)» كـ «(' RSI')» — علامات غلط.
+     *    كلمة إنجليزية لازم تبدأ بحرف وتخلص قبل أي رمز غير إنجليزي.
      */
-    const RE = /\b([A-Za-z][A-Za-z0-9]*(?:[./][A-Za-z0-9]+)*)\b/g;
-    return String(text).replace(RE, '<bdi>$1</bdi>');
+    const RE = /\b[A-Za-z][A-Za-z0-9]*(?:[./][A-Za-z0-9]+)*\b/g;
+    /* ['<tag>' | '&entity;' | 'نص'] — الـcapture بيخليهم يتقروا منفصلين.
+       (?:amp;)? عشان كيان زي «&gt;» بعد الـescape بيبقى «&amp;gt;» */
+    return String(text)
+      .split(/(<[^<>]*>|&(?:amp;)?(?:#\d+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);)/g)
+      .map(part => {
+        if (!part) return '';
+        const c = part.charAt(0);
+        if (c === '<' || c === '&') return part;   /* تاج أو كيان — نلمسهوش */
+        return part.replace(RE, '<bdi>$&</bdi>');
+      })
+      .join('');
   }
 
   const gl = (t, d) => {
@@ -878,6 +902,8 @@
       /* حما إضافية: نشيل أي on* handler أو javascript: */
       desc = desc.replace(/on[a-z]+\s*=\s*(['"])?[^'"\s>]+\1/gi, '');
       desc = desc.replace(/javascript\s*:/gi, '');
+      /* ⚠️ الـisolateLatin شغالة وهي واعية بالتاجات — من غير كده
+         بتاكل <b> و <br> وبتقلب اتجاه الفقرة (شوف جوهرها) */
       desc = isolateLatin(desc);
     } else {
       desc = isolateLatin(esc(desc));
