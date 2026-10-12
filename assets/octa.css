@@ -4915,4 +4915,7 @@ body.sb-open .sb-scrim { display: block; }
   transition: border-color .14s, color .14s;
 }
 .sb-toggle:hover { border-color: var(--gold); color: var(--gold); }
-@media (min-width: 1100px) { .sb-toggle { display: none; } }
+/* ⛌ قبل: الزرار كان مخفي فوق 1100px، يعني على الديسكتوب
+   مفيش طريقة تفتح الـsidebar أصلاً.
+   دلوقتي: ظاهر دايماً — بس على الديسكتوب بيفتح الشاشة-Rh side. */
+@media (min-width: 1100px) { .sb-toggle { display: inline-flex; } }
