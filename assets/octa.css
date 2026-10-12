@@ -5016,8 +5016,15 @@ body.sb-open .sb-scrim { display: block; }
   --set-ac-ink:  var(--gold);     /* نص ذهبي — مقروء 7.4:1 على الغامق */
   --set-ac-bg:   var(--goldBg);
   --set-ok:      var(--up);
-  --set-bad:     var(--dn);
+  --set-bad:     #f4626a;   /* أحمر مقروء: 4.66:1 على الصف الغامق (var(--dn) بيطلع 3.83) */
+  --set-bad-solid:#dc2626;   /* أبيض عليه: 4.83:1 */
+  --set-on-bg:   var(--gold);
+  --set-on-fg:   var(--pri);
   --set-warn:    var(--warn);
+  --set-warn-bg: rgba(245,158,11,.12);
+  --set-ok-bd:   rgba(34,197,94,.42);
+  --set-warn-bd: rgba(245,158,11,.42);
+  --set-bad-bd:  rgba(239,68,68,.42);
   --set-shadow:  0 30px 70px rgba(0,0,0,.6);
   --set-pad:     14px;
   --set-gap:     8px;
@@ -5025,7 +5032,7 @@ body.sb-open .sb-scrim { display: block; }
 }
 :root[data-theme="light"] .set-overlay,
 body.light .set-overlay {
-  --set-bg:      #fff;
+  --set-bg:      var(--set-on-fg);
   --set-bg2:     #f5f7fa;
   --set-row:     rgba(15,27,43,.035);
   --set-row-h:   rgba(15,27,43,.07);
@@ -5033,8 +5040,16 @@ body.light .set-overlay {
   --set-ink2:    #4a5a6d;                        /* 7.4:1  */
   --set-line:    rgba(15,27,43,.12);
   --set-line2:   rgba(15,27,43,.2);
-  --set-ac-ink:  var(--gold3);                    /* 7.1:1 — مش الذهبي الفاتح */
+  --set-ac-ink:  var(--gold3);                    /* 6.8:1 — مش الذهبي الفاتح (3.8) */
   --set-ac-bg:   rgba(154,123,24,.1);
+  --set-bad:     #b91c1c;                        /* 6.0:1 */
+  --set-bad-solid:#b91c1c;                        /* أبيض عليه 6.5:1 */
+  --set-on-bg:   var(--gold3);                    /* 7.2:1 مع أبيض */
+  --set-on-fg:   var(--set-on-fg);
+  --set-warn-bg: rgba(180,83,9,.1);
+  --set-ok-bd:   rgba(4,120,87,.38);
+  --set-warn-bd: rgba(180,83,9,.38);
+  --set-bad-bd:  rgba(185,28,28,.38);
   --set-shadow:  0 20px 60px rgba(15,27,43,.25);
 }
 
@@ -5043,7 +5058,7 @@ body.light .set-overlay {
 @media (min-width: 700px) { .set-overlay { padding: 18px; } }
 
 .set-panel {
-  font-size: 15px;                 /* ثابت — مش متأثر بالحجم المختار */
+  font-size: 15.5px;               /* ثابت — مش متأثر بالحجم المختار */
   line-height: 1.65;
   font-family: inherit;
   padding: 0;
@@ -5062,8 +5077,8 @@ body.set-locked { overflow: hidden; }
   border-bottom: 1px solid var(--set-line);
   background: var(--set-bg);
 }
-.set-panel .te-t { font-size: 1.06rem; font-weight: 900; color: var(--set-ac-ink); }
-.set-panel .te-s { margin: 2px 0 0; font-size: .74rem; }
+.set-panel .te-t { font-size: 1.06em; font-weight: 900; color: var(--set-ac-ink); }
+.set-panel .te-s { margin: 2px 0 0; font-size: .74em; }
 .set-x { flex: 0 0 auto; }
 
 /* التبويبات — مثبّتة، بتتزحلق أفقياً على الموبايل */
@@ -5080,10 +5095,10 @@ body.set-locked { overflow: hidden; }
   min-height: 38px; padding: 7px 13px;
   border-radius: 11px; border: 1px solid var(--set-line);
   background: var(--set-row); color: var(--set-ink2);
-  font-family: inherit; font-size: .8rem; font-weight: 800; cursor: pointer;
+  font-family: inherit; font-size: .8em; font-weight: 800; cursor: pointer;
   white-space: nowrap; transition: background .15s, color .15s, border-color .15s;
 }
-.set-tab span { font-size: .95rem; line-height: 1; }
+.set-tab span { font-size: .95em; line-height: 1; }
 .set-tab:hover { background: var(--set-row-h); color: var(--set-ink); }
 .set-tab.on {
   background: var(--set-ac-bg); border-color: var(--set-ac);
@@ -5110,8 +5125,8 @@ body.set-locked { overflow: hidden; }
   background: var(--set-row); border: 1px solid var(--set-line);
 }
 .set-r-t { flex: 1 1 auto; min-width: 0; }
-.set-r-t b { display: block; font-size: .85rem; font-weight: 800; color: var(--set-ink); }
-.set-r-t span { display: block; font-size: .7rem; color: var(--set-ink2); line-height: 1.55; margin-top: 1px; }
+.set-r-t b { display: block; font-size: .85em; font-weight: 800; color: var(--set-ink); }
+.set-r-t span { display: block; font-size: .7em; color: var(--set-ink2); line-height: 1.55; margin-top: 1px; }
 .set-r-c { flex: 0 0 auto; margin-inline-start: auto; }
 @media (max-width: 430px) {
   .set-row { flex-wrap: wrap; }
@@ -5127,13 +5142,11 @@ body.set-locked { overflow: hidden; }
 .set-seg-b {
   min-height: 34px; padding: 6px 12px; border: none; border-radius: 8px;
   background: transparent; color: var(--set-ink2);
-  font-family: inherit; font-size: .76rem; font-weight: 800; cursor: pointer;
+  font-family: inherit; font-size: .76em; font-weight: 800; cursor: pointer;
   white-space: nowrap; transition: background .15s, color .15s;
 }
 .set-seg-b:hover { color: var(--set-ink); }
-.set-seg-b.on { background: var(--set-ac); color: var(--pri); }
-:root[data-theme="light"] .set-overlay .set-seg-b.on,
-body.light .set-overlay .set-seg-b.on { color: #fff; }
+.set-seg-b.on { background: var(--set-on-bg); color: var(--set-on-fg); }
 @media (pointer: coarse) { .set-seg-b { min-height: 40px; padding: 8px 13px; } }
 
 /* ── ⑤ المفتاح ── */
@@ -5167,13 +5180,13 @@ body.light .set-overlay .set-seg-b.on { color: #fff; }
 /* ── ⑦ المنزلقات ── */
 .set-rng { display: flex; align-items: center; gap: 9px; }
 .set-val {
-  font-size: .78rem; font-weight: 800; color: var(--set-ink);
+  font-size: .78em; font-weight: 800; color: var(--set-ink);
   font-variant-numeric: tabular-nums; min-width: 42px; text-align: center;
 }
 .set-mini {
   min-height: 30px; padding: 4px 9px; border-radius: 8px; cursor: pointer;
   border: 1px solid var(--set-line); background: var(--set-row);
-  color: var(--set-ink2); font-family: inherit; font-size: .7rem; font-weight: 800;
+  color: var(--set-ink2); font-family: inherit; font-size: .7em; font-weight: 800;
 }
 .set-mini:hover { color: var(--set-ink); border-color: var(--set-line2); }
 
@@ -5206,7 +5219,7 @@ body.light .set-overlay .set-seg-b.on { color: #fff; }
 
 /* ── ⑧ قوائم الأدوات ── */
 .set-h2 {
-  font-size: .8rem; font-weight: 900; color: var(--set-ac-ink);
+  font-size: .8em; font-weight: 900; color: var(--set-ac-ink);
   margin: 10px 2px 0; padding-inline-start: 9px;
   border-inline-start: 3px solid var(--set-ac);
 }
@@ -5220,40 +5233,40 @@ body.light .set-overlay .set-seg-b.on { color: #fff; }
 .set-trow.off { opacity: .5; }
 .set-tico {
   width: 34px; height: 34px; flex: 0 0 auto; border-radius: 10px;
-  display: grid; place-items: center; font-size: 1rem;
+  display: grid; place-items: center; font-size: 1em;
   background: var(--set-ac-bg); border: 1px solid var(--set-line2);
 }
 .set-tnm { flex: 1 1 auto; min-width: 0; }
-.set-tnm b { display: block; font-size: .83rem; font-weight: 800; color: var(--set-ink); }
-.set-tnm i { display: block; font-style: normal; font-size: .68rem; color: var(--set-ink2); }
+.set-tnm b { display: block; font-size: .83em; font-weight: 800; color: var(--set-ink); }
+.set-tnm i { display: block; font-style: normal; font-size: .68em; color: var(--set-ink2); }
 .set-tmv { display: flex; flex-direction: column; gap: 3px; }
 .set-tmv button {
   width: 30px; height: 23px; border-radius: 7px; cursor: pointer; line-height: 1;
-  font-size: .62rem; border: 1px solid var(--set-line);
+  font-size: .62em; border: 1px solid var(--set-line);
   background: var(--set-row-h); color: var(--set-ink);
 }
 .set-tmv button:disabled { opacity: .25; cursor: default; }
 .set-tvis, .set-remove {
   width: 32px; height: 32px; flex: 0 0 auto; border-radius: 9px; cursor: pointer;
-  font-size: .85rem; border: 1px solid var(--set-line);
+  font-size: .85em; border: 1px solid var(--set-line);
   background: var(--set-row-h); color: var(--set-ink2);
 }
 .set-tvis.on { background: var(--set-ac-bg); border-color: var(--set-ac); color: var(--set-ac-ink); }
-.set-remove:hover { background: var(--set-bad); border-color: var(--set-bad); color: #fff; }
+.set-remove:hover { background: var(--set-bad-solid); border-color: var(--set-bad-solid); color: var(--set-on-fg); }
 @media (pointer: coarse) { .set-tvis, .set-remove { width: 40px; height: 40px; } .set-tmv button { width: 36px; height: 27px; } }
 
 .set-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .set-chip {
   min-height: 36px; padding: 7px 12px; border-radius: 999px; cursor: pointer;
   border: 1px dashed var(--set-line2); background: transparent;
-  color: var(--set-ink); font-family: inherit; font-size: .76rem; font-weight: 700;
+  color: var(--set-ink); font-family: inherit; font-size: .76em; font-weight: 700;
   transition: background .15s, border-color .15s;
 }
 .set-chip:hover { background: var(--set-ac-bg); border-color: var(--set-ac); border-style: solid; }
 @media (pointer: coarse) { .set-chip { min-height: 42px; } }
 
 .set-empty {
-  padding: 16px; text-align: center; font-size: .78rem; color: var(--set-ink2);
+  padding: 16px; text-align: center; font-size: .78em; color: var(--set-ink2);
   border: 1px dashed var(--set-line2); border-radius: var(--set-r);
 }
 
@@ -5264,46 +5277,46 @@ body.light .set-overlay .set-seg-b.on { color: #fff; }
   background: var(--set-row); border: 1px solid var(--set-line);
 }
 .set-w { display: flex; align-items: center; gap: 10px; }
-.set-wn { flex: 0 0 84px; font-size: .77rem; color: var(--set-ink); font-weight: 700; }
+.set-wn { flex: 0 0 84px; font-size: .77em; color: var(--set-ink); font-weight: 700; }
 .set-w input[type="range"] { flex: 1 1 auto; width: auto; }
 .set-wv {
-  flex: 0 0 46px; text-align: center; font-size: .76rem; font-weight: 800;
+  flex: 0 0 46px; text-align: center; font-size: .76em; font-weight: 800;
   color: var(--set-ac-ink); font-variant-numeric: tabular-nums;
 }
 .set-sum {
-  padding: 8px 12px; border-radius: 10px; font-size: .73rem; font-weight: 700;
+  padding: 8px 12px; border-radius: 10px; font-size: .73em; font-weight: 700;
   background: var(--set-row); border: 1px solid var(--set-line); color: var(--set-ink2);
 }
-.set-sum.ok   { color: var(--set-ok);   border-color: color-mix(in srgb, var(--set-ok) 45%, transparent); }
-.set-sum.bad  { color: var(--set-warn); border-color: color-mix(in srgb, var(--set-warn) 45%, transparent); }
+.set-sum.ok   { color: var(--set-ok);   border-color: var(--set-ok-bd); }
+.set-sum.bad  { color: var(--set-warn); border-color: var(--set-warn-bd); }
 
 /* ── ⑩ ملاحظات وأزرار ── */
 .set-note {
-  padding: 9px 12px; border-radius: 10px; font-size: .72rem; line-height: 1.65;
+  padding: 9px 12px; border-radius: 10px; font-size: .72em; line-height: 1.65;
   background: var(--set-row); border: 1px solid var(--set-line); color: var(--set-ink2);
 }
 .set-note.warn {
-  background: color-mix(in srgb, var(--set-warn) 12%, transparent);
-  border-color: color-mix(in srgb, var(--set-warn) 42%, transparent);
+  background: var(--set-warn-bg);
+  border-color: var(--set-warn-bd);
   color: var(--set-ink);
 }
 .set-btns { display: flex; flex-wrap: wrap; gap: 7px; }
 .set-ghost, .set-danger {
   flex: 1 1 150px; min-height: 42px; padding: 10px 12px; border-radius: 11px;
-  font-family: inherit; font-size: .78rem; font-weight: 800; cursor: pointer;
+  font-family: inherit; font-size: .78em; font-weight: 800; cursor: pointer;
   border: 1px solid var(--set-line); background: var(--set-row); color: var(--set-ink);
   transition: background .15s, border-color .15s;
 }
 .set-ghost:hover { background: var(--set-row-h); border-color: var(--set-line2); }
-.set-danger { color: var(--set-bad); border-color: color-mix(in srgb, var(--set-bad) 45%, transparent); }
-.set-danger:hover { background: var(--set-bad); color: #fff; border-color: var(--set-bad); }
+.set-danger { color: var(--set-bad); border-color: var(--set-bad-bd); }
+.set-danger:hover { background: var(--set-bad-solid); color: var(--set-on-fg); border-color: var(--set-bad-solid); }
 
 /* ── ⑪ التخزين ── */
 .set-meter { height: 9px; border-radius: 999px; background: var(--set-row-h); overflow: hidden; border: 1px solid var(--set-line); }
 .set-meter i { display: block; height: 100%; border-radius: 999px; background: var(--set-ac); }
 .set-keys { display: flex; flex-wrap: wrap; gap: 5px; }
 .set-key {
-  font-size: .64rem; padding: 3px 8px; border-radius: 6px;
+  font-size: .64em; padding: 3px 8px; border-radius: 6px;
   background: var(--set-row); border: 1px solid var(--set-line); color: var(--set-ink2);
   unicode-bidi: isolate; direction: ltr;
 }
@@ -5312,13 +5325,13 @@ body.light .set-overlay .set-seg-b.on { color: #fff; }
 .set-about {
   margin-top: 4px; padding: 13px; border-radius: var(--set-r);
   background: var(--set-row); border: 1px solid var(--set-line);
-  font-size: .71rem; line-height: 1.8; color: var(--set-ink2); text-align: center;
+  font-size: .71em; line-height: 1.8; color: var(--set-ink2); text-align: center;
 }
 .set-about b { color: var(--set-ink); letter-spacing: .04em; }
 
 /* ── ⑫ الذيل ── */
 .set-panel > .te-actions { margin: 0; padding: 11px var(--set-pad) 14px; border-top: 1px solid var(--set-line); background: var(--set-bg); }
-.set-panel > .te-actions button { min-height: 44px; font-size: .88rem; font-family: inherit; font-weight: 800; cursor: pointer; border-radius: 12px; }
+.set-panel > .te-actions button { min-height: 44px; font-size: .88em; font-family: inherit; font-weight: 800; cursor: pointer; border-radius: 12px; }
 
 /* ── ⑬ الكثافة (اختيارية) ── */
 body.set-snug  .set-row,
@@ -5343,7 +5356,7 @@ body.set-notab { font-variant-numeric: normal; }
 .set-toast {
   position: fixed; inset-inline: 0; bottom: 22px; margin: auto; width: max-content;
   max-width: 86vw; padding: 11px 18px; border-radius: 12px; z-index: 4000;
-  font-family: inherit; font-size: .8rem; font-weight: 800; text-align: center;
+  font-family: inherit; font-size: .8em; font-weight: 800; text-align: center;
   color: var(--txt); background: var(--pri3); border: 1px solid var(--line2);
   box-shadow: 0 8px 28px rgba(0,0,0,.4);
   opacity: 0; pointer-events: none; transform: translateY(8px);

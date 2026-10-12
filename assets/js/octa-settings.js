@@ -80,17 +80,19 @@
   /* ══════════════════════════════════════════════════════════
      3) الألوان — كل سمة بتتوافق مع octa-tokens.css
      ══════════════════════════════════════════════════════════ */
+  /* gold3 = النسخة الغامقة من لون التمييز — دي اللي بتتكتب بيها
+     النصوص الصغيرة في السمة الفاتحة (#6b5410 مش #9a7b18). */
   var ACCENTS = {
-    gold:   { n: 'ذهبي',  gold: '#d4af37', gold2: '#f4d03f', bg: 'rgba(212,175,55,.12)' },
-    green:  { n: 'زمردي', gold: '#16c79a', gold2: '#5eead4', bg: 'rgba(22,199,154,.12)' },
-    blue:   { n: 'أزرق',  gold: '#4dabf7', gold2: '#8fd0ff', bg: 'rgba(77,171,247,.12)' },
-    purple: { n: 'بنفسجي', gold: '#a78bfa', gold2: '#c9b8ff', bg: 'rgba(167,139,250,.12)' }
+    gold:   { n: 'ذهبي',   gold: '#d4af37', gold2: '#f4d03f', gold3: '#6b5410', bg: 'rgba(212,175,55,.12)' },
+    green:  { n: 'زمردي',  gold: '#16c79a', gold2: '#5eead4', gold3: '#0b5f58', bg: 'rgba(22,199,154,.12)' },
+    blue:   { n: 'أزرق',   gold: '#4dabf7', gold2: '#8fd0ff', gold3: '#1e3a8a', bg: 'rgba(77,171,247,.12)' },
+    purple: { n: 'بنفسجي', gold: '#a78bfa', gold2: '#c9b8ff', gold3: '#4c1d95', bg: 'rgba(167,139,250,.12)' }
   };
   var LIGHT_ACCENT = {
-    gold:   { gold: '#9a7b18', gold2: '#b8912f', bg: 'rgba(154,123,24,.1)' },
-    green:  { gold: '#0f766e', gold2: '#0d9488', bg: 'rgba(15,118,110,.1)' },
-    blue:   { gold: '#1d4ed8', gold2: '#2563eb', bg: 'rgba(29,78,216,.1)' },
-    purple: { gold: '#6d28d9', gold2: '#7c3aed', bg: 'rgba(109,40,217,.1)' }
+    gold:   { gold: '#9a7b18', gold2: '#b8912f', gold3: '#6b5410', bg: 'rgba(154,123,24,.1)' },
+    green:  { gold: '#0f766e', gold2: '#0d9488', gold3: '#0b5f58', bg: 'rgba(15,118,110,.1)' },
+    blue:   { gold: '#1d4ed8', gold2: '#2563eb', gold3: '#1e3a8a', bg: 'rgba(29,78,216,.1)' },
+    purple: { gold: '#6d28d9', gold2: '#7c3aed', gold3: '#4c1d95', bg: 'rgba(109,40,217,.1)' }
   };
 
   var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
@@ -128,6 +130,7 @@
     var r = document.documentElement.style;
     r.setProperty('--gold', a.gold);
     r.setProperty('--gold2', a.gold2);
+    r.setProperty('--gold3', a.gold3);   /* النسخة الغامقة — لوحدها هي اللي بتوصل AA في الفاتح */
     r.setProperty('--goldBg', a.bg);
     r.setProperty('--ac', a.gold);
     r.setProperty('--pct', a.gold);
@@ -162,8 +165,6 @@
     var eb = el('eduBanner');
     if (eb) eb.style.display = hide ? 'none' : '';
     document.querySelectorAll('.edu-toggle').forEach(function (n) { n.style.display = hide ? 'none' : ''; });
-    var bg = el('gate');
-    if (bg && !hide) bg.style.display = '';
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -174,6 +175,7 @@
   (function () { for (var i = 0; i < 10; i++) { L2A[LAT[i]] = ARAB[i]; A2L[ARAB[i]] = LAT[i]; } })();
 
   var orig = new WeakMap();     /* TextNode → النص الأصلي */
+  var convCount = 0;            /* كام عقدة اتحوّلت — عشان منمشيش على الشجرة كلها بلا داعي */
   var convTimer = null;
 
   function swap(t, tbl) {
@@ -188,12 +190,12 @@
       if (orig.has(n)) return;
       var t = n.nodeValue;
       if (!/[0-9٠-٩]/.test(t)) return;
-      orig.set(n, t);
+      orig.set(n, t); convCount++;
       n.nodeValue = swap(t, L2A);
     } else {
       if (!orig.has(n)) return;
       n.nodeValue = orig.get(n);
-      orig.delete(n);
+      orig.delete(n); convCount--;
     }
   }
 
@@ -210,6 +212,7 @@
   }
 
   function applyNums() {
+    if (S.nums === 'lat' && convCount === 0) return;   /* مفيش حاجة اتحوّلت — متحمشش الصفحة */
     walk(document.body);
   }
 
@@ -292,6 +295,9 @@
   var EXTRA_KEY = 'octa_toolbar_extra_v1';   /* أدوات الـsidebar اللي اتشالت للشريط */
   var BASE_IDS = null;                        /* الـ8 الأصلية — نictionalize مرة واحدة */
 
+  if (typeof TOOLS !== 'undefined' && Array.isArray(TOOLS)) {
+    BASE_IDS = TOOLS.map(function (t) { return t.id; });   /* الـ8 الأصلية — مش هنمسحها أبداً */
+  }
   function tools() {
     if (typeof TOOLS === 'undefined' || !Array.isArray(TOOLS)) return [];
     if (!BASE_IDS) BASE_IDS = TOOLS.map(function (t) { return t.id; });
@@ -312,7 +318,7 @@
     var want = lsArr(EXTRA_KEY);
     var all = allTools();
 
-    /* شيل أي حاجة مش مطلوبة (بس الـ8 الأصلية مش هنمسحها) */
+    /* شيل أي حاجة مش مطلوبة — الـ8 الأصلية مش هنمسحها أبداً */
     for (var i = list.length - 1; i >= 0; i--) {
       var id = list[i].id;
       if (BASE_IDS && BASE_IDS.indexOf(id) >= 0) continue;
@@ -362,7 +368,8 @@
   }
   function resetBar() {
     lsDel('octa_tool_order_v1'); lsDel('octa_tool_hidden_v1'); lsDel(EXTRA_KEY);
-    if (typeof toolReset === 'function') toolReset(); else applyBar();
+    if (typeof toolReset === 'function') toolReset();
+    applyBar();
   }
 
   function sidebarOpen() { return (lsGet('octa_sidebar') === '1'); }
@@ -389,10 +396,16 @@
     if (!S.refresh) return;
     refTimer = setInterval(tick, S.refreshSec * 1000);
   }
-  function applyMarket() {
-    if (S.market === 'us' && typeof window.mkSetMK === 'function') {
-      setTimeout(function () { try { window.mkSetMK('us'); } catch (e) { } }, 400);
-    }
+  /* force = المستخدم داس دلوقتي — وقتها نطبّق أي قيمة حتى لو رجع مصري
+  /* force = المستخدم داس دلوقتي — وقتها نطبّق أي قيمة حتى لو رجع مصري.
+     من غير force (أول تحميل) بنسلّم قيمة 'us' بس، عشان ما نمسحش
+     فلتر صفحة الأسواق لأي زائر جديد. */
+  function applyMarket(force) {
+    if (typeof window.mkSetMK !== 'function') return;
+    if (!force && S.market === 'egypt') return;
+    setTimeout(function () {
+      try { window.mkSetMK(force ? S.market : 'us'); } catch (e) { }
+    }, 400);
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -439,6 +452,7 @@
       });
       S = load();
       applyAll();
+      if (ov) render();
       toast('اترجّع ' + n + ' إعداد ✅');
     };
     fr.readAsText(file);
@@ -547,10 +561,8 @@
         c: seg('refreshSec', [['30', '30 ثانية'], ['60', 'دقيقة'], ['300', '5 دقايق']], String(S.refreshSec))
       });
     }
-    h += row({
-      t: 'عملة العرض', s: 'بتظهر في لوحة الإعدادات والحسابات',
-      c: seg('cur', [['egp', 'ج.م'], ['EGP', 'EGP'], ['usd', '$']], S.cur)
-    });
+    /* ⛌ «عملة العرض» اتشالت — البورصة المصرية بالجنيه المصري
+       دايماً، والاختيار كان بيلخبط (ج.م / EGP / $ لنفس الرقم). */
     h += '<div class="set-foot">كل التغييرات بتتحفظ على جهازك فوراً — مفيش إعادة تحميل.</div>';
     return h;
   }
@@ -722,7 +734,9 @@
 
     h += '<div class="set-h2">📦 مساحة التخزين</div>';
     h += '<div class="set-meter"><i style="width:' + Math.min(100, Math.round(st.total / 5120 * 100)) + '%"></i></div>';
-    h += '<div class="set-note">' + ltr(st.count + ' عنصر') + ' · ' + ltr((st.total / 1024).toFixed(1) + ' كيلوبايت') +
+    h += '<div class="set-note">' +
+      ltr(st.count === 0 ? 'مفيش' : st.count === 1 ? 'عنصر واحد' : st.count === 2 ? 'عنصرين' : st.count <= 10 ? st.count + ' عناصر' : st.count + ' عنصر') +
+      ' · ' + ltr((st.total / 1024).toFixed(1) + ' كيلوبايت') +
       ' من ' + ltr('5 ميجابايت') + '</div>';
     h += '<div class="set-keys">' + st.rows.slice(0, 6).map(function (r) {
       return '<span class="set-key">' + esc(r.k) + ' <i>' + ltr((r.b / 1024).toFixed(1) + 'KB') + '</i></span>';
@@ -774,7 +788,7 @@
         '<div class="set-body" id="setBody" role="tabpanel">' + body() + '</div>' +
 
         '<div class="te-actions">' +
-          '<button type="button" onclick="OCTASettings.close()">تم ✅</button>' +
+          '<button type="button" class="done" onclick="OCTASettings.close()">تم ✅</button>' +
         '</div>' +
       '</div>';
     var cfg = el('toolCfg');
@@ -794,7 +808,6 @@
 
     render();
     document.body.classList.add('set-locked');
-    ov.addEventListener('keydown', trap);
     setTimeout(function () { var f = ov.querySelector('.set-tab.on'); if (f) f.focus(); }, 40);
   }
 
@@ -811,7 +824,7 @@
 
   function trap(e) {
     if (e.key === 'Escape') { e.preventDefault(); close(); return; }
-    if (e.key !== 'Tab') return;
+    if (e.key !== 'Tab' || !ov) return;
     var f = ov.querySelectorAll('button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])');
     if (!f.length) return;
     var a = f[0], b = f[f.length - 1];
@@ -832,9 +845,9 @@
 
       /* السوق */
       case 'market':
-        S.market = val; save(); applyMarket(); render(); return;
+        S.market = val; save(); applyMarket(true); render(); return;
       case 'refresh':
-        S.refresh = val === '1'; save(); applyRefresh(); render(); return;
+        S.refresh = !S.refresh; save(); applyRefresh(); render(); return;
       case 'refreshSec':
         S.refreshSec = parseInt(val, 10) || 60; save(); applyRefresh(); render(); return;
       case 'cur':
@@ -854,9 +867,9 @@
       case 'accent': S.accent = val; save(); applyAccent(); render(); return;
       case 'size': S.size = parseInt(val, 10) || 100; save(); applyLook(); render(); return;
       case 'density': S.density = val; save(); applyLook(); render(); return;
-      case 'sticky': S.sticky = val === '1'; save(); applyLook(); render(); return;
-      case 'tabular': S.tabular = val === '1'; save(); applyLook(); render(); return;
-      case 'motion': S.motion = val === '1'; save(); applyLook(); render(); return;
+      case 'sticky': S.sticky = !S.sticky; save(); applyLook(); render(); return;
+      case 'tabular': S.tabular = !S.tabular; save(); applyLook(); render(); return;
+      case 'motion': S.motion = !S.motion; save(); applyLook(); render(); return;
 
       /* الأدوات */
       case 'bar': setBar(val, true); toast('اتضافت للشريط ✅'); render(); return;
@@ -864,7 +877,7 @@
       case 'vis': toggleVis(val); render(); return;
       case 'move': { var p = String(val).split('|'); move(p[0], parseInt(p[1], 10)); render(); return; }
       case 'resetBar': resetBar(); toast('رجع الشريط للافتراضي ✅'); render(); return;
-      case 'sidebar': setSidebar(val === '1'); render(); return;
+      case 'sidebar': setSidebar(!sidebarOpen()); render(); return;
 
       /* الأوزان */
       case 'wnorm': {
@@ -883,12 +896,12 @@
 
       /* المزيد */
       case 'track': {
-        S.track = val === '1'; save();
+        S.track = !S.track; save();
         if (typeof octaTrackConsent === 'function') octaTrackConsent(S.track);
         else if (S.track) lsDel('octa_no_track'); else lsSet('octa_no_track', '1');
         render(); return;
       }
-      case 'focus': S.focus = val === '1'; save(); applyLook(); applyFocus(); render(); return;
+      case 'focus': S.focus = !S.focus; save(); applyLook(); applyFocus(); render(); return;
       case 'export': download(); toast('اتنزّل الملف ✅'); return;
       case 'import': { var f = el('setFile'); if (f) f.click(); return; }
       case 'clearSoft': clearSoft(); render(); return;
@@ -918,7 +931,7 @@
       if (box && box.nextElementSibling && box.nextElementSibling.classList.contains('set-sum')) {
         var tot = 0;
         Object.keys(w[S.wset]).forEach(function (k) { tot += w[S.wset][k]; });
-        box.nextElementSibling.innerHTML = 'المجموع ' + tot + '% — ' +
+        box.nextElementSibling.innerHTML = 'المجموع ' + ltr(tot + '%') + ' — ' +
           (Math.round(tot) === 100 ? '✅ تمام' : 'مش لازم 100 بالظبط، بس كل ما زاد عن 100 قلّل منه');
         box.nextElementSibling.className = 'set-sum ' + (Math.round(tot) === 100 ? 'ok' : 'bad');
       }
@@ -930,7 +943,6 @@
       var l2 = n.parentNode.querySelector('.set-wv'); if (l2) l2.textContent = CFG.th[val];
       return;
     }
-    if (name === 'set-val') onSet(val, '');
   }
 
   function onInputFile(e) {
@@ -962,9 +974,13 @@
       onInputFile(e);
     });
 
-    /* ⌨️ Ctrl/⌘ + , يفتح الإعدادات — زي أي برنامج */
+    /* ⌨️ Ctrl/⌘ + , يفتح الإعدادات — زي أي برنامج.
+       Escape + حبس الـTab: على document مش على الـoverlay
+       (الحدث بيبدأ من العنصر المركّز جواه، فلو مربوط على ov هيمشي صح —
+        بس document أأمن لو التركيز اتسرّب). */
     document.addEventListener('keydown', function (e) {
-      if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); toggle(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); toggle(); return; }
+      if (ov) trap(e);
     });
   }
 
@@ -1014,17 +1030,29 @@
     });
   }
 
+  var booted = false;
   function boot() {
+    if (booted) return;          /* ما يشتغلش مرتين */
+    booted = true;
     syncLegacy();
     bind();
     routeLegacyToggles();
     applyAll();
     watchNums();
 
+    if (!el('setToast')) {
+      var t = document.createElement('div');
+      t.id = 'setToast';
+      t.className = 'set-toast';
+      t.setAttribute('role', 'status');
+      t.setAttribute('aria-live', 'polite');
+      t.setAttribute('data-set-nodigits', '');   /* الأرقام اللي جوّاها تفضل لاتينية */
+      document.body.appendChild(t);
+    }
+
     if (mq && mq.addEventListener) {
       mq.addEventListener('change', function () { if (S.theme === 'auto') { applyTheme(); if (ov) render(); } });
     }
-    if (typeof OCTA_TRACKED !== 'undefined') { /* noop — للتوافق */ }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
@@ -1060,16 +1088,5 @@
     apply: applyAll,
     refresh: function () { S = load(); applyAll(); if (ov) render(); }
   };
-
-  /* مؤشر صغير — يشتغل قبل ما الـgate يفتح */
-  document.addEventListener('DOMContentLoaded', function () {
-    var t = document.createElement('div');
-    t.id = 'setToast';
-    t.className = 'set-toast';
-    t.setAttribute('role', 'status');
-    t.setAttribute('aria-live', 'polite');
-    t.setAttribute('data-set-nodigits', '');
-    document.body.appendChild(t);
-  });
 
 })();
