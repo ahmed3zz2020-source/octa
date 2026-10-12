@@ -464,7 +464,7 @@
         '</div>' +
         '<button class="sv-adv' + (S.advOpen ? ' on' : '') + '" onclick="scAdv()">' +
           (S.advOpen ? '✕ إخفاء' : '⚙ الفلاتر') + (advCount() ? ' <b>' + advCount() + '</b>' : '') + '</button>' +
-        '<button class="sv-about" onclick="scAbout()">❓ المعايير</button>' +
+        '<button class="sv-about-btn" onclick="scAbout()">❓ المعايير</button>' +
       '</div>' +
 
       (S.advOpen ? advPanel() : '') +
