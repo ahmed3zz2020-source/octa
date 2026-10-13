@@ -5206,7 +5206,10 @@ body.set-locked { overflow: hidden; }
   content: 'OFF';
   position: absolute; inset-block: 0;
   display: flex; align-items: center;
-  inset-inline-end: 32px;
+  /* المسافة دي محسوبة من حافة الشكل المقابل للنقطة:
+     عرض الشكل − حجم النقطة − الحشو = المساحة المتاحة للكلمة.
+     14px بتفصل الكلمة عن النقطة في الوضعين والاتجاهين. */
+  inset-inline-end: 14px;
   font-size: 11.5px; font-weight: 800; letter-spacing: .7px; line-height: 1;
   color: var(--set-ink2); pointer-events: none;
   /* ⚠ ما تتحوّلش الـinsets — الانتقال بينهم كان بيحسب
@@ -5215,7 +5218,7 @@ body.set-locked { overflow: hidden; }
 }
 .set-sw.on::after {
   content: 'ON';
-  inset-inline-end: auto; inset-inline-start: 32px;
+  inset-inline-end: auto; inset-inline-start: 14px;
   color: var(--set-ac);
 }
 [dir="rtl"] .set-sw i { transform: translateX(0); }
@@ -5226,8 +5229,8 @@ body.set-locked { overflow: hidden; }
 @media (pointer: coarse) {
   .set-sw { width: 94px; height: 34px; }
   .set-sw i { width: 28px; height: 28px; inset-block-start: 2px; }
-  .set-sw::after { font-size: 12.5px; inset-inline-end: 35px; }
-  .set-sw.on::after { inset-inline-end: auto; inset-inline-start: 35px; }
+  .set-sw::after { font-size: 12.5px; inset-inline-end: 15px; }
+  .set-sw.on::after { inset-inline-end: auto; inset-inline-start: 15px; }
   [dir="rtl"] .set-sw.on i { transform: translateX(-62px); }
   [dir="ltr"] .set-sw.on i { transform: translateX(62px); }
 }
