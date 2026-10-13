@@ -127,7 +127,11 @@
   function renderPage() {
     var host = document.getElementById('armsList');
     if (!host) return;
-    if (!AF.built) { buildDerived(); buildRisk3(); AF.built = true; }
+    /* ⛌ النسب بتبني على OS_DB — لو اتحسبت قبل ما البيانات
+       توصل، الـmaps بتفضل فاضية للأبد. فبنبنيها كل مرة؛
+       296 صف و12 قطاع — مش تكلفة. */
+    buildDerived();
+    buildRisk3();
 
     if (AF.sel) return renderDetail();
 
