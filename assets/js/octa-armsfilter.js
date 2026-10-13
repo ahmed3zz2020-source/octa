@@ -150,10 +150,14 @@
   }
 
   /* ═══ الصفحة ═══ */
+  /* آخر عدد صفوف اشتغلنا عليه — لو OS_DB اتغيّر نعيد الرسم */
+  var lastN = -1;
+
   function renderPage() {
     var host = document.getElementById('armsList');
     if (!host) return;
     ensureBuilt();
+    lastN = OS_DB.length;
 
     if (AF.sel) return renderDetail();
 
@@ -266,6 +270,11 @@
     });
   }
 
+  function armsVisible() {
+    var el = document.getElementById('page-arms');
+    return !!el && el.style.display !== 'none' && el.offsetHeight > 0;
+  }
+
   document.addEventListener('click', function (e) {
     var card = e.target.closest('[data-af]');
     if (!card) return;
@@ -286,6 +295,15 @@
     if (e.target.id !== 'afMin') return;
     renderDetail();
   });
+
+  /* ⛌ الكروت كانت بتترسم قبل ما الأسعار توصل، فكانت بتقول 0 من 296.
+     ده مراقب خفيف: بيشتغل بس والصفحة مفتوحة، وبيعيد الرسم
+     غير لما عدد الأسهم يتغيّر فعلاً. */
+  setInterval(function () {
+    if (OS_DB.length === lastN) return;
+    if (!armsVisible()) return;
+    if (AF.sel) renderDetail(); else renderPage();
+  }, 1200);
 
   /* ═══ الواجهة ═══ */
   window.OCTAArmsFilter = {
