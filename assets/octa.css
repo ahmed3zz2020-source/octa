@@ -2081,9 +2081,18 @@
       .toolbar { order: 2; }
       .tool-btn { padding: 7px 12px; font-size: .76rem; }
 
-      /* ④ إخفاء تلقائي عند النزول */
-      .octa-topbar.hide-top { transform: translateY(-100%); }
-      .octa-topbar { transition: transform .25s cubic-bezier(.4,0,.2,1); }
+      /* ④ إخفاء تلقائي عند النزول
+         ⛌ الكود القديم كان بيعمل translateY(-100%) على الـtopbar كله،
+         فشريط الأدوات كان بيختفي معاه — وده اللي كان بيحصل على الموبايل.
+         دلوقتي بنقفل الصفّين الفوقانيين بس (الشعار + الأذرع)
+         وشريط الأدوات بيفضل ظاهر في آخر الهيدر. */
+      .octa-topbar .octa-brand,
+      .octa-topbar .arms-bar {
+        max-height: 520px; opacity: 1; overflow: hidden;
+        transition: max-height .25s cubic-bezier(.4,0,.2,1), opacity .18s linear;
+      }
+      .octa-topbar.hide-top .octa-brand,
+      .octa-topbar.hide-top .arms-bar { max-height: 0; opacity: 0; }
       .m-scrim { display: none; position: fixed; inset: 0; background: rgba(4,10,18,.5); z-index: 55; }
       .m-scrim.on { display: block; }
 
@@ -4924,16 +4933,16 @@ body.sb-open .sb-scrim { display: block; }
    في آخر الصف على نفس الارتفاع بالظبط.
    ══════════════════════════════════════════════════════════════ */
 
-/* ⛌ قبل 2026-10-13 كان relative فـ الشريط كان بيضيع مع السكرول
-   على الموبايل والتابلت مع بعض. دلوقتي sticky تحت الشريطين فوقاه.
-   ارتفاع الـnav بيتقاس وقت التشغيل ويتخزّن في --navh. */
+/* ⚠ .toolbar-wrap جوّه .octa-topbar واللي هو نفسه sticky من فوق،
+   فمفيش داعي لـsticky هنا تاني — كنا بنضاعف التثبيت.
+   التثبيت بيبقى من الاختيار: نخفي الصفّين فوقاني بس
+   وقت النزول، والشريط ده يفضل ظاهر. */
 .toolbar-wrap {
   padding: 0;
-  position: sticky;
-  top: calc(62px + var(--navh, 56px));
-  z-index: 98;
+  position: relative;
   background: var(--pri2);
   border-top: 1px solid var(--line);
+  flex: 0 0 auto;
 }
 body.light .toolbar-wrap { background: #fff; }
 

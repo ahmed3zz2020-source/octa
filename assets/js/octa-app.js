@@ -2088,31 +2088,3 @@ function pickRank(q){
   scored.sort(function(a,b){ return (b.s + b.boost) - (a.s + a.boost); });
   return scored.map(function(o){ return o.x; });
 }
-/* ═══════════════════════════════════════════════════════════
-   قياس ارتفاع شريط الـnav — الشريط تحتاه لازم يتثبّت تحته بالظبط.
-   ارتفاع الـnav بيتغيّر حسب الشاشة (الموبايل أزرار أصغر)،
-   فالتقسيم الثابت بيسيب فجوة أو تداخل.
-   ═══════════════════════════════════════════════════════════ */
-(function () {
-  function syncNavH() {
-    var n = document.querySelector('.nav');
-    if (!n) return;
-    var h = Math.round(n.getBoundingClientRect().height);
-    if (h > 0) document.documentElement.style.setProperty('--navh', h + 'px');
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () {
-      syncNavH();
-      window.addEventListener('resize', syncNavH);
-      window.addEventListener('orientationchange', function () { setTimeout(syncNavH, 250); });
-      if (window.ResizeObserver) new ResizeObserver(syncNavH).observe(n);
-    });
-  } else {
-    syncNavH();
-    window.addEventListener('resize', syncNavH);
-  }
-  /* أول رسم بعد تحميل الخطوط — الارتفاع بيتغيّر */
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncNavH);
-  setTimeout(syncNavH, 900);
-  setTimeout(syncNavH, 2200);
-})();
