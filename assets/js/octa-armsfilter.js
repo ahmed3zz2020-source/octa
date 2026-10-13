@@ -40,7 +40,10 @@
     { id: 'risk', ic: '⚠️', n: 'المخاطرة', d: 'التذبذب وأكبر هبوط',
       get: function (s) { return ARM_RISK[s.code]; }, src: '4996 شمعة لكل سهم · 2000→2026', derived: true },
     { id: 'div', ic: '🎁', n: 'التوزيعات', d: 'بيدفع لك كام',
-      get: function (s) { return ARM_DIV[s.code]; }, src: 'نسبة التوزيع من بيانات البورصة', derived: true }
+      get: function (s) { return ARM_DIV[s.code]; }, src: 'نسبة التوزيع من بيانات البورصة', derived: true,
+      /* ⚠ صفر توزيع مش «بيانات» — السهم ده مش بيوزّع أصلاً
+         ولازم المستخدم يشوف العدد ده مش في الحسبة. */
+      has: function (s) { return ARM_DIV[s.code] != null && (s.dy || 0) > 0; } }
   ];
 
   /* ── نتيجتين مشتقة ── */
