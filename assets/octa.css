@@ -5669,3 +5669,21 @@ body.set-notab { font-variant-numeric: normal; }
   font-variant-numeric: tabular-nums;
 }
 .gt-code-in::placeholder { letter-spacing: 9px; opacity: .35; }
+
+/* حالة الانتظار — بدل الكارت الفاضي */
+.gt-wait {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 16px; font-size: .84rem; font-weight: 700; color: var(--muted);
+}
+.gt-spin {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--line); border-top-color: var(--gold);
+  animation: gtSpin .7s linear infinite;
+}
+@keyframes gtSpin { to { transform: rotate(360deg); } }
+
+.gt-err {
+  padding: 13px; border-radius: 10px; margin-bottom: 10px; text-align: center;
+  background: rgba(224,120,80,.1); border: 1px solid rgba(224,120,80,.3);
+  font-size: .84rem; font-weight: 700; color: #e07850;
+}

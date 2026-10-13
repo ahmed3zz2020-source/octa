@@ -31,6 +31,23 @@
   }
 
   function gateEl() { return document.getElementById('gate'); }
+
+  /* حالة الانتظار — ⛌ الكارت الفاضي كان مربك.
+     المستخدم بيشوف «بنتحقق» بدل ما يفكر إن الموقع باظ. */
+  function pending(msg) {
+    var f = document.getElementById('gt-form');
+    if (!f) return;
+    f.innerHTML = '<div class="gt-wait"><span class="gt-spin"></span>' + msg + '</div>';
+    var h = document.getElementById('gt-h');
+    if (h) h.textContent = 'أهلاً بعودتك';
+  }
+
+  /* ⛌ حزام أمان: لو الفورم اتقفلت لسبب ما، ارسم تاني.
+     البوابة بطاقة مالهاش زرار = الموقع ميت. */
+  function ensurePainted() {
+    var f = document.getElementById('gt-form');
+    if (f && !f.innerHTML.trim()) welcome();
+  }
   function formEl() { return document.getElementById('gt-form'); }
 
   function say(t, ok) {
@@ -44,6 +61,13 @@
     var g = gateEl();
     if (g) g.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    /* ⛌ حزام أمان: البوابة من غير زرار = الموقع ميت ومفيش مخرج.
+       ⛌ لو الفورم اتقفلت لسبب ما (خطأ في الرسم، تحديث متقطع)
+       بنعيد الرسم فوراً. */
+    setTimeout(function () {
+      var f = document.getElementById('gt-form');
+      if (g && g.style.display !== 'none' && (!f || !f.innerHTML.trim())) welcome();
+    }, 120);
   }
 
   function shut() {
@@ -277,20 +301,20 @@
       }
     } catch (e) { }
 
-    /* ⛌ لو عنده توكن: بنحط البوابة الأول وبعدين بنتحقق.
-       الكود كان بيعمل shut() (يعني بيفتح الموقع) وبعدين verify()
-       — فأي توكن مزوّر كان بيدخل الموقع قبل ما السيرفر يرد.
-       ⛌ ترتيبنا دلوقتي: البوابة تتقفل ← السيرفر يتأكد ← لو
-       غلط نرجع للشاشة الأولى.
-       الإحساس إن كل refresh بيرجّعك للبوابة — ده المقصود. */
-    if (token()) {
-      open();
-      verify();
-      return;
-    }
+    /* ⛌ البوابة بترسم نفسها الأول — دايماً، قبل أي تحقق.
+       الكود كان بيعمل open() وبعدين verify() من غير ما يستدعي
+       welcome() — فأي حد عنده توكن (قديم أو مزوّر) كان بيشوف كارت
+       فاضي من غير زرار واحد: البوابة مفتوحة، الموقع مقفول،
+       ومفيش طريقة يخرج منها.
 
+       ⛌ الترتيب الصح: ارسم ← اقفل ← تحقق. */
     welcome();
     open();
+
+    if (token()) {
+      pending('⏳ بنتحقق من حسابك…');
+      verify();
+    }
   });
 
   /* التأكد إن التوكن لسه صالح — لو مش كده نرجع للبابة */
@@ -298,34 +322,38 @@
     var t = token();
     if (!t) { welcome(); open(); return; }
 
-    /* ⛌ ليش البوابة بتظهر فوراً؟
-       الكود القديم كان بيعتمد على رد السيرفر: لو الشبكة وقعت أو
-       الرد اتأخر، الصفحة كانت بتفتح والمستخدم يدخل من غير تحقق.
-       توكن مزوّر كان كافي.
-
-       ⛌ القاعدة دلوقتي: **شك = اتحقق**.
-       البوابة بتظهر طول ما التحقق شغّال، وبتتشال بس لما السيرفر
-       يقول «التوكن ده صحيح» — ولا حاجة تانية.
-    */
-    open();   // ⛌ افترض إنه لازم تسجيل، لحد ما نعرف العكس
-
+    /* ⛌ القاعدة: **شك = مقفول**.
+       البوابة مرسومة بالفعل (welcome + open). SERVER يدي واحد:
+         · 200      → الموقع ينفتح
+         · أي حاجة تانية → التوكن يتمسح ونرجع للشاشة الأولى
+         · خطأ شبكة   → نفضل مقفولين ونقوله، ⛔ ما نفتحش أبداً */
     fetch(apiBase() + '/api/auth/me', {
       headers: { 'Authorization': 'Bearer ' + t }
     }).then(function (r) {
       if (r.ok) { shut(); return; }
-      // ⛔ أي حاجة غير 200 = التوكن مش مقبول
-      try {
-        localStorage.removeItem('octa_token');
-        localStorage.removeItem('octa_user');
-        window.OCTA_USER_ID = '';
-      } catch (e) { }
+      logoutLocal();
       welcome();
       open();
     }).catch(function () {
-      /* ⛌ الشبكة وقعت. ⛔ مش بنفتح — بنقفل.
-         نسيبه مقفول أحسن ما ندي حد توكن من غير تحقق. */
-      say('⚠️ مش قادرين نوصل للسيرفر — جرب تاني', false);
-      open();
+      /* ⛌ ⛌ الشبكة وقعت.
+         ⛌ القديم كان بيعمل كاش ساكت — يعني الموقع مفتوح والخسارة.
+         ⛌ دلوقتي: نفضل مقفولين ونقوله يعمل refresh. */
+      var f = document.getElementById('gt-form');
+      if (f) {
+        f.innerHTML = '<div class="gt-err">⚠️ مش قادرين نوصل للسيرفر</div>' +
+          '<button class="gt-go" id="gtRetry">🔄 جرّب تاني</button>';
+        var b = document.getElementById('gtRetry');
+        if (b) b.onclick = function () { location.reload(); };
+      }
     });
   }
+
+  function logoutLocal() {
+    try {
+      localStorage.removeItem('octa_token');
+      localStorage.removeItem('octa_user');
+      window.OCTA_USER_ID = '';
+    } catch (e) { }
+  }
+
 })();
