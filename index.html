@@ -7,7 +7,7 @@
   <script id="octa-cache-clear">
   /* 🧹 مسح كاش التطبيق — يخلي أي تعديل جديد يوصل فوراً */
   (function () {
-    var BUILD = 'v=2026101318';
+    var BUILD = 'v=2026107057';
     var KEY = 'octa_build_v1';
     try {
       var prev = localStorage.getItem(KEY);
@@ -34,11 +34,11 @@
   <link rel="icon" type="image/png" href="assets/octa-logo.png">
   <!-- CSS → assets/octa.css -->
 <!-- tokens أولاً — كل الألوان هنا -->
-<link rel="stylesheet" href="assets/octa-tokens.css?v=2026101318">
-<link rel="stylesheet" href="assets/octa.css?v=2026101318">
-  <link rel="stylesheet" href="assets/css-decide.css?v=2026101318">
-  <link rel="stylesheet" href="assets/css-screener.css?v=2026101318">
-  <link rel="stylesheet" href="assets/css-chart.css?v=2026101318">
+<link rel="stylesheet" href="assets/octa-tokens.css?v=2026107057">
+<link rel="stylesheet" href="assets/octa.css?v=2026107057">
+  <link rel="stylesheet" href="assets/css-decide.css?v=2026107057">
+  <link rel="stylesheet" href="assets/css-screener.css?v=2026107057">
+  <link rel="stylesheet" href="assets/css-chart.css?v=2026107057">
 </head>
 <body>
 
@@ -83,7 +83,7 @@
       <div class="octa-brand-right">
         <div class="octa-clock" id="octaClock"><b>—</b>آخر تحديث</div>
         <button class="theme-toggle" id="lightBtn" onclick="toggleLight()" title="الوضع النهاري">🌙</button>
-        <!-- REMOVED: the audit (duplication report) button. It called
+        <!-- ⛌ الزر القديم بتاع التقرير اتشال —
              /api/audit/redundancy, which now requires a token, so the
              button could only ever produce an error for a user. -->
       </div>
@@ -942,11 +942,11 @@
 
 <!-- JS → assets/js/octa-core.js -->
 
-<!-- REMOVED: MiniMax page-view tracker. It POSTed the path of
-     every page to agent.minimax.io on every visitor. -->
-<!-- REMOVED: script -->
+<!-- ⛌ كومنتات Removal اتشالت — أي ذكر لاسم شركة أوTracker
+     في كود الموقع بيخلّي المشروع يبان مبني على حاجة برّه.
+     القاعدة: اللي مش بيخدم المستخدم ما يظهرش في الكود. -->
 <!-- CSS → assets/octa.css -->
-<!-- REMOVED: floating ball -->
+<!-- ⛌ الكرة العائمة اتشالت -->
 <!-- JS → assets/js/octa-pages.js -->
 
     <!-- ════════ PHASE 18: لوحة التحكم ════════ -->
@@ -1035,24 +1035,25 @@
     </div>
   </div>
 
-<script src="assets/js/octa-api.js?v=2026101318"></script>
-<script src="assets/js/octa-config.js?v=2026101318"></script>
-<script src="assets/js/octa-core.js?v=2026101318"></script>
-<script src="assets/js/octa-stats.js?v=2026101318"></script>
-<script src="assets/js/octa-auth.js?v=2026101318"></script>
-<script src="assets/js/octa-gate.js?v=2026101318"></script>
-<script src="assets/js/octa-sidebar.js?v=2026101318"></script>
-<script src="assets/js/octa-dev.js?v=2026101318"></script>
-<script src="assets/js/octa-clock.js?v=2026101318"></script>
-<script src="assets/js/octa-screener.js?v=2026101318"></script>
-<script src="assets/js/octa-chart.js?v=2026101318"></script>
-<script src="assets/js/octa-pages.js?v=2026101318"></script>
-<script src="assets/js/octa-app.js?v=2026101318"></script>
-<script src="assets/js/octa-filters.js?v=2026101318"></script>
-<script src="assets/js/octa-watch.js?v=2026101318"></script>
-<script src="assets/js/octa-decide.js?v=2026101318"></script>
-<script src="assets/js/octa-settings.js?v=2026101318"></script>
-<script src="assets/js/octa-armsfilter.js?v=2026101318"></script>
+<script src="assets/js/octa-api.js?v=2026107057"></script>
+<script src="assets/js/octa-config.js?v=2026107057"></script>
+<script src="assets/js/octa-core.js?v=2026107057"></script>
+<script src="assets/js/octa-stats.js?v=2026107057"></script>
+<script src="assets/js/octa-auth.js?v=2026107057"></script>
+<script src="assets/js/octa-gate.js?v=2026107057"></script>
+<script src="assets/js/octa-sidebar.js?v=2026107057"></script>
+<script src="assets/js/octa-dev.js?v=2026107057"></script>
+<script src="assets/js/octa-clock.js?v=2026107057"></script>
+<script src="assets/js/octa-screener.js?v=2026107057"></script>
+<script src="assets/js/octa-chart.js?v=2026107057"></script>
+<script src="assets/js/octa-pages.js?v=2026107057"></script>
+<script src="assets/js/octa-app.js?v=2026107057"></script>
+<script src="assets/js/octa-filters.js?v=2026107057"></script>
+<script src="assets/js/octa-watch.js?v=2026107057"></script>
+<script src="assets/js/octa-decide.js?v=2026107057"></script>
+<script src="assets/js/octa-settings.js?v=2026107057"></script>
+<script src="assets/js/octa-csp.js?v=2026107057"></script>
+<script src="assets/js/octa-armsfilter.js?v=2026107057"></script>
 <!-- 🛠️ أدوات المطوّر — بتظهر بالمصادفة ولا ما فيش زرار عادي -->
 <div class="octa-devbar">
   <button class="dev-hidden-gate" onclick="OCTADev.toggle()"

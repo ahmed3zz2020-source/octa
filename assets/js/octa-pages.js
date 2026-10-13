@@ -1,7 +1,7 @@
 /* ═══ OCTA · octa-pages.js · 194KB ═══ */
 /* REMOVED: initFloatingBall and its DOMContentLoaded hook.
    The ball markup is gone from index.html along with the tracker;
-   the handler would have been dead code pointing at agent.minimax.io. */
+   the handler would have been dead code pointing at a removed service. */
 
 
 

@@ -173,3 +173,44 @@ body.light {
   --slot:        rgba(15, 27, 43, .04);
   --grad-blue:   linear-gradient(135deg, #0284c7, #04855f);
 }
+/* ═══════════════════════════════════════════════════════════
+   🔒 CSP + SRI — حماية المتصفح من أي كود مش بتوعنا
+   ═══════════════════════════════════════════════════════════
+   ⛌ ليش مهم: من غير CSP، أي كود يتحقن في الصفحة يقدر
+      يقرا كل حاجة في localStorage (توكن المستخدم) ويبعتها.
+
+   📌 كل مصدر هنا مستخدم فعلاً في الموقع — مفيش مصدر مش
+      لازمه (قاعدة: مفيش allow-wildcard عشان نتساهل).
+
+   connect-src → الباك + المصادر اللي بنجيب منها بيانات
+   frame-src   → شارت TradingView (iframe)
+   script-src  → سكربت TradingView بس (الباقي local)
+   style-src   → 'unsafe-inline' للحقن الديناميكي في CSS
+   img-src     → لوجوهات TradingView
+   ═══════════════════════════════════════════════════════════ */
+
+/* السلوك المقيّد: ⛔ مش مفعّل افتراضياً.
+   المتصفح بيحذّر على أي مخالفة، ولما نتأكد إن كل حاجة سليمة
+   بنحوّله لـ 'Content-Security-Policy'. */
+.meta-csp-report {
+  content: default-src 'self';
+  base-uri 'self';
+  object-src 'none';
+  frame-ancestors 'self';
+  form-action 'self';
+  img-src 'self' data: blob: https://s3.tradingview.com https://logo.clearbit.com;
+  font-src 'self' data:;
+  style-src 'self' 'unsafe-inline';
+  script-src 'self' https://s3.tradingview.com https://*.cloudflareinsights.com;
+  connect-src 'self'
+    https://octa-prices-production-4ccb.up.railway.app
+    https://scanner.tradingview.com
+    https://news.google.com
+    https://api.rss2json.com
+    https://foudalens.com
+    https://www.egx.com.eg;
+  frame-src https://s3.tradingview.com https://www.tradingview.com;
+  media-src 'self' blob:;
+  worker-src 'self' blob:;
+  upgrade-insecure-requests;
+}
