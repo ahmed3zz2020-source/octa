@@ -88,11 +88,10 @@
     document.getElementById('gtLogin').onclick = function () { login(); };
   }
 
-  /* ═══ تسجيل ═══
-     📌 خطوتين: الأول اسم وإيميل، والتاني الكود.
-     ليه كده؟ الحقول بتتعب بتبقى أسهل من 3 boxes مرة واحدة،
-     والمستخدم بيفهم المطلوب منه وهو بيعمل الخطوة.
-     ⛌ «الكود» مش كلمة سر — هو رقم يتحفظ في الـbrowser.
+  /* ═══ التسجيل ═══
+     📌 إيميل → كود في الإيميل → دخول.
+     ⛌ مش بنطلب كلمة سر: إثبات إن الإيميل ليك أصعب بكتير
+     من إنك تفتكر حاجة اخترتها من زمان.
   */
   function signup() {
     formEl().innerHTML =
@@ -100,84 +99,95 @@
       '<input id="gtName" class="gt-in" placeholder="مثلاً: أحمد" maxlength="40" autocomplete="name">' +
       '<label class="gt-lb">إيميلك</label>' +
       '<input id="gtMail" class="gt-in" type="email" placeholder="example@mail.com" maxlength="120" autocomplete="email" dir="ltr">' +
-      '<div class="gt-split" id="gtStep2" style="display:none">' +
-        '<label class="gt-lb">اختار كود من 6 أرقام <small>ده اللي هتدخل بيه بعد كده</small></label>' +
-        '<div class="gt-codes" id="gtCodes"></div>' +
-        '<input id="gtKey" class="gt-in gt-code-in" placeholder="······" maxlength="6" inputmode="numeric" autocomplete="off">' +
-      '</div>' +
       '<div id="gtMsg" class="gt-msg"></div>' +
-      '<button class="gt-go" id="gtDo">التالي</button>' +
+      '<button class="gt-go" id="gtDo">ابعتلي الكود</button>' +
       '<button class="gt-back" id="gtBack">رجوع</button>';
-
-    var key = document.getElementById('gtKey');
-    var step = 1;
-
-    /* ⛌ مفيش توليد على السيرفر — الكود بيختاره المستخدم.
-       ⛌ مش بنطلب «اختار كلمة سر» — كلمة سر معناها إن حد بيفتكرها
-       بعد سنة. كود 6 أرقام أسهل بكتير وأمانه أعلى لوحده. */
-    function paintCodes() {
-      var box = document.getElementById('gtCodes');
-      box.innerHTML = '';
-      for (var i = 0; i < 3; i++) {
-        var c = String(Math.floor(100000 + Math.random() * 900000));
-        var b = document.createElement('button');
-        b.type = 'button'; b.className = 'gt-pick'; b.textContent = c;
-        b.onclick = function (e) {
-          key.value = e.target.textContent;
-          box.querySelectorAll('.gt-pick').forEach(function (x) { x.classList.remove('on'); });
-          e.target.classList.add('on');
-        };
-        box.appendChild(b);
-      }
-    }
-    paintCodes();
 
     var go = function () {
       var name = document.getElementById('gtName').value.trim();
       var mail = document.getElementById('gtMail').value.trim();
-      var k = key.value.trim();
       var btn = document.getElementById('gtDo');
 
-      if (step === 1) {
-        if (!name) { say('❌ اكتب اسمك الأول', false); document.getElementById('gtName').focus(); return; }
-        if (!mail) { say('❌ الإيميل مطلوب', false); document.getElementById('gtMail').focus(); return; }
-        if (mail.indexOf('@') < 1 || mail.indexOf('.') < 1) { say('❌ شكل الإيميل غلط', false); return; }
-        step = 2;
-        document.getElementById('gtStep2').style.display = 'block';
-        btn.textContent = 'اعمل حسابي';
-        say('اختار كود أو اكتبه بنفسك — 6 أرقام', true);
-        key.focus();
-        return;
-      }
+      if (!mail) { say('❌ الإيميل مطلوب', false); return; }
+      if (mail.indexOf('@') < 1 || mail.indexOf('.') < 1) { say('❌ شكل الإيميل غلط', false); return; }
 
-      if (!/^\d{6}$/.test(k)) { say('❌ الكود 6 أرقام', false); key.focus(); return; }
-
-      go.disabled = true; go.textContent = '⏳ بنعمل حسابك…';
-      fetch(apiBase() + '/api/auth/register', {
+      btn.disabled = true; btn.textContent = '⏳ بنبعت…';
+      fetch(apiBase() + '/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name || 'مستخدم', key: k, email: mail })
-      }).then(function (r) { return r.json().then(function (d) { return { d: d }; }); })
+        body: JSON.stringify({ email: mail, name: name || 'مستخدم' })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (!d || !d.ok) {
+          say('❌ ' + ((d && d.error) || 'حصل خطأ'), false);
+          btn.disabled = false; btn.textContent = 'ابعتلي الكود';
+          return;
+        }
+        askCode(name, mail, 'حساب جديد');
+      }).catch(function () {
+        say('❌ الاتصال فشل — جرب تاني', false);
+        btn.disabled = false; btn.textContent = 'ابعتلي الكود';
+      });
+    };
+
+    document.getElementById('gtDo').onclick = go;
+    document.getElementById('gtBack').onclick = welcome;
+    document.getElementById('gtKey')
+      && document.getElementById('gtKey').addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
+    setTimeout(function () { document.getElementById('gtName').focus(); }, 60);
+  }
+
+  /* ═══ شاشة استقبال الكود ═══ */
+  function askCode(name, mail, what) {
+    formEl().innerHTML =
+      '<div class="gt-sent">📬</div>' +
+      '<div class="gt-sent-t">ابعتنا الكود على إيميلك</div>' +
+      '<div class="gt-sent-s">' + esc(mail) + '</div>' +
+      '<label class="gt-lb">الكود <small>6 أرقام</small></label>' +
+      '<input id="gtKey" class="gt-in gt-code-in" placeholder="······" maxlength="6" inputmode="numeric" autocomplete="one-time-code">' +
+      '<div id="gtMsg" class="gt-msg"></div>' +
+      '<button class="gt-go" id="gtDo">ادخل</button>' +
+      '<button class="gt-back" id="gtResend">📩 ابعت تاني</button>' +
+      '<button class="gt-back" id="gtBack">رجوع</button>';
+
+    var go = function () {
+      var k = document.getElementById('gtKey').value.trim();
+      var btn = document.getElementById('gtDo');
+      if (!/^\d{6}$/.test(k)) { say('❌ الكود 6 أرقام', false); return; }
+      btn.disabled = true; btn.textContent = '⏳ بنتحقق…';
+      fetch(apiBase() + '/api/auth/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: mail, code: k, name: name })
+      }).then(function (r) { return r.json().then(function (d) { return { d: d, ok: r.ok }; }); })
         .then(function (o) {
-          if (o.d && o.d.ok) {
+          if (o.ok && o.d && o.d.token) {
             put(o.d.token, o.d.user);
             try { octaTrack('signup', 'gate', ''); } catch (e) { }
             shut();
           } else {
-            say('❌ ' + ((o.d && o.d.error) || 'حصل خطأ'), false);
-            go.disabled = false; go.textContent = 'اعمل حسابي';
-            step = 2;
+            say('❌ ' + ((o.d && o.d.error) || 'الكود غلط'), false);
+            btn.disabled = false; btn.textContent = 'ادخل';
+            document.getElementById('gtKey').value = '';
           }
         }).catch(function () {
           say('❌ الاتصال فشل — جرب تاني', false);
-          go.disabled = false; go.textContent = 'اعمل حسابي';
+          btn.disabled = false; btn.textContent = 'ادخل';
         });
     };
 
     document.getElementById('gtDo').onclick = go;
     document.getElementById('gtBack').onclick = welcome;
-    key.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
-    setTimeout(function () { document.getElementById('gtName').focus(); }, 60);
+    document.getElementById('gtResend').onclick = function () {
+      var b = this; b.disabled = true; b.textContent = '⏳…';
+      fetch(apiBase() + '/api/auth/otp/send', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: mail, name: name || 'مستخدم' })
+      }).then(function () { say('✅ بعثنا كود جديد', true); })
+        .finally(function () { b.disabled = false; b.textContent = '📩 ابعت تاني'; });
+    };
+    var k = document.getElementById('gtKey');
+    k.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
+    setTimeout(function () { k.focus(); }, 80);
   }
 
   /* ═══ دخول ═══ */
@@ -185,44 +195,33 @@
     formEl().innerHTML =
       '<label class="gt-lb">إيميلك</label>' +
       '<input id="gtMail2" class="gt-in" type="email" placeholder="example@mail.com" maxlength="120" autocomplete="email" dir="ltr">' +
-      '<label class="gt-lb">الكود <small>6 أرقام — اللي اخترته أول مرة</small></label>' +
-      '<input id="gtKey2" class="gt-in gt-code-in" placeholder="······" maxlength="6" inputmode="numeric" autocomplete="one-time-code">' +
       '<div id="gtMsg" class="gt-msg"></div>' +
-      '<button class="gt-go" id="gtDo2">ادخل</button>' +
-      '<button class="gt-back" id="gtReset">نسيت الكود؟</button>' +
+      '<button class="gt-go" id="gtDo2">ابعتلي الكود</button>' +
       '<button class="gt-back" id="gtBack2">رجوع</button>';
 
     var go = function () {
       var mail = document.getElementById('gtMail2').value.trim();
-      var k = document.getElementById('gtKey2').value.trim();
+      var btn = document.getElementById('gtDo2');
       if (!mail) { say('❌ الإيميل مطلوب', false); return; }
-      if (!/^\d{6}$/.test(k)) { say('❌ الكود 6 أرقام', false); return; }
-
-      go.disabled = true; go.textContent = '⏳ بنتحقق…';
-      fetch(apiBase() + '/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'x', key: k, email: mail })
-      }).then(function (r) { return r.json().then(function (d) { return { d: d }; }); })
-        .then(function (o) {
-          if (o.d && o.d.ok) {
-            put(o.d.token, o.d.user);
-            try { octaTrack('login', 'gate', ''); } catch (e) { }
-            shut();
-          } else {
-            say('❌ ' + ((o.d && o.d.error) || 'الإيميل أو كلمة السر غلط'), false);
-            go.disabled = false; go.textContent = 'ادخل';
-          }
-        }).catch(function () {
-          say('❌ الاتصال فشل — جرب تاني', false);
-          go.disabled = false; go.textContent = 'ادخل';
-        });
+      if (mail.indexOf('@') < 1 || mail.indexOf('.') < 1) { say('❌ شكل الإيميل غلط', false); return; }
+      btn.disabled = true; btn.textContent = '⏳ بنبعت…';
+      fetch(apiBase() + '/api/auth/otp/send', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: mail })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (!d || !d.ok) {
+          say('❌ ' + ((d && d.error) || 'حصل خطأ'), false);
+          btn.disabled = false; btn.textContent = 'ابعتلي الكود'; return;
+        }
+        askCode('', mail, 'دخول');
+      }).catch(function () {
+        say('❌ الاتصال فشل — جرب تاني', false);
+        btn.disabled = false; btn.textContent = 'ابعتلي الكود';
+      });
     };
 
     document.getElementById('gtDo2').onclick = go;
-    document.getElementById('gtReset').onclick = forgot;
     document.getElementById('gtBack2').onclick = welcome;
-    document.getElementById('gtKey2').addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
     setTimeout(function () { document.getElementById('gtMail2').focus(); }, 60);
   }
 

@@ -5652,16 +5652,6 @@ body.set-notab { font-variant-numeric: normal; }
 .gt-lb:first-child { margin-top: 0; }
 .gt-lb small { font-weight: 400; opacity: .75; font-size: .9em; }
 
-.gt-codes { display: flex; gap: 7px; margin-bottom: 9px; }
-.gt-pick {
-  flex: 1; padding: 11px 4px; border-radius: 10px; cursor: pointer;
-  background: var(--pri); border: 1px solid var(--line);
-  color: var(--txt); font-family: inherit; font-size: .92rem; font-weight: 800;
-  letter-spacing: 1.5px; font-variant-numeric: tabular-nums;
-  transition: border-color .15s, background .15s;
-}
-.gt-pick:hover { border-color: var(--gold); }
-.gt-pick.on { border-color: var(--gold); background: rgba(212,175,55,.13); color: var(--gold); }
 
 .gt-code-in {
   text-align: center; letter-spacing: 9px;
@@ -5686,4 +5676,16 @@ body.set-notab { font-variant-numeric: normal; }
   padding: 13px; border-radius: 10px; margin-bottom: 10px; text-align: center;
   background: rgba(224,120,80,.1); border: 1px solid rgba(224,120,80,.3);
   font-size: .84rem; font-weight: 700; color: #e07850;
+}
+
+/* ═══ شاشة «ابعتنا الكود» ═══ */
+.gt-sent {
+  text-align: center; font-size: 2.6rem; line-height: 1;
+  margin: 4px 0 10px;
+}
+.gt-sent-t { text-align: center; font-weight: 800; font-size: .95rem; margin-bottom: 4px; }
+.gt-sent-s {
+  text-align: center; font-size: .8rem; color: var(--muted);
+  direction: ltr; margin-bottom: 14px;
+  overflow-wrap: anywhere;
 }
