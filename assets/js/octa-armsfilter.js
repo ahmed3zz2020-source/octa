@@ -166,15 +166,23 @@
 
     h += '<div class="af-intro">';
     h += '<div class="af-i-q">ازاي OCTA بيحلّل؟</div>';
-    h += '<div class="af-i-a">كل سهم بيتقيّم من <b>5 محركات</b>، وكل محرك بيطلع درجة من 100 — وفيه حالات بتعدّاه قبل الخصومات.</div>';
-    h += '<div class="af-i-a">الدرجة النهائية = مجموع الدرجات مضروبة في أوزانها، بعد خصم المخاطرة.</div>';
+    h += '<div class="af-i-a">المحرك بيقيّم كل سهم من <b>7 محاور</b>، وكل محور بيطلع درجة من 100.</div>';
+    h += '<div class="af-i-a">الدرجة النهائية = مجموع (درجة كل محور × وزنه) بعد استبعاد المحاور الناقصة، وبعدين خصومات.</div>';
     h += '<div class="af-i-w">' +
       '<span>🛡️ الأمان <b>24%</b></span><span>💰 الأساسي <b>22%</b></span>' +
       '<span>📈 الفني <b>18%</b></span><span>💧 السيولة <b>18%</b></span>' +
-      '<span>💼 المحفظة <b>9%</b></span><span>📰 الأخبار <b>5%</b></span>' +
+      '<span>💼 المحفظة <b>9%</b> <i class="af-fix">ثابت</i></span>' +
+      '<span>📰 الأخبار <b>5%</b> <i class="af-fix">ثابت</i></span>' +
       '<span>🧠 المعنويات <b>4%</b></span></div>';
+    h += '<div class="af-i-hon">' +
+      '⚠️ <b>محورين ثابتين دلوقتي:</b> الأخبار 45 لكل سهم، والمحفظة 70 لكل سهم — ' +
+      'مفيش مصدر بيانات ليهم لسه. يعني <b>14% من الوزن ثابت</b> وبيزوّد صفر للفرق بين الأسهم. ' +
+      'اللي بيفرق فعلياً هو <b>5 محاور</b>.' +
+      '</div>';
     h += '<div class="af-i-n">👆 اختار ذراع عشان تشوف الأسهم مرتبة بيها — الدرجة دي <b>نفس الرقم</b> اللي دخل في المجموع، مش حساب تاني.</div>';
     h += '</div>';
+
+    h += aboutBox();
 
     h += '<div class="af-grid">';
     ARMS8.forEach(function (a) {
@@ -196,6 +204,63 @@
     host.innerHTML = h;
   }
 
+  /* ══ كارت الشرح — نفس فكرة كارت الفلتر筛查 ══ */
+  function aboutBox() {
+    var o = !!AF.about;
+    var h = '<div class="af-about' + (o ? ' open' : '') + '">';
+    h += '<button type="button" class="af-about-h" data-af="about">' +
+      '<span>❓ كل الفلاتر دي بتعمل إيه؟</span><b>' + (o ? '▲' : '▼') + '</b></button>';
+    if (!o) { h += '</div>'; return h; }
+
+    h += '<div class="af-about-b">';
+
+    h += '<div class="af-diff">';
+    h += '<div class="af-dc">' +
+      '<div class="af-dh">🔒 من محرك OCTA</div>' +
+      '<div class="af-db">الأوزان دي <b>مقفولة</b> — إحنا اللي بنظبطها</div>' +
+      '<ul class="af-dl">' +
+      '<li>محور واحد بياخد أوزان مجرّدة ومحدّدة</li>' +
+      '<li>الدرجة النهائية = المجموع المرجّح بعد خصم المخاطرة</li>' +
+      '<li>ليه؟ عشان تكون الدرجة <b>مقارنة</b> بين الأسهم مش تنافس مع Stocks تانية</li>' +
+      '</ul></div>';
+    h += '<div class="af-dc">' +
+      '<div class="af-dh">🎚️ من ذراع بتختاره</div>' +
+      '<div class="af-db">أنت بتختار <b>ذراع واحدة</b> بس</div>' +
+      '<ul class="af-dl">' +
+      '<li>الأسهم بتترتيب <b>بالدرجة دي</b> بس</li>' +
+      '<li>عمود «الفرق» بيقولك السهم قوي هنا ولا ضعيف</li>' +
+      '<li>ده مش بيغيّر الدرجة النهائية — بيغيّر <b>نظرك أنت</b></li>' +
+      '</ul></div>';
+    h += '</div>';
+
+    /* ⛌ الخلط اللي الناس بتعمله */
+    h += '<div class="af-warn">' +
+      '<b>⚠️ الخلط اللي بيحصل:</b> ' +
+      '«الأعلى في الذراع» مش معناها «الأفضل استثمار». ' +
+      'سهم ممتاز في <b>الأساسي</b> ممكن يكون ضعيف في <b>الأمان</b> — وده بالظبط الفرق بين اختيار ذراع والاختيار تاني.' +
+      '</div>';
+
+    /* الأذرع ورا Expedition بعض */
+    h += '<div class="af-dl2">';
+    ARMS8.forEach(function (a) {
+      var c = coverage(a);
+      h += '<div class="af-r' + (a.derived ? ' der' : '') + '">' +
+        '<span class="af-ri">' + a.ic + '</span>' +
+        '<span class="af-rn">' + a.n + '</span>' +
+        '<span class="af-rd">' + a.d + '</span>' +
+        '<span class="af-rc">' + c.have + '/' + c.all + ' · ' + c.pct + '%</span>' +
+        '<span class="af-rs">' + a.src + '</span>' +
+        '</div>';
+    });
+    h += '</div>';
+
+    h += '<div class="af-note2">💡 <b>التغطية</b> بتقول لك كام سهم عنده بيانات للذراع ده فعلاً. ' +
+      'اللي مالوش بيانات مش بيتردب بصفر — بيتشال من الحسبة ويُحسب لك.</div>';
+
+    h += '</div></div>';
+    return h;
+  }
+
   /* ═══ التفاصيل ═══ */
   function renderDetail() {
     var arm = ARMS8.filter(function (a) { return a.id === AF.arm; })[0] || ARMS8[0];
@@ -210,7 +275,13 @@
       .sort(function (a, b) { return arm.get(b) - arm.get(a); });
 
     var h = '';
-    h += '<div class="af-back"><button type="button" class="af-bb" data-af="back">→ كل الأذرع</button></div>';
+    h += '<div class="af-bar">' +
+      '<button type="button" class="af-bb" data-af="back">→ كل الأذرع</button>' +
+      '<div class="af-bar-r">' +
+      '<span class="af-tm" id="afTime">—</span>' +
+      '<button type="button" class="af-rb" data-af="refresh">🔄 تحديث</button>' +
+      '<button type="button" class="af-xb" data-af="close" aria-label="اخرج من الفلتر">✕</button>' +
+      '</div></div>';
 
     h += '<div class="af-d-h"><span class="af-d-ic">' + arm.ic + '</span>' +
       '<div><div class="af-d-n">' + arm.n + '</div>' +
@@ -262,6 +333,46 @@
     bind();
   }
 
+  /* ══ ريفيش جو الفلتر — مش بيخرج بره ولا بيرسم الصفحة ══
+     ⛌ لو نادينا switchPage كان المستخدم بيضيع مكانه في كل مرة. */
+  function doRefresh() {
+    var btn = document.querySelector('.af-rb');
+    var tm = document.getElementById('afTime');
+    if (btn) { btn.textContent = '⏳ جاري…'; btn.disabled = true; }
+    var done = function (msg, ok) {
+      if (btn) { btn.textContent = msg; btn.disabled = false; }
+      if (tm) tm.textContent = ok ? new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'فشل التحديث';
+      setTimeout(function () {
+        if (btn) { btn.textContent = '🔄 تحديث'; btn.disabled = false; }
+      }, 2600);
+    };
+    try {
+      var pr = (typeof refreshPrices === 'function') ? refreshPrices
+             : (typeof loadAll === 'function') ? loadAll
+             : (typeof octaLoadDB === 'function') ? octaLoadDB : null;
+      if (!pr) return done('🔄 تحديث', false);
+      var r = pr();
+      if (r && typeof r.then === 'function') {
+        return r.then(function () { lastN = -1; renderDetail(); done('✅ اتحدّث', true); })
+                 .catch(function () { done('⚠️ فشل', false); });
+      }
+      setTimeout(function () { lastN = -1; renderDetail(); done('✅ اتحدّث', true); }, 1200);
+    } catch (e) { done('⚠️ فشل', false); }
+  }
+
+  /* ══ اخرج من الفلتر — يرجّعك مكان ما كنتش ══ */
+  function leaveFilter() {
+    AF.sel = null;
+    var back = AF.from || 'home';
+    if (typeof switchPage === 'function') switchPage(back);
+  }
+
+  function currentPageId() {
+    var p = document.querySelector('.page');
+    if (p && p.id) return p.id.replace('page-', '');
+    return 'home';
+  }
+
   /* ═══ الأحداث ═══ */
   function bind() {
     var min = document.getElementById('afMin');
@@ -282,8 +393,13 @@
     if (!card) return;
     var v = card.getAttribute('data-af');
     if (v === 'back') { AF.sel = null; renderPage(); return; }
+    if (v === 'about') { AF.about = !AF.about; renderPage(); return; }
+    if (v === 'close') { leaveFilter(); return; }
+    if (v === 'refresh') { doRefresh(); return; }
     if (v === 'min') return;
-    AF.arm = v; AF.min = 0; AF.sel = v; renderDetail();
+    AF.arm = v; AF.min = 0; AF.sel = v;
+    AF.from = currentPageId();
+    renderDetail();
   });
 
   document.addEventListener('input', function (e) {

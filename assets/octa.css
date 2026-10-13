@@ -5584,3 +5584,93 @@ body.set-notab { font-variant-numeric: normal; }
   font-style: normal; font-size: .68rem; margin-inline-start: 3px;
   color: var(--gold); vertical-align: super;
 }
+
+/* ═══ فلتر الأذرع — كارت الشرح ═══ */
+.af-about {
+  margin-bottom: 14px; border-radius: 13px;
+  background: var(--card, var(--pri2)); border: 1px solid var(--line);
+  overflow: hidden;
+}
+.af-about-h {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 16px; cursor: pointer; font-family: inherit;
+  background: transparent; border: 0; color: var(--gold);
+  font-size: .89rem; font-weight: 800;
+}
+.af-about-h:hover { background: rgba(212,175,55,.06); }
+.af-about-h b { font-size: .8rem; color: var(--muted); }
+.af-about-b { padding: 4px 16px 16px; border-top: 1px dashed var(--line); }
+
+.af-diff { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; margin: 14px 0 12px; }
+@media (max-width: 700px) { .af-diff { grid-template-columns: 1fr; } }
+.af-dc {
+  padding: 12px 14px; border-radius: 11px;
+  background: var(--pri2); border: 1px solid var(--line);
+}
+.af-dh { font-weight: 800; font-size: .85rem; margin-bottom: 5px; }
+.af-db { font-size: .76rem; color: var(--muted); margin-bottom: 9px; line-height: 1.7; }
+.af-db b { color: var(--gold); }
+.af-dl { margin: 0; padding-inline-start: 17px; }
+.af-dl li { font-size: .77rem; line-height: 1.85; color: var(--muted); }
+.af-dl b { color: var(--txt); }
+
+.af-warn {
+  padding: 11px 14px; border-radius: 11px; margin-bottom: 13px;
+  background: rgba(224,120,80,.08); border: 1px solid rgba(224,120,80,.28);
+  font-size: .79rem; line-height: 1.85; color: var(--muted);
+}
+.af-warn b { color: var(--txt); }
+
+.af-dl2 { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); }
+.af-r {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 4px 8px;
+  align-items: baseline; padding: 10px 12px; border-radius: 10px;
+  background: var(--pri2); border: 1px solid var(--line);
+}
+.af-r.der { border-style: dashed; }
+.af-ri { font-size: 1.05rem; }
+.af-rn { font-weight: 800; font-size: .83rem; }
+.af-rd { font-size: .72rem; color: var(--muted); grid-column: 2 / 4; }
+.af-rc { font-size: .7rem; color: var(--gold); font-weight: 700; white-space: nowrap; }
+.af-rs { font-size: .66rem; color: var(--muted); grid-column: 1 / 4; opacity: .8; }
+
+.af-note2 {
+  margin-top: 12px; font-size: .77rem; line-height: 1.85;
+  color: var(--muted);
+}
+.af-note2 b { color: var(--gold); }
+
+/* honesty box */
+.af-i-hon {
+  margin-top: 10px; padding: 11px 13px; border-radius: 10px;
+  background: rgba(224,120,80,.08); border: 1px solid rgba(224,120,80,.3);
+  font-size: .78rem; line-height: 1.85; color: var(--muted);
+}
+.af-i-hon b { color: var(--txt); }
+.af-fix {
+  font-style: normal; font-size: .62rem; padding: 1px 6px;
+  border-radius: 99px; background: rgba(224,120,80,.18);
+  color: #e07850; margin-inline-start: 4px;
+}
+
+/* شريط الثبات جوه الفلتر */
+.af-bar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 9px; margin-bottom: 11px; padding: 8px 10px;
+  border-radius: 12px; background: var(--card, var(--pri2));
+  border: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+}
+.af-bar-r { display: flex; align-items: center; gap: 7px; }
+.af-tm { font-size: .7rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.af-rb, .af-xb {
+  padding: 7px 13px; border-radius: 100px; cursor: pointer;
+  background: var(--pri2); border: 1px solid var(--line);
+  color: var(--txt); font-family: inherit; font-weight: 800; font-size: .78rem;
+  white-space: nowrap;
+}
+.af-rb:hover { border-color: var(--gold); color: var(--gold); }
+.af-rb:disabled { opacity: .55; cursor: default; }
+.af-xb { width: 34px; padding: 7px 0; text-align: center; }
+.af-xb:hover { border-color: #e07850; color: #e07850; }
