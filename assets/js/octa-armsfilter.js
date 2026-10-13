@@ -129,10 +129,20 @@
   /* ═══ الحالة ═══ */
   var AF = { arm: 'total', min: 0, sector: 'all', sel: null, built: false };
 
+  /* ⛌ النسب مبنية على OS_DB — لو اتحسبت قبل ما البيانات توصل
+     بتفضل فاضية. فبنبنيها عند كل قراءة: 296 صف و12 قطاع،
+     مش تكلفة. */
+  function ensureBuilt() {
+    if (!OS_DB || !OS_DB.length) return;
+    buildDerived();
+    buildRisk3();
+  }
+
   /* ═══ التغطية ═══ */
   function coverage(arm) {
+    ensureBuilt();
     var rows = OS_DB.filter(function (s) { return s.price > 0; });
-    var have = rows.filter(function (s) { return arm.get(s) != null; });
+    var have = rows.filter(function (s) { return arm.has ? arm.has(s) : arm.get(s) != null; });
     return { have: have.length, all: rows.length, pct: rows.length ? Math.round(have.length / rows.length * 100) : 0 };
   }
 
@@ -140,11 +150,7 @@
   function renderPage() {
     var host = document.getElementById('armsList');
     if (!host) return;
-    /* ⛌ النسب بتبني على OS_DB — لو اتحسبت قبل ما البيانات
-       توصل، الـmaps بتفضل فاضية للأبد. فبنبنيها كل مرة؛
-       296 صف و12 قطاع — مش تكلفة. */
-    buildDerived();
-    buildRisk3();
+    ensureBuilt();
 
     if (AF.sel) return renderDetail();
 
@@ -191,7 +197,7 @@
       if (AF.sector !== 'all' && (s.sectorEn || s.sector) !== AF.sector) return false;
       return true;
     });
-    var scored = rows.filter(function (s) { return arm.get(s) != null; });
+    var scored = rows.filter(function (s) { return arm.has ? arm.has(s) : arm.get(s) != null; });
     var skipped = rows.length - scored.length;
     var shown = scored.filter(function (s) { return arm.get(s) >= AF.min; })
       .sort(function (a, b) { return arm.get(b) - arm.get(a); });
@@ -208,7 +214,8 @@
 
     h += '<div class="af-stats">' +
       '<span class="af-s"><b>' + scored.length + '</b> عندهم بيانات</span>' +
-      (skipped ? '<span class="af-s warn"><b>' + skipped + '</b> بدون بيانات</span>' : '') +
+      (skipped ? '<span class="af-s warn"><b>' + skipped + '</b> ' +
+        (arm.id === 'div' ? 'بدون توزيع' : 'بدون بيانات') + '</span>' : '') +
       '<span class="af-s ok"><b>' + shown.length + '</b> عدّى الفلتر</span></div>';
 
     if (!shown.length) {
