@@ -132,15 +132,20 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: mail, name: name || 'مستخدم' })
-      }).then(function (r) { return r.json(); }).then(function (d) {
-        if (!d || !d.ok) {
-          say('❌ ' + errAr(d), false);
-          btn.disabled = false; btn.textContent = 'ابعتلي الكود';
-          return;
-        }
-        askCode(name, mail, 'حساب جديد');
-      }).catch(function () {
-        say('❌ الاتصال فشل — جرب تاني', false);
+      }).then(function (r) {
+        return r.text().then(function (txt) {
+          var d = null; try { d = JSON.parse(txt); } catch (e) { d = null; }
+          return { s: r.status, d: d };
+        });
+      }).then(function (o) {
+        if (o.s === 200 && o.d && o.d.ok) { askCode(name, mail, 'حساب جديد'); return; }
+        if (o.s === 429) { var w = (o.d && o.d.retry_after) || 60; say('⏳ استنى ' + Math.ceil(w / 60) + ' دقيقة وجرب تاني', false); }
+        else say('❌ ' + ((o.d && o.d.error) || ('خطأ ' + o.s)), false);
+        btn.disabled = false; btn.textContent = 'ابعتلي الكود';
+        return;
+      }).catch(function (e) {
+        var why = (e && e.message) ? e.message : String(e);
+        say('⚠️ مش قادرين نوصل للسيرفر (' + why.slice(0, 55) + ')', false);
         btn.disabled = false; btn.textContent = 'ابعتلي الكود';
       });
     };
@@ -300,10 +305,71 @@
     };
   }
 
+  /* ═══════════════════════════════════════════════════════════
+     🔄 مزامنة النسخة — تحلّ مشاكل «التباب القديم»
+     ───────────────────────────────────────────────────────────
+     ⛔⛔ المشكلة: التابات القديمة في المتصفح بتفضل شغالة بالكود القديم
+        (نفس الـDOM ونفس الـJavaScript) حتى بعد النشر. المستخدم
+        يشوف رسالة من يوم فاتت ويحس إن الموقع باظ.
+        ⛌ الحل: بنخزّن رقم النسخة، ولو اختلف → إعادة تحميل واحدة.
+        ⛌ «مرة واحدة بس» عشان ما نعملش loop لا نهائي.
+     ═══════════════════════════════════════════════════════════ */
+  function syncBuild() {
+    try {
+      var me = document.currentScript;
+      var v = (me && me.src || '').split('v=')[1] || '';
+      if (!v) v = String(Date.now()).slice(0, 6);
+      var prev = localStorage.getItem('octa_build_v');
+      if (prev && prev !== v) {
+        localStorage.setItem('octa_build_v', v);
+        sessionStorage.setItem('octa_reloaded', v);
+        location.reload();
+        return;
+      }
+      localStorage.setItem('octa_build_v', v);
+      sessionStorage.setItem('octa_reloaded', v);
+    } catch (e) { }
+  }
+  syncBuild();
+
   /* ═══ تشغيل ═══ */
   window.OCTAGate = {
     open: open, shut: shut,
     login: login, signup: signup, welcome: welcome
+  };
+
+  /* ⛔⛌ السيرفر رفض بيانات محمية (401) — يعني التوكن مش صالح.
+     ⛔ قبل الكود ده كان الموضوع صامت: الصفحة بتفتح وهي فاضية
+        والـuser مبيعرفش إن السبب إن sessionته انتهت.
+        ⛌ دلوقتي: نقوله بالظبط ونرجّعه للبابة. */
+  window.OCTAAuthFail = function (path) {
+    if (window.__octaAuthFailShown) return;   /* مرة واحدة بس */
+    window.__octaAuthFailShown = true;
+    try { localStorage.removeItem('octa_token'); } catch (e) { }
+    try { localStorage.removeItem('octa_user'); } catch (e) { }
+    window.OCTA_USER_ID = '';
+    try {
+      var b = document.getElementById('octaAuthMsg');
+      if (!b) {
+        b = document.createElement('div');
+        b.id = 'octaAuthMsg';
+        b.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;'
+          + 'align-items:center;justify-content:center;background:rgba(10,14,20,.82);'
+          + 'padding:20px;font-family:system-ui,sans-serif';
+        b.innerHTML = '<div style="max-width:340px;background:#16202e;border:1px solid #2b3a4f;'
+          + 'border-radius:16px;padding:26px;text-align:center;color:#e8edf5">'
+          + '<div style="font-size:34px">🔑</div>'
+          + '<div style="margin:10px 0 6px;font-size:18px;font-weight:700">انتهت جلستك</div>'
+          + '<div style="color:#93a1b5;font-size:14px;line-height:1.7">'
+          + 'حسابك مش متعرّف عليه — اعمل دخول تاني من إيميلك</div>'
+          + '<button id="octaAuthAgain" style="margin-top:18px;width:100%;padding:12px;'
+          + 'border:0;border-radius:10px;background:#d4af37;color:#16202e;font-weight:700;'
+          + 'font-size:15px;cursor:pointer">إعادة الدخول</button></div>';
+        document.body.appendChild(b);
+        var g = document.getElementById('octaAuthAgain');
+        if (g) g.onclick = function () { location.href = location.origin + location.pathname + '?r=' + Date.now(); };
+      }
+    } catch (e) { }
   };
 
   window.addEventListener('DOMContentLoaded', function () {

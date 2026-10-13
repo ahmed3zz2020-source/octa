@@ -12,4 +12,4 @@ dist/
 .env.*
 
 # ⛔ أسرار — ما تحطش هنا أبداً
-# التوكن في Railway Variables فقط
+# التوكن في Railway Variables فقط/workspace/octa-secrets/

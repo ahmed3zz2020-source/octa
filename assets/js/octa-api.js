@@ -101,11 +101,20 @@
     if (s.indexOf(SERVERS[0].url) !== 0) return ORIG.apply(this, arguments);
 
     const opt = _withToken(url, opts);
+    const guarded = AUTH_PATHS.indexOf(_pathOf(url)) !== -1;
 
     return ORIG.call(this, url, opt)
       .then(function (r) {
         /* السيرفر رجّع error حقيقي (مش شبكة) — مفيش failover */
         if (r.status >= 500) window.OCTAServer.failover();
+        /* ⛔ ⛔ التوكن مرفوض أو مش موجود ← الموقع كله هيطلع فاضي
+           والـuser مش هيعرف السبب. الحل الوحيد: نقوله ونرجّعه للبابة
+           بدل ما نسيبه قدام صفحة صامتة. */
+        if (guarded && r.status === 401 && r.path !== '/api/auth/me') {
+          try {
+            if (typeof window.OCTAAuthFail === 'function') window.OCTAAuthFail(r.path);
+          } catch (e) { }
+        }
         return r;
       })
       .catch(function (e) {
