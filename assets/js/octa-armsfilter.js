@@ -14,19 +14,27 @@
      sext = الحقل داخل OS_DB (مجاني 100%)
      src  = مصدر الرقم — بيتعرض للمستخدم
      cov  = التغطية (بيتحسب وقت التشغيل، مش مكتوب يدوي) */
+  /* قراءة الدرجة من أي مكان محفوظة فيه — خطأ تطبيع واحد
+     يكفي يخلي الفلتر يرجع صفر صف من غير ما يبان */
+  function ax(s, k) {
+    var sc = s.sect || s.sections;
+    if (sc && sc[k] != null) return sc[k];
+    return s[k];
+  }
+
   var ARMS8 = [
     { id: 'total', ic: '🐙', n: 'المجموع', d: 'تقييم OCTA الكامل',
       get: function (s) { return s.score; }, src: 'المحركات الخمسة كلها' },
     { id: 'q', ic: '💰', n: 'الأساسي', d: 'جودة الشركة من جوه',
-      get: function (s) { return s.sect && s.sect.q; }, src: 'أرباح وعوائد ونسب' },
+      get: function (s) { return ax(s, 'q'); }, src: 'أرباح وعوائد ونسب' },
     { id: 'v', ic: '🏷️', n: 'التقييم', d: 'السهم غالي ولا رخيص',
-      get: function (s) { return s.sect && s.sect.v; }, src: 'مضاعف الربحية والقيمة الدفترية' },
+      get: function (s) { return ax(s, 'v'); }, src: 'مضاعف الربحية والقيمة الدفترية' },
     { id: 'm', ic: '📈', n: 'الفني', d: 'حركة السعر والزخم',
-      get: function (s) { return s.sect && s.sect.m; }, src: 'مؤشرات فنية من الشارت' },
+      get: function (s) { return ax(s, 'm'); }, src: 'مؤشرات فنية من الشارت' },
     { id: 'lq', ic: '💧', n: 'السيولة', d: 'تقدر تبيع بدري ولا لأ',
-      get: function (s) { return s.sect && s.sect.lq; }, src: 'حجم التداول ونسبته' },
+      get: function (s) { return ax(s, 'lq'); }, src: 'حجم التداول ونسبته' },
     { id: 'sf', ic: '🛡️', n: 'الأمان', d: 'السهم بيتزنق قد إيه',
-      get: function (s) { return s.sect && s.sect.sf; }, src: 'مخاطرة وتذبذب تاريخي' },
+      get: function (s) { return ax(s, 'sf'); }, src: 'مخاطرة وتذبذب تاريخي' },
     /* ↓ الاتنين دول مش من محرك الخمسة — محسوبين من بيانات تاريخية حقيقية.
        كل واحد فيهم بيقول التغطية بتاعته بوضوح. */
     { id: 'risk', ic: '⚠️', n: 'المخاطرة', d: 'التذبذب وأكبر هبوط',
@@ -55,28 +63,20 @@
     vals.forEach(function (o, i) {
       /* +0.5 عشان النتيجة متوسطة للمتساويين مش 0 */
       var r = ((i + 0.5) / n) * 100;
-      (dir > 0 ? ARM_DIV : ARM_RISK)[o.c] = Math.round(r);
+      ARM_DIV[o.c] = Math.round(r);
     });
   }
 
   function buildDerived() {
-    ARM_RISK = {}; ARM_DIV = {};
+    ARM_DIV = {};
     var bySector = {};
     OS_DB.forEach(function (s) { (bySector[s.sectorEn || s.sector] = bySector[s.sectorEn || s.sector] || []).push(s); });
 
+    /* ⛌ المخاطرة مش هنا — buildRisk3 هي اللي بتحسبها من 3 مؤشرات.
+       كانت بتتكتب هنا وبتتمسح بعدها، والنتيجة كانت شاربي لوحدها. */
     Object.keys(bySector).forEach(function (sec) {
-      var L = bySector[sec];
-      /* المخاطرة: تذبذب أقل = أمان أعلى. shopfloor واحد بس
-         مش نسبة مقارَنة — مؤشر مطلق من تاريخ السهم نفسه. */
-      pctRank(L, function (s) { return s.vol1y; }, -1);
-      pctRank(L, function (s) { return s.mdd; }, -1);
-      pctRank(L, function (s) { return s.sharpe3y; }, 1);
-      /* التوزيعات: كل ما النسبة أعلى كل ما أحسن */
-      pctRank(L, function (s) { return (s.dy || 0); }, 1);
+      pctRank(bySector[sec], function (s) { return (s.dy || 0); }, 1);
     });
-
-    /* ادمج المخاطرة من 3 مؤشرات — التذبذب 40% · الهبوط 35% · شاربي 25% */
-    Object.keys(ARM_RISK).forEach(function (c) { ARM_RISK[c] = ARM_RISK[c]; });
   }
 
   /* المخاطرة المحسوبة من 3 مصادر — بنعملها منفصلة عشان ما نلخبطش */
@@ -127,7 +127,7 @@
   function renderPage() {
     var host = document.getElementById('armsList');
     if (!host) return;
-    if (!AF.built) { buildRisk3(); buildDerived(); AF.built = true; }
+    if (!AF.built) { buildDerived(); buildRisk3(); AF.built = true; }
 
     if (AF.sel) return renderDetail();
 

@@ -872,7 +872,10 @@ async function octaLoadDB(){
       /* ⭐ الحقول الجديدة ··من data_full */
       scoreConf: f.conf, whyNote: f.why || '',
       partial: f.partial || [], missingSections: f.missing || [],
-      sect: {q:f.q, v:f.v, m:f.m, sf:f.sf, lq:f.lq},
+      /* ⚠ الأرقام دي متخزّنة جوه EGX_DB كـ f.sect مش f.q.
+         الخريطة القديمة كانت بتقرا f.q فكانت sect بتطلع كلها null
+         والفلاتر اللي بتعتمد عليها مش شغالة. */
+      sect: f.sect || f.sections || {q:f.q, v:f.v, m:f.m, sf:f.sf, lq:f.lq},
       sectorEn: f.sector || '', sectorAr: f.sectorAr || f.sector || '',
       pack: f.pack || '', packNote: f.packNote || '', industry: f.industry,
       deRatio: f.de, curRatio: f.cr, quickRatio: f.qr, roic: f.roic, roaV: f.roa,
