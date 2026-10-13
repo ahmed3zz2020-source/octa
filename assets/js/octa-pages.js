@@ -2699,6 +2699,10 @@ document.addEventListener('DOMContentLoaded', function () {
     else if (window.scrollY > lastY + 8){ bar.classList.add('hide-top'); }
     else if (window.scrollY < lastY - 8){ bar.classList.remove('hide-top'); }
     lastY = Math.max(0, window.scrollY);
+    /* ⛌ شريط الحساب (au-bar) مثبّت top-left بـz-index 9990،
+       فلما الهيدر ينطوي كان بيغطي شريط الأدوات على الموبايل.
+       بنخفيه معاه ونرجّعه أول ما يرجع الهيدر. */
+    document.body.classList.toggle('hd-collapsed', bar.classList.contains('hide-top'));
     ticking = false;
   };
   window.addEventListener('scroll', () => {

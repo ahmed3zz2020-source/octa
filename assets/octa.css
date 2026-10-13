@@ -4587,6 +4587,14 @@ body{margin:0;padding:0 10px 50px;
   color: var(--muted);
   box-shadow: 0 3px 16px rgba(0, 0, 0, .28);
 }
+/* يختفي مع الهيدر وقت الطي عشان ما يغطّيش شريط الأدوات المثبّت */
+@media (max-width: 760px) {
+  body.hd-collapsed .au-bar {
+    opacity: 0; pointer-events: none;
+    transform: translateY(-14px);
+    transition: opacity .18s, transform .18s;
+  }
+}
 .au-bar a { color: var(--gold); text-decoration: none; font-weight: 600; }
 .au-bar a:hover { text-decoration: underline; }
 .au-dot {
