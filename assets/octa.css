@@ -5209,7 +5209,9 @@ body.set-locked { overflow: hidden; }
   inset-inline-end: 32px;
   font-size: 11.5px; font-weight: 800; letter-spacing: .7px; line-height: 1;
   color: var(--set-ink2); pointer-events: none;
-  transition: inset-inline-end .18s, inset-inline-start .18s, color .18s;
+  /* ⚠ ما تتحوّلش الـinsets — الانتقال بينهم كان بيحسب
+     الناحيتين مع بعض، فالنص بيتزحم في مساحة ضيقة. */
+  transition: color .18s;
 }
 .set-sw.on::after {
   content: 'ON';
