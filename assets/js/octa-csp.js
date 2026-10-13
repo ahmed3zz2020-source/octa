@@ -18,11 +18,15 @@
   }
 
   function install(csp) {
-    var s = document.createElement('meta');
-    s.setAttribute('http-equiv', 'Content-Security-Policy');
-    if (!ENFORCE) s.setAttribute('content', 'report-uri /csp-report; ' + csp);
-    else           s.setAttribute('content', csp);
-    document.head.appendChild(s);
+    /* ⛌ report-uri و frame-ancestors المتروكة بالـmeta بيطلعوا تحذير.
+       المتصفح بيتجاهلهم تماماً.إحنا بنحطّهم في الهيدر
+       (Railway/CORS) — هنا بنشيلهم ونسيب الباقي يشتغل. */
+    csp = csp.replace(/report-uri[^;]*;?\s*/i, '')
+             .replace(/frame-ancestors[^;]*;?\s*/i, '');
+    var el = document.createElement('meta');
+    el.setAttribute('http-equiv', 'Content-Security-Policy');
+    el.setAttribute('content', csp);
+    document.head.appendChild(el);
   }
 
   function ready(fn) {
