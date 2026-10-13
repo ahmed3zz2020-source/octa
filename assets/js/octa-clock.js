@@ -29,8 +29,42 @@
 
   function cairoNow(d) {
     d = d || new Date();
-    /* القاهرة = UTC+2 طوال السنة */
-    return new Date(d.getTime() + (d.getTimezoneOffset() + 120) * 60000);
+    /* ⛌ القاهرة = UTC+3 (لا UTC+2).
+       مصر رجّعت التوقيت الصيفي من 2023، فالساعة بتزيد ساعة
+       من أواخر أبريل لغاية أواخر أكتوبر. الكود القديم كان
+       بيطرح ساعة زيادة — فيقول «السوق مغلق» وهو مفتوح، والأسعار
+       ما بتتحدثش.
+
+       📌 الأرقام دي بتتظبط لوحدها حسب التوقيت الصيفي:
+          · صيف (UTC+3)  → بتخزّن التوقيت الصيفي
+          · شتاء (UTC+2) → بيرجع +2
+       ⛔-market phase-server بيحسب بالـbackend صح (UTC+3)،
+          فالواجهة كانت هي اللي غالطة. */
+    /* getTimezoneOffset بيرجع الدقائق *قبل* UTC (بتUIS بتволبvice بتUTC+3
+       فبترجع −180). فبـ180 دي بقى إحنا بنطرح، وبـ−180 إحنا بنضيف.
+       ⛌ الحساب = الجهاز + إزاحة القاهرة، لا الفرق. */
+    var tzMin = d.getTimezoneOffset();        // دقيقة، قبل UTC
+    var cairoMin = isCairoSummer(d) ? 180 : 120;
+    return new Date(d.getTime() + (cairoMin + tzMin) * 60000);
+  }
+
+  /* ⛌ التوقيت الصيفي المصري: من آخر جمعة في أبريل لآخر خميس في أكتوبر */
+  function isCairoSummer(d) {
+    d = d || new Date();
+    var y = d.getFullYear();
+    // آخر خميس في أكتوبر
+    var oct = new Date(y, 9, 31);
+    var lastThuOct = new Date(oct.getTime() - ((oct.getDay() - 4 + 7) % 7) * 86400000);
+    // آخر خميس في أبريل، وبعدها اليوم اللي بعده هو الجمعة
+    // (30 أبريل ممكن يبقى خميس — فلازم نرجع للخميس الأول مش للأخير)
+    var apr = new Date(y, 3, 30);
+    var lastThuApr = new Date(apr.getTime() - ((apr.getDay() - 4 + 7) % 7) * 86400000);
+    var lastFriApr = new Date(lastThuApr.getTime() + 86400000);
+    /* ⛌ لازم نقارن بالوقت اللي اتحسبت بيه — مش «دلوقتي».
+       ⛌ الكود القديم كان بيعمل new Date() جوّه، فأي تاريخ في
+       الماضي أو المستقبل بيطلع صيفي دايماً. */
+    var now = new Date(d.getTime());
+    return now > lastFriApr && now < lastThuOct;
   }
 
   /* 0=الأحد … 6=السبت */
