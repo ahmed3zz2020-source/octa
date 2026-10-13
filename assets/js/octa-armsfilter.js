@@ -166,7 +166,7 @@
 
     h += '<div class="af-intro">';
     h += '<div class="af-i-q">ازاي OCTA بيحلّل؟</div>';
-    h += '<div class="af-i-a">كل سهم بيتقيّم من <b>5 محركات</b>، وكل محرك بيطلع درجة من 100.</div>';
+    h += '<div class="af-i-a">كل سهم بيتقيّم من <b>5 محركات</b>، وكل محرك بيطلع درجة من 100 — وفيه حالات بتعدّاه قبل الخصومات.</div>';
     h += '<div class="af-i-a">الدرجة النهائية = مجموع الدرجات مضروبة في أوزانها، بعد خصم المخاطرة.</div>';
     h += '<div class="af-i-w">' +
       '<span>🛡️ الأمان <b>24%</b></span><span>💰 الأساسي <b>22%</b></span>' +
@@ -243,7 +243,8 @@
         '<td class="af-i">' + (i + 1) + '</td>' +
         '<td><b>' + s.code + '</b><span class="af-nm">' + (s.name || '') + '</span></td>' +
         '<td class="af-sc">' + (s.sectorAr || s.sector || '—') + '</td>' +
-        '<td><b class="af-v' + (av >= 70 ? ' hi' : av >= 50 ? ' mid' : ' lo') + '">' + Math.round(av) + '</b></td>' +
+        '<td><b class="af-v' + (av >= 70 ? ' hi' : av >= 50 ? ' mid' : ' lo') + '">' + Math.round(av) +
+        (av > 100 ? '<i class="af-over" title="الدرجة دي عدّت 100 قبل خصم المخاطرة">↑</i>' : '') + '</b></td>' +
         '<td class="af-tot">' + Math.round(tv) + '</td>' +
         '<td class="af-d' + (d > 0 ? ' up' : d < 0 ? ' dn' : '') + '">' + (d > 0 ? '+' : '') + d + '</td>' +
         '<td class="af-n">' + (s.price || 0).toFixed(2) + '</td>' +
@@ -254,6 +255,7 @@
     h += '</tbody></table>';
     if (shown.length > 120) h += '<div class="af-more">📊 بيعرض أول 120 من ' + shown.length + ' سهم — ضيّق الفلتر عشان تشوف الباقي</div>';
     h += '</div>';
+    h += '<div class="af-legend"><b>↑</b> = الدرجة عدّت 100. ده بيحصل في <b>20 حالة</b> من 1480 قراءة — المحرك بيطلع أعلى من 100 قبل ما خصم المخاطرة والثقة يوصّل المجموع لـ 100. مش خطأ في الفلتر، و<b>المجموع النهائي مابعديش 100</b>.</div>';
     h += '<div class="af-legend"><b>الفرق</b> = درجة ' + arm.n + ' ناقص درجة المجموع. كل ما الرقم أعلى، السهم ده قوي في الذراع ده بس ضعيف في الباقي.</div>';
 
     document.getElementById('armsList').innerHTML = h;

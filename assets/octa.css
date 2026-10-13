@@ -5580,3 +5580,7 @@ body.set-notab { font-variant-numeric: normal; }
   .af-t { font-size: .75rem; }
   .af-t th, .af-t td { padding: 8px 9px; }
 }
+.af-over {
+  font-style: normal; font-size: .68rem; margin-inline-start: 3px;
+  color: var(--gold); vertical-align: super;
+}
