@@ -12,7 +12,8 @@
   /* 📌 عدد أرقام الباسورد — تغيّره هنا بس */
   var PIN_LEN = 4;
 
-  /* 📌 لو السيرفر مبعتش رقم محاولات، بنحسبه من عندنا */
+  /* 📌 عدد المحاولات المسموحة — نفس PIN_FAIL_LIMIT بتاع الباك.
+     ⛔ لو الباك غيّر الرقم، غيّر السطر ده بس. */
   var PIN_TRIES = 5;
 
   /* ═══ الاتصال ═══ */
@@ -318,11 +319,14 @@
     }, 1000);
   }
 
-  /* 📌 رقم المحاولات اللي فاضل — السيرفر أولى، ولا نحسبه ourselves */
-  function leftTries(d) {
+  /* 📌 رقم المحاولات اللي فاضل.
+     ⛔ السيرفر مش بيبعته (بيسلّم 401 {why:"bad_pin"} بس) — فبنحسبه
+        من عندنا على PIN_FAIL_LIMIT بتاع الباك (٥). لو الباك بعت
+        رقم في المستقبل، إحنا بنحترمه. */
+  function leftTries(d, tries) {
     var v = d && (d.remaining != null ? d.remaining
       : (d.left != null ? d.left : (d.tries_left != null ? d.tries_left : null)));
-    if (v == null || isNaN(v)) return Math.max(0, PIN_TRIES - state.tries);
+    if (v == null || isNaN(v)) return Math.max(0, PIN_TRIES - (tries || 0));
     return Math.max(0, Number(v));
   }
 
@@ -336,10 +340,21 @@
     if (b) b.onclick = function () { location.reload(); };
   }
 
-  /* 📌 رد السيرفر في التسجيل — رسالة واحدة مفهومة، ما نقولش مين مسجّل */
+  /* 📌 رد السيرفر في التسجيل — بنوريه زي ما هو،
+     ⛔ وبيتقسم على why (نوع الخطأ) عشان 409 (إيميل أو باسورد مكرر)
+        ما يطلعش للمستخدم كرقم أو كود غامض. */
   function fail(o, fallback) {
     if (o.s === 429) { locked(o.d.retry_after || o.d.retry || 60); return; }
-    say(fallback || ('❌ ' + ((o.d && o.d.error) || ('خطأ ' + o.s))), false);
+    var d = o.d || {};
+    var t = d.error || fallback || ('حصل خطأ (' + o.s + ')');
+    if (d.why === 'email_taken') {
+      t = d.error || 'الإيميل ده مسجّل قبل كده';
+      say('❌ ' + t + ' — لو فاكر الباسورد، «عندك حساب؟ ادخل»', false);
+    } else if (d.why === 'pin_taken') {
+      say('❌ ' + (d.error || 'الباسورد ده مستخدم من قبل') + ' — اكتب ٤ أرقام تانية', false);
+    } else {
+      say('❌ ' + t, false);
+    }
     shake();
   }
 
@@ -404,7 +419,7 @@
           state.pin = '';
           paintDots(); paintPad(false); syncGo();
           if (btn) btn.textContent = 'أنشئ حسابي';
-          fail(o, '❌ الإيميل ده مسجّل قبل كده — جرّب «عندك حساب؟ ادخل»');
+          fail(o, 'التسجيل مانفعش — جرّب تاني');
         })
         .catch(function () {
           state.pin = ''; paintDots(); paintPad(false); syncGo();
@@ -476,6 +491,8 @@
       '<button class="gt-back" id="gtBack" type="button">رجوع</button>';
 
     onPad(function (p) {
+      /* ⛌ العدّاد بيتزاد قبل الطلب — عشان الرسالة بعد الغلط
+        تقول كام محاولة فاضلة فعلاً (مش دايماً ٥). */
       state.tries++;
       paintPad(true);
       clearMsg();
@@ -489,10 +506,10 @@
           }
           if (o.s === 429) { locked(o.d.retry_after || o.d.retry || 60); return; }
           /* ⛌ كل حاجة تانية = الباسورد غلط. ما نقولش حاجة عن الحساب. */
-          state.tries = 0;
-          badPin(leftTries(o.d));
+          badPin(leftTries(o.d, state.tries));
           paintPad(false);
         })
+        /* ⛔ شبكة — المحاولة دي مااتحسبتش عند السيرفر، فنصفّر العدّاد */
         .catch(function () { state.tries = 0; paintPad(false); down('الدخول'); });
     });
 
@@ -500,47 +517,37 @@
     document.getElementById('gtBack').onclick = function () { welcome(); };
   }
 
-  /* ═══ نسيت كلمة المرور — إيميل استرجاع، مش كود دخول ═══ */
+  /* ═══════════════════════════════════════════════════════════
+     ④ نسيت الباسورد
+     ───────────────────────────────────────────────────────────
+     ⛔⛔ حسابات الباسورد **مافيش لها استرجاع** — ده تصميم الباك
+        مش نقص في الشاشة:
+          · إيميل التأكيد مابقعش فيه الباسورد ولا فيه زرار استرجاع
+          · /api/auth/reset بيرجّع كود النظام القديم (key) مش للباسورد
+        ⛌ فبنقولها للمستخدم بنص صريح بدل ما نوعده بإيميل مش هيوصله.
+        📌 لو الباك ضاف POST /api/auth/pin/reset — السطر الوحيد
+           هنا هو اللي هيتغيّر.
+     ═══════════════════════════════════════════════════════════ */
   function forgot() {
     stopLock();
     state.pin = '';
     head('نسيت كلمة المرور', 1);
     boxEl().className = 'gt-box';
     formEl().innerHTML =
-      '<div class="gt-ico">📬</div>' +
-      '<h1 class="gt-h">هنرجّعلك الباسورد</h1>' +
-      '<p class="gt-txt">اكتب الإيميل بتاع الحساب، وهنبعتلك عليه إيميل استرجاع</p>' +
-      '<input id="gtMail3" class="gt-in" type="email" placeholder="name@mail.com" maxlength="120" autocomplete="email" dir="ltr">' +
-      '<div class="gt-msg" id="gtMsg"></div>' +
-      '<button class="gt-go" id="gtSend" type="button">ابعت إيميل الاسترجاع</button>' +
+      '<div class="gt-ico">🔒</div>' +
+      '<h1 class="gt-h">مافيش استرجاع للباسورد</h1>' +
+      '<div class="gt-txt left">' +
+        'حسابك اتفتح بـ<b>٤ أرقام</b> هم المفتاح الوحيد ليه —<br>' +
+        'الإيميل اللي بعتناه وقت التسجيل كان <b>تأكيد</b> بس، ومكانش فيه الباسورد،' +
+        ' ومكانش فيه زرار «نسيت» جواه.<br><br>' +
+        'عشان كده مفيش إيميل استرجاع ولا زرار أرجّعلك الباسورد — ' +
+        'وده اللي بيمنع حد يفتح إيميلك ويسرق حسابك.' +
+      '</div>' +
+      '<button class="gt-go" id="gtNewAcc" type="button">عمل حساب جديد</button>' +
       '<button class="gt-back" id="gtBack3" type="button">رجوع للدخول</button>';
 
-    var btn = document.getElementById('gtSend');
-    var go = function () {
-      var m = document.getElementById('gtMail3').value.trim();
-      if (!m) { say('❌ اكتب الإيميل', false); return; }
-      if (m.indexOf('@') < 1 || m.indexOf('.') < 1) { say('❌ شكل الإيميل غلط', false); return; }
-      btn.disabled = true; btn.textContent = '⏳ بنبعت…';
-      post('/api/auth/reset', { email: m })
-        .then(function (o) {
-          btn.disabled = false; btn.textContent = 'ابعت إيميل الاسترجاع';
-          if (o.s === 429) { locked(o.d.retry_after || 60); return; }
-          /* ⛌ رد واحد سواء الإيميل مسجّل أو لأ — ما نقولش مين مسجّل */
-          if (o.s === 200 && o.d && o.d.ok) {
-            say('✅ ' + (o.d.msg || 'لو الإيميل ده مسجّل، إيميل الاسترجاع في الطريق'), true);
-            btn.style.display = 'none';
-            return;
-          }
-          say('❌ ' + ((o.d && o.d.error) || 'جرّب تاني بعد شوية'), false);
-        })
-        .catch(function () { btn.disabled = false; btn.textContent = 'ابعت إيميل الاسترجاع'; down('الاسترجاع'); });
-    };
-
-    btn.onclick = go;
+    document.getElementById('gtNewAcc').onclick = function () { signup(); };
     document.getElementById('gtBack3').onclick = function () { login(); };
-    var i = document.getElementById('gtMail3');
-    i.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
-    setTimeout(function () { i.focus(); }, 60);
   }
 
   /* ═══ «أريد مساعدة» — صفحة مساعدة جوه البوابة ═══ */
@@ -553,9 +560,9 @@
       '<h1 class="gt-h">محتاج مساعدة؟</h1>' +
       '<div class="gt-txt left">' +
         '• <b>الباسورد</b> هو الـ4 أرقام اللي انت اخترتها أول مرة — من غيرهم مفيش دخول<br>' +
-        '• <b>مفيش إيميل</b> في شاشة الدخول — الإيميل للاسترجاع بس<br>' +
-        '• <b>نسيت الـ4 أرقام؟</b> اضغط «نسيت كلمة المرور» في شاشة الدخول<br>' +
-        '• <b>القفل</b> بيقفل مؤقت لو اتكتب غلط كذا مرة — وبيعدّي لوحده' +
+        '• <b>مفيش إيميل</b> في شاشة الدخول — الباسورد هو كل حاجة<br>' +
+        '• <b>نسيت الـ4 أرقام؟</b> مفيش استرجاع — اعرف حساب جديد<br>' +
+        '• <b>القفل</b> بيقفل ١٥ دقيقة بعد ٥ محاولات غلط — وبعدها ساعة' +
       '</div>' +
       '<button class="gt-go" id="gtBackH" type="button">فهمت — ارجع</button>';
 
