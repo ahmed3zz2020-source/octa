@@ -4626,20 +4626,45 @@ body{margin:0;padding:0 10px 50px;
 }
 
 /* ══════════════════════════════════════════════════════════════
-   🚪 بوابة الدخول — لوحة الأرقام
+   🚪 بوابة الدخول — ملء الشاشة على الموبايل
    ──────────────────────────────────────────────────────────────
    ⛔ كل الألوان من الـtokens (octa-tokens.css) — ممنوع hex هنا.
+   📌 القاعدة: **الشاشة** هي اللي بتتغيّر، مش كل شاشة لوحدها.
+      · موبايل  → الكارت بياخد الشاشة كلها، والفراغ بيتوزّع
+      · ≥ ٧٠٠px → الكارت بيرجع في النص بعرض أقصى ٤٢٠
+        (٧٠٠ مش ٨٢٠ عشان تابلت ٧٦٨×١٠٢٤ يبقى كارت زي ما هو)
+   📌 مافيش شاشة استثنائية: القواعد دي على الهيكل نفسه
+      (#gate › .gt-body › .gt-box › #gt-form) — فأي شاشة جديدة
+      بتاخد نفس المعالجة من غير سطر واحد زيادة.
    ══════════════════════════════════════════════════════════════ */
+
+/* ⓪ الحاوية — الطول الديناميكي + قصّ النوتش.
+   ⛔ 100dvh مش 100vh: في متصفح الموبايل 100vh = الشاشة من غير
+      شريط العنوان، فالبوابة كانت بتقفز وبتقطع نص الكارت.
+   ⛔ الحاشية من الـsafe-area: النوتش فوق والشريط تحت. */
 #gate {
   background: var(--bg) !important;
+  height: 100vh;                 /* متصفحات/webviews من غير dvh */
+  height: 100dvh;                /* الطول الحقيقي مع شريط العنوان */
+  max-width: 100vw;
+  overscroll-behavior: none;     /* ⛔ مفيش سحب لتحت ولا rubber-band */
+  padding:
+    env(safe-area-inset-top, 0px)
+    env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-left, 0px);
 }
-/* 🖥️ الشاشة كلها عمود: شريط فوق + محتوى في النص */
+@supports not (height: 100dvh) {
+  #gate { height: 100vh; }
+}
+
+/* 🖥️ الهيكل كله عمود: شريط فوق (ثابت) + محتوى (مرن) */
 .gt-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;              /* ⛔ البوابة نفسها مابتتمرّش — التمرير جوه */
+  overscroll-behavior: none;
   /* ⛔ لازم لون صراحة: البوابة شايلة ألوان النهاري، فلو ورثنا لون
      الـbody (نص غامق على خلفية غامقة) — الكلام بيختفي. */
   color: var(--txt);
@@ -4654,7 +4679,7 @@ body{margin:0;padding:0 10px 50px;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 16px 18px 4px;
+  padding: 12px 18px 6px;
   flex: 0 0 auto;
 }
 .gt-top-t {
@@ -4676,65 +4701,78 @@ body{margin:0;padding:0 10px 50px;
 .gt-top-b:hover { color: var(--gold); }
 .gt-top-b.bk { color: var(--gold); }
 
+/* 📌 الوسط — هو اللي بيرن، وهو الوحيد اللي بيتمرّ لو المحتوى
+   أطول من الشاشة (شاشة التسجيل على ٣٦٠ مثلاً). */
 .gt-body {
   flex: 1 1 auto;
+  min-height: 0;                 /* ⛔ بدونها الـflex مش بيعرف يقسّم الشاشة */
   width: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 6px 20px 18px;
+  justify-content: safe center;  /* ⛔ مافيش قصّ من فوق لو المحتوى طويل */
+  padding: 2px 16px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
+
+/* 📌 الكارت — على الموبايل الشاشة نفسها هي الكارت:
+   مافيش إطار ولا خلفية ولا حاشية عمودية. */
 .gt-box {
   width: 100%;
-  max-width: 400px;
-  padding: 24px 20px 20px;
-  text-align: center;
-  border: 1px solid var(--line);
-  border-radius: var(--r4);
-  background: var(--card);
-  box-shadow: var(--sh3);
-}
-/* ⛌ شاشة الدخول — من غير كارت: الشاشة نفسها سوداء زي الصورة */
-.gt-box.pin {
-  max-width: 380px;
+  max-width: 460px;
+  flex: 1 1 auto;                /* ياخد باقي الارتفاع */
+  display: flex;
+  flex-direction: column;
   padding: 0;
+  text-align: center;
   border: 0;
+  border-radius: 0;
   background: transparent;
   box-shadow: none;
 }
-/* 📌 شاشة التسجيل فيها حقول فوق اللوحة — نصغّر زرار اللوحة شوية
-   عشان الشاشة تفضل مظبوطة على موبايل 360 من غير scroll. */
-.gt-box.reg .gt-pad { --k: 66px; --g: 8px; }
-.gt-box.reg .gt-msg { min-height: 1.1em; margin: 6px 0; }
-.gt-box.reg .gt-lb { margin: 7px 0 4px; }
-.gt-box.reg .gt-in { padding: 11px 13px; }
-.gt-box.pin .gt-ico { font-size: 2.2rem; margin-bottom: 6px; }
-.gt-box.pin .gt-h {
-  font-size: 1.12rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  margin-bottom: 0;
+/* 📌 المحتوى — عمود واحد بيتوزّع على طول الشاشة */
+#gt-form {
+  flex: 1 1 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
+/* 📌 التوزيع: الشاشة اللي فيها لوحة (دخول · كود · باسورد جديد ·
+   تسجيل) → الشريط فوق والجملة في النص واللوحة تحت، زي الصور
+   دي بالظبط. 📌 والشاشة من غير لوحة (اختيار · نسيان · مساعدة)
+   → الكلام في نص الشاشة.
+   ⛔ :has() مش موجودة في webview قديم = المحتوى بيفضل متجمّع
+      فوق وخلاص — مافيش حاجة بتتكسر. */
+.gt-box:not(:has(.gt-pad)) #gt-form { justify-content: center; }
+.gt-box:not(:has(.gt-pad)) #gt-form { justify-content: safe center; }
+/* 📌 الشاشة اللي فيها لوحة: العنوان في نص النص، واللوحة تحت —
+   والفراغ المتباقي بينسمت بين فوق العنوان وبين فوق اللوحة. */
+.gt-box:has(.gt-pad) #gt-form > :first-child { margin-top: auto; }
+.gt-box:has(.gt-pad) .gt-pad { margin-top: auto; }
+
 .gt-ico {
-  font-size: 2.9rem;
+  font-size: 2.6rem;
   line-height: 1;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .gt-h {
-  margin: 0 0 5px;
-  font-size: 1.5rem;
+  margin: 0 0 6px;
+  font-size: 1.3rem;
   font-weight: 800;
   letter-spacing: -.4px;
 }
 .gt-sub {
-  margin: 0 0 22px;
+  margin: 0 0 18px;
   font-size: .85rem;
   color: var(--muted);
 }
-/* 📌 الجملة الصغيرة تحت الإيميل في شاشة التسجيل */
+/* 📌 الجملة الصغيرة (شاشة التسجيل · شاشة طلب الكود) */
 .gt-sub2 {
-  margin: 7px 0 2px;
-  padding: 7px 10px;
+  margin: 6px 0 2px;
+  padding: 8px 10px;
   font-size: .74rem;
   line-height: 1.75;
   color: var(--muted);
@@ -4759,14 +4797,14 @@ body{margin:0;padding:0 10px 50px;
 }
 .gt-in:focus { border-color: var(--gold); }
 .gt-txt {
-  margin: 0 0 13px;
+  margin: 0 0 12px;
   font-size: .82rem;
   color: var(--muted);
   line-height: 1.75;
 }
 .gt-msg {
-  min-height: 1.4em;
-  margin: 9px 0;
+  min-height: 1.3em;
+  margin: 8px 0;
   font-size: .79rem;
   line-height: 1.7;
   font-weight: 600;
@@ -4804,7 +4842,7 @@ body{margin:0;padding:0 10px 50px;
 .gt-back {
   display: block;
   width: 100%;
-  margin-top: 8px;
+  margin-top: 6px;
   padding: 9px;
   font-size: .78rem;
   font-family: inherit;
@@ -4814,12 +4852,14 @@ body{margin:0;padding:0 10px 50px;
   cursor: pointer;
 }
 .gt-back:hover { color: var(--gold); }
+/* 📌 في شاشة الدخول «رجوع» بيبقى سطر واحد تحت «نسيت الباسورد» */
+.gt-box.pin .gt-back { margin-top: 2px; font-size: .75rem; }
 /* 📌 «نسيت كلمة المرور؟» — تحت اللوحة زي الصورة */
 .gt-forgot {
   display: block;
   width: 100%;
-  margin-top: 16px;
-  padding: 12px 8px 10px;
+  margin-top: 12px;
+  padding: 10px 8px;
   font-size: .87rem;
   font-weight: 600;
   font-family: inherit;
@@ -4831,39 +4871,65 @@ body{margin:0;padding:0 10px 50px;
   transition: color var(--t1);
 }
 .gt-forgot:hover { color: var(--gold); }
-.gt-box.pin .gt-back { margin-top: 2px; font-size: .75rem; }
 .gt-note {
-  margin-top: 18px;
-  padding-top: 14px;
+  margin-top: 16px;
+  padding-top: 12px;
   border-top: 1px dashed var(--line);
   font-size: .71rem;
   color: var(--muted);
   opacity: .85;
   line-height: 1.8;
 }
-@media (max-width: 480px) {
-  .gt-top { padding: 14px 16px 2px; }
-  .gt-body { padding: 4px 14px 22px; }
-  .gt-box { padding: 24px 18px 20px; }
-  .gt-h { font-size: 1.3rem; }
-  .gt-ico { font-size: 2.6rem; }
-  .gt-box.pin { padding: 0; }
-  .gt-box.pin .gt-ico { font-size: 2rem; }
-  .gt-box.pin .gt-h { font-size: 1.04rem; }
-}
-/* ⛔ شاشات قصيرة (تابلت أفقي / موبايل صغير) — نصغّر اللوحة
-   بدل ما الشاشة تطلع بره الشاشة. */
-@media (max-height: 680px) {
-  .gt-box.pin .gt-ico { font-size: 1.7rem; margin-bottom: 2px; }
-  .gt-box.pin .gt-dots { margin: 12px 0 4px; }
-  .gt-box.pin .gt-forgot { margin-top: 10px; padding: 9px 8px 8px; }
-  .gt-box.pin .gt-back { display: none; }
-  /* 📌 شاشات التسجيل والاسترجاع أطول — نضيّق الحقول */
-  .gt-box:not(.pin) { padding: 18px 18px 16px; }
-  .gt-box:not(.pin) .gt-in { padding: 10px 12px; }
-  .gt-box:not(.pin) .gt-lb { margin: 8px 0 4px; }
-  .gt-box:not(.pin) .gt-sub2 { padding: 7px 10px; font-size: .73rem; }
-  .gt-ico { font-size: 2rem; margin-bottom: 6px; }
+/* 📌 شاشة التسجيل فيها حقول فوق اللوحة — نضيّقها شوية */
+.gt-box.reg .gt-msg { min-height: 1.1em; margin: 6px 0; }
+.gt-box.reg .gt-lb { margin: 7px 0 4px; }
+.gt-box.reg .gt-in { padding: 11px 13px; }
+
+/* ══════════════════════════════════════════════════════════════
+   🖥️ التابلت واللاب (≥ ٧٠٠px) — الكارت في النص
+   ──────────────────────────────────────────────────────────────
+   📌 هنا البوابة بترجع كارت حقيقي: عرض أقصى ٤٢٠px، وسط عمودي،
+   ومن غير أي تمديد على طول الشاشة.
+   ══════════════════════════════════════════════════════════════ */
+@media (min-width: 700px) {
+  .gt-top { padding: 16px 18px 4px; }
+  .gt-body { padding: 6px 20px 24px; }
+  .gt-box {
+    flex: 0 1 auto;               /* ⛔ مابيشدش على طول الشاشة — في النص */
+    max-width: 420px;
+    padding: 26px 22px 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--r4);
+    background: var(--card);
+    box-shadow: var(--sh3);
+  }
+  /* ⛌ شاشات الأرقام والشيفرة: الشاشة نفسها هي الكارت (من غير إطار) */
+  .gt-box.pin,
+  .gt-box.code:not(.card) {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .gt-box.bio {
+    padding: 28px 20px 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--r4);
+    background: var(--card);
+    box-shadow: var(--sh3);
+  }
+  /* 📌 على الشاشات الكبيرة المحتوى بيتجمّع في النص تاني */
+  #gt-form { justify-content: center; }
+  .gt-box:has(.gt-pad) #gt-form > :first-child,
+  .gt-box:has(.gt-pad) .gt-pad { margin-top: 0; }
+  .gt-ico { font-size: 2.9rem; margin-bottom: 12px; }
+  .gt-h { font-size: 1.5rem; }
+  .gt-box.pin .gt-ico { font-size: 2.2rem; margin-bottom: 6px; }
+  .gt-box.pin .gt-h,
+  .gt-box.code .gt-h { font-size: 1.12rem; }
+  .gt-box.code .gt-ico { font-size: 2.2rem; margin-bottom: 6px; }
+  .gt-box.bio .gt-ico { font-size: 3.2rem; margin-bottom: 10px; }
+  .gt-box.bio .gt-h { font-size: 1.2rem; }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -5821,25 +5887,50 @@ body.set-notab { font-variant-numeric: normal; }
 }
 
 .gt-pad {
-  /* 📌 مقاس الزرار — العرض والارتفاع (دائري) بيتحسبوا من هنا.
-     ⛔ بيتصغّر مع الشاشة الطويلة عشان اللوحة ماتفتحش على دو-role. */
-  --k: 84px;
+  /* 📌 مقاس الزر بيتحسب من العرض والارتفاع مع بعض:
+       · من العرض    → ٣ أعمدة تظبط من غير تمدد أفقي (حتى ٣٢٠)
+       · من الارتفاع → ٤ صفوف تظبط من غير scroll (حتى ٣٢٠×٥٦٨)
+     ⛔ --fit: الحاجات الثابتة فوق اللوحة (شريط + عنوان + نقط +
+        رسالة + نسيت + رجوع) — بتزيد في شاشات التسجيل والكود. */
   --g: 10px;
+  --k: 76px;                 /* احتياطي لو المتصفح مش بيعرف dvh */
+  --kmax: 96px;
+  --fit: 334px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--g);
   direction: ltr;
   width: min(100%, calc(var(--k) * 3 + var(--g) * 2));
-  margin: 4px auto 0;
+  margin: 6px auto 0;
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
+/* 📌 الشاشة الديماها: لو المتصفح بيعرف dvh نحسب المقاس منه.
+   ⛔ الـenv جوه المعادلة: النوتش بياخد من الطول، واللوحة
+      لازم تعرف ده عشان ماتكبرش علىIPSوتطلع بره الشاشة. */
+@supports (height: 100dvh) {
+  .gt-pad {
+    --k: clamp(
+      48px,
+      min(
+        (100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 56px) / 3,
+        (100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - var(--fit)) / 4
+      ),
+      var(--kmax)
+    );
+  }
+}
+/* 📌 شاشات فيها محتوى فوق اللوحة (تسجيل · كود) → --fit أكبر
+   عشان الشاشة تفضل مظبوطة من غير scroll. */
+.gt-box.reg .gt-pad { --fit: 448px; --kmax: 84px; }
+.gt-box.code .gt-pad { --fit: 412px; --kmax: 88px; }
+
 .gt-key {
   display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 1 / 1;        /* ⛔ مربع مثالي دايماً — مهما حسبنا --k */
   min-height: 46px;
   padding: 0;
   font-family: inherit;
@@ -5875,21 +5966,12 @@ body.set-notab { font-variant-numeric: normal; }
 .gt-pad.dis .gt-key { cursor: not-allowed; }
 .gt-pad.dis .gt-key:active { transform: none; }
 
-@media (max-width: 400px) {
-  .gt-pad { --k: 76px; --g: 9px; }
-  .gt-dots { gap: 13px; }
-}
-/* ⛔ الشاشة قصيرة (تابلت أفقي / موبايل صغير): نصغّر اللوحة
-   بدل ما البوابة تطلع بره الشاشة. */
-@media (max-height: 700px) {
-  .gt-pad { --k: 60px; --g: 8px; }
-  .gt-box.reg .gt-pad { --k: 54px; }
-}
-/* 📌 التابلت أوسع — نرجّع مقاس الزرار الكامل */
+/* 📌 التابلت واللاب — مقاس زرار اللوحة كامل (مابيتحسبش من dvh) */
 @media (min-width: 700px) {
-  .gt-box.reg .gt-pad { --k: 76px; --g: 9px; }
+  .gt-pad { --k: 84px; --g: 10px; }
+  .gt-box.reg .gt-pad,
+  .gt-box.code .gt-pad { --k: 76px; --g: 9px; }
 }
-
 /* حالة الانتظار — بدل الكارت الفاضي */
 .gt-wait {
   display: flex; align-items: center; justify-content: center; gap: 10px;
@@ -5913,16 +5995,9 @@ body.set-notab { font-variant-numeric: normal; }
    ────────────────────────────────────────────────────────────
    ⛌ الكارت مافيش فيه غير البصمة. الضغط بره = ٤ أرقام.
    ══════════════════════════════════════════════════════════════ */
-.gt-box.bio {
-  max-width: 380px;
-  padding: 28px 20px 20px;
-  text-align: center;
-  border: 1px solid var(--line);
-  border-radius: var(--r4);
-  background: var(--card);
-  box-shadow: var(--sh3);
-}
-.gt-box.bio .gt-ico { font-size: 3.2rem; margin-bottom: 10px; }
+/* ⛌ شكل الكارت نفسه (الإطار والعرض الأقصى) متظبّط في بلوك ٧٠٠ فوق — هنا المقاسات بس. */
+.gt-box.bio { text-align: center; }
+.gt-box.bio .gt-ico { font-size: 2.8rem; margin-bottom: 10px; }
 .gt-box.bio .gt-h { font-size: 1.2rem; font-weight: 700; margin: 0 0 4px; }
 .gt-box.bio[data-busy] .gt-ico { animation: gtBioPulse 1.1s ease-in-out infinite; }
 @keyframes gtBioPulse {
@@ -5938,15 +6013,8 @@ body.set-notab { font-variant-numeric: normal; }
    📌 الخانات بتتصغّر (flex-shrink) مش بتكبّر — عشان ٦ خانات
       تظبط على شاشة 320 من غير scroll أفقي.
    ══════════════════════════════════════════════════════════════ */
-.gt-box.code {
-  max-width: 400px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.gt-box.code .gt-ico { font-size: 2.2rem; margin-bottom: 6px; }
-.gt-box.code .gt-h { font-size: 1.12rem; font-weight: 700; margin-bottom: 2px; }
+.gt-box.code .gt-ico { font-size: 2.4rem; margin-bottom: 6px; }
+.gt-box.code .gt-h { font-size: 1.2rem; font-weight: 700; margin-bottom: 2px; }
 
 /* 📌 لافتة «محاولات كتيرة» — أعلى الشاشة */
 .gt-alert {
@@ -6009,37 +6077,11 @@ body.set-notab { font-variant-numeric: normal; }
 }
 .gt-cdt.out b { color: var(--dn); }
 
-/* 📌 الشاشة بتاخد الكارت العادي (لما فيها إيميل وزرار) */
-.gt-box.code.card {
-  padding: 24px 20px 20px;
-  border: 1px solid var(--line);
-  background: var(--card);
-  box-shadow: var(--sh3);
-}
-/* ⛌ شاشة الكود فيها ٦ خانات فوق اللوحة — نصغّر لوحة الأرقام
-   عشان الشاشة تظبط على 360 من غير scroll. */
-.gt-box.code .gt-pad { --k: 66px; --g: 8px; }
-
-@media (max-width: 480px) {
-  .gt-box.code .gt-ico { font-size: 2rem; }
-  .gt-box.code .gt-h { font-size: 1.04rem; }
-  .gt-box.code.card { padding: 24px 18px 20px; }
-  .gt-box.bio { padding: 22px 18px 18px; }
-  .gt-box.bio .gt-ico { font-size: 2.6rem; }
-}
-@media (max-height: 680px) {
-  .gt-box.code .gt-ico { font-size: 1.7rem; margin-bottom: 2px; }
-  .gt-box.code .gt-code-row { margin: 12px 0 2px; }
-  .gt-box.code.card { padding: 18px 18px 16px; }
-  .gt-box.code.card .gt-in { padding: 10px 12px; }
-  .gt-box.code .gt-back { display: none; }
-  .gt-box.bio { padding: 18px 18px 14px; }
-  .gt-box.bio .gt-ico { font-size: 2.2rem; margin-bottom: 4px; }
-  .gt-box.bio .gt-note { display: none; }
-}
-/* 📌 التابلت أوسع — رجّع مقاس زرار اللوحة كامل */
-@media (min-width: 700px) {
-  .gt-box.code .gt-pad { --k: 76px; --g: 9px; }
+/* 📌 الشاشة دي فيها إيميل وزرار — تاخد نفس كارت شاشة الدخول
+   بالظبط (الباقي متظبّط في بلوك ٧٠٠ فوق).
+   ⛌ مقاس لوحة الأرقام متظبّط في بلوك .gt-pad (--fit). */
+@media (max-width: 380px) {
+  .gt-box.code .gt-code-row { gap: 6px; }
 }
 
 /* ═══ نصوص مساعدة (صفحة «أريد مساعدة») ═══ */

@@ -712,15 +712,22 @@
     var pb = document.getElementById('gtBioPin');
     if (pb) pb.onclick = toPin;
 
-    /* ⛌⛌ الضغط بره الكارت = ٤ أرقام فوراً (بلا ما نطلب ولا كلمة) */
+    /* ⛌⛌ الضغط بره الكارت = ٤ أرقام فوراً (بلا ما نطلب ولا كلمة)
+       ⛌⛌ بنيسجّل المستمع بعد ما الحدث الحالي يخلص (setTimeout):
+          ضغطة «ادخل» نفسها بتكمّل في الـbubbling على .gt-body بعد ما
+          الشاشة الجديدة تركب — فكانت بتلخبطنا على لوحة الأرقام في نفس
+          اللحظة (البصمة ما كانتش بتبان أصلاً على الموبايل). */
     var body = document.querySelector('.gt-body');
     if (body) {
-      body.onclick = function (e) {
+      setTimeout(function () {
         if (me !== screenId) return;
-        var box = document.getElementById('gtBio');
-        if (box && (box === e.target || box.contains(e.target))) return;
-        toPin();
-      };
+        body.onclick = function (e) {
+          if (me !== screenId) return;
+          var box = document.getElementById('gtBio');
+          if (box && (box === e.target || box.contains(e.target))) return;
+          toPin();
+        };
+      }, 0);
     }
     if (go) go.click();          /* 📌 بنجرب البصمة لوحدها */
   }
