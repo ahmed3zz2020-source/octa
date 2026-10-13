@@ -1300,12 +1300,20 @@ function vDeriveValuation(f){
   return Math.max(5, Math.min(95, v));
 }
 function vWeighted(scores,w){
+  /* المحاور الناقصة بتتشال والباقي بيتطبّع — زي المحرك بالظبط.
+     ⚠ كانت بترجّع 0 لو مفيش ولا محور متاح.
+     الرقم 0 هنا معناه «صفر من 100» — وده كذب.
+     ⛔ الصفر هو الدرجة الحقيقية لو محور فعلاً وصل صفر.
+     لا ناقص ⛔ مفيش أرقام خالص ⇒ null. */
   let sum=0,wsum=0;
   for(const k in w){ if(w[k]<=0) continue; const v=scores[k];
     if(v==null||isNaN(v)) continue; sum+=v*w[k]; wsum+=w[k]; }
-  return wsum ? sum/wsum : 0;
+  return wsum ? sum/wsum : null;
 }
-function vVerdictOf(sc){ if(sc>=CFG.th.buy) return {t:CFG.labels.buy,c:'v-buy'};
+function vVerdictOf(sc){ /* ⛔ null معناها «مفيش بيانات» — مش صفر.
+  لو رجعناها sell هنقول للمستخدم «بيع» بسبب مفيش سبب. */
+  if(sc==null||isNaN(sc)) return {t:'غير متاح',c:'v-none'};
+  if(sc>=CFG.th.buy) return {t:CFG.labels.buy,c:'v-buy'};
   if(sc>=CFG.th.hold) return {t:CFG.labels.hold,c:'v-hold'};
   return {t:CFG.labels.sell,c:'v-sell'}; }
 function vExplOf(x){ if(!x) return {};
@@ -1443,7 +1451,10 @@ function vRenderCard(d,exRaw,tech){
   const us=Object.assign({},ax,{valuation:val});
   const usScore=vWeighted(us,W_US), egxScore=vWeighted(Object.assign({},ax),W_EGX);
   const v=vVerdictOf(usScore), vEgx=vVerdictOf(egxScore);
-  const color = usScore>=CFG.th.buy?'#16c79a':(usScore>=CFG.th.hold?'#d4af37':'#ff5252');
+  /* ⛔ بدون بيانات ⇒ لون محايد، مش أحمر. الأحمر معناه «سيء» مش «مجهول». */
+  const color = (usScore==null) ? '#8b93a7'
+    : usScore>=CFG.th.buy ? 'var(--up)'
+    : usScore>=CFG.th.hold ? 'var(--gold)' : 'var(--red2,#ff5252)';
 
   const s=vAgo(d.data_ts), stale = s!=null && s>7200;
   const fresh='<div class="vfresh'+(stale?' stale':'')+'">'+

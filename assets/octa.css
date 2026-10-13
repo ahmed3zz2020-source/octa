@@ -5674,3 +5674,21 @@ body.set-notab { font-variant-numeric: normal; }
 .af-rb:disabled { opacity: .55; cursor: default; }
 .af-xb { width: 34px; padding: 7px 0; text-align: center; }
 .af-xb:hover { border-color: #e07850; color: #e07850; }
+
+/* 🏦 ملاحظة البنوك والعقارات — في كارت الشرح */
+.af-banks {
+  padding: 13px 15px; border-radius: 12px; margin-bottom: 12px;
+  background: rgba(212,175,55,.06); border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--gold);
+}
+.af-bk-t { font-weight: 800; font-size: .87rem; margin-bottom: 8px; color: var(--gold); }
+.af-bk-b { font-size: .79rem; line-height: 1.9; color: var(--muted); }
+.af-bk-b b { color: var(--txt); }
+.af-bk-f {
+  margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--line);
+  font-size: .77rem; line-height: 1.8; color: var(--muted);
+}
+.af-bk-f b { color: var(--gold); }
+/* حالة «مفيش بيانات» — مش أحمر، مش أخضر */
+.v-none { color: var(--muted) !important; }
+.v-none.v-pill, span.v-none { background: rgba(139,147,167,.14) !important; border-color: var(--line) !important; }
