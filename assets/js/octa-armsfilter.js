@@ -132,6 +132,13 @@
   /* ═══ الحالة ═══ */
   var AF = { arm: 'total', min: 0, sector: 'all', sel: null, built: false };
 
+  /* تهريب النصوص — الاسم جاي من البيانات */
+  function esc(v) {
+    return String(v == null ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
   /* ⛌ النسب مبنية على OS_DB — لو اتحسبت قبل ما البيانات توصل
      بتفضل فاضية. فبنبنيها عند كل قراءة: 296 صف و12 قطاع،
      مش تكلفة. */
@@ -278,8 +285,9 @@
     h += '<div class="af-bar">' +
       '<button type="button" class="af-bb" data-af="back">→ كل الأذرع</button>' +
       '<div class="af-bar-r">' +
-      '<span class="af-tm" id="afTime">—</span>' +
-      '<button type="button" class="af-rb" data-af="refresh">🔄 تحديث</button>' +
+      '<span class="af-tm" id="afTime">' + esc(AF.tstamp || '—') + '</span>' +
+      '<button type="button" class="af-rb" data-af="refresh"' + (AF.busy ? ' disabled' : '') + '>' +
+        (AF.busy ? '⏳ جاري…' : '🔄 تحديث') + '</button>' +
       '<button type="button" class="af-xb" data-af="close" aria-label="اخرج من الفلتر">✕</button>' +
       '</div></div>';
 
@@ -300,6 +308,7 @@
       h += '<div class="af-empty">مفيش سهم عدّى. جرّب تنزل الدرجة لـ ' + Math.max(0, AF.min - 20) + '.' +
         (AF.sector !== 'all' ? ' شوف كل القطاعات.' : '') + '</div>';
       document.getElementById('armsList').innerHTML = h;
+      lastN = OS_DB.length;
       bind();
       return;
     }
@@ -312,8 +321,8 @@
       var av = arm.get(s), tv = s.score || 0, d = Math.round(av - tv);
       h += '<tr data-afcode="' + s.code + '">' +
         '<td class="af-i">' + (i + 1) + '</td>' +
-        '<td><b>' + s.code + '</b><span class="af-nm">' + (s.name || '') + '</span></td>' +
-        '<td class="af-sc">' + (s.sectorAr || s.sector || '—') + '</td>' +
+        '<td><b>' + esc(s.code) + '</b><span class="af-nm">' + esc(s.name || '') + '</span></td>' +
+        '<td class="af-sc">' + esc(s.sectorAr || s.sector || '—') + '</td>' +
         '<td><b class="af-v' + (av >= 70 ? ' hi' : av >= 50 ? ' mid' : ' lo') + '">' + Math.round(av) +
         (av > 100 ? '<i class="af-over" title="الدرجة دي عدّت 100 قبل خصم المخاطرة">↑</i>' : '') + '</b></td>' +
         '<td class="af-tot">' + Math.round(tv) + '</td>' +
@@ -336,28 +345,34 @@
   /* ══ ريفيش جو الفلتر — مش بيخرج بره ولا بيرسم الصفحة ══
      ⛌ لو نادينا switchPage كان المستخدم بيضيع مكانه في كل مرة. */
   function doRefresh() {
-    var btn = document.querySelector('.af-rb');
-    var tm = document.getElementById('afTime');
-    if (btn) { btn.textContent = '⏳ جاري…'; btn.disabled = true; }
-    var done = function (msg, ok) {
-      if (btn) { btn.textContent = msg; btn.disabled = false; }
-      if (tm) tm.textContent = ok ? new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'فشل التحديث';
-      setTimeout(function () {
-        if (btn) { btn.textContent = '🔄 تحديث'; btn.disabled = false; }
-      }, 2600);
+    AF.busy = true;
+    renderDetail();
+
+    var done = function (ok) {
+      AF.busy = false;
+      /* ⛌ الوقت في AF.tstamp مش في الـDOM — أي إعادة رسم
+         (مراقب البيانات مثلاً) كانت بترجّعه لـ — وتمسح حالة الزرار */
+      AF.tstamp = ok
+        ? new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        : 'فشل التحديث';
+      renderDetail();
     };
-    try {
-      var pr = (typeof refreshPrices === 'function') ? refreshPrices
-             : (typeof loadAll === 'function') ? loadAll
-             : (typeof octaLoadDB === 'function') ? octaLoadDB : null;
-      if (!pr) return done('🔄 تحديث', false);
-      var r = pr();
-      if (r && typeof r.then === 'function') {
-        return r.then(function () { lastN = -1; renderDetail(); done('✅ اتحدّث', true); })
-                 .catch(function () { done('⚠️ فشل', false); });
-      }
-      setTimeout(function () { lastN = -1; renderDetail(); done('✅ اتحدّث', true); }, 1200);
-    } catch (e) { done('⚠️ فشل', false); }
+
+    function run() {
+      /* octaLoadDB بيرجّع فوراً لو البيانات جاهزة — فنجبر تحميل جديد */
+      try { if (typeof EGX_DB !== 'undefined') EGX_DB = null; } catch (e) { }
+      try { if (typeof OS_READY !== 'undefined') OS_READY = false; } catch (e) { }
+      var pr = (typeof octaLoadDB === 'function') ? octaLoadDB : null;
+      if (!pr) return done(false);
+      try {
+        var r = pr();
+        if (r && typeof r.then === 'function') {
+          return r.then(function () { done(true); }).catch(function () { done(false); });
+        }
+      } catch (e) { return done(false); }
+      setTimeout(function () { done(true); }, 1500);
+    }
+    run();
   }
 
   /* ══ اخرج من الفلتر — يرجّعك مكان ما كنتش ══ */
