@@ -68,6 +68,9 @@
   }
 
   function buildDerived() {
+    try { buildDiv(); } catch (e) { console.warn('توزيعات:', e); ARM_DIV = {}; }
+  }
+  function buildDiv() {
     ARM_DIV = {};
     var bySector = {};
     OS_DB.forEach(function (s) { (bySector[s.sectorEn || s.sector] = bySector[s.sectorEn || s.sector] || []).push(s); });
@@ -81,6 +84,9 @@
 
   /* المخاطرة المحسوبة من 3 مصادر — بنعملها منفصلة عشان ما نلخبطش */
   function buildRisk3() {
+    try { buildRisk3Run(); } catch (e) { console.warn('مخاطرة:', e); ARM_RISK = {}; }
+  }
+  function buildRisk3Run() {
     var parts = { vol: {}, mdd: {}, shp: {} };
     var bySector = {};
     OS_DB.forEach(function (s) { (bySector[s.sectorEn || s.sector] = bySector[s.sectorEn || s.sector] || []).push(s); });
@@ -98,11 +104,18 @@
       return vals;
     }
 
+    /* ⛌ rank بترجع undefined لما يكون في أقل من 3 أسهم في القطاع،
+       والـforEach عليها كانت بتوقّف الصفحة كلها. */
+    function each(sec, fn, out) {
+      var r = rank(sec, fn);
+      if (!r) return;
+      r.forEach(function (o) { out[o.c] = o.r; });
+    }
     Object.keys(bySector).forEach(function (name) {
       var L = bySector[name];
-      rank(L, function (s) { return s.vol1y; }).forEach(function (o) { parts.vol[o.c] = o.r; });
-      rank(L, function (s) { return s.mdd; }).forEach(function (o) { parts.mdd[o.c] = o.r; });
-      rank(L, function (s) { return s.sharpe3y; }).forEach(function (o) { parts.shp[o.c] = o.r; });
+      each(L, function (s) { return s.vol1y; }, parts.vol);
+      each(L, function (s) { return s.mdd; }, parts.mdd);
+      each(L, function (s) { return s.sharpe3y; }, parts.shp);
     });
 
     ARM_RISK = {};
