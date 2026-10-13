@@ -151,9 +151,11 @@
 
       var u = getUser();
       if (u) {
+        /* ⛌ «خروج» اتشال من الشريط — مش المكان بتاعه.
+           دلوقتي lives في لوحة الإعدادات · المزيد · الحساب. */
         bar.innerHTML = '<span class="au-dot"></span>👤 ' + esc(u.name || 'مستخدم') +
           ' · <a href="javascript:OCTAAuth.show(\'login\')">تغيير الكود</a>' +
-          ' · <a href="javascript:OCTAAuth.logout()">خروج</a>';
+          ' · <a href="javascript:OCTASettings.open()">⚙️</a>';
       } else {
         bar.innerHTML = '<span class="au-dot off"></span>' +
           '<a href="javascript:OCTAAuth.show(\'reg\')">💼 احفظ محفظتك ومنبهاتك</a>';

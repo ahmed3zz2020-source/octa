@@ -710,6 +710,26 @@
   }
 
   /* ── ⑤ المزيد ── */
+  /* ── كتلة الحساب ── */
+  function acctBlock() {
+    var u = (window.OCTAAuth && OCTAAuth.user) ? OCTAAuth.user() : null;
+    var h = '';
+    if (u) {
+      h += '<div class="set-note">مسجّل دخولك باسم <b>' +
+        esc(u.name || 'مستخدم') + '</b> — محفظتك ومنبهاتك محفوظة بيه.</div>';
+      h += '<div class="set-btns">' +
+        '<button type="button" data-set="chgCode" class="set-ghost">🔑 تغيير كود الدخول</button>' +
+        '<button type="button" data-set="logout" class="set-danger">🚪 تسجيل الخروج</button>' +
+        '</div>';
+    } else {
+      h += '<div class="set-note">مش مسجّل دخول — محفظتك بتتحفظ على الجهاز لحد ما تسجّل.</div>';
+      h += '<div class="set-btns">' +
+        '<button type="button" data-set="login" class="set-ghost">💼 تسجيل الدخول</button>' +
+        '</div>';
+    }
+    return h;
+  }
+
   function secMore() {
     var st = storageSize();
     var h = '';
@@ -742,6 +762,9 @@
       return '<span class="set-key">' + esc(r.k) + ' <i>' + ltr((r.b / 1024).toFixed(1) + 'KB') + '</i></span>';
     }).join('') + '</div>';
 
+    h += '<div class="set-h2">👤 الحساب</div>';
+    h += acctBlock();
+
     h += '<div class="set-h2">♻️ تنظيف</div>';
     h += '<div class="set-btns"><button type="button" data-set="clearSoft" class="set-ghost">🧹 مسح الإعدادات والكاش (مش الدخول)</button></div>';
 
@@ -768,8 +791,14 @@
      ══════════════════════════════════════════════════════════ */
   var ov = null, lastFocus = null;
 
+  /* ⛌ قبل الـ10-10-2025: أي render() كان بيرجّع شريط التمرير لفوق،
+     فلو المستخدم ضغط «أوزان OCTA الأصلية» جوّه نص القسم الطويل
+     كان بيختفي منه فوراً. دلوقتي بنحفظ المكان ونرجّعه. */
+  var keepScroll = 0;
   function render() {
     if (!ov) return;
+    var oldBody = document.getElementById('setBody');
+    if (oldBody) keepScroll = oldBody.scrollTop;
     ov.innerHTML =
       '<div class="te-panel set-panel" role="dialog" aria-modal="true" aria-label="إعدادات OCTA">' +
         '<div class="te-h"><div>' +
@@ -793,6 +822,9 @@
       '</div>';
     var cfg = el('toolCfg');
     if (cfg) cfg.textContent = '✕';
+
+    var nb = document.getElementById('setBody');
+    if (nb) nb.scrollTop = keepScroll;
   }
 
   function open(id) {
@@ -840,7 +872,7 @@
   function onSet(name, val) {
     switch (name) {
       /* تبويبات */
-      case 'tab': sec = val; render(); return;
+      case 'tab': sec = val; keepScroll = 0; render(); return;
       case 'close': close(); return;
 
       /* السوق */
@@ -904,6 +936,14 @@
       case 'focus': S.focus = !S.focus; save(); applyLook(); applyFocus(); render(); return;
       case 'export': download(); toast('اتنزّل الملف ✅'); return;
       case 'import': { var f = el('setFile'); if (f) f.click(); return; }
+      case 'chgCode': OCTASettings.close(); OCTAAuth.show('login'); return;
+      case 'login': OCTASettings.close(); OCTAAuth.show('login'); return;
+      case 'logout':
+        if (confirm('تسجيل الخروج؟ محفظتك ومنبهاتك هتفضل محفوظة على الحساب.')) {
+          OCTAAuth.logout();
+        }
+        render();
+        return;
       case 'clearSoft': clearSoft(); render(); return;
       case 'resetAll': resetAll(); render(); return;
     }

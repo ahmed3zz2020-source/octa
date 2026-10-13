@@ -4936,6 +4936,7 @@ body.sb-open .sb-scrim { display: block; }
 
 /* الأدوات — مرنة وبتاخد الباقي */
 .tb-row .toolbar {
+  order: 2;
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
@@ -4948,14 +4949,15 @@ body.sb-open .sb-scrim { display: block; }
 }
 .tb-row .toolbar::-webkit-scrollbar { display: none; }
 
-/* الزرارين — ملزومين في الآخر، نفس الارتفاع */
+/* الزرارين — أول الشريط، نفس الارتفاع ونفس خط الفاصل */
 .tb-btns {
+  order: 1;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 4px;
-  padding-inline-start: 6px;
-  border-inline-start: 1px solid var(--line);
+  padding-inline-end: 6px;
+  border-inline-end: 1px solid var(--line);
 }
 .tb-btn {
   display: flex;
