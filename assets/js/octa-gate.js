@@ -18,6 +18,17 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  function errAr(d) {
+    var e = (d && d.error) || '';
+    if (e === 'rate limit exceeded') {
+      var w = (d && d.retry_after) || 60;
+      return 'استنى ' + Math.ceil(w / 60) + ' دقيقة وجرب تاني';
+    }
+    if (e === 'too many') return '📧 بعتّ الكود كتير — استنى شوية';
+    if (!e) return 'حصل خطأ';
+    return e;
+  }
+
   function token() {
     try { return localStorage.getItem('octa_token') || ''; } catch (e) { return ''; }
   }
@@ -118,7 +129,7 @@
         body: JSON.stringify({ email: mail, name: name || 'مستخدم' })
       }).then(function (r) { return r.json(); }).then(function (d) {
         if (!d || !d.ok) {
-          say('❌ ' + ((d && d.error) || 'حصل خطأ'), false);
+          say('❌ ' + errAr(d), false);
           btn.disabled = false; btn.textContent = 'ابعتلي الكود';
           return;
         }
@@ -210,7 +221,7 @@
         body: JSON.stringify({ email: mail })
       }).then(function (r) { return r.json(); }).then(function (d) {
         if (!d || !d.ok) {
-          say('❌ ' + ((d && d.error) || 'حصل خطأ'), false);
+          say('❌ ' + errAr(d), false);
           btn.disabled = false; btn.textContent = 'ابعتلي الكود'; return;
         }
         askCode('', mail, 'دخول');
@@ -256,7 +267,7 @@
             document.getElementById('gtSend').style.display = 'none';
             document.getElementById('gtCode').focus();
           } else {
-            say('❌ ' + ((d && d.error) || 'حصل خطأ'), false);
+            say('❌ ' + errAr(d), false);
           }
         }).catch(function () { say('❌ الاتصال فشل', false); });
     };

@@ -53,13 +53,48 @@
     failed: (i) => fails[i || active] || 0,
   };
 
+  /* ═══════════════════════════════════════════════════════════
+     🔐 المسارات المحمية — لازم يتبعتلها توكن المستخدم
+     ───────────────────────────────────────────────────────────
+     ⛔ ⛔ السيرفر بيرفض /api/egx_full و /api/ranking بدون توكن
+        (401 «النسخة الكاملة محمية») — والواجهة كلها بتتبني عليهما،
+        فكانت الصفحة بتفتح وهي فاضية.
+     ⛌ بنضيف التوكن هنا في مكان واحد بدل 30 نداء في كل ملف.
+     ⛌ بنضيفه للمسارات المحمية بس — عشان ما نعملش preflight
+        على كل طلب في الموقع (벨ا двуفة).
+     ═══════════════════════════════════════════════════════════ */
+  const AUTH_PATHS = [
+    '/api/egx_full', '/api/ranking', '/api/portfolio',
+    '/api/stats', '/api/alerts/watch', '/api/alerts/diag',
+    '/api/auth/me'
+  ];
+
+  function _withToken(url, opts) {
+    const path = String(url || '').split('?')[0];
+    if (AUTH_PATHS.indexOf(path) === -1) return opts;
+    let t = '';
+    try { t = localStorage.getItem('octa_token') || ''; } catch (e) { }
+    if (!t) return opts;
+    const o = opts || {};
+    try {
+      const h = new Headers(o.headers || {});
+      if (!h.get('Authorization')) h.set('Authorization', 'Bearer ' + t);
+      o.headers = h;
+    } catch (e) {
+      o.headers = Object.assign({}, o.headers || {}, { 'Authorization': 'Bearer ' + t });
+    }
+    return o;
+  }
+
   /* 🩺 شغّل على السيرفر التاني لو الرئيسي واقع */
   const ORIG = ORIG_FETCH;
   window.fetch = function (url, opts) {
     const s = String(url || '');
     if (s.indexOf(SERVERS[0].url) !== 0) return ORIG.apply(this, arguments);
 
-    return ORIG.apply(this, arguments)
+    const opt = _withToken(url, opts);
+
+    return ORIG.call(this, url, opt)
       .then(function (r) {
         /* السيرفر رجّع error حقيقي (مش شبكة) — مفيش failover */
         if (r.status >= 500) window.OCTAServer.failover();
@@ -69,7 +104,7 @@
         /* شبكة — جرّب السيرفر التاني */
         window.OCTAServer.failover();
         const nu = String(url).replace(SERVERS[0].url, window.OCTA_API);
-        return ORIG.call(window, nu, opts);
+        return ORIG.call(window, nu, _withToken(nu, opts));
       });
   };
 })();
