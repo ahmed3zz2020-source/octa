@@ -2259,7 +2259,7 @@ function startOctaClock() {
     }).catch(() => { el.innerHTML = '<b>—</b>غير متصل'; });
   }
   tick();
-  setInterval(tick, 60000);
+  setInterval(tick, 10000);  /* ⏱️ كل ١٠ ثواني بدل دقيقة */
 }
 
 // تشغيل

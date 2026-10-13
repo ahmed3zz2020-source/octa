@@ -5908,6 +5908,140 @@ body.set-notab { font-variant-numeric: normal; }
   font-size: .84rem; font-weight: 700; color: #e07850;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   👆 شاشة البصمة — الموبايل بس
+   ────────────────────────────────────────────────────────────
+   ⛌ الكارت مافيش فيه غير البصمة. الضغط بره = ٤ أرقام.
+   ══════════════════════════════════════════════════════════════ */
+.gt-box.bio {
+  max-width: 380px;
+  padding: 28px 20px 20px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r4);
+  background: var(--card);
+  box-shadow: var(--sh3);
+}
+.gt-box.bio .gt-ico { font-size: 3.2rem; margin-bottom: 10px; }
+.gt-box.bio .gt-h { font-size: 1.2rem; font-weight: 700; margin: 0 0 4px; }
+.gt-box.bio[data-busy] .gt-ico { animation: gtBioPulse 1.1s ease-in-out infinite; }
+@keyframes gtBioPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.13); opacity: .62; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   🔑 شاشة الكود — ٦ خانات + عدّاد صلاحية
+   ────────────────────────────────────────────────────────────
+   📌 الكود أرقام لاتينية — الخانات LTR جوّه صفحة RTL،
+      زي لوحة الأرقام بالظبط.
+   📌 الخانات بتتصغّر (flex-shrink) مش بتكبّر — عشان ٦ خانات
+      تظبط على شاشة 320 من غير scroll أفقي.
+   ══════════════════════════════════════════════════════════════ */
+.gt-box.code {
+  max-width: 400px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.gt-box.code .gt-ico { font-size: 2.2rem; margin-bottom: 6px; }
+.gt-box.code .gt-h { font-size: 1.12rem; font-weight: 700; margin-bottom: 2px; }
+
+/* 📌 لافتة «محاولات كتيرة» — أعلى الشاشة */
+.gt-alert {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+  background: var(--goldBg);
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--gold2);
+}
+
+.gt-code-row {
+  display: flex;
+  justify-content: center;
+  gap: clamp(6px, 2vw, 10px);
+  margin: 18px 0 2px;
+  direction: ltr;
+}
+.gt-cb {
+  flex: 0 1 44px;
+  min-width: 0;
+  height: clamp(44px, 12.5vw, 58px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: clamp(1.1rem, 4.6vw, 1.45rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--txt);
+  background: var(--slot);
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+  transition: border-color var(--t1), background var(--t1);
+}
+.gt-cb.on { border-color: var(--gold); background: var(--goldBg); }
+/* ⛌ الأنيميشن موجود فعلاً فوق — نفس اهتزاز النقط، مفيش تكرار */
+.gt-code-row.bad { animation: gtShake .5s cubic-bezier(.36, .07, .19, .97) both; }
+.gt-code-row.bad .gt-cb { border-color: var(--dn); }
+
+/* 📌 عدّاد صلاحية الكود — 10:00 ينزل لحد 00:00 */
+.gt-cdt {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.gt-cdt b {
+  color: var(--gold);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: .95rem;
+}
+.gt-cdt.out b { color: var(--dn); }
+
+/* 📌 الشاشة بتاخد الكارت العادي (لما فيها إيميل وزرار) */
+.gt-box.code.card {
+  padding: 24px 20px 20px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: var(--sh3);
+}
+/* ⛌ شاشة الكود فيها ٦ خانات فوق اللوحة — نصغّر لوحة الأرقام
+   عشان الشاشة تظبط على 360 من غير scroll. */
+.gt-box.code .gt-pad { --k: 66px; --g: 8px; }
+
+@media (max-width: 480px) {
+  .gt-box.code .gt-ico { font-size: 2rem; }
+  .gt-box.code .gt-h { font-size: 1.04rem; }
+  .gt-box.code.card { padding: 24px 18px 20px; }
+  .gt-box.bio { padding: 22px 18px 18px; }
+  .gt-box.bio .gt-ico { font-size: 2.6rem; }
+}
+@media (max-height: 680px) {
+  .gt-box.code .gt-ico { font-size: 1.7rem; margin-bottom: 2px; }
+  .gt-box.code .gt-code-row { margin: 12px 0 2px; }
+  .gt-box.code.card { padding: 18px 18px 16px; }
+  .gt-box.code.card .gt-in { padding: 10px 12px; }
+  .gt-box.code .gt-back { display: none; }
+  .gt-box.bio { padding: 18px 18px 14px; }
+  .gt-box.bio .gt-ico { font-size: 2.2rem; margin-bottom: 4px; }
+  .gt-box.bio .gt-note { display: none; }
+}
+/* 📌 التابلت أوسع — رجّع مقاس زرار اللوحة كامل */
+@media (min-width: 700px) {
+  .gt-box.code .gt-pad { --k: 76px; --g: 9px; }
+}
+
 /* ═══ نصوص مساعدة (صفحة «أريد مساعدة») ═══ */
 .gt-txt.left { text-align: right; }
 .gt-txt b { color: var(--txt); font-weight: 700; }

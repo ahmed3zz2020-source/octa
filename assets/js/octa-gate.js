@@ -16,6 +16,75 @@
      ⛔ لو الباك غيّر الرقم، غيّر السطر ده بس. */
   var PIN_TRIES = 5;
 
+  /* ═══════════════════════════════════════════════════════════
+     🔑 القاعدة الجديدة — ٣ غلط ورا بعض جوه دقيقة = كود إيميل
+     ═══════════════════════════════════════════════════════════ */
+
+  /* 📌 عدد أرقام الكود — ٦، زي ^[0-9]{6}$ في الباك */
+  var CODE_LEN = 6;
+
+  /* 📌 نافذة المحاولات القصيرة — نفس WINDOW_SECONDS في الباك.
+     ⛔ لو الباك غيّرها، السطرين دول هما اللي يتغيّروا بس. */
+  var STRIKE_LIMIT = 3;      /* ٣ غلط ورا بعض */
+  var STRIKE_WINDOW = 60;    /* جوه ٦٠ ثانية */
+
+  /* 📌 صلاحية الكود — ١٠ دقايق.
+     📌 ده عرض في الواجهة بس — الباك هو اللي بيحسم وبيبعت سبب
+        المنتهي. العدّاد بيقف لو السيرفر اتأخر. */
+  var CODE_TTL = 10 * 60;
+
+  /* 📌 محاولات الكود الغلط قبل ما الكود يموت (TOO_MANY_WRONG) */
+  var CODE_TRIES = 5;
+
+  /* 📌 مسارات الكود.
+     ⛔ الباك الحالي (update_prices.py) مافيش المسارات دي — الموجود
+        /api/auth/otp/* وده بيرفض حسابات الباسورد بـ409 pin_account.
+        دي مسارات العقد الجديد (plan.yaml بند ٣).
+     ⛌ لو الباك غيّر الاسم، غيّر السطر ده بس — الباقي بيقرا منه. */
+  var PATHS = {
+    send:   '/api/auth/pin/challenge/send',
+    verify: '/api/auth/pin/challenge/verify',
+    newpin: '/api/auth/pin/challenge/newpin'
+  };
+
+  /* 📌 التجديد الصامت — قبل ما التوكن يخلص.
+     ⛔ صفر شاشات · صفر طلب باسورد · صفر إزعاج.
+     ⛔⛔⛔ الرقم بيتقرأ من السيرفر (expires_in) — ممنوع رقم ثابت هنا.
+        لو ثبّتنا على نفس عمر التوكن كان التجديد بيقع على اللحظة
+        اللي بينتهي فيها ⇒ 401 ⇒ المستخدم بيتطرد كل ساعتين وهو
+        بيتصفح عادي. دهدرس مهم اتصاد بالاختبار مش بالنظر. */
+  var RENEW_FALLBACK_MS = 90 * 60 * 1000;   // ٧٢٠٠ × ٠.٧٥
+  var RENEW_PATH = '/api/auth/refresh';
+
+  /* 📌 ٧٥٪ من عمر التوكن: فارق آمن ضد أي تأخّر في الشبكة،
+     وقريب ما يكفيش إنه يضيّع وقت المستخدم في وضع معتمد. */
+  function renewDelayMs(expiresInSec) {
+    var s = Number(expiresInSec);
+    if (!isFinite(s) || s <= 0) s = 7200;
+    /* ⛌ حد أدنى دقيقة — لو السيرفر رجّع رقم غريب ما نبقاش
+       بنجدد كل ٢٠٠ مللي ثانية. */
+    return Math.max(60000, Math.floor(s * 1000 * 0.75));
+  }
+
+  /* 📌 الخمول — ٣٠ دقيقة من غير ما يلمس الموقع.
+     ⛔ دي خامل (idle) في المتصفح مش تروكن بصري: بتتحسب من آخر
+        لمسة (ماوس · لمس · ضغط · كتابة · scroll) — مش من وقت فتح
+        الصفحة ومش من وقت الـHTTP. */
+  var IDLE_MS = 30 * 60 * 1000;
+  var IDLE_TICK = 60 * 1000;
+
+  /* 📌 البصمة — للموبايل بس. التابلت واللاب مافيش فيهما مستشعر
+     بصمة أصلاً، فبيشتغلوا بـ٤ أرقام وخلاص.
+     ⛔ البصمة **مفيش لها endpoint في الباك لسه** — شوف deliverable.
+        لو المسار رجّع 404 أو المتصفح مافيش فيه WebAuthn، بنردّ
+        فوراً على لوحة ٤ أرقام. */
+  var P_BIO = '/api/auth/pin/fingerprint';
+
+  /* 📌 ⛔⛔ الرد المحايد — حرفياً واحد، في كل الحالات.
+     ⛔ ممنوع نكتب «الإيميل مش مسجّل» — الرد ده بيعمل تلميح
+        وبيبقى قناة مفتوحة عشان نعرف مين عندنا حساب ومين لأ. */
+  var NOTE_SAME = 'لو الإيميل ده بتاعك، هتلاقي كود من ٦ أرقام في بريدك';
+
   /* ═══ الاتصال ═══ */
   function apiBase() {
     try { return (typeof OCTA_API !== 'undefined' && OCTA_API) || ''; }
@@ -42,6 +111,26 @@
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /* 📌 طلب بتروكن (تروكن الفتح أو تروكن الجلسة) — الباك بيقرا
+     التروكن من هيدر Authorization مش من الـbody.
+     ⛔-body فاضي للأومد: /api/auth/refresh بيرفض أي credential
+     في الـbody بـ400 — فمفيش سبب نبعت أي حاجة. */
+  function postAuth(path, body, authToken) {
+    var h = { 'Content-Type': 'application/json' };
+    if (authToken) h['Authorization'] = 'Bearer ' + authToken;
+    return fetch(apiBase() + path, {
+      method: 'POST',
+      headers: h,
+      body: JSON.stringify(body || {})
+    }).then(function (r) {
+      return r.text().then(function (txt) {
+        var d = null;
+        try { d = JSON.parse(txt); } catch (e) { d = null; }
+        return { s: r.status, d: d || {} };
+      }, function () { return { s: r.status, d: {} }; });
+    });
   }
 
   /* ═══ التوكن ═══ */
@@ -103,8 +192,10 @@
   function topT() { return document.getElementById('gtTopT'); }
   function topB() { return document.getElementById('gtTopB'); }
 
-  /* 📌 الشريط فوق: عنوان على اليمين + زرار على الشمال */
-  function head(title, back) {
+  /* 📌 الشريط فوق: عنوان على اليمين + زرار على الشمال.
+     📌 backFn — الدالة اللي زرار الرجوع بيرجعله.
+        لو مش موجودة بيرجع لأول شاشة (زي ما كان قبل كده). */
+  function head(title, back, backFn) {
     var t = topT(), b = topB();
     if (t) t.textContent = title;
     if (!b) return;
@@ -112,7 +203,7 @@
     if (back) {
       b.textContent = 'رجوع';
       b.className = 'gt-top-b bk';
-      b.onclick = function () { welcome(); };
+      b.onclick = function () { (backFn || welcome)(); };
     } else {
       b.textContent = 'أريد مساعدة';
       b.className = 'gt-top-b';
@@ -136,6 +227,7 @@
     if (g) g.remove();
     document.body.style.overflow = '';
     stopLock();
+    wipeFlow();     /* ⛔ الإيميل والكود يتمسحوا مع إغلاق البوابة */
     try { window.OCTAAuth && window.OCTAAuth.refresh && window.OCTAAuth.refresh(); } catch (e) { }
 
     /* ⛔⛔ المحتوى المحمي بيتخطّى وهو لسه بره البوابة (السيرفر بيرد 401).
@@ -168,12 +260,51 @@
      state.lock   ثواني فاضية (السيرفر رجّع 429)
      state.tries  عدد المحاولات الغلط
      ═══════════════════════════════════════════════════════════ */
-  var state = { pin: '', lock: 0, tries: 0, lockTimer: null, jump: null };
+  var state = { pin: '', len: PIN_LEN, lock: 0, tries: 0, lockTimer: null, jump: null };
+
+  /* ⛔⛔⛔ بيانات الشاشة الجديدة — في الذاكرة **بس**.
+     ⛔ ممنوع الإيميل أو الكود أو التذكرة يتفكّروا في
+        localStorage أو sessionStorage أو cookie أو log أو تحليلات.
+        الباك نفسه بيخزّنهم مشفّرين — الواجهة ماتخزّنش خالص. */
+  var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0 };
+
+  function wipeFlow() {
+    flow.email = ''; flow.code = ''; flow.unlock = '';
+    flow.tries = 0;
+    stopCd();
+  }
+
+  function stopCd() {
+    if (flow.cdTimer) { clearInterval(flow.cdTimer); flow.cdTimer = null; }
+    flow.cd = 0;
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     ⏱ نافذة المحاولات القصيرة — ٣ غلط ورا بعض جوه ٦٠ ثانية
+     ───────────────────────────────────────────────────────────
+     ⛔ النافذة **سلايدر**: كل محاولة جديدة بتدفع القديمة اللي
+        خرجت بره الـ٦٠ ثانية. لو فضلت دقيقة وفسكت، العدّاد
+        بيبدأ من الصفر — وده بالظبط اللي بيمنع المهاجم يوزّع
+        محاولاته على نافذتين.
+     📌 الختم بتاعها: Date.now() — الوقت من المتصفح.
+        ⛔ ده مش أمان، ده راحة للمستخدم. الأمان كله في الباك،
+           والواجهة بتتبعه مش بتعارضه.
+     ═══════════════════════════════════════════════════════════ */
+  var hits = [];
+  function strikeCount() {
+    var cut = Date.now() - STRIKE_WINDOW * 1000;
+    while (hits.length && hits[0] <= cut) hits.shift();
+    return hits.length;
+  }
+  function strikePush() { hits.push(Date.now()); return strikeCount(); }
+  function strikeReset() { hits = []; }
 
   function stopLock() {
     if (state.lockTimer) { clearInterval(state.lockTimer); state.lockTimer = null; }
     if (state.jump) { clearTimeout(state.jump); state.jump = null; }
     state.lock = 0;
+    stopCd();   /* ⛌ عدّاد الكود يموت مع أي شاشة جديدة */
+    screenId++; /* ⛌ أي مستمع شاشة قديم يموت فورًا (زي مستمع البصمة) */
   }
 
   /* 📌 النقطة الواحدة بتتعبى مع كل رقم — وده كل مؤشر التقدم */
@@ -186,6 +317,36 @@
         kids[i].className = 'gt-dot' + (i < state.pin.length ? ' on' : '');
       }
     }
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     🔢 خانات الكود — ٦ خانات LTR (زي لوحة الأرقام بالظبط)
+     ═══════════════════════════════════════════════════════════ */
+  function codeHtml() {
+    var b = '';
+    for (var i = 0; i < CODE_LEN; i++) b += '<div class="gt-cb"></div>';
+    return '<div class="gt-code-row" id="gtCodeRow">' + b + '</div>';
+  }
+
+  function paintCode() {
+    var r = document.getElementById('gtCodeRow');
+    if (!r) return;
+    var ks = r.getElementsByTagName('div');
+    for (var i = 0; i < ks.length; i++) {
+      ks[i].className = 'gt-cb' + (i < state.pin.length ? ' on' : '');
+    }
+  }
+
+  function shakeCode() {
+    var r = document.getElementById('gtCodeRow');
+    if (!r) return;
+    r.classList.remove('bad');
+    void r.offsetWidth;          /* ⛌ بدون force reflow الأنيميشن مش هيشتغل تاني */
+    r.classList.add('bad');
+    setTimeout(function () {
+      var e = document.getElementById('gtCodeRow');
+      if (e) e.classList.remove('bad');
+    }, 560);
   }
 
   function padHtml(dis) {
@@ -237,12 +398,12 @@
       /* ⛌ زرار متقفل = الرقم مش هيتقبل (قفل السيرفر أو وهو رايح) */
       if (b.tagName === 'BUTTON' && b.disabled) return;
       if (k === 'd') state.pin = state.pin.slice(0, -1);
-      else if (state.pin.length < PIN_LEN) state.pin += k;
+      else if (state.pin.length < state.len) state.pin += k;
       else return;
       paintDots();
       if (onAny) onAny();
-      /* ⛌ 4 أرقام كملوا → يتسلّموا لوحدهم. مفيش زرار «دخول» أصلاً. */
-      if (state.pin.length === PIN_LEN && onFull) {
+      /* ⛌ الأرقام كملت → يتسلّموا لوحدهم. مفيش زرار «دخول» أصلاً. */
+      if (state.pin.length === state.len && onFull) {
         var v = state.pin;
         paintPad(true);          /* ⛌ نقفل اللوحة وهو رايح للسيرفر */
         setTimeout(function () {
@@ -269,14 +430,15 @@
     }, 560);
   }
 
-  function badPin(left) {
+  function badPin(left, strikes) {
     state.pin = '';
     paintDots();
     shake();
-    if (left == null) clearMsg();
-    else if (left <= 0) say('الباسورد غلط — المحاولات خلصت', false);
-    else if (left === 1) say('الباسورد غلط — آخر محاولة', false);
-    else say('الباسورد غلط — فاضل ' + left + ' محاولات', false);
+    if (strikes == null) { clearMsg(); return; }
+    /* 📌 left = المحاولات الفاضلة في نافذة الدقيقة (السيرفر بيحسبها) */
+    if (left <= 0) say('الباسورد غلط — المحاولات خلصت', false);
+    else if (left === 1) say('الباسورد غلط — آخر محاولة قبل ما نطلب كود على الإيميل', false);
+    else say('الباسورد غلط — فاضل ' + left + ' محاولات قبل ما نطلب كود', false);
   }
 
   function mm(s) {
@@ -291,6 +453,7 @@
     /* ⛌ نفضّي النقط: متبقاش 4 نقط مملوءة وباسورد غلط */
     state.pin = '';
     paintDots();
+    paintCode();
     paintPad(true);
 
     var m = document.getElementById('gtMsg');
@@ -363,7 +526,7 @@
      ═══════════════════════════════════════════════════════════ */
   function welcome() {
     stopLock();
-    state.pin = ''; state.tries = 0;
+    state.pin = ''; state.tries = 0; state.len = PIN_LEN;
     mount();
     head('تسجيل الدخول', 0);
     boxEl().className = 'gt-box';
@@ -384,7 +547,7 @@
      ═══════════════════════════════════════════════════════════ */
   function signup() {
     stopLock();
-    state.pin = '';
+    state.pin = ''; state.len = PIN_LEN;
     mount();
     head('حساب جديد', 1);
     boxEl().className = 'gt-box reg';
@@ -477,9 +640,132 @@
   /* ═══════════════════════════════════════════════════════════
      ③ الدخول — بالظبط زي الصورة
      ═══════════════════════════════════════════════════════════ */
-  function login() {
+  /* ═══════════════════════════════════════════════════════════
+     👆 البصمة — للموبايل بس
+     ───────────────────────────────────────────────────────────
+     📌 «طريقة تلغي التانية»: الموبايل بصمته الأول، والتابلت
+        واللاب مافيش فيهما مستشعر أصلاً فبيشتغلوا بـ٤ أرقام
+        وخلاص — من غير ما نذكر البصمة أصلاً.
+     ⛔⛔ مافيش endpoint للبصمة في الباك لسه (update_prices.py) —
+        فبنتعامل مع ده بأمان: لو WebAuthn مش موجود، أو المتصفح
+        رفض، أو المسار رجّع 404 → لوحة ٤ أرقام فوراً.
+     ⛌ الضغط **بره** الكارت = ٤ أرقام على طول. مافيش قفل
+        للمستخدم اللي مش عايز البصمة.
+     ═══════════════════════════════════════════════════════════ */
+  /* 📌 البصمة — للموبايل بس.
+     ⛔⛔⛔ شرط أحمد: التابلت واللاب ٤ أرقام بس، وصفر ذكر للبصمة
+        — عشان «الموقع يبان بروفيشنال».
+        ⛔ متكفيش بـ hasTouch: لابتوب بلمس أو تابلت في وضع
+        أفقي هيبقى عنده maxTouchPoints > 0 وهيعرض البصمة غلط. */
+  var BIO_MIN_EDGE = 600;   /* أصغر ضلع — أي جهاز منه أكبر = تابلت أو لاب */
+
+  function isPhone() {
+    try {
+      var w = window.screen.width || 0, h = window.screen.height || 0;
+      if (!w || !h) return false;
+      /* ⛔ التابلت (٧٦٨×١٠٢٤) واللاب (١٤٤٠×٩٠٠) ولاب-بلمس
+        (١٠٢٤×٦٠٠) كلهم أكبر من ٦٠٠ ⇒ ٤ أرقام بس.
+        الموبايت أقل من ٦٠٠ في الضلع الأصغر — ده الحد المعروف. */
+      if (Math.min(w, h) >= BIO_MIN_EDGE) return false;
+      var coarse = window.matchMedia
+        && window.matchMedia('(pointer: coarse)').matches;
+      return coarse || (navigator.maxTouchPoints > 0);
+    } catch (e) { return false; }
+  }
+  function isTouch() { return isPhone(); }
+  function hasBio() {
+    try {
+      return typeof window.PublicKeyCredential === 'function'
+        && !!(navigator.credentials && navigator.credentials.get);
+    } catch (e) { return false; }
+  }
+
+  /* 📌 عدّاد شاشات البوابة — أي مستمع قديم يموت لما الشاشة تتغيّر.
+     ⛌ stopLock() بيعدّه، وكل شاشة بتناديه الأول. */
+  var screenId = 0;
+
+  function bioLogin() {
     stopLock();
-    state.pin = ''; state.tries = 0;
+    var me = screenId;
+    mount();
+    head('تسجيل الدخول', 0);
+    boxEl().className = 'gt-box bio';
+    formEl().innerHTML =
+      '<div class="gt-bio" id="gtBio">' +
+        '<div class="gt-ico">👆</div>' +
+        '<h1 class="gt-h">ادخل ببصمة</h1>' +
+        '<p class="gt-sub2">ضع إصبعك على المستشعر — أسرع وأأمن من ٤ أرقام</p>' +
+        '<button class="gt-go" id="gtBioGo" type="button">👆 بصمة</button>' +
+        '<button class="gt-back" id="gtBioPin" type="button">ادخل بـ٤ أرقام</button>' +
+        '<p class="gt-note">لو البصمة مشتغلتش، دوس بره الكارت وهتدخل بأرقام</p>' +
+      '</div>';
+
+    function off() {
+      var b = document.querySelector('.gt-body');
+      if (b) b.onclick = null;
+    }
+
+    function toPin() { if (me !== screenId) return; off(); login(1); }
+
+    var go = document.getElementById('gtBioGo');
+    if (go) go.onclick = function () { if (me === screenId) doBio(off); };
+    var pb = document.getElementById('gtBioPin');
+    if (pb) pb.onclick = toPin;
+
+    /* ⛌⛌ الضغط بره الكارت = ٤ أرقام فوراً (بلا ما نطلب ولا كلمة) */
+    var body = document.querySelector('.gt-body');
+    if (body) {
+      body.onclick = function (e) {
+        if (me !== screenId) return;
+        var box = document.getElementById('gtBio');
+        if (box && (box === e.target || box.contains(e.target))) return;
+        toPin();
+      };
+    }
+    if (go) go.click();          /* 📌 بنجرب البصمة لوحدها */
+  }
+
+  /* 📌 محاولة البصمة — أي فشل بيرجّعنا للوحة ٤ أرقام */
+  function doBio(off) {
+    off = off || function () { };
+    var box = document.getElementById('gtBio');
+    if (box) box.setAttribute('data-busy', '1');
+    var b = document.getElementById('gtBioGo');
+    if (b) { b.disabled = true; b.textContent = '⏳ بنستنى البصمة...'; }
+    var go = window.location.protocol === 'https:' || isLocal()
+      ? postAuth(P_BIO, { device: 'bio' }, null)
+      : Promise.resolve({ s: 404, d: {} });
+    go.then(function (o) {
+      if (o.s === 200 && o.d && o.d.token) {
+        off();
+        put(o.d.token, o.d.user);
+        shut();
+        return;
+      }
+      /* ⛔⛔ مافيش بصمة في الباك — أو رفضها المتصفح. ٤ أرقام على طول. */
+      off();
+      login(1);
+    }).catch(function () { off(); login(1); });
+  }
+
+  function isLocal() {
+    try {
+      var h = location.hostname;
+      return h === 'localhost' || h === '127.0.0.1' || h === '';
+    } catch (e) { return false; }
+  }
+
+  /* 📌 noBio — جاي من شاشة البصمة نفسها:Means «المستخدم اختار
+     الأرقام بنفسه»، فماشيش تاني على البصمة. */
+  function login(noBio) {
+    stopLock();
+    state.pin = ''; state.tries = 0; state.len = PIN_LEN;
+    /* ⛔ رجع المستخدم وشكله خلص من النافذة القصيرة — مش هنفسحله
+        الطريق ونعيده للوحة تاني. */
+    if (strikeCount() >= STRIKE_LIMIT) { askCode(); return; }
+    /* 📱 الموبايل: البصمة الأول. ⛔ التابلت واللاب: ٤ أرقام بس
+        من غير ما نذكر البصمة أصلاً — مافيش مستشعر. */
+    if (!noBio && isTouch() && hasBio()) { bioLogin(); return; }
     mount();
     head('تسجيل الدخول', 0);
     boxEl().className = 'gt-box pin';
@@ -500,54 +786,357 @@
       post('/api/auth/pin/login', { pin: p })
         .then(function (o) {
           if (o.s === 200 && o.d && o.d.token) {
+            strikeReset();
             put(o.d.token, o.d.user);
             shut();
             return;
           }
+          /* ⛔⛌ السيرفر هو اللي بيحسم. 429 = قفل ١٥ دقيقة (القاعدة ②).
+            والـneed_code بيرجع **401** مش 429 — انتبه. */
           if (o.s === 429) { locked(o.d.retry_after || o.d.retry || 60); return; }
+          if (needCode(o.d)) { askCode(); return; }
           /* ⛌ كل حاجة تانية = الباسورد غلط. ما نقولش حاجة عن الحساب. */
-          badPin(leftTries(o.d, state.tries));
+          var n = strikePush();
+          if (n >= STRIKE_LIMIT) { askCode(); return; }
+          badPin(winLeft(o.d, state.tries), n);
           paintPad(false);
         })
         /* ⛔ شبكة — المحاولة دي مااتحسبتش عند السيرفر، فنصفّر العدّاد */
-        .catch(function () { state.tries = 0; paintPad(false); down('الدخول'); });
+        .catch(function () {
+          state.tries = 0; strikeReset(); paintPad(false); down('الدخول');
+        });
     });
 
     document.getElementById('gtForgot').onclick = function () { forgot(); };
     document.getElementById('gtBack').onclick = function () { welcome(); };
   }
 
+  /* ⛌ السيرفر قال «الكود مطلوب»؟ — الباك بيرجّعها 401 + why:need_code.
+     📌 لو الباك غيّر الاسم، زيده هنا. */
+  function needCode(d) {
+    if (!d) return false;
+    if (d.need_code === true) return true;
+    var w = String(d.why || '');
+    return w === 'need_code' || w === 'code_required' || w === 'challenge'
+        || w === 'need_email' || w === 'need_challenge';
+  }
+
+  /* 📌 كام محاولة في **نافذة الدقيقة** فاضلة — الباك بيبعتها في
+     attempts_left. لو مش موجودة بنحسبها عندنا. */
+  function winLeft(d, tries) {
+    var v = d && (d.attempts_left != null ? d.attempts_left : null);
+    if (v == null || isNaN(v)) return Math.max(0, STRIKE_LIMIT - (tries || 0));
+    return Math.max(0, Number(v));
+  }
+
   /* ═══════════════════════════════════════════════════════════
      ④ نسيت الباسورد
      ───────────────────────────────────────────────────────────
-     ⛔⛔ حسابات الباسورد **مافيش لها استرجاع** — ده تصميم الباك
-        مش نقص في الشاشة:
-          · إيميل التأكيد مابقعش فيه الباسورد ولا فيه زرار استرجاع
-          · /api/auth/reset بيرجّع كود النظام القديم (key) مش للباسورد
-        ⛌ فبنقولها للمستخدم بنص صريح بدل ما نوعده بإيميل مش هيوصله.
-        📌 لو الباك ضاف POST /api/auth/pin/reset — السطر الوحيد
-           هنا هو اللي هيتغيّر.
+     📌 القاعدة الجديدة غيّرته — بقى في استرجاع بالكود.
+        الكلام القديم كان «مافيش استرجاع» واللي فاتح من ساعتها.
      ═══════════════════════════════════════════════════════════ */
   function forgot() {
     stopLock();
-    state.pin = '';
+    state.pin = ''; state.len = PIN_LEN;
     head('نسيت كلمة المرور', 1);
     boxEl().className = 'gt-box';
     formEl().innerHTML =
-      '<div class="gt-ico">🔒</div>' +
-      '<h1 class="gt-h">مافيش استرجاع للباسورد</h1>' +
+      '<div class="gt-ico">🔑</div>' +
+      '<h1 class="gt-h">بنسلّك من غير الباسورد</h1>' +
       '<div class="gt-txt left">' +
-        'حسابك اتفتح بـ<b>٤ أرقام</b> هم المفتاح الوحيد ليه —<br>' +
-        'الإيميل اللي بعتناه وقت التسجيل كان <b>تأكيد</b> بس، ومكانش فيه الباسورد،' +
-        ' ومكانش فيه زرار «نسيت» جواه.<br><br>' +
-        'عشان كده مفيش إيميل استرجاع ولا زرار أرجّعلك الباسورد — ' +
-        'وده اللي بيمنع حد يفتح إيميلك ويسرق حسابك.' +
+        'الطريقة الوحيدة: <b>كود على الإيميل</b>.<br>' +
+        'اكتب إيميلك المسجّل وهنعتلك كود من ٦ أرقام،' +
+        ' تكتبه وتختار ٤ أرقام جديدة تدخل بيها من هنا.<br><br>' +
+        '<b>الإيميل لوحده مش بيفتح</b> — لازم الكود اللي جالك' +
+        ' في بريدك كمان. عشان كده لو حد غيرك فتح إيميلك' +
+        ' ميقدرش ياخد حسابك بنفسه.' +
       '</div>' +
-      '<button class="gt-go" id="gtNewAcc" type="button">عمل حساب جديد</button>' +
+      '<button class="gt-go" id="gtChGo" type="button">ابعتلي كود على الإيميل</button>' +
+      '<button class="gt-go alt" id="gtNewAcc" type="button">عمل حساب جديد</button>' +
       '<button class="gt-back" id="gtBack3" type="button">رجوع للدخول</button>';
 
+    var cg = document.getElementById('gtChGo');
+    if (cg) cg.onclick = function () { askCode(); };
     document.getElementById('gtNewAcc').onclick = function () { signup(); };
     document.getElementById('gtBack3').onclick = function () { login(); };
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     ⑤ شاشة طلب الكود — إيميل واحد وزرار
+     ───────────────────────────────────────────────────────────
+     ⛔⛔⛔ الرد المحايد شرط أمني مش ذوق:
+        · الإيميل مسجّل     -> 200 «لو الإيميل ده بتاعك...»
+        · الإيميل مش مسجّل  -> 200 **بالنص نفسه** ومفيش إرسال
+        ⛔ ممنوع نميّز بين اتنين — لا في الواجهة ولا في الباك.
+           أي كلمة زي «الإيميل ده مش مسجّل» بتبقى قناة مفتوحة
+           نبني بيها قاموس بالمحاولات ونعرف مين عندنا حساب.
+     ═══════════════════════════════════════════════════════════ */
+  function askCode() {
+    stopLock();
+    state.pin = ''; state.len = PIN_LEN; flow.tries = 0;
+    mount();
+    head('محاولات كتيرة', 1, function () { login(); });
+    boxEl().className = 'gt-box code card';
+    formEl().innerHTML =
+      '<div class="gt-ico">🔑</div>' +
+      '<div class="gt-alert">⚠️ محاولات كتيرة</div>' +
+      '<h1 class="gt-h">هنبعتلك كود على الإيميل المسجّل</h1>' +
+      '<p class="gt-sub2">بعد ٣ محاولات غلط ورا بعض — ودي أأمن من إنك تضل تخمّن</p>' +
+      '<label class="gt-lb" for="gtChMail">إيميلك المسجّل</label>' +
+      '<input id="gtChMail" class="gt-in" type="email" dir="ltr" maxlength="120" ' +
+        'autocomplete="email" inputmode="email" placeholder="name@mail.com">' +
+      '<div class="gt-msg" id="gtMsg"></div>' +
+      '<button class="gt-go" id="gtChSend" type="button">ابعت الكود</button>' +
+      '<button class="gt-back" id="gtChBack" type="button">رجوع للدخول</button>';
+
+    var btn = document.getElementById('gtChSend');
+    var mail = document.getElementById('gtChMail');
+
+    function send() {
+      var v = (mail.value || '').trim();
+      /* ⛌ فحص الشكل بس — مش وجود الإيميل. وجوده الباك هو اللي
+         بيحكم فيه، وهو اللي بيرد المحايد. */
+      if (!v) { say('اكتب إيميلك الأول', false); return; }
+      if (v.indexOf('@') < 1 || v.indexOf('.') < 1) { say('شكل الإيميل غلط', false); return; }
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ بنعت...'; }
+      clearMsg();
+
+      post(PATHS.send, { email: v })
+        .then(function (o) {
+          if (o.s === 200) {
+            /* ⛔⛔ نفس الشاشة ونفس الكلام — مسجّل أو لأ. */
+            flow.email = v;
+            codeEntry();
+            return;
+          }
+          /* ⛔ 429 → الزر يفضل مقفول طول العدّاد (sayRate بيفتحه). */
+          if (o.s === 429) { sayRate(o.d); return; }
+          if (btn) { btn.disabled = false; btn.textContent = 'ابعت الكود'; }
+          if (o.s === 400) { say('❌ ' + ((o.d && o.d.error) || 'شكل الإيميل غلط'), false); return; }
+          /* ⛔⛔ أي حاجة تانية (404/409/500): مفيش كلام يبوّح إن
+             الإيميل مسجّل ولا لأ. رسالة عامة وخلاص. */
+          say('❌ مش قادرين نبعت الكود دلوقتي — جرّب بعد شوية', false);
+        })
+        .catch(function () {
+          if (btn) { btn.disabled = false; btn.textContent = 'ابعت الكود'; }
+          say('❌ مش قادرين نوصل للسيرفر', false);
+        });
+    }
+
+    /* 📌 429 — حد الإرسال (٣ أكواد للإيميل في اليوم) أو حد الـIP.
+       ⛔ العدّاد بييجي من السيرفر مش متخيّنين. */
+    function sayRate(d) {
+      var s2 = Math.max(1, Number((d && (d.retry_after || d.retry)) || 0) || 900);
+      if (btn) { btn.disabled = true; btn.textContent = '⏔ استنى'; }
+      var m = document.getElementById('gtMsg');
+      if (!m) return;
+      m.className = 'gt-msg no';
+      m.innerHTML = '⏔ استنى شوية واطلب تاني' +
+        ' <span class="gt-cd" id="gtRateCd">(' + mm(s2) + ')</span>';
+      var t = setInterval(function () {
+        s2--;
+        var c = document.getElementById('gtRateCd');
+        if (s2 <= 0) {
+          clearInterval(t);
+          if (btn) { btn.disabled = false; btn.textContent = 'ابعت الكود'; }
+          m.innerHTML = '⏔ خلص الوقت — تقدر تطلب تاني';
+          return;
+        }
+        if (c) c.textContent = '(' + mm(s2) + ')';
+      }, 1000);
+    }
+
+    if (btn) btn.onclick = send;
+    if (mail) mail.onkeydown = function (e) { if (e.key === 'Enter') send(); };
+    document.getElementById('gtChBack').onclick = function () { login(); };
+    setTimeout(function () { if (mail) mail.focus(); }, 60);
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     ⑥ شاشة كتابة الكود — ٦ خانات وعدّاد صلاحية
+     ═══════════════════════════════════════════════════════════ */
+  function codeEntry() {
+    stopLock();
+    state.pin = ''; state.len = CODE_LEN; flow.tries = 0;
+    mount();
+    head('كود الدخول', 1, function () { askCode(); });
+    boxEl().className = 'gt-box code';
+    formEl().innerHTML =
+      '<div class="gt-ico">📩</div>' +
+      '<h1 class="gt-h">اكتب الكود اللي جالك</h1>' +
+      '<p class="gt-txt">' + esc(NOTE_SAME) + '</p>' +
+      codeHtml() +
+      '<p class="gt-cdt" id="gtCd">⏱ الكود صالح <b id="gtCdN">' + mm(CODE_TTL) + '</b></p>' +
+      padHtml(0) +
+      '<button class="gt-back" id="gtChAgain" type="button">ارجع — اكتب إيميل تاني</button>';
+
+    var back = document.getElementById('gtChAgain');
+    if (back) back.onclick = function () { askCode(); };
+
+    startCd();
+
+    onPad(function (v) {
+      paintPad(true);
+      clearMsg();
+      post(PATHS.verify, { email: flow.email, code: v })
+        .then(function (o) {
+          var d = o.d || {};
+          if (o.s === 200) {
+            /* 📌 ده **تروكن فتح** مش توكن جلسة — الباك بيوقّعه
+               بمفتاح تاني و require_user() بيرفضه. عمره ١٠ دقايق
+               واستعمال واحد. التوكن مش بيتسلّمش غير لما المستخدم
+               يختار الباسورد الجديد. */
+            flow.unlock = d.unlock || d.ticket || '';
+            flow.code = v;
+            state.pin = '';
+            paintCode();
+            newPin();
+            return;
+          }
+          if (o.s === 429) {
+            if (String(d.why || '') === 'too_many_wrong') {
+              codeDead('⛔ الكود اتقفل — اطلب كود جديد');
+              return;
+            }
+            locked(d.retry_after || d.retry || 60);
+            return;
+          }
+          /* ⛔⛔ 401 = رد واحد في كل الأحوال: كود غلط · كود منتهي ·
+             مفيش كود · الإيميل مش مسجّل. الباك مش بيفرّق — والواجهة
+             كمان مش هتفرّق. بنورّي كلامه هو (فيه «اطلب كود جديد»)
+             وعدّاد المحاولات بيتحسب عندنا. */
+          if (o.s === 401 || o.s === 400) { codeWrong(d); return; }
+          codeDead('❌ مش قادرين نكمّل — اطلب كود جديد');
+        })
+        .catch(function () {
+          paintPad(false);
+          say('❌ مش قادرين نوصل للسيرفر', false);
+        });
+    });
+  }
+
+  /* 📌 الكود غلط أو منتهي — الرد واحد في الحالتين.
+     📌 العدّاد بيكمل طول ما الكود حي؛ ولما يوصل ٥ غلط (نفس
+        PIN_CHAL_WRONG بتاع الباك) نقفل الشاشة ونقول «اطلب جديد». */
+  function codeWrong(d) {
+    flow.tries++;
+    var left = Math.max(0, CODE_TRIES - flow.tries);
+    state.pin = '';
+    paintCode();
+    paintPad(false);
+    shakeCode();
+    if (left <= 0) { codeDead('⛔ الكود اتقفل — اطلب كود جديد'); return; }
+    var t = String((d && d.error) || 'الكود غلط');
+    if (left === 1) say('❌ ' + t + ' — آخر محاولة', false);
+    else say('❌ ' + t + ' — فاضل ' + left + ' محاولات', false);
+  }
+
+  /* 📌 الكود مات — الشاشة بتقف واللوحة بتقفل، وزرار الرجوع
+     بيفتح شاشة طلب كود جديد من الأول. */
+  function codeDead(msg) {
+    stopCd();
+    state.pin = '';
+    paintCode();
+    paintPad(true);
+    say(msg, false);
+    var b = document.getElementById('gtChAgain');
+    if (b) b.textContent = 'اطلب كود جديد';
+  }
+
+  /* 📌 عدّاد صلاحية الكود — 10:00 ينزل لحد 00:00 */
+  function startCd() {
+    stopCd();
+    flow.cd = CODE_TTL;
+    var n0 = document.getElementById('gtCdN');
+    if (n0) n0.textContent = mm(flow.cd);
+    flow.cdTimer = setInterval(function () {
+      flow.cd--;
+      var num = document.getElementById('gtCdN');
+      if (flow.cd <= 0) {
+        stopCd();
+        if (num) num.textContent = '00:00';
+        codeDead('⏰ الكود خلصت صلاحيته — اطلب كود جديد');
+        return;
+      }
+      if (num) num.textContent = mm(flow.cd);
+    }, 1000);
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     ⑦ شاشة اختيار الباسورد الجديد
+     ───────────────────────────────────────────────────────────
+     ⛔⛔⛔ مفيش أي شاشة «تم الدخول» هنا. التوكن بييجي من طلب واحد
+        بعد ما الـ4 أرقام يتقبلوا، ومفيش طريق تاني يفتح الموقع.
+     ═══════════════════════════════════════════════════════════ */
+  function newPin() {
+    stopLock();
+    state.pin = ''; state.len = PIN_LEN;
+    mount();
+    head('اختار باسورد جديد', 1, function () { login(); });
+    boxEl().className = 'gt-box pin';
+    formEl().innerHTML =
+      '<div class="gt-ico">🔐</div>' +
+      '<h1 class="gt-h">اختار ٤ أرقام جديدة</h1>' +
+      '<p class="gt-sub2">دي اللي هتدخل بيه من هنا</p>' +
+      padHtml(0) +
+      '<button class="gt-back" id="gtNpBack" type="button">رجوع</button>';
+
+    document.getElementById('gtNpBack').onclick = function () { login(); };
+
+    onPad(function (v) {
+      paintPad(true);
+      clearMsg();
+      /* 📌 تروكن الفتح في هيدر Authorization (مش في الـbody) —
+         زي ما الباك بيقرا (_bearer). والـbody فيه new_pin بس. */
+      postAuth(PATHS.newpin, { new_pin: v }, flow.unlock)
+        .then(function (o) {
+          var d = o.d || {};
+          if (o.s === 200 && d.token) {
+            /* ⛔⛔ اللحظة الوحيدة اللي فيها توكن — بعد ما ٤ أرقام
+               جديدة اتقبلت. قبل كده مافيش توين خالص. */
+            wipeFlow();
+            try { octaTrack('pin_reset', 'gate', ''); } catch (e) { }
+            put(d.token, d.user);
+            shut();
+            return;
+          }
+          state.pin = '';
+          paintDots();
+          if (o.s === 409 || d.why === 'pin_taken') {
+            /* ⛌ 409 → اللوحة فاضية تاني والمستخدم يختار غيره */
+            paintPad(false);
+            say('❌ الباسورد ده مستخدم من قبل — اختار غيره', false);
+            shake();
+            return;
+          }
+          if (o.s === 400) {
+            paintPad(false);
+            say('❌ ' + (d.error || 'الباسورد لازم يكون ٤ أرقام'), false);
+            shake();
+            return;
+          }
+          if (o.s === 429) { locked(d.retry_after || d.retry || 60); return; }
+          if (o.s === 401) {
+            /* ⛔ تروكن الفتح خلص (عمره ١٠ دقايق) — نبدأ من الأول */
+            wipeFlow();
+            askCode();
+            return;
+          }
+          if (o.s === 404) {
+            wipeFlow();
+            paintPad(false);
+            say('❌ الحساب مش موجود — ابدأ من الأول', false);
+            return;
+          }
+          wipeFlow();
+          paintPad(false);
+          say('❌ مش قادرين نكمّل — جرّب تاني', false);
+        })
+        .catch(function () {
+          state.pin = ''; paintDots(); paintPad(false);
+          down('تغيير الباسورد');
+        });
+    });
   }
 
   /* ═══ «أريد مساعدة» — صفحة مساعدة جوه البوابة ═══ */
@@ -561,7 +1150,8 @@
       '<div class="gt-txt left">' +
         '• <b>الباسورد</b> هو الـ4 أرقام اللي انت اخترتها أول مرة — من غيرهم مفيش دخول<br>' +
         '• <b>مفيش إيميل</b> في شاشة الدخول — الباسورد هو كل حاجة<br>' +
-        '• <b>نسيت الـ4 أرقام؟</b> مفيش استرجاع — اعرف حساب جديد<br>' +
+        '• <b>نسيت الـ4 أرقام؟</b> ابعت كود على إيميلك المسجّل واختار ٤ جديدة<br>' +
+        '• <b>3 غلط ورا بعض جوه دقيقة</b> يطلبوا كود على الإيميل — وده بيحميك<br>' +
         '• <b>القفل</b> بيقفل ١٥ دقيقة بعد ٥ محاولات غلط — وبعدها ساعة' +
       '</div>' +
       '<button class="gt-go" id="gtBackH" type="button">فهمت — ارجع</button>';
@@ -575,7 +1165,7 @@
      بيبعت /api/auth/pin/change والتوكن بيتلزق من octa-api.js */
   function pinStep(title, hint) {
     stopLock();
-    state.pin = '';
+    state.pin = ''; state.len = PIN_LEN;
     mount();
     head(title, 1);
     boxEl().className = 'gt-box';
@@ -638,11 +1228,112 @@
   }
   syncBuild();
 
+  /* ═══════════════════════════════════════════════════════════
+     ⏰ التجديد الصامت — كل ساعتين بالظبط
+     ───────────────────────────────────────────────────────────
+     ⛔⛔⛔ صفر شاشات · صفر spinner · صفر إشعار · صفر طلب باسورد.
+        المستخدم ميفحشش عن حاجة. الهدف إن الجلسة ما تقطعش
+        وهو قاعد يقرأ.
+     📌 التوكن الجديد بيتخزّن في نفس الاسم octa_token — زي النظام.
+     ⛔⛔ ممنوع أي حاجة تانية تتخزّن: لا باسورد ولا كود إيميل
+        ولا بصمة. المتصفح بيخزّن التّوكن بس.
+     ⛔ مافيش مؤقّت جلسات في الواجهة — ما فيش شاشة بتقفل بعد
+        وقت معيّن. البوابة بتظهر بس لما السيرفر يرفض التوكن.
+     ═══════════════════════════════════════════════════════════ */
+  var renewAt = 0;
+  var renewTimer = null;
+  var renewMs = RENEW_FALLBACK_MS;   /* بيتحدّث من expires_in كل مرة */
+
+  function renew() {
+    /* ⛔ مفيش توكن = مفيش حاجة نعملها — ونتقفل بهدوء */
+    if (!token()) return Promise.resolve({ s: 0, d: {} });
+    renewAt = Date.now() + renewMs;
+
+    /* 📌 POST /api/auth/refresh — التوكن القديم بس.
+       ⛔ الـbody فاضي عن قصد: الباك بيرفض أي credential فيه بـ401. */
+    return postAuth(RENEW_PATH, {}, token()).then(function (o) {
+      if (o.s === 200) {
+        /* 📌 لو رجّع توكن جديد → نحدّثه بصمت. */
+        if (o.d && o.d.token) {
+          put(o.d.token, o.d.user);
+          /* ⛔ الجدولة بتتبع السيرفر دايماً — لو غيّر عمر التوكن
+             من غير ما نعرف، هنمشي معاه. */
+          renewMs = renewDelayMs(o.d.expires_in);
+          clearInterval(renewTimer); renewTimer = null;
+          renewEvery();
+        }
+        return o;
+      }
+      if (o.s === 401 || o.s === 400) {
+        /* ⛔ التوكن مش صالح خلاص → البوابة. بس كده. */
+        logoutLocal();
+        wipeFlow();
+        welcome();
+        open();
+        return o;
+      }
+      /* ⛔ خطأ شبكة أو 500 — مش هنقفل حاجة على المستخدم؛
+         هنجرّب تاني بعد نفس المدة. */
+      return o;
+    }).catch(function () { return { s: 0, d: {} }; });
+  }
+
+  /* 📌 المجدول — بيتحسب من expires_in اللي الباك رجّعه. */
+  function renewEvery() {
+    if (renewTimer) clearInterval(renewTimer);
+    renewAt = Date.now() + renewMs;
+    renewTimer = setInterval(function () { renew(); }, renewMs);
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     ⏱ نافذة الخمول — ٣٠ دقيقة من غير ما يلمس الموقع
+     ───────────────────────────────────────────────────────────
+     ⛔⛔⛔ دي **خامل (idle) في المتصفح** — مش تروكن بصري ومش وقت
+        HTTP. بتتحسب من **آخر لمسة**: ماوس · لمس · ضغط · كتابة ·
+        scroll. مش من وقت فتح الصفحة.
+     ⛌ mousemove لوحده بيحصل أثناء القراءة العادية — فمفيش إزعاج
+        للمستخدم اللي قاعد يقرأ من غير ما يحرّك إيده.
+     ⛔⛔/browser ما فتحش الموقع تاني خالص → ما ينفعش نقفل حاجة
+        أصلاً. القفل بيحصل أول ما يرجع.
+     ═══════════════════════════════════════════════════════════ */
+  var lastTouch = Date.now();
+  function touch() { lastTouch = Date.now(); }
+  ['pointerdown', 'pointermove', 'keydown', 'scroll', 'touchstart', 'wheel']
+    .forEach(function (ev) {
+      try { document.addEventListener(ev, touch, { passive: true }); } catch (e) { }
+    });
+
+  function idleCheck() {
+    /* ⛔ مفيش توكن (في البوابة دلوقتي) → مافيش قفل */
+    if (!token()) { lastTouch = Date.now(); return; }
+    if (Date.now() - lastTouch <= IDLE_MS) return;
+    /* ⛔ عدّى نص ساعة خامل → البوابة. التوكن يتمسح. */
+    logoutLocal();
+    wipeFlow();
+    lastTouch = Date.now();
+    welcome();
+    open();
+  }
+
+  /* 📌 التابات بتجمّد المؤقّتات في الخلفية. أول ما المستخدم يرجع
+     للتاب بنشوف: عدّى وقت الخمول ولا التجديد ولا لأ. بصمت. */
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    if (token() && Date.now() - lastTouch > IDLE_MS) { idleCheck(); return; }
+    if (Date.now() - renewAt >= 0) renew();
+  });
+
+  setInterval(idleCheck, IDLE_TICK);
+  renewEvery();
+
   /* ═══ تشغيل ═══ */
   window.OCTAGate = {
     open: open, shut: shut,
     welcome: welcome, login: login, signup: signup,
-    forgot: forgot, help: help, changePin: changePin
+    forgot: forgot, help: help, changePin: changePin,
+    /* 📌 الشاشتين الجديدتين مفتوحين للاختبار والمعاينة */
+    askCode: askCode, codeEntry: codeEntry, newPin: newPin,
+    renew: renew, renewEvery: function () { return renewMs; }
   };
 
   /* ⛔⛌ السيرفر رفض بيانات محمية (401) — يعني التوكن مش صالح.
