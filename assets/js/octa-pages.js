@@ -489,10 +489,22 @@ function renderIntel(d) {
 /* ════════ PHASE 13: أفضل الفرص ════════ */
 let OPPS_LOADED = false;
 
+/* ⛔⛔⛔ المسار ده بقى محمي على السيرفر (401 من غير توكن).
+   ⛔ والكود ده كان بيطلبه **قبل الدخول**: setTimeout(loadOpportunities, 800)
+      شغّال طول ما البوابة مفتوحة — يعني زائر مجهول كان بيطلبه
+      وبياخد 401 وبيشوف "تعذر التحميل".
+   ⛌ الحل مش إننا نفتح المسار تاني — الحل نتخطى النداء لحد ما
+      يبقى فيه توكن، وبعدين نعيد التحميل لحظة الدخول.
+      ⛌ ملاحظة: مبنحطّش OPPS_LOADED هنا — عايزينه يعيد المحاولة بعد الدخول. */
+function octaHasToken() {
+  try { return !!(localStorage.getItem('octa_token') || ''); } catch (e) { return false; }
+}
+
 async function loadOpportunities(force) {
   const grid = document.getElementById('oppsGrid');
   if (!grid) return;
   if (OPPS_LOADED && !force) return;
+  if (!octaHasToken()) return;   /* ⛔ لسه داخلش — نتخطى، مش نفتح المسار */
   if (!grid.innerHTML || force) grid.innerHTML = '<div class="opps-loading">جاري التحميل...</div>';
   try {
     const res = await fetch(OCTA_API + '/api/ranking?_=' + Date.now());
@@ -533,6 +545,13 @@ async function loadOpportunities(force) {
     };
   }
   document.addEventListener('DOMContentLoaded', function () { setTimeout(loadOpportunities, 800); setTimeout(loadEarlyOpps, 1800); });
+
+  /* ⛔⛔ لحظة الدخول: البوابة بتنطفي بس الصفحة مش بتتعملها reload،
+     فالمحتوى اللي اتخطّى وقت كان الزائر بره ميفتحش لوحده.
+     ⛌ البوابة بتطلق الحدث ده بعد ما تتأكد → نحمّل دلوقتي. */
+  document.addEventListener('octa:authed', function () {
+    setTimeout(function () { loadOpportunities(true); }, 120);
+  });
 })();
 
 
@@ -2101,6 +2120,15 @@ async function armRisk(box) {
 
 /* ══════ ⑦ المحفظة — كروت ══════ */
 async function armPortfolio(box) {
+  /* ⛔⛔ /api/portfolio بقى 401 لزائر مجهول. الأذرع ديوراء البوابة
+     (لازم تدوس على الذراع)، بس ⛌ نحوطّن كمان على localhost
+     (لأن البوابة مش بتتتحط خالص هناك)
+     فبنعمل نفس التخطي بدل ما نخلي 401 يمسح التوكن
+     ويطلّع رسالة «انتهت جلستك» على مستخدم مش داخل أصلاً. */
+  if (!octaHasToken()) {
+    box.innerHTML = '<div class="opps-loading">سجّل دخولك عشان تشوف محفظتك</div>';
+    return;
+  }
   const [pf, d] = await Promise.all([
     fetch(OCTA_API + '/api/portfolio').then(r=>r.json()).catch(()=>({})),
     fetch(OCTA_API + '/api/rank?limit=20').then(r=>r.json()).catch(()=>({results:[]})),
@@ -2150,6 +2178,11 @@ async function armPortfolio(box) {
 
 /* ══════ ⑧ الفرص — أعمل إيه ══════ */
 async function armOpportunity(box) {
+  /* ⛔ نفس كلام armPortfolio — /api/ranking محمي دلوقتي */
+  if (!octaHasToken()) {
+    box.innerHTML = '<div class="opps-loading">سجّل دخولك عشان تشوف الفرص</div>';
+    return;
+  }
   const [opp, strat] = await Promise.all([
     fetch(OCTA_API + '/api/opportunities').then(r=>r.json()),
     fetch(OCTA_API + '/api/strategies').then(r=>r.json()),

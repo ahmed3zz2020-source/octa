@@ -86,6 +86,11 @@
     if (g) g.remove();
     document.body.style.overflow = '';
     try { window.OCTAAuth && window.OCTAAuth.refresh && window.OCTAAuth.refresh(); } catch (e) { }
+
+    /* ⛔⛔ المحتوى المحمي بيتخطّى وهو لسه بره البوابة (عشان السيرفر
+       بيرد 401). البوابة دي بتنطفي من غير reload، فالمحتوى ده
+       ميفتحش لوحده. ⛌ الحدث ده بيقول للصفحة: اتأكدت، حمّل دلوقتي. */
+    try { document.dispatchEvent(new CustomEvent('octa:authed')); } catch (e) { }
   }
 
   /* ═══ الشاشة الأولى: ترحيب + اختيار ═══ */
