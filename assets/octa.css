@@ -5643,3 +5643,29 @@ body.set-notab { font-variant-numeric: normal; }
 /* حالة «مفيش بيانات» — مش أحمر، مش أخضر */
 .v-none { color: var(--muted) !important; }
 .v-none.v-pill, span.v-none { background: rgba(139,147,167,.14) !important; border-color: var(--line) !important; }
+
+/* ═══ بوابة الدخول — الحقول والكود ═══ */
+.gt-lb {
+  display: block; font-size: .76rem; font-weight: 700;
+  color: var(--muted); margin: 12px 0 5px;
+}
+.gt-lb:first-child { margin-top: 0; }
+.gt-lb small { font-weight: 400; opacity: .75; font-size: .9em; }
+
+.gt-codes { display: flex; gap: 7px; margin-bottom: 9px; }
+.gt-pick {
+  flex: 1; padding: 11px 4px; border-radius: 10px; cursor: pointer;
+  background: var(--pri); border: 1px solid var(--line);
+  color: var(--txt); font-family: inherit; font-size: .92rem; font-weight: 800;
+  letter-spacing: 1.5px; font-variant-numeric: tabular-nums;
+  transition: border-color .15s, background .15s;
+}
+.gt-pick:hover { border-color: var(--gold); }
+.gt-pick.on { border-color: var(--gold); background: rgba(212,175,55,.13); color: var(--gold); }
+
+.gt-code-in {
+  text-align: center; letter-spacing: 9px;
+  font-size: 1.22rem; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.gt-code-in::placeholder { letter-spacing: 9px; opacity: .35; }

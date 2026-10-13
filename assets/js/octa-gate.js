@@ -64,25 +64,69 @@
     document.getElementById('gtLogin').onclick = function () { login(); };
   }
 
-  /* ═══ تسجيل ═══ */
+  /* ═══ تسجيل ═══
+     📌两步: الأول اسم وإيميل، والتاني الكود.
+     ليه كده؟ الحقول بتتعب بتبقى أسهل من 3 boxes مرة واحدة،
+     والمستخدم بيفهم المطلوب منه وهو بيعمل الخطوة.
+     ⛌ «الكود» مش كلمة سر — هو رقم يتحفظ في الـbrowser.
+  */
   function signup() {
     formEl().innerHTML =
-      '<input id="gtName" class="gt-in" placeholder="اسمك" maxlength="40" autocomplete="name">' +
-      '<input id="gtMail" class="gt-in" type="email" placeholder="إيميلك" maxlength="120" autocomplete="email">' +
-      '<input id="gtKey" class="gt-in" type="password" placeholder="كلمة سر (6 حروف على الأقل)" maxlength="80" autocomplete="new-password">' +
+      '<label class="gt-lb">اسمك</label>' +
+      '<input id="gtName" class="gt-in" placeholder="مثلاً: أحمد" maxlength="40" autocomplete="name">' +
+      '<label class="gt-lb">إيميلك</label>' +
+      '<input id="gtMail" class="gt-in" type="email" placeholder="example@mail.com" maxlength="120" autocomplete="email" dir="ltr">' +
+      '<div class="gt-split" id="gtStep2" style="display:none">' +
+        '<label class="gt-lb">اختار كود من 6 أرقام <small>ده اللي هتدخل بيه بعد كده</small></label>' +
+        '<div class="gt-codes" id="gtCodes"></div>' +
+        '<input id="gtKey" class="gt-in gt-code-in" placeholder="······" maxlength="6" inputmode="numeric" autocomplete="off">' +
+      '</div>' +
       '<div id="gtMsg" class="gt-msg"></div>' +
-      '<button class="gt-go" id="gtDo">اعمل حسابي</button>' +
+      '<button class="gt-go" id="gtDo">التالي</button>' +
       '<button class="gt-back" id="gtBack">رجوع</button>';
 
     var key = document.getElementById('gtKey');
+    var step = 1;
+
+    /* ⛌ مفيش توليد على السيرفر — الكود بيختاره المستخدم.
+       ⛌ مش بنطلب «اختار كلمة سر» — كلمة سر معناها إن حد بيفتكرها
+       بعد سنة. كود 6 أرقام أسهل بكتير وأمانه أعلى لوحده. */
+    function paintCodes() {
+      var box = document.getElementById('gtCodes');
+      box.innerHTML = '';
+      for (var i = 0; i < 3; i++) {
+        var c = String(Math.floor(100000 + Math.random() * 900000));
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'gt-pick'; b.textContent = c;
+        b.onclick = function (e) {
+          key.value = e.target.textContent;
+          box.querySelectorAll('.gt-pick').forEach(function (x) { x.classList.remove('on'); });
+          e.target.classList.add('on');
+        };
+        box.appendChild(b);
+      }
+    }
+    paintCodes();
+
     var go = function () {
       var name = document.getElementById('gtName').value.trim();
       var mail = document.getElementById('gtMail').value.trim();
       var k = key.value.trim();
+      var btn = document.getElementById('gtDo');
 
-      if (!mail) { say('❌ الإيميل مطلوب', false); document.getElementById('gtMail').focus(); return; }
-      if (mail.indexOf('@') < 1 || mail.indexOf('.') < 1) { say('❌ شكل الإيميل غلط', false); return; }
-      if (k.length < 6) { say('❌ كلمة السر 6 حروف على الأقل', false); return; }
+      if (step === 1) {
+        if (!name) { say('❌ اكتب اسمك الأول', false); document.getElementById('gtName').focus(); return; }
+        if (!mail) { say('❌ الإيميل مطلوب', false); document.getElementById('gtMail').focus(); return; }
+        if (mail.indexOf('@') < 1 || mail.indexOf('.') < 1) { say('❌ شكل الإيميل غلط', false); return; }
+        step = 2;
+        document.getElementById('gtStep2').style.display = 'block';
+        btn.textContent = 'اعمل حسابي';
+        say('اختار كود أو اكتبه بنفسك — 6 أرقام', true);
+        key.focus();
+        return;
+      }
+
+      if (!/^\d{6}$/.test(k)) { say('❌ الكود 6 أرقام', false); key.focus(); return; }
 
       go.disabled = true; go.textContent = '⏳ بنعمل حسابك…';
       fetch(apiBase() + '/api/auth/register', {
@@ -98,6 +142,7 @@
           } else {
             say('❌ ' + ((o.d && o.d.error) || 'حصل خطأ'), false);
             go.disabled = false; go.textContent = 'اعمل حسابي';
+            step = 2;
           }
         }).catch(function () {
           say('❌ الاتصال فشل — جرب تاني', false);
@@ -114,17 +159,20 @@
   /* ═══ دخول ═══ */
   function login() {
     formEl().innerHTML =
-      '<input id="gtMail2" class="gt-in" type="email" placeholder="إيميلك" maxlength="120" autocomplete="email">' +
-      '<input id="gtKey2" class="gt-in" type="password" placeholder="كلمة السر" maxlength="80" autocomplete="current-password">' +
+      '<label class="gt-lb">إيميلك</label>' +
+      '<input id="gtMail2" class="gt-in" type="email" placeholder="example@mail.com" maxlength="120" autocomplete="email" dir="ltr">' +
+      '<label class="gt-lb">الكود <small>6 أرقام — اللي اخترته أول مرة</small></label>' +
+      '<input id="gtKey2" class="gt-in gt-code-in" placeholder="······" maxlength="6" inputmode="numeric" autocomplete="one-time-code">' +
       '<div id="gtMsg" class="gt-msg"></div>' +
       '<button class="gt-go" id="gtDo2">ادخل</button>' +
-      '<button class="gt-back" id="gtReset">نسيت كلمة السر؟</button>' +
+      '<button class="gt-back" id="gtReset">نسيت الكود؟</button>' +
       '<button class="gt-back" id="gtBack2">رجوع</button>';
 
     var go = function () {
       var mail = document.getElementById('gtMail2').value.trim();
       var k = document.getElementById('gtKey2').value.trim();
-      if (!mail || !k) { say('❌ املا الخانتين', false); return; }
+      if (!mail) { say('❌ الإيميل مطلوب', false); return; }
+      if (!/^\d{6}$/.test(k)) { say('❌ الكود 6 أرقام', false); return; }
 
       go.disabled = true; go.textContent = '⏳ بنتحقق…';
       fetch(apiBase() + '/api/auth/register', {
