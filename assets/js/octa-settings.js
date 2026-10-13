@@ -537,8 +537,12 @@
   }
 
   function sw(on, act) {
+    /* «ON / OFF» جوه المفتاح — بدون الكلام ده
+       الوضع مش واضح بالعين. */
     return '<button type="button" class="set-sw' + (on ? ' on' : '') + '" data-set="' + act + '" data-val="1"' +
-      ' role="switch" aria-checked="' + (on ? 'true' : 'false') + '"><i></i></button>';
+      ' role="switch" aria-checked="' + (on ? 'true' : 'false') + '"' +
+      ' aria-label="' + (on ? 'مفعّل' : 'مقفول') + '">' +
+      '<i></i><em><b class="sw-off">OFF</b><b class="sw-on">ON</b></em></button>';
   }
 
   /* ── ① السوق ── */

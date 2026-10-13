@@ -4924,7 +4924,18 @@ body.sb-open .sb-scrim { display: block; }
    في آخر الصف على نفس الارتفاع بالظبط.
    ══════════════════════════════════════════════════════════════ */
 
-.toolbar-wrap { padding: 0; position: relative; }
+/* ⛌ قبل 2026-10-13 كان relative فـ الشريط كان بيضيع مع السكرول
+   على الموبايل والتابلت مع بعض. دلوقتي sticky تحت الشريطين فوقاه.
+   ارتفاع الـnav بيتقاس وقت التشغيل ويتخزّن في --navh. */
+.toolbar-wrap {
+  padding: 0;
+  position: sticky;
+  top: calc(62px + var(--navh, 56px));
+  z-index: 98;
+  background: var(--pri2);
+  border-top: 1px solid var(--line);
+}
+body.light .toolbar-wrap { background: #fff; }
 
 .tb-row {
   display: flex;
@@ -5151,21 +5162,57 @@ body.set-locked { overflow: hidden; }
 .set-seg-b.on { background: var(--set-on-bg); color: var(--set-on-fg); }
 @media (pointer: coarse) { .set-seg-b { min-height: 40px; padding: 8px 13px; } }
 
-/* ── ⑤ المفتاح ── */
+/* ── ⑤ المفتاح ──
+   ⚠ النقطة بتتحرك مع اتجاه اللغة، مش باتجاه ثابت.
+   الكود القديم كان بيحرّكها +19px دايماً، وفي العربي (RTL) ده
+   كان بيطلّعها بره الشكل تمامًا. دلوقتي مسافة الحركة
+   = عرض الشكل − حجم النقطة − الحشو × ٢، والاتجاه بيتقلب. */
 .set-sw {
-  width: 46px; height: 27px; border-radius: 999px; position: relative;
+  width: 84px; height: 30px; border-radius: 999px; position: relative;
   border: 1px solid var(--set-line2); background: var(--set-row-h);
-  cursor: pointer; padding: 0; transition: background .18s, border-color .18s;
+  cursor: pointer; padding: 0; overflow: hidden;
+  transition: background .18s, border-color .18s;
+  flex: 0 0 auto;
 }
 .set-sw i {
   position: absolute; inset-block-start: 2px; inset-inline-start: 2px;
-  width: 21px; height: 21px; border-radius: 50%;
+  width: 24px; height: 24px; border-radius: 50%;
   background: var(--set-ink2); transition: transform .18s, background .18s;
+  z-index: 2;
 }
+/* النص — دايماً على الناحية المقابلة للنقطة */
+.set-sw em {
+  position: absolute; inset-block-start: 0; inset-block-end: 0;
+  display: flex; align-items: center; gap: 3px;
+  font-style: normal; font-size: 11px; font-weight: 800;
+  letter-spacing: .6px; line-height: 1;
+  z-index: 1; pointer-events: none;
+}
+.set-sw .sw-on, .set-sw .sw-off { transition: opacity .15s; }
+.set-sw .sw-off { opacity: 1; }
+.set-sw .sw-on  { opacity: 0; }
 .set-sw.on { background: var(--set-ac-bg); border-color: var(--set-ac); }
-.set-sw.on i { background: var(--set-ac); transform: translateX(19px); }
-[dir="ltr"] .set-sw.on i { transform: translateX(-19px); }
-@media (pointer: coarse) { .set-sw { width: 52px; height: 31px; } .set-sw i { width: 25px; height: 25px; } .set-sw.on i { transform: translateX(21px); } }
+.set-sw.on i { background: var(--set-ac); }
+.set-sw.on .sw-off { opacity: 0; }
+.set-sw.on .sw-on  { opacity: 1; }
+
+/* RTL: النقطة تبدأ يمين فتتحرك شمال، والنص يعكس الناحية */
+.set-sw em { inset-inline-end: 30px; }
+.set-sw.on em { inset-inline-end: auto; inset-inline-start: 30px; }
+[dir="rtl"] .set-sw i { transform: translateX(0); }
+[dir="rtl"] .set-sw.on i { transform: translateX(-56px); }
+[dir="ltr"] .set-sw i { transform: translateX(0); }
+[dir="ltr"] .set-sw.on i { transform: translateX(56px); }
+
+@media (pointer: coarse) {
+  .set-sw { width: 94px; height: 34px; }
+  .set-sw i { width: 28px; height: 28px; inset-block-start: 2px; }
+  .set-sw em { font-size: 12px; }
+  .set-sw em { inset-inline-end: 33px; }
+  .set-sw.on em { inset-inline-end: auto; inset-inline-start: 33px; }
+  [dir="rtl"] .set-sw.on i { transform: translateX(-62px); }
+  [dir="ltr"] .set-sw.on i { transform: translateX(62px); }
+}
 
 /* ── ⑥ نقاط لون التمييز ── */
 .set-dots { display: inline-flex; gap: 9px; }
