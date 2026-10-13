@@ -4,7 +4,99 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0a1929">
-  <script id="octaErrTrap">
+  <script id="octaDiag">
+/* ═══════════════════════════════════════════════════════════
+   🩺 كارت الفحص — بيتفتح بـ ?diag=1 في شريط العنوان
+   ───────────────────────────────────────────────────────────
+   ⛔ ليش؟ كان أي حاجة بتبقى فاضية وال��ستخدم مبيعرفش السبب.
+   ⛌ الكارت ده بيعمل ٥ فحوصات ويقول النتيجة بالعربي — من غير
+   ما يحتاج يفتح DevTools ولا يفهم في أي حاجة تقنية.
+   ═══════════════════════════════════════════════════════════ */
+window.__octaDiag = function () {
+  var box = document.createElement('div');
+  box.id = '__octaDiag';
+  box.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(8,12,18,.94);'
+    + 'padding:16px;font:13px/1.9 system-ui;direction:rtl;color:#e8edf5;overflow:auto';
+  box.innerHTML = '<div style="max-width:520px;margin:0 auto">'
+    + '<div style="font-size:19px;font-weight:700;margin-bottom:4px">🩺 فحص OCTA</div>'
+    + '<div id="__dgList"></div>'
+    + '<button id="__dgClose" style="margin-top:16px;width:100%;padding:12px;border:0;'
+    + 'border-radius:10px;background:#d4af37;color:#16202e;font-weight:700;font-size:15px">'
+    + 'اقفل</button></div>';
+  document.body.appendChild(box);
+  box.querySelector('#__dgClose').onclick = function(){ box.remove(); };
+  var L = box.querySelector('#__dgList');
+  var API = (typeof OCTA_API !== 'undefined' && OCTA_API)
+    || 'https://octa-prices-production-4ccb.up.railway.app';
+
+  function line(txt, cls) {
+    var d = document.createElement('div');
+    d.style.cssText = 'padding:7px 10px;border-radius:8px;margin-bottom:6px;background:#16202e;'
+      + 'border-right:3px solid ' + (cls === 'ok' ? '#51cf66' : cls === 'no' ? '#ff6b6b' : '#ffd43b');
+    d.textContent = txt;
+    L.appendChild(d);
+  }
+
+  function head(p) {
+    var h = new Headers();
+    var t = '';
+    try { t = localStorage.getItem('octa_token') || ''; } catch (e) {}
+    if (t) h.set('Authorization', 'Bearer ' + t);
+    return h;
+  }
+
+  line('▶ السيرفر…');
+  fetch(API + '/').then(function (r) { return r.json(); }).then(function (d) {
+    line('✅ السيرفر: ' + d.status + ' · السوق ' + d.market_phase + ' · ' + d.cairo_time, 'ok');
+  }).catch(function (e) {
+    line('❌ السيرفر: ' + (e && e.message), 'no');
+  });
+
+  line('▶ التوكن…');
+  fetch(API + '/api/auth/me', { headers: head() }).then(function (r) {
+    return r.json().then(function (d) { return { s: r.status, d: d }; });
+  }).then(function (o) {
+    if (o.s === 200) line('✅ دخولك: ' + (o.d.user && o.d.user.name || 'مستخدم'), 'ok');
+    else line('⛔ مش داخل (كود ' + o.s + ') — لازم تعمل دخول تاني', 'no');
+  }).catch(function (e) { line('❌ التوكن: ' + (e && e.message), 'no'); });
+
+  [['الأسهم كاملة', '/api/data_full'],
+   ['الترتيب', '/api/rank?limit=5'],
+   ['الأسعار', '/api/quotes?market=egypt']
+  ].forEach(function (p) {
+    fetch(API + p[1], { headers: head() }).then(function (r) {
+      return r.text().then(function (t) { return { s: r.status, t: t }; });
+    }).then(function (o) {
+      var n = 0;
+      try { var j = JSON.parse(o.t); n = (j.stocks && Object.keys(j.stocks).length)
+              || (j.results && j.results.length) || (j.count || 0); } catch (e) {}
+      if (o.s === 200) line('✅ ' + p[0] + ': ' + n + ' سجل', 'ok');
+      else line('⛔ ' + p[0] + ' → ' + o.s, 'no');
+    }).catch(function (e) { line('❌ ' + p[0] + ': ' + (e && e.message), 'no'); });
+  });
+
+  setTimeout(function () {
+    line('▶ الصفحات…');
+    try {
+      var pages = document.querySelectorAll('[id$="Page"], .page');
+      line('📄 عدد صفحات الموقع: ' + pages.length, 'ok');
+      if (typeof switchPage === 'function') {
+        switchPage('stocks');
+        setTimeout(function () {
+          var el = document.getElementById('stockPage');
+          line('🔘 زر الأسهم → ' + (el
+            ? (getComputedStyle(el).display === 'none' ? 'مقفل ❌' : 'فتح ✅')
+            : 'مفيش صفحة stocks في الـHTML'), 'info');
+        }, 350);
+      } else { line('⛔ دالة switchPage مش موجودة', 'no'); }
+    } catch (e) { line('❌ ' + (e && e.message), 'no'); }
+  }, 1200);
+};
+if (/[?&]diag=1/.test(location.search)) {
+  window.addEventListener('load', function () { setTimeout(window.__octaDiag, 700); });
+}
+</script>
+<script id="octaErrTrap">
 /* ⛔⛔ لحد دلوقتي أي خطأ JavaScript كان بيختفي تمامًا — المستخدم بيشوف
    صفحة زي الصورة ومحدش بيعرف السبب. الكارت ده بيوريه فوق.
    ⛌ مش بيظهر أخطاء الشبكة (fetch) — دي ليها رسائلها. */
