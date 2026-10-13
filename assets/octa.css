@@ -5197,25 +5197,25 @@ body.set-locked { overflow: hidden; }
   background: var(--set-ink2); transition: transform .18s, background .18s;
   z-index: 2;
 }
-/* النص — دايماً على الناحية المقابلة للنقطة */
-.set-sw em {
-  position: absolute; inset-block-start: 0; inset-block-end: 0;
-  display: flex; align-items: center; gap: 3px;
-  font-style: normal; font-size: 11px; font-weight: 800;
-  letter-spacing: .6px; line-height: 1;
-  z-index: 1; pointer-events: none;
-}
-.set-sw .sw-on, .set-sw .sw-off { transition: opacity .15s; }
-.set-sw .sw-off { opacity: 1; }
-.set-sw .sw-on  { opacity: 0; }
 .set-sw.on { background: var(--set-ac-bg); border-color: var(--set-ac); }
 .set-sw.on i { background: var(--set-ac); }
-.set-sw.on .sw-off { opacity: 0; }
-.set-sw.on .sw-on  { opacity: 1; }
 
-/* RTL: النقطة تبدأ يمين فتتحرك شمال، والنص يعكس الناحية */
-.set-sw em { inset-inline-end: 30px; }
-.set-sw.on em { inset-inline-end: auto; inset-inline-start: 30px; }
+/* الكلمة (ON / OFF) — عنصر واحد بـcontent، دايماً على الناحية
+   المقابلة للنقطة. */
+.set-sw::after {
+  content: 'OFF';
+  position: absolute; inset-block: 0;
+  display: flex; align-items: center;
+  inset-inline-end: 32px;
+  font-size: 11.5px; font-weight: 800; letter-spacing: .7px; line-height: 1;
+  color: var(--set-ink2); pointer-events: none;
+  transition: inset-inline-end .18s, inset-inline-start .18s, color .18s;
+}
+.set-sw.on::after {
+  content: 'ON';
+  inset-inline-end: auto; inset-inline-start: 32px;
+  color: var(--set-ac);
+}
 [dir="rtl"] .set-sw i { transform: translateX(0); }
 [dir="rtl"] .set-sw.on i { transform: translateX(-56px); }
 [dir="ltr"] .set-sw i { transform: translateX(0); }
@@ -5224,9 +5224,8 @@ body.set-locked { overflow: hidden; }
 @media (pointer: coarse) {
   .set-sw { width: 94px; height: 34px; }
   .set-sw i { width: 28px; height: 28px; inset-block-start: 2px; }
-  .set-sw em { font-size: 12px; }
-  .set-sw em { inset-inline-end: 33px; }
-  .set-sw.on em { inset-inline-end: auto; inset-inline-start: 33px; }
+  .set-sw::after { font-size: 12.5px; inset-inline-end: 35px; }
+  .set-sw.on::after { inset-inline-end: auto; inset-inline-start: 35px; }
   [dir="rtl"] .set-sw.on i { transform: translateX(-62px); }
   [dir="ltr"] .set-sw.on i { transform: translateX(62px); }
 }

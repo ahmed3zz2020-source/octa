@@ -537,12 +537,12 @@
   }
 
   function sw(on, act) {
-    /* «ON / OFF» جوه المفتاح — بدون الكلام ده
-       الوضع مش واضح بالعين. */
+    /* الكلمة (ON / OFF) بتولّدها CSS عبر content —
+       عنصر واحد بدل اتنين متقاطعين، فمفيش احتمال للنص يطلع
+       في غير مكانه أو يبان الاتنين مع بعض. */
     return '<button type="button" class="set-sw' + (on ? ' on' : '') + '" data-set="' + act + '" data-val="1"' +
       ' role="switch" aria-checked="' + (on ? 'true' : 'false') + '"' +
-      ' aria-label="' + (on ? 'مفعّل' : 'مقفول') + '">' +
-      '<i></i><em><b class="sw-off">OFF</b><b class="sw-on">ON</b></em></button>';
+      ' aria-label="' + (on ? 'مفعّل' : 'مقفول') + '"><i></i></button>';
   }
 
   /* ── ① السوق ── */
