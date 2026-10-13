@@ -4746,7 +4746,6 @@ body{margin:0;padding:0 10px 50px;
    → الكلام في نص الشاشة.
    ⛔ :has() مش موجودة في webview قديم = المحتوى بيفضل متجمّع
       فوق وخلاص — مافيش حاجة بتتكسر. */
-.gt-box:not(:has(.gt-pad)) #gt-form { justify-content: center; }
 .gt-box:not(:has(.gt-pad)) #gt-form { justify-content: safe center; }
 /* 📌 الشاشة اللي فيها لوحة: العنوان في نص النص، واللوحة تحت —
    والفراغ المتباقي بينسمت بين فوق العنوان وبين فوق اللوحة. */
@@ -5971,6 +5970,14 @@ body.set-notab { font-variant-numeric: normal; }
   .gt-pad { --k: 84px; --g: 10px; }
   .gt-box.reg .gt-pad,
   .gt-box.code .gt-pad { --k: 76px; --g: 9px; }
+}
+/* ⛔⭐ موبايل/تابلت أفقي (العرض كبير والارتفاع قصير):
+   الرقم الثابت ٨٤px كان بيطلع اللوحة بره الشاشة ⬇️
+   هنا بنرجّعه يحسب من 100dvh زي الموبايل الطولي. */
+@media (min-width: 700px) and (max-height: 560px) {
+  .gt-pad { --k: clamp(48px, (100dvh - var(--fit) - 40px) / 4, 84px); }
+  .gt-box.reg .gt-pad,
+  .gt-box.code .gt-pad { --k: clamp(46px, (100dvh - var(--fit) - 36px) / 4, 76px); }
 }
 /* حالة الانتظار — بدل الكارت الفاضي */
 .gt-wait {
