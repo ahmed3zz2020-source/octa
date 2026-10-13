@@ -64,14 +64,22 @@
         على كل طلب في الموقع (벨ا двуفة).
      ═══════════════════════════════════════════════════════════ */
   const AUTH_PATHS = [
-    '/api/egx_full', '/api/ranking', '/api/portfolio',
+    '/api/egx_full', '/api/data_full', '/api/ranking', '/api/portfolio',
     '/api/stats', '/api/alerts/watch', '/api/alerts/diag',
     '/api/auth/me'
   ];
 
+  /* ⛔ الـfetch بتيجي برابط كامل (https://…/api/egx_full) —
+     والمقارنة كانت على السلسلة نفسها، فindexOf كان -1 دايماً
+     والتوكن ماتبعتش أصلاً. بنطلّع المسار بس ونقارن بيه. */
+  function _pathOf(url) {
+    const s = String(url || '').split('?')[0].split('#')[0];
+    const i = s.indexOf('/api/');
+    return i === -1 ? s : s.slice(i);
+  }
+
   function _withToken(url, opts) {
-    const path = String(url || '').split('?')[0];
-    if (AUTH_PATHS.indexOf(path) === -1) return opts;
+    if (AUTH_PATHS.indexOf(_pathOf(url)) === -1) return opts;
     let t = '';
     try { t = localStorage.getItem('octa_token') || ''; } catch (e) { }
     if (!t) return opts;

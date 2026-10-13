@@ -661,29 +661,50 @@ const EGX_COLS = {
 let EGX_DB = null, EGX_META = null;
 
 let RK = {};
-async function loadRiskFile(){
-  try {
-    const r = await fetch('data_risk.json?_=' + Date.now());
-    if (r.ok) RK = await r.json();
-  } catch(e){ /* اختياري */ }
+/* ⛔⛔ كان بيقرأ data_risk.json من القرص (47KB) — الملف كان static
+   على Cloudflare فأي زائر ينزّله من غير تسجيل.
+   كل الحقول دي موجودة جوه رد الـAPI (vol1y·vol3y·mdd·mdd1y·
+   sharpe3y·sortino3y·cagr3y·frm52hi) في المسارين، فبقت بتتبعت معاهم.
+   ملاحظة: الكاش بقى فاضي عن قصد. */
+async function loadRiskFile(){ RK = {}; return RK; }
+
+/* ⛔ الفرق بين الشكلين — غلط هنا = 22 حقل بيضيعوا بصمت:
+     /api/data_full → total·verdict·q·m·sf·lq·conf·sectorAr·pack·why…
+     /api/egx_full  → n·en·s·score·decision·s_rsi·s_dy…
+   فنقرأ الشكل من الرد نفسه مش من اسم المسار. */
+function _isFullShape(f){
+  if (!f || !f.stocks) return false;
+  if (f._shape) return f._shape === 'full';
+  const k = Object.keys(f.stocks)[0];
+  const s = k ? f.stocks[k] : null;
+  return !!(s && (s.total != null || s.verdict != null || s.conf != null));
 }
+
 async function loadEgxFile(){
   if (EGX_DB) return EGX_DB;
   const bust = '?_=' + Date.now();
   await loadRiskFile();
   try {
-    /* 🆕 data_full.json الأول — فيه 296 سهم + 22 حقل جديد + تقييم بالثقة
-       الترتيب: ① data_full ② Railway ③ data_egx (fallback) */
-    let f = await fetch('data_full.json' + bust)
-      .then(r => r.ok ? r.json() : null).catch(() => null);
-    let fromFull = !!(f && f.stocks);
+    /* ⛔⛔ الداتا بقت من الـAPI المحمي — مفيش أي ملف على القرص.
+       الترتيب: ① /api/data_full (محمي · 285 سهم · تقييم الأذرع الخمسة)
+                 ② /api/egx_full  (محمي · fallback قديم بدون تقييم)
+       الاتنين محميين بـ require_user على السيرفر.
+       🔑 التوكن بيتلزق في octa-api.js لوحده (AUTH_PATHS) —
+          مفيش ولا سر ولا توكن مكتوب في الواجهة.
+       ملاحظة: لو السيرفر واقع الاتنين بيرجعوا فاضي والواجهة
+       بترجع لسلوك /api/rank بس — أحسن من إننا نعرض أرقام مكشوفة. */
+    const pick = async (path) => {
+      try {
+        const r = await fetch(OCTA_API + path + bust);
+        if (!r.ok) return null;
+        return await r.json();
+      } catch(e){ return null; }
+    };
+    let f = await pick('/api/data_full');
+    let fromFull = _isFullShape(f);
     if (!fromFull) {
-      f = await fetch(OCTA_API + '/api/egx_full' + bust)
-        .then(r => r.ok ? r.json() : null).catch(() => null);
-      if (!f || !f.stocks) {
-        f = await fetch('data_egx.json' + bust)
-          .then(r => r.ok ? r.json() : null).catch(() => null);
-      }
+      f = await pick('/api/egx_full');
+      fromFull = _isFullShape(f);
     }
     if (!f || !f.stocks) return null;
     const prices = null;
@@ -852,7 +873,12 @@ async function octaLoadDB(){
     OS_DB = apiRows.map(s => ({ code:s.code, name:OCTA_NAME_FIX[s.code]||s.name||s.code, sector:s.sector||'—',
       price:Number(s.price||0), change:Number(s.change||0),
       score:Number(s.final_score||s.score||0), decision:s.decision||'—', _live:true }));
-    OS_READY = true;
+    /* ⛔⛔ الداتا الكاملة بقت محمية بالتوكن. لو الطلب راح 401
+       (يعني لسه داخل والUCE كاش ماكانش موجود) متقفلش الكاش هنا —
+       وإلا أول ضغطة بعد الدخول هتفضل 30 سهم لحد ما يعمل refresh.
+       القاعدة: الكاش يتقفل بس لما يبقى فيه توكن صالح. */
+    try { OS_READY = !!localStorage.getItem('octa_token'); }
+    catch (e) { OS_READY = true; }
     return OS_DB;
   }
 
