@@ -4626,23 +4626,97 @@ body{margin:0;padding:0 10px 50px;
 }
 
 /* ══════════════════════════════════════════════════════════════
-   🚪 بوابة الدخول
+   🚪 بوابة الدخول — لوحة الأرقام
+   ──────────────────────────────────────────────────────────────
+   ⛔ كل الألوان من الـtokens (octa-tokens.css) — ممنوع hex هنا.
    ══════════════════════════════════════════════════════════════ */
 #gate {
-  background: var(--bg, #0b0e14) !important;
+  background: var(--bg) !important;
+}
+/* 🖥️ الشاشة كلها عمود: شريط فوق + محتوى في النص */
+.gt-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* ⛔ لازم لون صراحة: البوابة شايلة ألوان النهاري، فلو ورثنا لون
+     الـbody (نص غامق على خلفية غامقة) — الكلام بيختفي. */
+  color: var(--txt);
+  font-family: inherit;
+}
+/* 📌 الشريط العلوي — عنوان يمين · زرار شمال */
+.gt-top {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 4px;
+  flex: 0 0 auto;
+}
+.gt-top-t {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--txt);
+}
+.gt-top-b {
+  padding: 6px 2px;
+  font-family: inherit;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: color var(--t1);
+}
+.gt-top-b:hover { color: var(--gold); }
+.gt-top-b.bk { color: var(--gold); }
+
+.gt-body {
+  flex: 1 1 auto;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 20px 18px;
 }
 .gt-box {
   width: 100%;
   max-width: 400px;
-  padding: 30px 26px 24px;
+  padding: 24px 20px 20px;
   text-align: center;
   border: 1px solid var(--line);
-  border-radius: 20px;
-  background: var(--card, #141821);
-  box-shadow: 0 20px 70px rgba(0, 0, 0, .5);
+  border-radius: var(--r4);
+  background: var(--card);
+  box-shadow: var(--sh3);
 }
-.gt-logo {
-  font-size: 3.2rem;
+/* ⛌ شاشة الدخول — من غير كارت: الشاشة نفسها سوداء زي الصورة */
+.gt-box.pin {
+  max-width: 380px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+/* 📌 شاشة التسجيل فيها حقول فوق اللوحة — نصغّر زرار اللوحة شوية
+   عشان الشاشة تفضل مظبوطة على موبايل 360 من غير scroll. */
+.gt-box.reg .gt-pad { --k: 66px; --g: 8px; }
+.gt-box.reg .gt-msg { min-height: 1.1em; margin: 6px 0; }
+.gt-box.reg .gt-lb { margin: 7px 0 4px; }
+.gt-box.reg .gt-in { padding: 11px 13px; }
+.gt-box.pin .gt-ico { font-size: 2.2rem; margin-bottom: 6px; }
+.gt-box.pin .gt-h {
+  font-size: 1.12rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  margin-bottom: 0;
+}
+.gt-ico {
+  font-size: 2.9rem;
   line-height: 1;
   margin-bottom: 12px;
 }
@@ -4656,6 +4730,18 @@ body{margin:0;padding:0 10px 50px;
   margin: 0 0 22px;
   font-size: .85rem;
   color: var(--muted);
+}
+/* 📌 الجملة الصغيرة تحت الإيميل في شاشة التسجيل */
+.gt-sub2 {
+  margin: 7px 0 2px;
+  padding: 7px 10px;
+  font-size: .74rem;
+  line-height: 1.75;
+  color: var(--muted);
+  background: var(--slot);
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+  text-align: right;
 }
 .gt-in {
   display: block;
@@ -4683,6 +4769,15 @@ body{margin:0;padding:0 10px 50px;
   margin: 9px 0;
   font-size: .79rem;
   line-height: 1.7;
+  font-weight: 600;
+}
+.gt-msg.ok { color: var(--up); }
+.gt-msg.no { color: var(--dn); }
+/* 📌 العدّاد التنازلي وقت القفل */
+.gt-cd {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--txt);
 }
 .gt-go {
   display: block;
@@ -4719,6 +4814,24 @@ body{margin:0;padding:0 10px 50px;
   cursor: pointer;
 }
 .gt-back:hover { color: var(--gold); }
+/* 📌 «نسيت كلمة المرور؟» — تحت اللوحة زي الصورة */
+.gt-forgot {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 8px 10px;
+  font-size: .87rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+  transition: color var(--t1);
+}
+.gt-forgot:hover { color: var(--gold); }
+.gt-box.pin .gt-back { margin-top: 2px; font-size: .75rem; }
 .gt-note {
   margin-top: 18px;
   padding-top: 14px;
@@ -4729,9 +4842,28 @@ body{margin:0;padding:0 10px 50px;
   line-height: 1.8;
 }
 @media (max-width: 480px) {
+  .gt-top { padding: 14px 16px 2px; }
+  .gt-body { padding: 4px 14px 22px; }
   .gt-box { padding: 24px 18px 20px; }
   .gt-h { font-size: 1.3rem; }
-  .gt-logo { font-size: 2.7rem; }
+  .gt-ico { font-size: 2.6rem; }
+  .gt-box.pin { padding: 0; }
+  .gt-box.pin .gt-ico { font-size: 2rem; }
+  .gt-box.pin .gt-h { font-size: 1.04rem; }
+}
+/* ⛔ شاشات قصيرة (تابلت أفقي / موبايل صغير) — نصغّر اللوحة
+   بدل ما الشاشة تطلع بره الشاشة. */
+@media (max-height: 680px) {
+  .gt-box.pin .gt-ico { font-size: 1.7rem; margin-bottom: 2px; }
+  .gt-box.pin .gt-dots { margin: 12px 0 4px; }
+  .gt-box.pin .gt-forgot { margin-top: 10px; padding: 9px 8px 8px; }
+  .gt-box.pin .gt-back { display: none; }
+  /* 📌 شاشات التسجيل والاسترجاع أطول — نضيّق الحقول */
+  .gt-box:not(.pin) { padding: 18px 18px 16px; }
+  .gt-box:not(.pin) .gt-in { padding: 10px 12px; }
+  .gt-box:not(.pin) .gt-lb { margin: 8px 0 4px; }
+  .gt-box:not(.pin) .gt-sub2 { padding: 7px 10px; font-size: .73rem; }
+  .gt-ico { font-size: 2rem; margin-bottom: 6px; }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -5644,21 +5776,119 @@ body.set-notab { font-variant-numeric: normal; }
 .v-none { color: var(--muted) !important; }
 .v-none.v-pill, span.v-none { background: rgba(139,147,167,.14) !important; border-color: var(--line) !important; }
 
-/* ═══ بوابة الدخول — الحقول والكود ═══ */
+/* ═══ بوابة الدخول — الحقول ═══ */
 .gt-lb {
   display: block; font-size: .76rem; font-weight: 700;
-  color: var(--muted); margin: 12px 0 5px;
+  color: var(--muted); margin: 9px 0 5px;
 }
 .gt-lb:first-child { margin-top: 0; }
 .gt-lb small { font-weight: 400; opacity: .75; font-size: .9em; }
 
+/* ══════════════════════════════════════════════════════════════
+   🔢 لوحة الأرقام — 3×3 + ⌫ + 0
+   ──────────────────────────────────────────────────────────────
+   📌 الأرقام بتقرأ من الشمال لليمين زي كل موبايل في الدنيا،
+      فاللوحة LTR جوّه صفحة RTL.
+   ══════════════════════════════════════════════════════════════ */
 
-.gt-code-in {
-  text-align: center; letter-spacing: 9px;
-  font-size: 1.22rem; font-weight: 800;
-  font-variant-numeric: tabular-nums;
+/* ● ● ● ● — نقطة بتتعبى مع كل رقم */
+.gt-dots {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin: 16px 0 4px;
 }
-.gt-code-in::placeholder { letter-spacing: 9px; opacity: .35; }
+.gt-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line2);
+  background: transparent;
+  transition: background var(--t1), border-color var(--t1), transform var(--t1);
+}
+.gt-dot.on {
+  background: var(--txt);
+  border-color: var(--txt);
+  transform: scale(1.12);
+}
+.gt-dots.bad { animation: gtShake .5s cubic-bezier(.36, .07, .19, .97) both; }
+.gt-dots.bad .gt-dot { border-color: var(--dn); }
+@keyframes gtShake {
+  10%, 90% { transform: translateX(-3px); }
+  20%, 80% { transform: translateX(5px); }
+  30%, 50%, 70% { transform: translateX(-8px); }
+  40%, 60% { transform: translateX(8px); }
+}
+
+.gt-pad {
+  /* 📌 مقاس الزرار — العرض والارتفاع (دائري) بيتحسبوا من هنا.
+     ⛔ بيتصغّر مع الشاشة الطويلة عشان اللوحة ماتفتحش على دو-role. */
+  --k: 84px;
+  --g: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--g);
+  direction: ltr;
+  width: min(100%, calc(var(--k) * 3 + var(--g) * 2));
+  margin: 4px auto 0;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.gt-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  min-height: 46px;
+  padding: 0;
+  font-family: inherit;
+  font-size: calc(var(--k) * .27);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--txt);
+  background: var(--slot);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background var(--t1), transform var(--t1);
+}
+.gt-key:hover { background: var(--pri3); border-color: var(--line2); }
+.gt-key:active { transform: scale(.94); background: var(--goldBg); border-color: var(--gold); }
+.gt-key.gt-del { font-size: 1.15rem; color: var(--muted); }
+/* ⛔ ⌫ كـSVG مش حرف — الحرف (U+232B) بيطلع مربع فاضي في ناس
+   كتير من الخطوط، الـSVG بيترسم في كل المتصفحات. */
+.gt-del svg {
+  width: 46%;
+  height: 46%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.gt-del:hover svg { color: var(--txt); }
+.gt-key.off { background: transparent; border-color: transparent; cursor: default; }
+.gt-key.off:hover { background: transparent; }
+.gt-pad.dis { opacity: .4; }
+.gt-pad.dis .gt-key { cursor: not-allowed; }
+.gt-pad.dis .gt-key:active { transform: none; }
+
+@media (max-width: 400px) {
+  .gt-pad { --k: 76px; --g: 9px; }
+  .gt-dots { gap: 13px; }
+}
+/* ⛔ الشاشة قصيرة (تابلت أفقي / موبايل صغير): نصغّر اللوحة
+   بدل ما البوابة تطلع بره الشاشة. */
+@media (max-height: 700px) {
+  .gt-pad { --k: 60px; --g: 8px; }
+  .gt-box.reg .gt-pad { --k: 54px; }
+}
+/* 📌 التابلت أوسع — نرجّع مقاس الزرار الكامل */
+@media (min-width: 700px) {
+  .gt-box.reg .gt-pad { --k: 76px; --g: 9px; }
+}
 
 /* حالة الانتظار — بدل الكارت الفاضي */
 .gt-wait {
@@ -5678,12 +5908,12 @@ body.set-notab { font-variant-numeric: normal; }
   font-size: .84rem; font-weight: 700; color: #e07850;
 }
 
-/* ═══ شاشة «ابعتنا الكود» ═══ */
-.gt-sent {
-  text-align: center; font-size: 2.6rem; line-height: 1;
-  margin: 4px 0 10px;
-}
-.gt-sent-t { text-align: center; font-weight: 800; font-size: .95rem; margin-bottom: 4px; }
+/* ═══ نصوص مساعدة (صفحة «أريد مساعدة») ═══ */
+.gt-txt.left { text-align: right; }
+.gt-txt b { color: var(--txt); font-weight: 700; }
+.gt-txt.left b { color: var(--gold); }
+
+/* ═══ شاشة «تم التسجيل» ═══ */
 .gt-sent-s {
   text-align: center; font-size: .8rem; color: var(--muted);
   direction: ltr; margin-bottom: 14px;

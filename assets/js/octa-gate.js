@@ -1,15 +1,40 @@
 /* ══════════════════════════════════════════════════════════════
-   🚪 بوابة الدخول
+   🚪 بوابة الدخول — لوحة الأرقام
    ──────────────────────────────────────────────────────────────
-   المستخدم لازم يسجّل قبل ما يشوف أي حاجة.
-   التسجيل = إيميل + كلمة سر.
+   الباسورد = 4 أرقام، بيتكتب من على لوحة زي تليفون الموبايل،
+   وبيتسلّم لوحده أواخر 4 رقم — من غير زرار.
+
+   ⛔ الشاشة مقفولة دايماً لحد ما السيرفر يوافق — مفيش استثناء.
    ══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
 
+  /* 📌 عدد أرقام الباسورد — تغيّره هنا بس */
+  var PIN_LEN = 4;
+
+  /* 📌 لو السيرفر مبعتش رقم محاولات، بنحسبه من عندنا */
+  var PIN_TRIES = 5;
+
+  /* ═══ الاتصال ═══ */
   function apiBase() {
     try { return (typeof OCTA_API !== 'undefined' && OCTA_API) || ''; }
     catch (e) { return ''; }
+  }
+
+  /* ⛌ التوكن بيتلزق جوّه octa-api.js — مش هنا.
+     بنقرا الرد كنص الأول عشان السيرفر ممكن يردّ HTML صفحة خطأ. */
+  function post(path, body) {
+    return fetch(apiBase() + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    }).then(function (r) {
+      return r.text().then(function (txt) {
+        var d = null;
+        try { d = JSON.parse(txt); } catch (e) { d = null; }
+        return { s: r.status, d: d || {} };
+      }, function () { return { s: r.status, d: {} }; });
+    });
   }
 
   function esc(s) {
@@ -18,21 +43,10 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  function errAr(d) {
-    var e = (d && d.error) || '';
-    if (e === 'rate limit exceeded') {
-      var w = (d && d.retry_after) || 60;
-      return 'استنى ' + Math.ceil(w / 60) + ' دقيقة وجرب تاني';
-    }
-    if (e === 'too many') return '📧 بعتّ الكود كتير — استنى شوية';
-    if (!e) return 'حصل خطأ';
-    return e;
-  }
-
+  /* ═══ التوكن ═══ */
   function token() {
     try { return localStorage.getItem('octa_token') || ''; } catch (e) { return ''; }
   }
-
   function put(t, u) {
     try {
       localStorage.setItem('octa_token', t);
@@ -40,44 +54,79 @@
       window.OCTA_USER_ID = (u && u.id) || '';
     } catch (e) { }
   }
+  function logoutLocal() {
+    try {
+      localStorage.removeItem('octa_token');
+      localStorage.removeItem('octa_user');
+      window.OCTA_USER_ID = '';
+    } catch (e) { }
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     🖼️ الهيكل
+     ───────────────────────────────────────────────────────────
+     ⛌ نسخة مطابقة لـindex.html. لو الـDOM اتشال (shut) ورجع
+     اتفتح تاني، بنعيد بناؤه من هنا — البوابة من غير زرار = موقع ميت.
+     ═══════════════════════════════════════════════════════════ */
+  var SHELL =
+    '<div class="gt-top">' +
+      '<div class="gt-top-t" id="gtTopT">تسجيل الدخول</div>' +
+      '<button class="gt-top-b" id="gtTopB" type="button">أريد مساعدة</button>' +
+    '</div>' +
+    '<div class="gt-body">' +
+      '<div class="gt-box" id="gtBox"><div id="gt-form"></div></div>' +
+    '</div>';
 
   function gateEl() { return document.getElementById('gate'); }
 
-  /* حالة الانتظار — ⛌ الكارت الفاضي كان مربك.
-     المستخدم بيشوف «بنتحقق» بدل ما يفكر إن الموقع باظ. */
-  function pending(msg) {
-    var f = document.getElementById('gt-form');
-    if (!f) return;
-    f.innerHTML = '<div class="gt-wait"><span class="gt-spin"></span>' + msg + '</div>';
-    var h = document.getElementById('gt-h');
-    if (h) h.textContent = 'أهلاً بعودتك';
+  /* ⛌ المونتاج — idempotent: يا ما فيش حاجة، يا بترجّع نفس العنصر */
+  function mount() {
+    var g = gateEl();
+    if (g) return g;
+    g = document.createElement('div');
+    g.id = 'gate';
+    g.className = 'gt-wrap';
+    g.style.cssText = 'position:fixed;inset:0;z-index:999999;display:flex;';
+    g.innerHTML = SHELL;
+    document.body.appendChild(g);
+    return g;
   }
 
-  /* ⛌ حزام أمان: لو الفورم اتقفلت لسبب ما، ارسم تاني.
-     البوابة بطاقة مالهاش زرار = الموقع ميت. */
-  function ensurePainted() {
+  function formEl() {
     var f = document.getElementById('gt-form');
-    if (f && !f.innerHTML.trim()) welcome();
+    if (f) return f;
+    mount();
+    return document.getElementById('gt-form');
   }
-  function formEl() { return document.getElementById('gt-form'); }
+  function boxEl() { return document.getElementById('gtBox'); }
+  function topT() { return document.getElementById('gtTopT'); }
+  function topB() { return document.getElementById('gtTopB'); }
 
-  function say(t, ok) {
-    var m = document.getElementById('gtMsg');
-    if (!m) return;
-    m.textContent = t;
-    m.style.color = ok ? '#22c55e' : '#ef4444';
+  /* 📌 الشريط فوق: عنوان على اليمين + زرار على الشمال */
+  function head(title, back) {
+    var t = topT(), b = topB();
+    if (t) t.textContent = title;
+    if (!b) return;
+    b.style.visibility = '';
+    if (back) {
+      b.textContent = 'رجوع';
+      b.className = 'gt-top-b bk';
+      b.onclick = function () { welcome(); };
+    } else {
+      b.textContent = 'أريد مساعدة';
+      b.className = 'gt-top-b';
+      b.onclick = function () { help(); };
+    }
   }
 
   function open() {
-    var g = gateEl();
-    if (g) g.style.display = 'flex';
+    var g = mount();
+    g.style.display = 'flex';
     document.body.style.overflow = 'hidden';
-    /* ⛌ حزام أمان: البوابة من غير زرار = الموقع ميت ومفيش مخرج.
-       ⛌ لو الفورم اتقفلت لسبب ما (خطأ في الرسم، تحديث متقطع)
-       بنعيد الرسم فوراً. */
     setTimeout(function () {
+      var gg = gateEl();
       var f = document.getElementById('gt-form');
-      if (g && g.style.display !== 'none' && (!f || !f.innerHTML.trim())) welcome();
+      if (gg && gg.style.display !== 'none' && (!f || !f.innerHTML.trim())) welcome();
     }, 120);
   }
 
@@ -85,234 +134,484 @@
     var g = gateEl();
     if (g) g.remove();
     document.body.style.overflow = '';
+    stopLock();
     try { window.OCTAAuth && window.OCTAAuth.refresh && window.OCTAAuth.refresh(); } catch (e) { }
 
-    /* ⛔⛔ المحتوى المحمي بيتخطّى وهو لسه بره البوابة (عشان السيرفر
-       بيرد 401). البوابة دي بتنطفي من غير reload، فالمحتوى ده
-       ميفتحش لوحده. ⛌ الحدث ده بيقول للصفحة: اتأكدت، حمّل دلوقتي. */
+    /* ⛔⛔ المحتوى المحمي بيتخطّى وهو لسه بره البوابة (السيرفر بيرد 401).
+       البوابة بتنطفي من غير reload، فالمحتوى ده ميفتحش لوحده.
+       ⛌ الحدث بيقول للصفحة: اتأكدت، حمّل دلوقتي. */
     try { document.dispatchEvent(new CustomEvent('octa:authed')); } catch (e) { }
   }
 
-  /* ═══ الشاشة الأولى: ترحيب + اختيار ═══ */
-  function welcome() {
+  /* ok = true (أخضر) · false (أحمر) · 'hi' (عادي) */
+  function say(t, ok) {
+    var m = document.getElementById('gtMsg');
+    if (!m) return;
+    m.textContent = t;
+    m.className = 'gt-msg' + (ok === true ? ' ok' : (ok === false ? ' no' : ''));
+  }
+  function clearMsg() { say('', 'hi'); }
+
+  /* حالة الانتظار — بدل الكارت الفاضي */
+  function pending(msg) {
+    var f = formEl();
+    if (!f) return;
+    f.innerHTML = '<div class="gt-wait"><span class="gt-spin"></span>' + (msg || '⏳ بنتحقق من حسابك…') + '</div>';
+    head('أهلاً بعودتك', 1);
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     🔢 لوحة الأرقام
+     ───────────────────────────────────────────────────────────
+     state.pin    الأرقام اللي اتكتبت
+     state.lock   ثواني فاضية (السيرفر رجّع 429)
+     state.tries  عدد المحاولات الغلط
+     ═══════════════════════════════════════════════════════════ */
+  var state = { pin: '', lock: 0, tries: 0, lockTimer: null, jump: null };
+
+  function stopLock() {
+    if (state.lockTimer) { clearInterval(state.lockTimer); state.lockTimer = null; }
+    if (state.jump) { clearTimeout(state.jump); state.jump = null; }
+    state.lock = 0;
+  }
+
+  /* 📌 النقطة الواحدة بتتعبى مع كل رقم — وده كل مؤشر التقدم */
+  function paintDots() {
+    var d = document.getElementById('gtDots');
+    if (!d) return;
+    var kids = d.childNodes;
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i].className !== undefined) {
+        kids[i].className = 'gt-dot' + (i < state.pin.length ? ' on' : '');
+      }
+    }
+  }
+
+  function padHtml(dis) {
+    return '<div class="gt-dots" id="gtDots">' +
+        '<i class="gt-dot"></i><i class="gt-dot"></i>' +
+        '<i class="gt-dot"></i><i class="gt-dot"></i>' +
+      '</div>' +
+      '<div class="gt-msg" id="gtMsg"></div>' +
+      '<div class="gt-pad' + (dis ? ' dis' : '') + '" id="gtPad">' +
+        '<button class="gt-key" data-k="1" type="button">1</button>' +
+        '<button class="gt-key" data-k="2" type="button">2</button>' +
+        '<button class="gt-key" data-k="3" type="button">3</button>' +
+        '<button class="gt-key" data-k="4" type="button">4</button>' +
+        '<button class="gt-key" data-k="5" type="button">5</button>' +
+        '<button class="gt-key" data-k="6" type="button">6</button>' +
+        '<button class="gt-key" data-k="7" type="button">7</button>' +
+        '<button class="gt-key" data-k="8" type="button">8</button>' +
+        '<button class="gt-key" data-k="9" type="button">9</button>' +
+        '<button class="gt-key gt-del" data-k="d" type="button" aria-label="مسح">' +
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9L2.5 12z"/>' +
+          '<path d="M15.6 9.6 20.4 14.4M20.4 9.6 15.6 14.4"/></svg>' +
+        '</button>' +
+        '<button class="gt-key" data-k="0" type="button">0</button>' +
+        '<span class="gt-key off"></span>' +
+      '</div>';
+  }
+
+  /* 📌 نفس اللوحة في كل شاشة — الفرق بس في اللي فوقها */
+  function paintPad(dis) {
+    var p = document.getElementById('gtPad');
+    if (!p) return;
+    p.className = 'gt-pad' + (dis ? ' dis' : '');
+    var bs = p.getElementsByTagName('button');
+    for (var i = 0; i < bs.length; i++) bs[i].disabled = !!dis;
+    paintDots();
+  }
+
+  /* 📌 علّق على اللوحة — كل ضغطة رقم أو ⌫.
+     onFull(pin)  → اتعبّت 4 أرقام (هنا بنسلّم)
+     onAny()      → أي تغيير (للزرار المتغيّر في شاشة التسجيل) */
+  function onPad(onFull, onAny) {
+    var p = document.getElementById('gtPad');
+    if (!p) return;
+    p.onclick = function (e) {
+      var b = e.target;
+      while (b && b !== p && !(b.getAttribute && b.tagName)) b = b.parentNode;
+      var k = b && b.getAttribute && b.getAttribute('data-k');
+      if (!k || state.lock > 0) return;
+      /* ⛌ زرار متقفل = الرقم مش هيتقبل (قفل السيرفر أو وهو رايح) */
+      if (b.tagName === 'BUTTON' && b.disabled) return;
+      if (k === 'd') state.pin = state.pin.slice(0, -1);
+      else if (state.pin.length < PIN_LEN) state.pin += k;
+      else return;
+      paintDots();
+      if (onAny) onAny();
+      /* ⛌ 4 أرقام كملوا → يتسلّموا لوحدهم. مفيش زرار «دخول» أصلاً. */
+      if (state.pin.length === PIN_LEN && onFull) {
+        var v = state.pin;
+        paintPad(true);          /* ⛌ نقفل اللوحة وهو رايح للسيرفر */
+        setTimeout(function () {
+          /* ⛌ لو المستخدم مسح رقم في الـ130ms دي، ما نسلّمش رقم قديم */
+          if (state.pin !== v) { paintPad(false); return; }
+          onFull(v);
+        }, 130);
+      }
+    };
+  }
+
+  /* 📌 اهتزاز — خطأ الباسورد أو ضغطة غلط */
+  function shake() {
+    var d = document.getElementById('gtDots');
+    if (!d) return;
+    d.classList.remove('bad');
+    /* ⛌ بدون force reflow، المتصفح مش هيشغّل الأنيميشن تاني */
+    void d.offsetWidth;
+    d.classList.add('bad');
+    /* ⛌ اللون الأحمر للنقط بيوصل لـ560ms بس — بعدين نلمس الأثر */
+    setTimeout(function () {
+      var e = document.getElementById('gtDots');
+      if (e) e.classList.remove('bad');
+    }, 560);
+  }
+
+  function badPin(left) {
+    state.pin = '';
+    paintDots();
+    shake();
+    if (left == null) clearMsg();
+    else if (left <= 0) say('الباسورد غلط — المحاولات خلصت', false);
+    else if (left === 1) say('الباسورد غلط — آخر محاولة', false);
+    else say('الباسورد غلط — فاضل ' + left + ' محاولات', false);
+  }
+
+  function mm(s) {
+    var m = Math.floor(s / 60), r = s % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r;
+  }
+
+  /* 📌 السيرفر رجّع 429 → اقفل + عدّاد تنازلي */
+  function locked(sec) {
+    var s = Math.max(1, Math.ceil(Number(sec) || 0) || 60);
+    state.lock = s;
+    /* ⛌ نفضّي النقط: متبقاش 4 نقط مملوءة وباسورد غلط */
+    state.pin = '';
+    paintDots();
+    paintPad(true);
+
+    var m = document.getElementById('gtMsg');
+    if (m) {
+      m.className = 'gt-msg no';
+      m.innerHTML = '⛔ مقفول ' + Math.floor(s / 60) + ' دقيقة' +
+        ' <span class="gt-cd" id="gtLockCd">(' + mm(s) + ')</span>';
+    }
+    stopLock();
+    state.lock = s;
+    state.lockTimer = setInterval(function () {
+      state.lock--;
+      var cd = document.getElementById('gtLockCd');
+      if (cd) cd.textContent = '(' + mm(Math.max(0, state.lock)) + ')';
+      var mm0 = document.getElementById('gtMsg');
+      if (state.lock <= 0) {
+        stopLock();
+        paintPad(false);
+        clearMsg();
+        return;
+      }
+      if (mm0 && state.lock % 60 === 0) {
+        mm0.innerHTML = '⛔ مقفول ' + Math.floor(state.lock / 60) + ' دقيقة' +
+          ' <span class="gt-cd">(' + mm(state.lock) + ')</span>';
+      }
+    }, 1000);
+  }
+
+  /* 📌 رقم المحاولات اللي فاضل — السيرفر أولى، ولا نحسبه ourselves */
+  function leftTries(d) {
+    var v = d && (d.remaining != null ? d.remaining
+      : (d.left != null ? d.left : (d.tries_left != null ? d.tries_left : null)));
+    if (v == null || isNaN(v)) return Math.max(0, PIN_TRIES - state.tries);
+    return Math.max(0, Number(v));
+  }
+
+  /* ═══ أخطاء مش متوقعة — السيرفر واقع أو مفيش نت ═══ */
+  function down(what) {
     formEl().innerHTML =
-      '<button class="gt-go" id="gtReg">ابدأ — إعمل حساب مجاناً</button>' +
-      '<button class="gt-go alt" id="gtLogin">عندك حساب؟ ادخل</button>' +
-      '<div id="gtMsg" class="gt-msg"></div>';
+      '<div class="gt-err">⚠️ مش قادرين نوصل للسيرفر</div>' +
+      '<p class="gt-txt">الاتصال بـ' + esc(what) + ' فشل — تأكد من النت وجرب تاني</p>' +
+      '<button class="gt-go" id="gtRetry" type="button">🔄 جرّب تاني</button>';
+    var b = document.getElementById('gtRetry');
+    if (b) b.onclick = function () { location.reload(); };
+  }
+
+  /* 📌 رد السيرفر في التسجيل — رسالة واحدة مفهومة، ما نقولش مين مسجّل */
+  function fail(o, fallback) {
+    if (o.s === 429) { locked(o.d.retry_after || o.d.retry || 60); return; }
+    say(fallback || ('❌ ' + ((o.d && o.d.error) || ('خطأ ' + o.s))), false);
+    shake();
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     ① شاشة الاختيار — أول مرة ولا راجع
+     ═══════════════════════════════════════════════════════════ */
+  function welcome() {
+    stopLock();
+    state.pin = ''; state.tries = 0;
+    mount();
+    head('تسجيل الدخول', 0);
+    boxEl().className = 'gt-box';
+    formEl().innerHTML =
+      '<div class="gt-ico">🐙</div>' +
+      '<h1 class="gt-h">OCTA</h1>' +
+      '<p class="gt-sub">اخطبوط — 8 أذرع بتحلّل السهم من كل زاوية</p>' +
+      '<button class="gt-go" id="gtReg" type="button">إعمل حساب جديد</button>' +
+      '<button class="gt-go alt" id="gtLogin" type="button">عندك حساب؟ ادخل</button>' +
+      '<div class="gt-note">الدخول بالباسورد بس — 4 أرقام من غير إيميل</div>';
 
     document.getElementById('gtReg').onclick = function () { signup(); };
     document.getElementById('gtLogin').onclick = function () { login(); };
   }
 
-  /* ═══ التسجيل ═══
-     📌 إيميل → كود في الإيميل → دخول.
-     ⛌ مش بنطلب كلمة سر: إثبات إن الإيميل ليك أصعب بكتير
-     من إنك تفتكر حاجة اخترتها من زمان.
-  */
+  /* ═══════════════════════════════════════════════════════════
+     ② التسجيل — مرة واحدة بس
+     ═══════════════════════════════════════════════════════════ */
   function signup() {
+    stopLock();
+    state.pin = '';
+    mount();
+    head('حساب جديد', 1);
+    boxEl().className = 'gt-box reg';
     formEl().innerHTML =
-      '<label class="gt-lb">اسمك</label>' +
+      '<label class="gt-lb" for="gtName">اسمك</label>' +
       '<input id="gtName" class="gt-in" placeholder="مثلاً: أحمد" maxlength="40" autocomplete="name">' +
-      '<label class="gt-lb">إيميلك</label>' +
-      '<input id="gtMail" class="gt-in" type="email" placeholder="example@mail.com" maxlength="120" autocomplete="email" dir="ltr">' +
-      '<div id="gtMsg" class="gt-msg"></div>' +
-      '<button class="gt-go" id="gtDo">ابعتلي الكود</button>' +
-      '<button class="gt-back" id="gtBack">رجوع</button>';
+      '<label class="gt-lb" for="gtMail">إيميلك</label>' +
+      '<input id="gtMail" class="gt-in" type="email" placeholder="name@mail.com" maxlength="120" autocomplete="email" dir="ltr">' +
+      '<p class="gt-sub2">هنبعتلك إيميل تأكيد مرة واحدة — بعد كده الباسورد هو كل حاجة</p>' +
+      '<label class="gt-lb">الباسورد <small>4 أرقام</small></label>' +
+      padHtml(0) +
+      '<button class="gt-go" id="gtDo" type="button" disabled>أنشئ حسابي</button>';
 
-    var go = function () {
-      var name = document.getElementById('gtName').value.trim();
-      var mail = document.getElementById('gtMail').value.trim();
-      var btn = document.getElementById('gtDo');
+    var btn = document.getElementById('gtDo');
+    function syncGo() { if (btn) btn.disabled = state.pin.length !== PIN_LEN; }
 
-      if (!mail) { say('❌ الإيميل مطلوب', false); return; }
-      if (mail.indexOf('@') < 1 || mail.indexOf('.') < 1) { say('❌ شكل الإيميل غلط', false); return; }
+    function send() {
+      var name = (document.getElementById('gtName').value || '').trim();
+      var mail = (document.getElementById('gtMail').value || '').trim();
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ بنسجّل…'; }
+      paintPad(true);
+      clearMsg();
 
-      btn.disabled = true; btn.textContent = '⏳ بنبعت…';
-      fetch(apiBase() + '/api/auth/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: mail, name: name || 'مستخدم' })
-      }).then(function (r) {
-        return r.text().then(function (txt) {
-          var d = null; try { d = JSON.parse(txt); } catch (e) { d = null; }
-          return { s: r.status, d: d };
-        });
-      }).then(function (o) {
-        if (o.s === 200 && o.d && o.d.ok) { askCode(name, mail, 'حساب جديد'); return; }
-        if (o.s === 429) { var w = (o.d && o.d.retry_after) || 60; say('⏳ استنى ' + Math.ceil(w / 60) + ' دقيقة وجرب تاني', false); }
-        else say('❌ ' + ((o.d && o.d.error) || ('خطأ ' + o.s)), false);
-        btn.disabled = false; btn.textContent = 'ابعتلي الكود';
-        return;
-      }).catch(function (e) {
-        var why = (e && e.message) ? e.message : String(e);
-        say('⚠️ مش قادرين نوصل للسيرفر (' + why.slice(0, 55) + ')', false);
-        btn.disabled = false; btn.textContent = 'ابعتلي الكود';
-      });
-    };
-
-    document.getElementById('gtDo').onclick = go;
-    document.getElementById('gtBack').onclick = welcome;
-    document.getElementById('gtKey')
-      && document.getElementById('gtKey').addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
-    setTimeout(function () { document.getElementById('gtName').focus(); }, 60);
-  }
-
-  /* ═══ شاشة استقبال الكود ═══ */
-  function askCode(name, mail, what) {
-    formEl().innerHTML =
-      '<div class="gt-sent">📬</div>' +
-      '<div class="gt-sent-t">ابعتنا الكود على إيميلك</div>' +
-      '<div class="gt-sent-s">' + esc(mail) + '</div>' +
-      '<label class="gt-lb">الكود <small>6 أرقام</small></label>' +
-      '<input id="gtKey" class="gt-in gt-code-in" placeholder="······" maxlength="6" inputmode="numeric" autocomplete="one-time-code">' +
-      '<div id="gtMsg" class="gt-msg"></div>' +
-      '<button class="gt-go" id="gtDo">ادخل</button>' +
-      '<button class="gt-back" id="gtResend">📩 ابعت تاني</button>' +
-      '<button class="gt-back" id="gtBack">رجوع</button>';
-
-    var go = function () {
-      var k = document.getElementById('gtKey').value.trim();
-      var btn = document.getElementById('gtDo');
-      if (!/^\d{6}$/.test(k)) { say('❌ الكود 6 أرقام', false); return; }
-      btn.disabled = true; btn.textContent = '⏳ بنتحقق…';
-      fetch(apiBase() + '/api/auth/otp/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: mail, code: k, name: name })
-      }).then(function (r) { return r.json().then(function (d) { return { d: d, ok: r.ok }; }); })
+      post('/api/auth/pin/register', { name: name, email: mail, pin: state.pin })
         .then(function (o) {
-          if (o.ok && o.d && o.d.token) {
-            put(o.d.token, o.d.user);
+          if (o.s === 200 && o.d && (o.d.ok || o.d.token)) {
+            if (o.d.token) put(o.d.token, o.d.user);
             try { octaTrack('signup', 'gate', ''); } catch (e) { }
-            shut();
-          } else {
-            say('❌ ' + ((o.d && o.d.error) || 'الكود غلط'), false);
-            btn.disabled = false; btn.textContent = 'ادخل';
-            document.getElementById('gtKey').value = '';
+            done(mail);
+            return;
           }
-        }).catch(function () {
-          say('❌ الاتصال فشل — جرب تاني', false);
-          btn.disabled = false; btn.textContent = 'ادخل';
+          state.pin = '';
+          paintDots(); paintPad(false); syncGo();
+          if (btn) btn.textContent = 'أنشئ حسابي';
+          fail(o, '❌ الإيميل ده مسجّل قبل كده — جرّب «عندك حساب؟ ادخل»');
+        })
+        .catch(function () {
+          state.pin = ''; paintDots(); paintPad(false); syncGo();
+          if (btn) btn.textContent = 'أنشئ حسابي';
+          down('التسجيل');
         });
-    };
+    }
 
-    document.getElementById('gtDo').onclick = go;
-    document.getElementById('gtBack').onclick = welcome;
-    document.getElementById('gtResend').onclick = function () {
-      var b = this; b.disabled = true; b.textContent = '⏳…';
-      fetch(apiBase() + '/api/auth/otp/send', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: mail, name: name || 'مستخدم' })
-      }).then(function () { say('✅ بعثنا كود جديد', true); })
-        .finally(function () { b.disabled = false; b.textContent = '📩 ابعت تاني'; });
-    };
-    var k = document.getElementById('gtKey');
-    k.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
-    setTimeout(function () { k.focus(); }, 80);
+    function check() {
+      if (state.pin.length !== PIN_LEN) return;
+      var name = (document.getElementById('gtName').value || '').trim();
+      var mail = (document.getElementById('gtMail').value || '').trim();
+      if (!name) { bad2('اكتب اسمك الأول'); return; }
+      if (!mail) { bad2('اكتب إيميلك'); return; }
+      if (mail.indexOf('@') < 1 || mail.indexOf('.') < 1) { bad2('شكل الإيميل غلط'); return; }
+      send();
+    }
+    /* ⛌ الباسورد بسّط بس — نفسه محتاج بيانات، فنفضّه ونرجّع اللوحة شغالة */
+    function bad2(t) {
+      state.pin = '';
+      paintDots(); paintPad(false); syncGo();
+      say('❌ ' + t, false);
+      shake();
+    }
+
+    onPad(check, syncGo);
+    if (btn) btn.onclick = function () { if (state.pin.length === PIN_LEN) check(); };
+
+    setTimeout(function () {
+      var n = document.getElementById('gtName');
+      if (n) n.focus();
+    }, 60);
   }
 
-  /* ═══ دخول ═══ */
+  /* ═══ شاشة النجاح ═══ */
+  function done(mail) {
+    stopLock();
+    head('تم التسجيل', 0);
+    var tb = topB();
+    if (tb) tb.style.visibility = 'hidden';   /* مفيش مساعدة محتاجاك دلوقتي */
+    boxEl().className = 'gt-box';
+    formEl().innerHTML =
+      '<div class="gt-ico">✅</div>' +
+      '<h1 class="gt-h">تم</h1>' +
+      '<p class="gt-txt">من هنا وكل مرة هتدخل بالباسورد</p>' +
+      '<p class="gt-sent-s">' + esc(mail || '') + '</p>' +
+      '<div class="gt-note">احفظ الـ4 أرقام دي كويس — هم وسيلة الدخول الوحيدة</div>' +
+      '<button class="gt-go" id="gtNow" type="button">ادخل دلوقتي</button>';
+
+    var b = document.getElementById('gtNow');
+    if (b) b.onclick = function () { stopLock(); login(); };
+    state.jump = setTimeout(function () { state.jump = null; login(); }, 3200);
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     ③ الدخول — بالظبط زي الصورة
+     ═══════════════════════════════════════════════════════════ */
   function login() {
+    stopLock();
+    state.pin = ''; state.tries = 0;
+    mount();
+    head('تسجيل الدخول', 0);
+    boxEl().className = 'gt-box pin';
     formEl().innerHTML =
-      '<label class="gt-lb">إيميلك</label>' +
-      '<input id="gtMail2" class="gt-in" type="email" placeholder="example@mail.com" maxlength="120" autocomplete="email" dir="ltr">' +
-      '<div id="gtMsg" class="gt-msg"></div>' +
-      '<button class="gt-go" id="gtDo2">ابعتلي الكود</button>' +
-      '<button class="gt-back" id="gtBack2">رجوع</button>';
+      '<div class="gt-ico">🗝️</div>' +
+      '<h1 class="gt-h">مرحباً بك في OCTA</h1>' +
+      padHtml(0) +
+      '<button class="gt-forgot" id="gtForgot" type="button">نسيت كلمة المرور؟</button>' +
+      '<button class="gt-back" id="gtBack" type="button">رجوع</button>';
 
-    var go = function () {
-      var mail = document.getElementById('gtMail2').value.trim();
-      var btn = document.getElementById('gtDo2');
-      if (!mail) { say('❌ الإيميل مطلوب', false); return; }
-      if (mail.indexOf('@') < 1 || mail.indexOf('.') < 1) { say('❌ شكل الإيميل غلط', false); return; }
-      btn.disabled = true; btn.textContent = '⏳ بنبعت…';
-      fetch(apiBase() + '/api/auth/otp/send', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: mail })
-      }).then(function (r) { return r.json(); }).then(function (d) {
-        if (!d || !d.ok) {
-          say('❌ ' + errAr(d), false);
-          btn.disabled = false; btn.textContent = 'ابعتلي الكود'; return;
-        }
-        askCode('', mail, 'دخول');
-      }).catch(function () {
-        say('❌ الاتصال فشل — جرب تاني', false);
-        btn.disabled = false; btn.textContent = 'ابعتلي الكود';
-      });
-    };
+    onPad(function (p) {
+      state.tries++;
+      paintPad(true);
+      clearMsg();
 
-    document.getElementById('gtDo2').onclick = go;
-    document.getElementById('gtBack2').onclick = welcome;
-    setTimeout(function () { document.getElementById('gtMail2').focus(); }, 60);
+      post('/api/auth/pin/login', { pin: p })
+        .then(function (o) {
+          if (o.s === 200 && o.d && o.d.token) {
+            put(o.d.token, o.d.user);
+            shut();
+            return;
+          }
+          if (o.s === 429) { locked(o.d.retry_after || o.d.retry || 60); return; }
+          /* ⛌ كل حاجة تانية = الباسورد غلط. ما نقولش حاجة عن الحساب. */
+          state.tries = 0;
+          badPin(leftTries(o.d));
+          paintPad(false);
+        })
+        .catch(function () { state.tries = 0; paintPad(false); down('الدخول'); });
+    });
+
+    document.getElementById('gtForgot').onclick = function () { forgot(); };
+    document.getElementById('gtBack').onclick = function () { welcome(); };
   }
 
-  /* ═══ نسيت كلمة السر ═══ */
+  /* ═══ نسيت كلمة المرور — إيميل استرجاع، مش كود دخول ═══ */
   function forgot() {
+    stopLock();
+    state.pin = '';
+    head('نسيت كلمة المرور', 1);
+    boxEl().className = 'gt-box';
     formEl().innerHTML =
-      '<p class="gt-txt">اكتب إيميلك وهنبعتلك كود على طول</p>' +
-      '<input id="gtMail3" class="gt-in" type="email" placeholder="إيميلك" maxlength="120">' +
-      '<div id="gtMsg" class="gt-msg"></div>' +
-      '<button class="gt-go" id="gtSend">ابعت الكود</button>' +
-      '<div id="gtStep2" style="display:none">' +
-        '<input id="gtCode" class="gt-in" placeholder="الكود (6 أرقام)" maxlength="6" inputmode="numeric">' +
-        '<input id="gtNew" class="gt-in" type="password" placeholder="كلمة السر الجديدة" maxlength="80">' +
-        '<button class="gt-go" id="gtSave">غيّر كلمة السر</button>' +
-      '</div>' +
-      '<button class="gt-back" id="gtBack3">رجوع</button>';
+      '<div class="gt-ico">📬</div>' +
+      '<h1 class="gt-h">هنرجّعلك الباسورد</h1>' +
+      '<p class="gt-txt">اكتب الإيميل بتاع الحساب، وهنبعتلك عليه إيميل استرجاع</p>' +
+      '<input id="gtMail3" class="gt-in" type="email" placeholder="name@mail.com" maxlength="120" autocomplete="email" dir="ltr">' +
+      '<div class="gt-msg" id="gtMsg"></div>' +
+      '<button class="gt-go" id="gtSend" type="button">ابعت إيميل الاسترجاع</button>' +
+      '<button class="gt-back" id="gtBack3" type="button">رجوع للدخول</button>';
 
-    document.getElementById('gtBack3').onclick = login;
-
-    document.getElementById('gtSend').onclick = function () {
+    var btn = document.getElementById('gtSend');
+    var go = function () {
       var m = document.getElementById('gtMail3').value.trim();
       if (!m) { say('❌ اكتب الإيميل', false); return; }
-      fetch(apiBase() + '/api/auth/reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: m })
-      }).then(function (r) { return r.json(); })
-        .then(function (d) {
-          if (d && d.ok) {
-            say('✅ ' + (d.msg || 'تم'), true);
-            document.getElementById('gtStep2').style.display = 'block';
-            document.getElementById('gtSend').style.display = 'none';
-            document.getElementById('gtCode').focus();
-          } else {
-            say('❌ ' + errAr(d), false);
+      if (m.indexOf('@') < 1 || m.indexOf('.') < 1) { say('❌ شكل الإيميل غلط', false); return; }
+      btn.disabled = true; btn.textContent = '⏳ بنبعت…';
+      post('/api/auth/reset', { email: m })
+        .then(function (o) {
+          btn.disabled = false; btn.textContent = 'ابعت إيميل الاسترجاع';
+          if (o.s === 429) { locked(o.d.retry_after || 60); return; }
+          /* ⛌ رد واحد سواء الإيميل مسجّل أو لأ — ما نقولش مين مسجّل */
+          if (o.s === 200 && o.d && o.d.ok) {
+            say('✅ ' + (o.d.msg || 'لو الإيميل ده مسجّل، إيميل الاسترجاع في الطريق'), true);
+            btn.style.display = 'none';
+            return;
           }
-        }).catch(function () { say('❌ الاتصال فشل', false); });
+          say('❌ ' + ((o.d && o.d.error) || 'جرّب تاني بعد شوية'), false);
+        })
+        .catch(function () { btn.disabled = false; btn.textContent = 'ابعت إيميل الاسترجاع'; down('الاسترجاع'); });
     };
 
-    document.getElementById('gtSave').onclick = function () {
-      var m = document.getElementById('gtMail3').value.trim();
-      var c = document.getElementById('gtCode').value.trim();
-      var n = document.getElementById('gtNew').value.trim();
-      if (!c || c.length !== 6) { say('❌ الكود 6 أرقام', false); return; }
-      if (n.length < 6) { say('❌ كلمة السر الجديدة قصيرة', false); return; }
+    btn.onclick = go;
+    document.getElementById('gtBack3').onclick = function () { login(); };
+    var i = document.getElementById('gtMail3');
+    i.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
+    setTimeout(function () { i.focus(); }, 60);
+  }
 
-      fetch(apiBase() + '/api/auth/reset/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: m, code: c, key: n })
-      }).then(function (r) { return r.json(); })
-        .then(function (d) {
-          if (d && d.ok) {
-            put(d.token, { name: 'مستخدم' });
-            shut();
-          } else {
-            say('❌ ' + ((d && d.error) || 'الكود غلط'), false);
-          }
-        }).catch(function () { say('❌ الاتصال فشل', false); });
+  /* ═══ «أريد مساعدة» — صفحة مساعدة جوه البوابة ═══ */
+  function help() {
+    stopLock();
+    head('مساعدة', 1);
+    boxEl().className = 'gt-box';
+    formEl().innerHTML =
+      '<div class="gt-ico">💡</div>' +
+      '<h1 class="gt-h">محتاج مساعدة؟</h1>' +
+      '<div class="gt-txt left">' +
+        '• <b>الباسورد</b> هو الـ4 أرقام اللي انت اخترتها أول مرة — من غيرهم مفيش دخول<br>' +
+        '• <b>مفيش إيميل</b> في شاشة الدخول — الإيميل للاسترجاع بس<br>' +
+        '• <b>نسيت الـ4 أرقام؟</b> اضغط «نسيت كلمة المرور» في شاشة الدخول<br>' +
+        '• <b>القفل</b> بيقفل مؤقت لو اتكتب غلط كذا مرة — وبيعدّي لوحده' +
+      '</div>' +
+      '<button class="gt-go" id="gtBackH" type="button">فهمت — ارجع</button>';
+
+    document.getElementById('gtBackH').onclick = function () {
+      if (boxEl().className.indexOf('pin') !== -1) login(); else welcome();
     };
+  }
+
+  /* ═══ تغيير الباسورد — للحساب القايم (من الإعدادات) ═══
+     بيبعت /api/auth/pin/change والتوكن بيتلزق من octa-api.js */
+  function pinStep(title, hint) {
+    stopLock();
+    state.pin = '';
+    mount();
+    head(title, 1);
+    boxEl().className = 'gt-box';
+    formEl().innerHTML =
+      '<p class="gt-txt">' + hint + '</p>' +
+      padHtml(0) +
+      '<button class="gt-back" id="gtBackC" type="button">رجوع</button>';
+    var b = document.getElementById('gtBackC');
+    if (b) b.onclick = function () { welcome(); };
+  }
+
+  function changePin() {
+    pinStep('تغيير الباسورد', 'اكتب الباسورد القديم — 4 أرقام');
+    onPad(function (oldPin) {
+      paintPad(true);
+      clearMsg();
+      state.jump = setTimeout(function () {
+        pinStep('الباسورد الجديد', 'اكتب الـ4 أرقام الجديدة');
+        onPad(function (newPin) {
+          paintPad(true);
+          post('/api/auth/pin/change', { old_pin: oldPin, new_pin: newPin })
+            .then(function (o) {
+              if (o.s === 200 && o.d && (o.d.ok || o.d.token)) {
+                if (o.d.token) put(o.d.token, o.d.user);
+                shut();
+                return;
+              }
+              state.pin = ''; paintDots(); paintPad(false);
+              say('❌ ' + ((o.d && o.d.error) || 'الباسورد القديم غلط'), false);
+            })
+            .catch(function () { state.pin = ''; paintDots(); paintPad(false); down('التغيير'); });
+        });
+      }, 500);
+    });
   }
 
   /* ═══════════════════════════════════════════════════════════
      🔄 مزامنة النسخة — تحلّ مشاكل «التباب القديم»
      ───────────────────────────────────────────────────────────
-     ⛔⛔ المشكلة: التابات القديمة في المتصفح بتفضل شغالة بالكود القديم
+     ⛔ التابات القديمة في المتصفح بتفضل شغالة بالكود القديم
         (نفس الـDOM ونفس الـJavaScript) حتى بعد النشر. المستخدم
         يشوف رسالة من يوم فاتت ويحس إن الموقع باظ.
-        ⛌ الحل: بنخزّن رقم النسخة، ولو اختلف → إعادة تحميل واحدة.
-        ⛌ «مرة واحدة بس» عشان ما نعملش loop لا نهائي.
+        ⛌ بنخزّن رقم النسخة، ولو اختلف → إعادة تحميل واحدة.
      ═══════════════════════════════════════════════════════════ */
   function syncBuild() {
     try {
@@ -335,60 +634,57 @@
   /* ═══ تشغيل ═══ */
   window.OCTAGate = {
     open: open, shut: shut,
-    login: login, signup: signup, welcome: welcome
+    welcome: welcome, login: login, signup: signup,
+    forgot: forgot, help: help, changePin: changePin
   };
 
   /* ⛔⛌ السيرفر رفض بيانات محمية (401) — يعني التوكن مش صالح.
-     ⛔ قبل الكود ده كان الموضوع صامت: الصفحة بتفتح وهي فاضية
+     ⛌ قبل الكود ده كان الموضوع صامت: الصفحة بتفتح وهي فاضية
         والـuser مبيعرفش إن السبب إن sessionته انتهت.
-        ⛌ دلوقتي: نقوله بالظبط ونرجّعه للبابة. */
+     ⛌ دلوقتي: نقوله بالظبط ونرجّعه للبابة بدل ما نسيبه قدام
+        صفحة صامتة. */
   window.OCTAAuthFail = function (path) {
     if (window.__octaAuthFailShown) return;   /* مرة واحدة بس */
     window.__octaAuthFailShown = true;
-    try { localStorage.removeItem('octa_token'); } catch (e) { }
-    try { localStorage.removeItem('octa_user'); } catch (e) { }
-    window.OCTA_USER_ID = '';
-    try {
-      var b = document.getElementById('octaAuthMsg');
-      if (!b) {
-        b = document.createElement('div');
-        b.id = 'octaAuthMsg';
-        b.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;'
-          + 'align-items:center;justify-content:center;background:rgba(10,14,20,.82);'
-          + 'padding:20px;font-family:system-ui,sans-serif';
-        b.innerHTML = '<div style="max-width:340px;background:#16202e;border:1px solid #2b3a4f;'
-          + 'border-radius:16px;padding:26px;text-align:center;color:#e8edf5">'
-          + '<div style="font-size:34px">🔑</div>'
-          + '<div style="margin:10px 0 6px;font-size:18px;font-weight:700">انتهت جلستك</div>'
-          + '<div style="color:#93a1b5;font-size:14px;line-height:1.7">'
-          + 'حسابك مش متعرّف عليه — اعمل دخول تاني من إيميلك</div>'
-          + '<button id="octaAuthAgain" style="margin-top:18px;width:100%;padding:12px;'
-          + 'border:0;border-radius:10px;background:#d4af37;color:#16202e;font-weight:700;'
-          + 'font-size:15px;cursor:pointer">إعادة الدخول</button></div>';
-        document.body.appendChild(b);
-        var g = document.getElementById('octaAuthAgain');
-        if (g) g.onclick = function () { location.href = location.origin + location.pathname + '?r=' + Date.now(); };
-      }
-    } catch (e) { }
+    logoutLocal();
+    var b = document.getElementById('octaAuthMsg');
+    if (!b) {
+      b = document.createElement('div');
+      b.id = 'octaAuthMsg';
+      b.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;'
+        + 'align-items:center;justify-content:center;background:rgba(10,14,20,.82);'
+        + 'padding:20px;font-family:system-ui,sans-serif';
+      b.innerHTML = '<div style="max-width:340px;background:var(--pri2);'
+        + 'border:1px solid var(--line);border-radius:16px;padding:26px;'
+        + 'text-align:center;color:var(--txt)">'
+        + '<div style="font-size:34px">🔑</div>'
+        + '<div style="margin:10px 0 6px;font-size:18px;font-weight:700">انتهت جلستك</div>'
+        + '<div style="color:var(--muted);font-size:14px;line-height:1.7">'
+        + 'حسابك مش متعرّف عليه — ادخل بالباسورد تاني</div>'
+        + '<button id="octaAuthAgain" style="margin-top:18px;width:100%;padding:12px;'
+        + 'border:0;border-radius:10px;background:var(--gold);color:var(--pri4);'
+        + 'font-weight:700;font-size:15px;cursor:pointer">إعادة الدخول</button></div>';
+      document.body.appendChild(b);
+      var g = document.getElementById('octaAuthAgain');
+      if (g) g.onclick = function () {
+        try { b.remove(); } catch (e) { }
+        window.__octaAuthFailShown = false;
+        welcome();
+        open();
+      };
+    }
   };
 
   window.addEventListener('DOMContentLoaded', function () {
-    // ⛔ localhost ميفتحش البوابة — للتطوير
+    /* ⛔ localhost ميفتحش البوابة — للتطوير */
     try {
       var h = location.hostname;
-      if (h === 'localhost' || h === '127.0.0.1') {
-        shut();
-        return;
-      }
+      if (h === 'localhost' || h === '127.0.0.1') { shut(); return; }
     } catch (e) { }
 
-    /* ⛌ البوابة بترسم نفسها الأول — دايماً، قبل أي تحقق.
-       الكود كان بيعمل open() وبعدين verify() من غير ما يستدعي
-       welcome() — فأي حد عنده توكن (قديم أو مزوّر) كان بيشوف كارت
-       فاضي من غير زرار واحد: البوابة مفتوحة، الموقع مقفول،
-       ومفيش طريقة يخرج منها.
-
-       ⛌ الترتيب الصح: ارسم ← اقفل ← تحقق. */
+    /* ⛌ الترتيب الصح: ارسم ← اقفل ← تحقق.
+       البوابة بترسم نفسها الأول — دايماً، قبل أي تحقق. */
+    mount();
     welcome();
     open();
 
@@ -398,13 +694,12 @@
     }
   });
 
-  /* التأكد إن التوكن لسه صالح — لو مش كده نرجع للبابة */
+  /* التأكد إن التوكن لسه صالح — لو مش كده نرجع للبوابة */
   function verify() {
     var t = token();
     if (!t) { welcome(); open(); return; }
 
     /* ⛌ القاعدة: **شك = مقفول**.
-       البوابة مرسومة بالفعل (welcome + open). SERVER يدي واحد:
          · 200      → الموقع ينفتح
          · أي حاجة تانية → التوكن يتمسح ونرجع للشاشة الأولى
          · خطأ شبكة   → نفضل مقفولين ونقوله، ⛔ ما نفتحش أبداً */
@@ -416,25 +711,8 @@
       welcome();
       open();
     }).catch(function () {
-      /* ⛌ ⛌ الشبكة وقعت.
-         ⛌ القديم كان بيعمل كاش ساكت — يعني الموقع مفتوح والخسارة.
-         ⛌ دلوقتي: نفضل مقفولين ونقوله يعمل refresh. */
-      var f = document.getElementById('gt-form');
-      if (f) {
-        f.innerHTML = '<div class="gt-err">⚠️ مش قادرين نوصل للسيرفر</div>' +
-          '<button class="gt-go" id="gtRetry">🔄 جرّب تاني</button>';
-        var b = document.getElementById('gtRetry');
-        if (b) b.onclick = function () { location.reload(); };
-      }
+      if (document.getElementById('gt-form')) down('السيرفر');
     });
-  }
-
-  function logoutLocal() {
-    try {
-      localStorage.removeItem('octa_token');
-      localStorage.removeItem('octa_user');
-      window.OCTA_USER_ID = '';
-    } catch (e) { }
   }
 
 })();

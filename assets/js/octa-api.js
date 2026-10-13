@@ -66,7 +66,7 @@
   const AUTH_PATHS = [
     '/api/egx_full', '/api/data_full', '/api/ranking', '/api/portfolio',
     '/api/stats', '/api/alerts/watch', '/api/alerts/diag',
-    '/api/auth/me'
+    '/api/auth/me', '/api/auth/pin/change'
   ];
 
   /* ⛔ الـfetch بتيجي برابط كامل (https://…/api/egx_full) —
