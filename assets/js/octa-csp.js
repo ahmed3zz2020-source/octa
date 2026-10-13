@@ -19,7 +19,7 @@
 
   function install(csp) {
     /* ⛌ report-uri و frame-ancestors المتروكة بالـmeta بيطلعوا تحذير.
-       المتصفح بيتجاهلهم تماماً.إحنا بنحطّهم في الهيدر
+       المتصفح بيتجاهلهم تماماً — إحنا بنحطّهم في الهيدر
        (Railway/CORS) — هنا بنشيلهم ونسيب الباقي يشتغل. */
     csp = csp.replace(/report-uri[^;]*;?\s*/i, '')
              .replace(/frame-ancestors[^;]*;?\s*/i, '');
