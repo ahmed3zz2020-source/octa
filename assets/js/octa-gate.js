@@ -47,6 +47,16 @@
     newpin: '/api/auth/pin/challenge/newpin'
   };
 
+  /* ⛔🔴 تدفّق التسجيل الجديد — الإيميل يتأكد **أول** حاجة.
+     ⛌ `pin/register` بقى 410 ⬇️ و-callah مابقاش له معنى.
+     ⭐ الترتيب: اسم+إيميل ⬇️ كود ⬇️ ٤ أرقام ⬇️ حساب جاهز.
+       الحساب **مش** بيتعمل غير بعد ما الكود يتأكد. */
+  var SIGNUP = {
+    start: '/api/auth/signup/start',
+    verify: '/api/auth/signup/verify',
+    newpin: '/api/auth/signup/newpin'
+  };
+
   /* 📌 التجديد الصامت — قبل ما التوكن يخلص.
      ⛔ صفر شاشات · صفر طلب باسورد · صفر إزعاج.
      ⛔⛔⛔ الرقم بيتقرأ من السيرفر (expires_in) — ممنوع رقم ثابت هنا.
@@ -267,6 +277,11 @@
         localStorage أو sessionStorage أو cookie أو log أو تحليلات.
         الباك نفسه بيخزّنهم مشفّرين — الواجهة ماتخزّنش خالص. */
   var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0 };
+
+  /* 📌 التسجيل ⬇️ لوحده عنده حالة مستقلة ⬇️ عشان ما نخلطش
+     بين «استرجاع باسورد» و«إنشاء حساب». والمهم ⬇️
+     `s.mode` بيقول لـcodeEntry و-newPin فين يروحوا لو رجعنا. */
+  var s = { name: '', email: '', mode: 'login' };
 
   function wipeFlow() {
     flow.email = ''; flow.code = ''; flow.unlock = '';
@@ -556,60 +571,48 @@
       '<input id="gtName" class="gt-in" placeholder="مثلاً: أحمد" maxlength="40" autocomplete="name">' +
       '<label class="gt-lb" for="gtMail">إيميلك</label>' +
       '<input id="gtMail" class="gt-in" type="email" placeholder="name@mail.com" maxlength="120" autocomplete="email" dir="ltr">' +
-      '<p class="gt-sub2">هنبعتلك إيميل تأكيد مرة واحدة — بعد كده الباسورد هو كل حاجة</p>' +
-      '<label class="gt-lb">الباسورد <small>4 أرقام</small></label>' +
-      padHtml(0) +
-      '<button class="gt-go" id="gtDo" type="button" disabled>أنشئ حسابي</button>';
+      '<p class="gt-sub2">هنبعتلك كود على الإيميل ⬇️ تكتبه وبعدين تختار ٤ أرقام. ' +
+      'حسابك مش بيتعمل غير لما الكود يتأكد.</p>' +
+      '<button class="gt-go" id="gtDo" type="button">ابعت الكود</button>';
 
     var btn = document.getElementById('gtDo');
-    function syncGo() { if (btn) btn.disabled = state.pin.length !== PIN_LEN; }
 
     function send() {
       var name = (document.getElementById('gtName').value || '').trim();
       var mail = (document.getElementById('gtMail').value || '').trim();
-      if (btn) { btn.disabled = true; btn.textContent = '⏳ بنسجّل…'; }
-      paintPad(true);
+      if (!name) { say('❌ اكتب اسمك الأول', false); return; }
+      if (!mail || mail.indexOf('@') < 1) {
+        say('❌ اكتب إيميل صح', false); return;
+      }
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ بنبعت الكود…'; }
       clearMsg();
 
-      post('/api/auth/pin/register', { name: name, email: mail, pin: state.pin })
+      /* ⛔⛔ مافيش باسورد في الطلب ⬇️ ولا في الشاشة ⬇️
+         الإيميل يتأكد **أول** حاجة وبعدين بس نطلب ٤ أرقام. */
+      post(SIGNUP.start, { name: name, email: mail })
         .then(function (o) {
-          if (o.s === 200 && o.d && (o.d.ok || o.d.token)) {
-            if (o.d.token) put(o.d.token, o.d.user);
-            try { octaTrack('signup', 'gate', ''); } catch (e) { }
-            done(mail);
+          if (o.s === 200) {
+            s.name = name; s.email = mail; s.mode = 'signup';
+            flow.email = mail;
+            try { octaTrack('signup_start', 'gate', ''); } catch (e) { }
+            codeEntry();
             return;
           }
-          state.pin = '';
-          paintDots(); paintPad(false); syncGo();
-          if (btn) btn.textContent = 'أنشئ حسابي';
-          fail(o, 'التسجيل مانفعش — جرّب تاني');
+          if (btn) { btn.disabled = false; btn.textContent = 'ابعت الكود'; }
+          var d = o.d || {};
+          if (o.s === 429) { locked(d.retry_after || d.retry || 60); return; }
+          say('❌ ' + ((d.error) || 'مقدرناش نبعت الكود — جرّب تاني'), false);
         })
         .catch(function () {
-          state.pin = ''; paintDots(); paintPad(false); syncGo();
-          if (btn) btn.textContent = 'أنشئ حسابي';
+          if (btn) { btn.disabled = false; btn.textContent = 'ابعت الكود'; }
           down('التسجيل');
         });
     }
 
-    function check() {
-      if (state.pin.length !== PIN_LEN) return;
-      var name = (document.getElementById('gtName').value || '').trim();
-      var mail = (document.getElementById('gtMail').value || '').trim();
-      if (!name) { bad2('اكتب اسمك الأول'); return; }
-      if (!mail) { bad2('اكتب إيميلك'); return; }
-      if (mail.indexOf('@') < 1 || mail.indexOf('.') < 1) { bad2('شكل الإيميل غلط'); return; }
-      send();
-    }
-    /* ⛌ الباسورد بسّط بس — نفسه محتاج بيانات، فنفضّه ونرجّع اللوحة شغالة */
-    function bad2(t) {
-      state.pin = '';
-      paintDots(); paintPad(false); syncGo();
-      say('❌ ' + t, false);
-      shake();
-    }
+    if (btn) btn.onclick = send;
 
-    onPad(check, syncGo);
-    if (btn) btn.onclick = function () { if (state.pin.length === PIN_LEN) check(); };
+    /* ⛌ مافيش لوحة أرقام في شاشة التسجيل ⬇️ مافيش باسورد هنا.
+       الباسورد بيتطلب **بعد** ما الكود يتأكد ⬇️ newPin(). */
 
     setTimeout(function () {
       var n = document.getElementById('gtName');
@@ -966,26 +969,31 @@
     stopLock();
     state.pin = ''; state.len = CODE_LEN; flow.tries = 0;
     mount();
-    head('كود الدخول', 1, function () { askCode(); });
+    /* 📌 رجوع وإرسال ⬇️ حسب إحنا في «تسجيل» ولا «استرجاع» */
+    var reg = (s.mode === 'signup');
+    head(reg ? 'كود التأكيد' : 'كود الدخول', 1, function () {
+      if (reg) { signup(); } else { askCode(); }
+    });
     boxEl().className = 'gt-box code';
     formEl().innerHTML =
       '<div class="gt-ico">📩</div>' +
       '<h1 class="gt-h">اكتب الكود اللي جالك</h1>' +
-      '<p class="gt-txt">' + esc(NOTE_SAME) + '</p>' +
+      '<p class="gt-txt">' + (reg ? esc(esc(NOTE_SAME) + ' — ده كود إنشاء حسابك') : esc(NOTE_SAME)) + '</p>' +
       codeHtml() +
       '<p class="gt-cdt" id="gtCd">⏱ الكود صالح <b id="gtCdN">' + mm(CODE_TTL) + '</b></p>' +
       padHtml(0) +
-      '<button class="gt-back" id="gtChAgain" type="button">ارجع — اكتب إيميل تاني</button>';
+      '<button class="gt-back" id="gtChAgain" type="button">' +
+        (reg ? 'ارجع — عدّل الإيميل' : 'ارجع — اكتب إيميل تاني') + '</button>';
 
     var back = document.getElementById('gtChAgain');
-    if (back) back.onclick = function () { askCode(); };
+    if (back) back.onclick = function () { if (reg) { signup(); } else { askCode(); } };
 
     startCd();
 
     onPad(function (v) {
       paintPad(true);
       clearMsg();
-      post(PATHS.verify, { email: flow.email, code: v })
+      post(reg ? SIGNUP.verify : PATHS.verify, { email: flow.email, code: v })
         .then(function (o) {
           var d = o.d || {};
           if (o.s === 200) {
@@ -1077,34 +1085,42 @@
      ═══════════════════════════════════════════════════════════ */
   function newPin() {
     stopLock();
+    var reg = (s.mode === 'signup');
     state.pin = ''; state.len = PIN_LEN;
     mount();
-    head('اختار باسورد جديد', 1, function () { login(); });
+    head(reg ? 'اختار باسورد' : 'اختار باسورد جديد', 1, function () {
+      if (reg) { codeEntry(); } else { login(); }
+    });
     boxEl().className = 'gt-box pin';
     formEl().innerHTML =
       '<div class="gt-ico">🔐</div>' +
-      '<h1 class="gt-h">اختار ٤ أرقام جديدة</h1>' +
-      '<p class="gt-sub2">دي اللي هتدخل بيه من هنا</p>' +
+      '<h1 class="gt-h">' + (reg ? 'اختار ٤ أرقام' : 'اختار ٤ أرقام جديدة') + '</h1>' +
+      '<p class="gt-sub2">' +
+        (reg ? 'دي اللي هتدخل بيه من هنا ⬇️ من غيرها مفيش دخول'
+             : 'دي اللي هتدخل بيه من هنا') + '</p>' +
       padHtml(0) +
       '<button class="gt-back" id="gtNpBack" type="button">رجوع</button>';
 
-    document.getElementById('gtNpBack').onclick = function () { login(); };
+    document.getElementById('gtNpBack').onclick = function () {
+      if (reg) { codeEntry(); } else { login(); }
+    };
 
     onPad(function (v) {
       paintPad(true);
       clearMsg();
       /* 📌 تروكن الفتح في هيدر Authorization (مش في الـbody) —
          زي ما الباك بيقرا (_bearer). والـbody فيه new_pin بس. */
-      postAuth(PATHS.newpin, { new_pin: v }, flow.unlock)
+      postAuth(reg ? SIGNUP.newpin : PATHS.newpin, { new_pin: v }, flow.unlock)
         .then(function (o) {
           var d = o.d || {};
           if (o.s === 200 && d.token) {
             /* ⛔⛔ اللحظة الوحيدة اللي فيها توكن — بعد ما ٤ أرقام
                جديدة اتقبلت. قبل كده مافيش توين خالص. */
+            var who = (reg ? s.email : flow.email);
             wipeFlow();
-            try { octaTrack('pin_reset', 'gate', ''); } catch (e) { }
+            try { octaTrack(reg ? 'signup' : 'pin_reset', 'gate', ''); } catch (e) { }
             put(d.token, d.user);
-            shut();
+            if (reg) { done(who); } else { shut(); }
             return;
           }
           state.pin = '';
