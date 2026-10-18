@@ -40,6 +40,8 @@
     lvl: 'start',          /* start | mid | pro | inst */
     live: false,           /* التحديث اللحظي شغّال؟ */
     lastQ: null,           /* آخر وقت تحديث */
+    qAge: null,            /* عمر بيانات السعر بالثواني — من الـAPI */
+    techAge: null,         /* عمر أرقام التحليل بالثواني — من الـAPI */
     mkt: null, mktT: null, /* حالة السوق */
     live: false,           /* التحديث اللحظي شغّال؟ */
     lastQ: null,           /* آخر وقت تحديث */
@@ -326,6 +328,7 @@
   function startLive() {
     if (LIVE_TIMER) return;
     tickLive();
+    tickTech();
     scheduleNext();
     /* ⏱️ تحديث العدّاد كل 5 ثواني حتى لو السعر مش بيتغير */
     CLOCK_TIMER = setInterval(function () {
@@ -364,14 +367,82 @@
           if (q.Recommend != null) st.tvRec = q['Recommend.All'];
           if (old != null && old !== q.close) { st._up = q.close > old; changed++; }
         });
+        markGhosts(rows);
         S.live = true;
-        const d = new Date();
-        S.lastQ = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        /* ⛔⛔ عمر الداتا الحقيقي من الـAPI — مش ساعة الجهاز.
+           الكود القديم كان بيحط new Date() وقت الطلب، فبيقول
+           «آخر تحديث 11:20» حتى لو الأرقام من 10:10 — وده اللي
+           خلّى الملف الثابت المتجمد يقعد 11 يوم محدش يحس بيه. */
+        S.qAge = j.age != null ? j.age : null;
         S.mkt = mkt();
         if (changed && !document.querySelector('.sv-adv')) render();
         else renderLiveDot();
       })
       .catch(function () { S.live = false; renderLiveDot(); });
+  }
+
+  /* 📊 أرقام التحليل من TradingView مباشرة
+     ⛔ قبل كده RSI والأداء والقيمة السوقية و P/E كانت كلهم من ملف
+     ثابت data/data_markets.js اتبنى مرة واحدة يوم 7 أكتوبر، فالصف
+     الواحد كان بيخلط سعر من اليوم بـ RSI من 11 يوم.
+     دلوقتي /api/market_tech بيرجّعهم من TradingView نفسه.
+     ⛔ القيمة اللي TradingView مش متأكد منها (null) مش بتيجي خالص،
+        فالفلتر يحتفظ بقيمته الأصلية بدل ما يشيلها. */
+  const TECH_API = window.OCTA_API + '/api/market_tech';
+  const TECH_EVERY = 300000;   /* 5 دقايق — الأرقام دي يومية مش لحظية */
+  let TECH_TIMER = null;
+
+  function tickTech() {
+    clearTimeout(TECH_TIMER);
+    fetch(TECH_API + '?market=' + M.id)
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (j && j.ok) {
+          const rows = (j.markets || {})[M.id];
+          if (rows) {
+            let touched = 0;
+            const db0 = db();
+            db0.forEach(function (st) {
+              const t = rows[st.code];
+              if (!t) return;
+              for (const k in t) {
+                if (t[k] !== null && t[k] !== undefined && st[k] !== t[k]) {
+                  st[k] = t[k]; touched++;
+                }
+              }
+            });
+            markGhosts(rows);
+            S.techAge = j.age != null ? j.age : null;
+            if (touched) render();
+          }
+        }
+        TECH_TIMER = setTimeout(tickTech, TECH_EVERY);
+      })
+      .catch(function () { TECH_TIMER = setTimeout(tickTech, TECH_EVERY); });
+  }
+
+  /* 🕐 عمر الداتا — «الآن» أو «من 4 د» بدل ساعة جهاز وهمية */
+  function relAge(sec) {
+    if (sec == null) return '…';
+    if (sec < 20) return 'الآن';
+    const m = Math.round(sec / 60);
+    if (m < 60) return 'من ' + m + ' د';
+    return 'من ' + Math.round(m / 60) + ' س';
+  }
+
+  /* 👻 أي سهم مش في البث الحي = متوقف أو مشطوب، ورقمه في الملف
+     الثابت متجمد. بنعلّمه noData والفلتر بيستبعده أصلاً
+     (السطر 181: if (s.noData) return false).
+     ⛔ الحارس: لو البث رجّع أقل من 90% من الأسهم مت markingش —
+        البث نفسه بيقف عند 700 صف في السوق الأمريكي، وده مش
+        معناه إن باقي الأسهم مشطوبة. */
+  function markGhosts(rows) {
+    const db0 = db();
+    if (!db0.length) return;
+    if (Object.keys(rows || {}).length < db0.length * 0.9) return;
+    const seen = {};
+    for (const c in rows) seen[c] = 1;
+    db0.forEach(function (st) { if (!seen[st.code]) st.noData = true; });
   }
 
   /* 📢 شريط حالة السوق */
@@ -410,14 +481,19 @@
         : 'السوق مقفول — الأسعار آخر سعر رسمي من آخر جلسة';
     }
 
-    /* ② آخر تحديث */
+    /* ② آخر تحديث — ⛔ عمر الداتا الحقيقي من الـAPI
+       الكود القديم كان بيحط S.lastQ = new Date() وقت الطلب = ساعة
+       الجهاز، فبيقول «آخر تحديث 11:20» حتى لو الداتا من 10:10. */
     const el = document.getElementById('scUpd');
     if (!el) return;
-    const st = mkt();
-    const dot = S.live ? '🟢' : '⚪';
-    const t = S.lastQ || '…';
-    el.textContent = dot + ' ' + t;
-    el.title = S.live ? 'بنحدّث كل دقيقة' : 'بنحدّث كل ١٥ دقيقة وأنا السوق مقفول';
+    const age = S.qAge;
+    const stale = age != null && age > 60;
+    const dot = !S.live ? '⚪' : (stale ? '🟡' : '🟢');
+    el.textContent = dot + ' ' + relAge(age);
+    el.style.color = stale ? '#ffc078' : '';
+    el.title = 'الأسعار من TradingView · عمر الداتا ' +
+      (age == null ? '—' : age + ' ثانية') +
+      (S.techAge != null ? ' · أرقام التحليل عمرها ' + S.techAge + ' ثانية' : '');
   }
 
   /* ══════════════ الرندر ══════════════ */
@@ -1327,7 +1403,8 @@
     const m = MARKS.find(x => x.id === id); if (m) M = m;
     window.__scMarket = M.id;          /* نمرّرها للشارت */
     S.shown = 40; render();
-    S.live = false; S.lastQ = null; renderLiveDot(); tickLive();
+    S.live = false; S.lastQ = null; S.qAge = null; S.techAge = null;
+    renderLiveDot(); tickLive(); tickTech();
   };
   window.scQInput = function (el) {
     const v = el.value, p = el.selectionStart;
