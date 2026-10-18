@@ -218,8 +218,8 @@
   }
 
   /*  تركيب الـwidget  */
-  function mountTV(cfg) {
-    const holder = document.getElementById('chTvInner');
+  function mountTV(cfg, holderId) {
+    const holder = document.getElementById(holderId || 'chTvInner');
     if (!holder) return;
     holder.innerHTML = '';
 
@@ -236,6 +236,9 @@
     inner.appendChild(script);
     holder.appendChild(inner);
   }
+  /* 📌 صفحة الذهب بتركّب الرسمة بتاعتها جوّه نفسها — نفس الكود */
+  window.__octaMountTV = mountTV;
+  window.OCTA_TV_WIDGET = TV_WIDGET;
 
   /* 
       شارت السهم
@@ -264,6 +267,11 @@
     if (!el) return;
     /*  متعاملش مع الضغط لو جوه الشارت نفسه */
     if (e.target.closest('#chModal')) return;
+    /* ⛌⛌ كتلٌ مهم: محرك الذهب (octa-gold.js) بيحقن شارة + زر
+       «التفاصيل» جوّه كارت XAUUSD. زراره لازم يفتح شاشة التحليل،
+       مش الرسمة — فبنFORMATسلّمه له قبل ما نخطف الدوسة.
+       ⛔ الزر ده في مرحلة capture (على document) فنحن اللي سابقين. */
+    if (e.target.closest('.gsig') || e.target.closest('.gmini')) return;
     e.preventDefault();
     e.stopPropagation();
     window.openAssetChart(
@@ -345,10 +353,12 @@
     const card = document.createElement('button');
     card.className = 'sb-i gc-card';
     card.type = 'button';
-    card.setAttribute('data-tv', 'OANDA:XAUUSD');
-    card.setAttribute('data-tvn', '🥇 الذهب');
-    card.setAttribute('data-tvs', 'أونصة · XAU/USD');
-    card.title = 'دوس تفتح شارت الذهب';
+    /* ⛔ كارت الذهب بيفتح شاشة التحليل الكاملة (octa-gold.js) —
+       فيها الشارة (أخضر/أحمر/أزرق) + الرسمة + كل التحليل.
+       مافيش data-tv عشان مايتصادمش مع هاندلر الشارت. */
+    card.removeAttribute('data-tv');
+    card.setAttribute('data-gold-intel', '1');
+    card.title = 'دوس تفتح تحليل الذهب الكامل';
     card.innerHTML =
       '<span class="sb-ico">🥇</span>' +
       '<span class="sb-t"><b>الذهب</b><i id="gcData">أونصة · XAU/USD</i></span>';
