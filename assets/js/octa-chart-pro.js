@@ -288,6 +288,15 @@
       toolBtns.forEach(function (b) {
         b.setAttribute('aria-pressed', b.getAttribute('data-tool') === activeTool ? 'true' : 'false');
       });
+      paintHint(activeTool);
+    }
+    var hintEl = el('tool-hint');
+    function paintHint(tool) {
+      if (!hintEl) return;
+      var map = (O.draw && O.draw.TOOL_HINT) ? O.draw.TOOL_HINT : null;
+      var label = (O.draw && O.draw.TOOL_LABEL && O.draw.TOOL_LABEL[tool]) ? O.draw.TOOL_LABEL[tool] : (tool || '');
+      var h = map && map[tool] ? map[tool] : '';
+      hintEl.textContent = (label ? label + ' · ' : '') + h;
     }
     toolBtns.forEach(function (b) {
       b.addEventListener('click', function () { setTool(b.getAttribute('data-tool')); });
@@ -299,7 +308,8 @@
         if (!O.draw) return;
         var act = b.getAttribute('data-draw');
         try {
-          if (act === 'undo') O.draw.undo();
+          if (act === 'delete') O.draw.removeSelected();
+          else if (act === 'undo') O.draw.undo();
           else if (act === 'redo') O.draw.redo();
           else if (act === 'clear') O.draw.clear();
           else if (act === 'lock') {
@@ -462,6 +472,44 @@
       });
     }
 
+    /* ── حالة الحساب + زر الدخول ── */
+    var loginBtn = el('ch-login');
+    function loggedIn() {
+      try { return !!(O.storage && O.storage.getToken && O.storage.getToken()); }
+      catch (e) { return false; }
+    }
+    function paintLogin() {
+      if (!loginBtn) return;
+      if (loggedIn()) {
+        loginBtn.textContent = 'محفوظ على السيرفر · خروج';
+        loginBtn.className = 'octa-btn octa-logged';
+      } else {
+        loginBtn.textContent = 'تسجيل الدخول للحفظ على السيرفر';
+        loginBtn.className = 'octa-btn';
+      }
+    }
+    if (loginBtn) {
+      loginBtn.addEventListener('click', function () {
+        if (loggedIn()) {
+          if (window.OCTAAuth && typeof window.OCTAAuth.logout === 'function') window.OCTAAuth.logout();
+          return;
+        }
+        if (window.OCTAAuth && typeof window.OCTAAuth.show === 'function') {
+          window.OCTAAuth.show(window.OCTAAuth.user() ? 'login' : 'reg');
+        } else {
+          setMsg('error', 'صفحة الدخول مش محمّلة');
+        }
+      });
+      /* بعد ما يسجّل دخول ويرجع للصفحة — نحدّث الحالة */
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) { paintLogin(); refreshSavedList(); }
+      });
+      window.addEventListener('storage', function (ev) {
+        if (!ev || ev.key === 'octa_token') { paintLogin(); refreshSavedList(); }
+      });
+    }
+    paintLogin();
+
     paintIndicatorButtons();
     refreshSavedList();
 
@@ -475,6 +523,23 @@
 
     load(sym);
     return instance;
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     🔗 فتح شارت سهم من أي مكان في الموقع
+     ───────────────────────────────────────────────────────────
+     الاستعمال: openChartNew('COMI')
+     بيفتح صفحة الشارت (chart.html) على السهم ده.
+     ============================================================ */
+  if (typeof root.openChartNew !== 'function') {
+    root.openChartNew = function (code) {
+      var c = String(code || '').trim().toUpperCase();
+      if (!c) return false;
+      var url = 'chart.html?code=' + encodeURIComponent(c);
+      try { window.location.assign(url); }
+      catch (e) { window.location.href = url; }
+      return true;
+    };
   }
 
   /* ═══════════════════════════════════════════════════════════

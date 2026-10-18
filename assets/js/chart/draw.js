@@ -1100,26 +1100,101 @@
 
     /* النص والعلامة: بنطلب النص */
     if (d.type === 'text' || d.type === 'flag') {
-      var label = askText(d.type === 'text' ? 'اكتب النص' : 'اكتب نص العلامة (اختياري)', d.text || '');
-      if (label === null) { render(); return; }   /* المستخدم لغى */
-      d.text = label;
-      if (d.type === 'text' && !d.text) { render(); return; }
+      var _title = (d.type === 'text') ? 'اكتب النص' : 'اكتب نص العلامة (اختياري)';
+      var _anchor = (d.points && d.points.length) ? d.points[d.points.length - 1] : null;
+      var _finish = function (val) {
+        /* العلامة: Esc = علامة فاضية (النص اختياري) · النص: Esc = إلغاء */
+        if (val === null || val === undefined) {
+          if (d.type === 'flag') { addDrawing(d); render(); return; }
+          render();
+          return;
+        }
+        d.text = String(val);
+        if (d.type === 'text' && !d.text) { render(); return; }
+        addDrawing(d);
+        render();
+      };
+      var _sync = askText(_title, d.text || '', _anchor, _finish);
+      if (_sync === undefined) { render(); return; }  /* المحرّر مفتوح — نستناه */
+      _finish(_sync);
+      return;
     }
 
     addDrawing(d);
     render();
   }
 
-  function askText(title, def) {
+  /* ✏️ محرّر النص — HTML overlay جوّه الشارت (مش window.prompt).
+     الـprompt الأصلي: قبيح، بيقفل التبويب في بعض المتصفحات،
+     وبيخلي أداة النص/العلامة شبه معطّلة على اللمس. */
+  var inlineEditor = null;
+
+  function askText(title, def, anchorPt, done) {
     if (typeof opts.onText === 'function') {
       var v = opts.onText(title, def);
       return (v === undefined) ? null : String(v);
     }
-    if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
-      var r = window.prompt(title, def || '');
-      return (r === null) ? null : String(r);
+    if (typeof document === 'undefined' || !document.body) return def || '';
+    if (inlineEditor) closeInlineEditor(null);
+
+    var wrap = document.createElement('div');
+    wrap.className = 'octa-draw-editor';
+    var inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'octa-draw-editor-input';
+    inp.maxLength = 120;
+    inp.value = def || '';
+    inp.placeholder = (title === 'اكتب النص') ? 'اكتب النص…' : 'نص العلامة (اختياري)';
+    inp.dir = 'rtl';
+    var hint = document.createElement('div');
+    hint.className = 'octa-draw-editor-hint';
+    hint.textContent = 'Enter للتأكيد · Esc للإلغاء';
+    wrap.appendChild(inp);
+    wrap.appendChild(hint);
+    document.body.appendChild(wrap);
+
+    /* 위치: عند النقطة لو معروفة، وإلا في نص الشارت */
+    var host = container;
+    var hb = (host && host.getBoundingClientRect) ? host.getBoundingClientRect() : null;
+    var x = hb ? hb.left + hb.width / 2 : 120;
+    var y = hb ? hb.top + 40 : 120;
+    if (anchorPt && isNum(anchorPt.x) && hb) { x = hb.left + anchorPt.x; }
+    if (anchorPt && isNum(anchorPt.y) && hb) { y = hb.top + anchorPt.y; }
+    var w = wrap.offsetWidth || 220, h = wrap.offsetHeight || 74;
+    x = Math.max(8, Math.min(x - w / 2, (hb ? hb.right : window.innerWidth) - w - 8));
+    y = Math.max(8, y - h - 14);
+    wrap.style.left = Math.round(x) + 'px';
+    wrap.style.top = Math.round(y) + 'px';
+
+    inlineEditor = wrap;
+    var _closed = false;
+    function close(val) {
+      if (_closed) return;
+      _closed = true;
+      if (inlineEditor === wrap) inlineEditor = null;
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      try { inp.removeEventListener('keydown', onKey); } catch (e) { }
+      if (typeof opts.onTextClosed === 'function') { try { opts.onTextClosed(); } catch (e) { } }
+      if (typeof done === 'function') done(val);
+      else if (val !== null && val !== undefined) render();
     }
-    return def || '';
+    function onKey(ev) {
+      ev.stopPropagation();
+      if (ev.key === 'Enter') { ev.preventDefault(); close(inp.value); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); close(null); }
+    }
+    inp.addEventListener('keydown', onKey);
+    wrap.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+    setTimeout(function () { try { inp.focus(); inp.select(); } catch (e) { } }, 10);
+    return undefined;
+  }
+
+  function closeInlineEditor(val) {
+    if (!inlineEditor) return;
+    var inp = inlineEditor.querySelector('input');
+    if (val !== undefined && inp) inp.value = val;
+    if (inlineEditor.parentNode) inlineEditor.parentNode.removeChild(inlineEditor);
+    inlineEditor = null;
   }
 
   function onPointerDown(e) {
@@ -1259,12 +1334,17 @@
     if (!d || (d.type !== 'text' && d.type !== 'flag')) return;
     e.preventDefault(); e.stopPropagation();
     if (locked) return;
-    var label = askText(d.type === 'text' ? 'اكتب النص' : 'اكتب نص العلامة (اختياري)', d.text || '');
-    if (label === null) return;
-    pushHistory();
-    d.text = label;
-    emit('change', { type: 'edit', id: d.id });
-    render();
+    var _t = (d.type === 'text') ? 'اكتب النص' : 'اكتب نص العلامة (اختياري)';
+    var _finish = function (val) {
+      if (val === null || val === undefined) return;
+      pushHistory();
+      d.text = String(val);
+      emit('change', { type: 'edit', id: d.id });
+      render();
+    };
+    var _sync = askText(_t, d.text || '', (d.points && d.points.length) ? d.points[d.points.length - 1] : null, _finish);
+    if (_sync === undefined) return;   /* المحرّر مفتوح */
+    _finish(_sync);
   }
 
   /* ═══════════════════════════════════════════════════════════

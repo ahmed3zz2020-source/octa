@@ -7,6 +7,7 @@
   <meta name="description" content="شارت OCTA — تحليل فني للأسهم المصرية: شموع كاكي، مؤشرات، أدوات رسم، خطوط سعر ووقت، وفريم يومي وأسبوعي وشهري.">
   <title>شارت OCTA — تحليل فني للأسهم المصرية</title>
   <link rel="stylesheet" href="js/chart/styles.css">
+  <link rel="stylesheet" href="js/chart/auth-mini.css">
 </head>
 
 <body class="octa-chart-page">
@@ -68,12 +69,15 @@
       <button class="octa-tool" type="button" data-tool="priceline" aria-pressed="false">خط سعر</button>
       <button class="octa-tool" type="button" data-tool="timeline" aria-pressed="false">خط وقت</button>
       <span class="octa-sep" aria-hidden="true"></span>
+      <button class="octa-tool octa-tool-act" type="button" data-draw="delete" title="احذف الرسمة المحددة (Delete)">حذف</button>
       <button class="octa-tool octa-tool-act" type="button" data-draw="undo" title="تراجع (Ctrl+Z)">تراجع</button>
       <button class="octa-tool octa-tool-act" type="button" data-draw="redo" title="إعادة (Ctrl+Shift+Z)">إعادة</button>
       <button class="octa-tool octa-tool-act" type="button" data-draw="clear" title="مسح كل الرسومات">مسح</button>
       <button class="octa-tool octa-tool-act" type="button" data-draw="lock" aria-pressed="false" title="قفل الطبقة">قفل</button>
       <button class="octa-tool octa-tool-act" type="button" data-draw="magnet" aria-pressed="true" title="المغناطيس (الالتصاق بالأسعار)">مغناطيس</button>
     </div>
+
+    <div class="octa-hint" id="tool-hint">المؤشر · اسحب على الشارت للتحريك · اضغط على رسمة عشان تعدّلها أو تحذفها</div>
 
     <!-- ══════════ شريط المؤشرات ══════════ -->
     <div class="octa-toolstrip" id="inds" role="group" aria-label="المؤشرات">
@@ -130,6 +134,7 @@
         <input id="ch-note" type="text" maxlength="500" placeholder="ملاحظة" dir="rtl">
         <button class="octa-btn octa-btn-main" id="ch-save" type="button">حفظ</button>
         <button class="octa-btn" id="ch-png" type="button">صورة PNG</button>
+        <button class="octa-btn" id="ch-login" type="button">تسجيل الدخول للحفظ على السيرفر</button>
       </div>
       <div class="octa-chlist" id="ch-list"></div>
     </div>
@@ -153,6 +158,7 @@
   <script src="js/chart/gestures.js"></script>
   <script src="js/chart/draw.js"></script>
   <script src="js/chart/storage.js"></script>
+  <script src="js/octa-auth.js"></script>
   <script src="js/octa-chart-pro.js"></script>
 
 </body>
