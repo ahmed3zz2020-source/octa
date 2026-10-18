@@ -193,11 +193,19 @@
     mini.classList.add('gmini');
     var host = el('div', 'gsig');
     host.appendChild(buildBadge(sig));
-    var btn = el('button', 'gopen', 'التفاصيل ◂');
-    btn.type = 'button';
-    btn.setAttribute('aria-label', 'افتح تحليل الذهب الكامل');
-    btn.addEventListener('click', function (e) { e.stopPropagation(); openGold(); });
-    host.appendChild(btn);
+    /* ⛌⛌ زرار «التفاصيل» اتشال بالاتفاق.
+       مكانه: الكارت كله بقى قابل للدوس وبيفتح شاشة التحليل.
+       ⛔ أول مرة بس نسمّع الدوسة — الحقن بيتعاد كل ٩٠ ثانية
+       ولولا الحارس ده كان كل مرة بنلمّد监听 جديد فوق القديم. */
+    mini.style.cursor = 'pointer';
+    mini.title = 'دوس تفتح تحليل الذهب الكامل';
+    if (mini.getAttribute('data-gold-tap') !== '1') {
+      mini.setAttribute('data-gold-tap', '1');
+      mini.addEventListener('click', function (e) {
+        e.stopPropagation();
+        openGold();
+      });
+    }
     mini.appendChild(host);
     return true;
   }
