@@ -36,6 +36,93 @@
     return window.matchMedia('(max-width: 820px)').matches;
   }
 
+  /* ════════════════════════════════════════════════════════════
+     📊 بيانات الأصول — السعر والتغير والجرام
+     ────────────────────────────────────────────────────────────
+     ⛔ مافيش بيانات = مافيش شريط. مش بنخترع ولا رقم واحد.
+     المصدر: /api/ticker (نفس بتاع شريط الأسعار في الموقع).
+     ════════════════════════════════════════════════════════════ */
+  const TICKER_BY_SYM = {
+    'OANDA:XAUUSD': 'tk-gold', 'OANDA:XAGUSD': 'tk-silver',
+    'EGP=X': 'tk-usd', 'EUR=X': 'tk-eur',
+    'EGX:EGX30': 'tk-egx', 'EGX:EGX70': 'tk-egx70',
+    'EGX:EGX100': 'tk-egx100', 'EGX:EGX33': 'tk-egx33',
+    'TVC:USOIL': 'tk-oil', 'TVC:UKOIL': 'tk-ukoil',
+    'SP:SPX': 'tk-spx', 'NASDAQ:IXIC': 'tk-nasdaq'
+  };
+  /* معادن → الجرام بالجنيه = الأونصة × الدولار ÷ 31.1035 */
+  const GRAM_OF = { 'OANDA:XAUUSD': 1, 'OANDA:XAGUSD': 1 };
+  const EGP_SYM = { 'EGP=X': 1, 'EUR=X': 1 };
+
+  function tickArr() {
+    const a = (typeof TICKER_DATA !== 'undefined' && TICKER_DATA) || window.__octaTickCache || null;
+    return Array.isArray(a) ? a : [];
+  }
+  function tick(id) {
+    const arr = tickArr();
+    for (let i = 0; i < arr.length; i++) if (arr[i] && arr[i].id === id) return arr[i];
+    return null;
+  }
+
+  let tickAsked = false;
+  function loadTick() {
+    if (tickAsked) return Promise.resolve();
+    tickAsked = true;
+    let base = '';
+    try { base = (typeof OCTA_API !== 'undefined' && OCTA_API) || ''; } catch (e) { base = ''; }
+    if (!base) return Promise.resolve();
+    return fetch(base + '/api/ticker?_=' + Date.now())
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.ticker) {
+          window.__octaTickCache = d.ticker;
+          if (typeof TICKER_DATA !== 'undefined') { try { TICKER_DATA = d.ticker; } catch (e) { } }
+        }
+      })
+      .catch(function () { });
+  }
+
+  function fmtNum(v, d) { return Number(v).toLocaleString('en-US', { maximumFractionDigits: d || 2 }); }
+  function chgHtml(c, d) {
+    c = Number(c || 0);
+    return '<b class="' + (c >= 0 ? 'up' : 'down') + '">' + (c >= 0 ? '▲ +' : '▼ ') +
+      Math.abs(c).toFixed(d || 2) + '%</b>';
+  }
+
+  /* شريط البيانات جوه نافذة الشارت */
+  function dataStripHtml(symbol) {
+    const id = TICKER_BY_SYM[symbol];
+    if (!id) return '';
+    const t = tick(id);
+    if (!t || !t.value) return '';          /* ⛔ مافيش رقم = مافيش شريط */
+    const v = Number(t.value), c = Number(t.change || 0);
+    const cur = EGP_SYM[symbol] ? 'ج.م' : '$';
+    let h = '<span class="ch-d-v">' + fmtNum(v) + ' <i>' + cur + '</i></span>' +
+      '<span class="ch-d-c">' + chgHtml(c) + '</span>';
+
+    if (GRAM_OF[symbol]) {
+      const usd = tick('tk-usd');
+      if (usd && usd.value) {
+        const g = (v * Number(usd.value)) / 31.1035;
+        const gc = (c + Number(usd.change || 0)) / 2;
+        h += '<span class="ch-d-s">سعر الجرام <b>' + fmtNum(g, 0) + ' ج.م</b> ' + chgHtml(gc) + '</span>';
+      }
+    }
+    return '<span class="ch-d-l">' + esc(t.label || '') + '</span>' + h;
+  }
+
+  /* نفس البيانات في كارت الذهب في السايدبار */
+  function paintGoldCard() {
+    const el = document.getElementById('gcData');
+    if (!el) return;
+    const g = tick('tk-gold'), u = tick('tk-usd');
+    if (!g || !g.value) { el.textContent = 'أونصة · XAU/USD'; return; }
+    const v = Number(g.value), c = Number(g.change || 0);
+    let s = fmtNum(v) + ' $ · ' + chgHtml(c);
+    if (u && u.value) s += ' · الجرام ' + fmtNum((v * Number(u.value)) / 31.1035, 0) + ' ج';
+    el.innerHTML = s;
+  }
+
   /* 
       بناء النافذة
       */
@@ -62,6 +149,11 @@
           '</div>' +
         '</div>' +
 
+        /* 📊 شريط البيانات — السعر الحقيقي تحت العنوان.
+           ⛔ الشارت لوحده مش كفاية: من غير الأرقام دي ماعرفش
+           إن ده الذهب بكام ولا دولار/جنيه ولا فين. */
+        '<div class="ch-data" id="chData"></div>' +
+
         '<div class="ch-tv-wrap" id="chTvWrap">' +
           '<div id="chTv" class="tradingview-widget-container">' +
             '<div id="chTvInner" class="tradingview-widget-container__widget"></div>' +
@@ -72,6 +164,16 @@
       '</div>';
 
     document.body.appendChild(wrap);
+
+    /*  البيانات — من نفس مصدر التيكر بتاع الموقع (ما بنجيبش مصدر تاني) */
+    try {
+      const strip = document.getElementById('chData');
+      if (strip) {
+        const paint = function () { strip.innerHTML = dataStripHtml(symbol); };
+        paint();
+        if (!tickArr().length) loadTick().then(paint);
+      }
+    } catch (e) { }
 
     /*  قفل الـscroll  من غير كده الصفحة ورا الشارت بتتزحلق
        بإيدك وإنت بترسم على الشارت */
@@ -249,13 +351,17 @@
     card.title = 'دوس تفتح شارت الذهب';
     card.innerHTML =
       '<span class="sb-ico">🥇</span>' +
-      '<span class="sb-t"><b>الذهب</b><i>شارت مباشر · XAU/USD</i></span>';
+      '<span class="sb-t"><b>الذهب</b><i id="gcData">أونصة · XAU/USD</i></span>';
     nav.insertBefore(card, nav.firstChild);
   }
 
   function boot() {
     injectGoldCard();
     paintAssets();
+    /* 📊 بيانات الذهب الحقيقية في الكارت — تتحدّث لوحدها */
+    paintGoldCard();
+    loadTick().then(paintGoldCard);
+    window.setInterval(paintGoldCard, 60000);
   }
 
   if (document.readyState === 'loading') {
@@ -267,6 +373,7 @@
   let tries = 0;
   const iv = setInterval(function () {
     injectGoldCard();
+    paintGoldCard();
     if (++tries > 20) clearInterval(iv);
   }, 700);
 
