@@ -115,3 +115,52 @@ body.light .ch-tv-wrap { background: #fff; }
 /* الأيقونات SVG جوّه الأزرار */
 .ch-lb svg { display: block; }
 .ch-lb.ch-x svg { stroke-width: 2.7; }
+
+/* ══════════════════════════════════════════════════════════════
+   📊 شريط البيانات جوه نافذة الشارت
+   ────────────────────────────────────────────────────────────
+   ⛔ الشارت لوحده = رسمة من غير رقم. لازم السعر الحقيقي
+   يكون فوق الرسم: الأونصة · التغير · سعر الجرام بالجنيه.
+   ══════════════════════════════════════════════════════════════ */
+.ch-data {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 8px; padding: 9px 14px;
+  background: var(--pri2);
+  border-bottom: 1px solid var(--line);
+  font-family: inherit;
+}
+.ch-data:empty { display: none; }
+.ch-d-l {
+  font-size: .68rem; font-weight: 800; color: var(--muted);
+  letter-spacing: .3px;
+}
+.ch-d-v {
+  font-size: 1.05rem; font-weight: 900; color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+.ch-d-v i { font-style: normal; font-size: .7rem; color: var(--muted); }
+.ch-d-c { font-size: .82rem; font-weight: 800; }
+.ch-d-s {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .72rem; color: var(--muted);
+  padding-inline-start: 9px; border-inline-start: 1px solid var(--line);
+}
+.ch-d-s b { font-size: .84rem; color: var(--txt); font-variant-numeric: tabular-nums; }
+.ch-data .up { color: var(--up, #22c55e); }
+.ch-data .down { color: var(--down, #ef4444); }
+body.light .ch-data { background: #fff; }
+
+/* نفس الأرقام في كارت الذهب بالسايدبار */
+.gc-card .sb-t i { font-style: normal; }
+.gc-card .sb-t i b { font-weight: 900; font-variant-numeric: tabular-nums; }
+.gc-card .sb-t i .up { color: #16c79a; }
+.gc-card .sb-t i .down { color: #ff5a5a; }
+body.light .gc-card .sb-t i .up { color: #0e9f7a; }
+body.light .gc-card .sb-t i .down { color: #d63d3d; }
+
+/* على الموبايل: الأرقام أصغر شوية عشان ما تاخدش سطرين */
+@media (max-width: 820px) {
+  .ch-data { padding: 7px 11px; gap: 7px; }
+  .ch-d-v { font-size: .95rem; }
+  .ch-d-s { font-size: .68rem; padding-inline-start: 7px; }
+}
