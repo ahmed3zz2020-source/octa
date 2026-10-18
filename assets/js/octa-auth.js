@@ -145,21 +145,20 @@
       var old = document.getElementById('auBar');
       if (old) old.remove();
 
+      var u = getUser();
+      /* ⛌⛌ المستخدم المسجّل: مافيش شريط خالص.
+         ⛌ الاسم + «تغيير الكود» + ⚙️ كانوا رجعوا تاني من غير ما نعرف،
+         والثلاثة كلهم في مكان واحد (شريط الحساب au-bar).
+         مكانهم دلوقتي: لوحة الإعدادات · المزيد · الحساب
+         (والخروج «🚪 تسجيل الخروج» موجود هناك كمان — سطر 726). */
+      if (u) return;
+
       var bar = document.createElement('div');
       bar.id = 'auBar';
       bar.className = 'au-bar';
-
-      var u = getUser();
-      if (u) {
-        /* ⛌ «خروج» اتشال من الشريط — مش المكان بتاعه.
-           دلوقتي lives في لوحة الإعدادات · المزيد · الحساب. */
-        bar.innerHTML = '<span class="au-dot"></span>👤 ' + esc(u.name || 'مستخدم') +
-          ' · <a href="javascript:OCTAAuth.show(\'login\')">تغيير الكود</a>' +
-          ' · <a href="javascript:OCTASettings.open()">⚙️</a>';
-      } else {
-        bar.innerHTML = '<span class="au-dot off"></span>' +
-          '<a href="javascript:OCTAAuth.show(\'reg\')">💼 احفظ محفظتك ومنبهاتك</a>';
-      }
+      /* ⛌ «خروج» اتشال من الشريط — مش المكان بتاعه. */
+      bar.innerHTML = '<span class="au-dot off"></span>' +
+        '<a href="javascript:OCTAAuth.show(\'reg\')">💼 احفظ محفظتك ومنبهاتك</a>';
       document.body.appendChild(bar);
     }
   };
