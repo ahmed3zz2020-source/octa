@@ -215,7 +215,8 @@
     'tk-egx33':  ['EGX:EGX33', '🕌 مؤشر EGX33 شرعي', 'EGX:EGX33'],
     'tk-oil':    ['TVC:USOIL', '🛢️ نفط WTI', 'TVC:USOIL'],
     'tk-ukoil':  ['TVC:UKOIL', '🛢️ نفط برنت', 'TVC:UKOIL'],
-    'tk-spx':    ['SP:SPX', 'S&P 500', 'SP:SPX']
+    'tk-spx':    ['SP:SPX', 'S&P 500', 'SP:SPX'],
+    'tk-nasdaq': ['NASDAQ:IXIC', '💻 Nasdaq', 'NASDAQ:IXIC']
   };
 
   function paintAssets() {
