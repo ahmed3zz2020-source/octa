@@ -1071,6 +1071,34 @@ function buildMoversCard() {
   return uniCard('glCard', '📊', 'أعلى ١٠ صعوداً وهبوطاً', 'اضغط للفلترة حسب الفترة', tabs + '<div id="glBody"></div>');
 }
 
+/* ═══ رموز TradingView للأصول — نفس خريطة octa-chart.js
+   ⛔ كارت XAU/USD في «الأصول العالمية» كان بيطلع صفحة المعلومات
+   ومكانش بيفتح الشارت — السبب إن الكارتات دي (.mini) مالهاش data-tv
+   والـhandler بيقرا الـid من عنصر تاني. الحل: نحط الـdata-tv من هنا. */
+const ASSET_TV = {
+  'tk-gold':   ['OANDA:XAUUSD', '🥇 الذهب', 'أونصة · XAU/USD'],
+  'tk-goldoz': ['OANDA:XAUUSD', '🥇 أونصة الذهب', 'OANDA:XAUUSD'],
+  'tk-gold24': ['OANDA:XAUUSD', '🥇 الذهب', 'أونصة · XAU/USD'],
+  'tk-silver': ['OANDA:XAGUSD', '🥈 الفضة', 'أونصة · XAG/USD'],
+  'tk-usd':    ['EGP=X', '💵 دولار / جنيه', 'EGP=X'],
+  'tk-eur':    ['EUR=X', '💶 يورو / جنيه', 'EUR=X'],
+  'tk-egx':    ['EGX:EGX30', '📊 مؤشر EGX30', 'EGX:EGX30'],
+  'tk-egx70':  ['EGX:EGX70', '📈 مؤشر EGX70', 'EGX:EGX70'],
+  'tk-egx100': ['EGX:EGX100', '📉 مؤشر EGX100', 'EGX:EGX100'],
+  'tk-egx33':  ['EGX:EGX33', '🕌 مؤشر EGX33 شرعي', 'EGX:EGX33'],
+  'tk-oil':    ['TVC:USOIL', '🛢️ نفط WTI', 'TVC:USOIL'],
+  'tk-ukoil':  ['TVC:UKOIL', '🛢️ نفط برنت', 'TVC:UKOIL'],
+  'tk-spx':    ['SP:SPX', 'S&P 500', 'SP:SPX'],
+  'tk-nasdaq': ['NASDAQ:IXIC', '💻 Nasdaq', 'NASDAQ:IXIC']
+};
+/* بيرجع الـattributes اللي بتخلي العنصر يفتح الشارت لوحده */
+function assetTvAttrs(id) {
+  const a = ASSET_TV[id];
+  if (!a) return '';
+  return ' data-tv="' + a[0] + '" data-tvn="' + a[1] + '" data-tvs="' + a[2] + '"' +
+         ' style="cursor:pointer" title="دوس تشوف الشارت"';
+}
+
 /* ═══ المؤشرات المصرية ═══ */
 function buildEgyCard(ticker, gold) {
   const map = {}; const seen = new Set();
@@ -1082,7 +1110,7 @@ function buildEgyCard(ticker, gold) {
   ];
   const body = '<div class="mini-row c6">' + WANT.map(w => {
     const t = map[w.id];
-    if (!t) return '<div class="mini"><div class="mini-n">' + w.n + '</div><div class="mini-v">—</div></div>';
+    if (!t) return '<div class="mini"' + assetTvAttrs(w.id) + '><div class="mini-n">' + w.n + '</div><div class="mini-v">—</div></div>';
 
     let c = Number(t.change||0);
     let v = Number(t.value||0).toLocaleString('en-US',{maximumFractionDigits:2});
@@ -1098,7 +1126,7 @@ function buildEgyCard(ticker, gold) {
       }
     }
 
-    return '<div class="mini"><div class="mini-n">' + w.n + '</div><div class="mini-v">' + v + '</div>' +
+    return '<div class="mini"' + assetTvAttrs(w.id) + '><div class="mini-n">' + w.n + '</div><div class="mini-v">' + v + '</div>' +
       '<div class="mini-c ' + (c>=0?'up':'down') + '">' + (c>=0?'▲ +':'▼ ') + Math.abs(c).toFixed(2) + '%</div></div>';
   }).join('') + '</div>' +
   '<div class="mini-note">💡 الجرام = أونصة الذهب (دولار) × الدولار/الجنيه ÷ 31.1035 — بيتحسب لحظياً</div>';
@@ -1113,9 +1141,9 @@ function buildGlobalCard(ticker) {
                   { id:'tk-spx', n:'🇺🇸 S&P 500' }, { id:'tk-nasdaq', n:'💻 Nasdaq' } ];
   const body = '<div class="mini-row c4">' + WANT.map(w => {
     const t = map[w.id];
-    if (!t) return '<div class="mini"><div class="mini-n">' + w.n + '</div><div class="mini-v">—</div></div>';
+    if (!t) return '<div class="mini"' + assetTvAttrs(w.id) + '><div class="mini-n">' + w.n + '</div><div class="mini-v">—</div></div>';
     const c = Number(t.change||0);
-    return '<div class="mini"><div class="mini-n">' + w.n + '</div><div class="mini-v">' +
+    return '<div class="mini"' + assetTvAttrs(w.id) + '><div class="mini-n">' + w.n + '</div><div class="mini-v">' +
       Number(t.value||0).toLocaleString('en-US',{maximumFractionDigits:2}) + '</div>' +
       '<div class="mini-c ' + (c>=0?'up':'down') + '">' + (c>=0?'+':'') + c.toFixed(2) + '%</div></div>';
   }).join('') + '</div>';
@@ -2732,21 +2760,45 @@ document.addEventListener('DOMContentLoaded', function () {
   if (b) b.setAttribute('aria-expanded', 'true');
 });
 
-/* الهيدر يختفى لما تنزل ويفضل لما طلّع — مساح·· بتوفر */
+/* الهيدر يختفى لما تنزل ويفضل لما طلّع — مساح·· بتوفر
+   ────────────────────────────────────────────────────────────
+   ⛌ الفخّ اللي كان بيخلّي «القائمة تتحرك فوق»:
+   الطي بـmax-height كان بيغيّر ارتفاع الصفحة → المتصفح بيعدّل scrollY
+   → الـhandler بيرد تاني → تذبذب (الهيدر بيقفز والشريط بيخطف).
+   الحل: الطي بقى بـtransform (CSS) + قفل في الـJS + عتبة أكبر. */
 (function initMobileHeader(){
   if (!('ontouchstart' in window)) return;
-  let lastY = window.scrollY, ticking = false;
+  let lastY = window.scrollY, ticking = false, lockUntil = 0;
   const bar = document.querySelector('.octa-topbar');
   if (!bar) return;
-  const onScroll = () => {
-    if (window.scrollY < 90){ bar.classList.remove('hide-top'); }
-    else if (window.scrollY > lastY + 8){ bar.classList.add('hide-top'); }
-    else if (window.scrollY < lastY - 8){ bar.classList.remove('hide-top'); }
+
+  /* ارتفاع الصفّين اللي بيتطوا (الشعار + الأذرع) — بيتحسب مرة واحدة */
+  function measure() {
+    const brand = bar.querySelector('.octa-brand');
+    const arms = bar.querySelector('.arms-bar');
+    const h = (brand ? brand.offsetHeight : 0) + (arms ? arms.offsetHeight : 0);
+    if (h > 0) bar.style.setProperty('--collapse-h', h + 'px');
+  }
+  measure();
+  window.addEventListener('resize', measure);
+
+  function setHidden(hide) {
+    if (bar.classList.contains('hide-top') === hide) return;
+    if (hide) measure();
+    bar.classList.toggle('hide-top', hide);
+    document.body.classList.toggle('hd-collapsed', hide);
+    /* ⛔ قفل قصير: أي حركة جاية من الـtransition ما تاخدش قرار تاني */
+    lockUntil = Date.now() + 320;
     lastY = Math.max(0, window.scrollY);
-    /* ⛌ شريط الحساب (au-bar) مثبّت top-left بـz-index 9990،
-       فلما الهيدر ينطوي كان بيغطي شريط الأدوات على الموبايل.
-       بنخفيه معاه ونرجّعه أول ما يرجع الهيدر. */
-    document.body.classList.toggle('hd-collapsed', bar.classList.contains('hide-top'));
+  }
+
+  const onScroll = () => {
+    const y = Math.max(0, window.scrollY);
+    if (Date.now() < lockUntil) { lastY = y; ticking = false; return; }
+    if (y < 90) setHidden(false);
+    else if (y > lastY + 16) setHidden(true);
+    else if (y < lastY - 16) setHidden(false);
+    lastY = y;
     ticking = false;
   };
   window.addEventListener('scroll', () => {
@@ -4150,12 +4202,12 @@ function renderGlobalAssets(ticker) {
   return '<div class="ticker-row-scroll" style="grid-template-columns:repeat(4,1fr)">' +
     GA_WANT.map(w => {
       const t = map[w.id];
-      if (!t) return `<div class="tk-mini" style="--tc:#64748b">
+      if (!t) return `<div class="tk-mini" style="--tc:#64748b"${assetTvAttrs(w.id)}>
         <div class="tkm-n">${w.n}</div>
         <div class="tkm-v">—</div><div class="tkm-c">—</div></div>`;
       const c = Number(t.change || 0);
       const col = c > 0.05 ? '#22c55e' : (c < -0.05 ? '#ef4444' : '#94a3b8');
-      return `<div class="tk-mini" style="--tc:${col}">
+      return `<div class="tk-mini" style="--tc:${col}"${assetTvAttrs(w.id)}>
         <div class="tkm-n">${w.n}</div>
         <div class="tkm-v">${Number(t.value||0).toLocaleString('en-US',{maximumFractionDigits:2})}</div>
         <div class="tkm-c" style="color:${col}">${c>=0?'▲ +':'▼ '}${c.toFixed(2)}%</div>
