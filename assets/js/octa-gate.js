@@ -1305,6 +1305,23 @@
         wipeFlow();
         welcome();
         open();
+        /* 📌 قولوله بهدوء إيه اللي حصل — بدون الشاشة المرعبة.
+           ⛔ الرسالة القديمة «انتهت جلستك» كانت بتغطي على شاشة
+           الدخول وتخلّيه يفكر إن الحساب اتقفل أو اتسرق. */
+        try {
+          var t = document.getElementById('gtTopT');
+          if (t) t.textContent = 'انتهت الجلسة — سجّل دخول تاني';
+          var box = document.getElementById('gt-form');
+          if (box && !box.getAttribute('data-expired')) {
+            box.setAttribute('data-expired', '1');
+            var n = document.createElement('div');
+            n.style.cssText = 'margin:0 0 14px;padding:10px 12px;border-radius:10px;'
+              + 'font-size:.8rem;font-weight:700;text-align:center;'
+              + 'background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.38);color:var(--gold)';
+            n.textContent = '⏳ الجلسة انتهت — سجّل دخولك تاني وكمل من نفس المكان';
+            box.insertBefore(n, box.firstChild);
+          }
+        } catch (e) { }
         return o;
       }
       /* ⛔ خطأ شبكة أو 500 — مش هنقفل حاجة على المستخدم؛
@@ -1398,6 +1415,19 @@
   };
 
   function showAuthFail(path) {
+    /* ⛔⛔⛔ الحارس الأخير — الرسالة دي مرعبة وبتغطي على شاشة الدخول،
+       فبتخلّي المستخدم يفكر إن اتطرد من حسابه وهو أصلاً مالوش جلسة.
+       ⛌ متطلعش غير في الحالة الوحيدة الصح:
+         · فيه توكن فعلاً (يعني كان داخل والمفروض يفضل داخل)
+         · البابة مقفولة (مش مفتوحة المنتظر)
+         · التحقق خلص (البابة مش شغالة)
+       أي حاجة غير كده = الباية بتلعب دورها عادي/metعملش حاجة. */
+    var _tk = '';
+    try { _tk = localStorage.getItem('octa_token') || ''; } catch (e) { }
+    if (window.__octaGateBusy || !_tk) return;
+    var _g = document.getElementById('gate');
+    if (_g) { try { if (getComputedStyle(_g).display !== 'none') return; } catch (e) { } }
+
     if (window.__octaAuthFailShown) return;   /* مرة واحدة بس */
     window.__octaAuthFailShown = true;
     logoutLocal();
@@ -1436,6 +1466,11 @@
       if (h === 'localhost' || h === '127.0.0.1') { shut(); return; }
     } catch (e) { }
 
+    /* ⛔ البابة بقت هي اللي بتتحكم من أول مللي — أي 401 في
+       المسارات المحمية لحد ما التحقق يخلص ما بيطلّعش رسالة
+       «انتهت جلستك» المرعبة فوق شاشة الدخول. */
+    window.__octaGateBusy = true;
+
     /* ⛌ الترتيب الصح: ارسم ← اقفل ← تحقق.
        البوابة بترسم نفسها الأول — دايماً، قبل أي تحقق. */
     mount();
@@ -1445,6 +1480,8 @@
     if (token()) {
       pending('⏳ بنتحقق من حسابك…');
       verify();
+    } else {
+      window.__octaGateBusy = false;
     }
   });
 
@@ -1460,11 +1497,15 @@
                       نقوله استنى ونعيد المحاولة لوحدنا
          · خطأ شبكة   → نفضل مقفولين ونقوله، ⛔ ما نفتحش أبداً */
     var tries = 0;
+    /* ⛔ البابة هي اللي بتتحقق دلوقتي — أي 401 في المسارات المحمية
+       لحد ما هي تخلص هو بتاعها، مش بندي «انتهت جلستك» ونعمل ريلود. */
+    window.__octaGateBusy = true;
     (function ask() {
     fetch(apiBase() + '/api/auth/me', {
       headers: { 'Authorization': 'Bearer ' + t }
     }).then(function (r) {
       if (r.ok) {
+        window.__octaGateBusy = false;
         shut();
         /* ⛔⛔⛔ الباج اللي كان بيطلّع المستخدم كل ساعتين وهو بيتصفح
            عادي: التوكن عمره ساعتين، والجدولة كانت بتبدأ من وقت فتح
@@ -1473,7 +1514,7 @@
            → الجدولة اتحطت 12:50 → عند 12:00 التوكن مات وكل
            المسارات المحمية رجّعت 401 → طرد من الحساب.
            ⛌ الحل: أول ما نتحقق من التوكن نجدده فوراً، والباك يرجّع
-           expires_in الحقيقي فتصير الجدولة على endowaq fi alhyqiq. */
+           expires_in الحقيقي فتصير الجدولة على الوقت الحقيقي. */
         renew();
         return;
       }
@@ -1491,12 +1532,15 @@
           return;
         }
         down('السيرفر');
+        window.__octaGateBusy = false;
         return;
       }
+      window.__octaGateBusy = false;
       logoutLocal();
       welcome();
       open();
     }).catch(function () {
+      window.__octaGateBusy = false;
       if (document.getElementById('gt-form')) down('السيرفر');
     });
     })();
