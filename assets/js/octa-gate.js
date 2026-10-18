@@ -518,6 +518,18 @@
     if (b) b.onclick = function () { location.reload(); };
   }
 
+  /* 🔄 السيرفر بيعمل restart (503 / 502)
+     ⛔ الرسالة دي بتظهر أثناء إعادة النشر — والمستخدم ثابت
+        جواه، فماينفعش نقوله «ادخل من جديد» والسبب إن السيرفر
+        بدأ يفتح. بنستناه ونعيد المحاولة لوحدنا. */
+  function booting(n) {
+    var f = formEl();
+    if (!f) return;
+    f.innerHTML =
+      '<div class="gt-err">🔄 السيرفر بيعمل restart</div>' +
+      '<p class="gt-txt">ثواني وبعدين هيفتح لوحده — متقلقش، حسابك محفوظ (محاولة ' + n + ')</p>';
+  }
+
   /* 📌 رد السيرفر في التسجيل — بنوريه زي ما هو،
      ⛔ وبيتقسم على why (نوع الخطأ) عشان 409 (إيميل أو باسورد مكرر)
         ما يطلعش للمستخدم كرقم أو كود غامض. */
@@ -1365,6 +1377,27 @@
      ⛌ دلوقتي: نقوله بالظبط ونرجّعه للبابة بدل ما نسيبه قدام
         صفحة صامتة. */
   window.OCTAAuthFail = function (path) {
+    /* ⛔⛔⛔ قبل ما نطرد المستخدم: جرّب تجديد صامت مرة واحدة.
+       المسارات المحمية بترجّع 401 لو التوكن خلص عمره بالظبط في
+       اللحظة دي — وده مش معناه إن الباسورد غلط.
+       ⛌ لو التجديد نجح بنكمّل عادي من غير ما نلمس الجلسة. */
+    if (window.__octaAuthRetry) return;        /* أثناء المحاولة جاري */
+    window.__octaAuthRetry = true;
+    try {
+      if (typeof renew === 'function' && token()) {
+        renew().then(function (o) {
+          window.__octaAuthRetry = false;
+          if (o && o.s === 200) { try { location.reload(); } catch (e) { } return; }
+          showAuthFail(path);
+        }).catch(function () { window.__octaAuthRetry = false; showAuthFail(path); });
+        return;
+      }
+    } catch (e) { }
+    window.__octaAuthRetry = false;
+    showAuthFail(path);
+  };
+
+  function showAuthFail(path) {
     if (window.__octaAuthFailShown) return;   /* مرة واحدة بس */
     window.__octaAuthFailShown = true;
     logoutLocal();
@@ -1422,18 +1455,51 @@
 
     /* ⛌ القاعدة: **شك = مقفول**.
          · 200      → الموقع ينفتح
-         · أي حاجة تانية → التوكن يتمسح ونرجع للشاشة الأولى
+         · 401/403  → التوكن مش صالح، يتمسح ونرجع للشاشة الأولى
+         · 5xx      → السيرفر بيعمل restart — ⛔ ما نمسحش التوكن،
+                      نقوله استنى ونعيد المحاولة لوحدنا
          · خطأ شبكة   → نفضل مقفولين ونقوله، ⛔ ما نفتحش أبداً */
+    var tries = 0;
+    (function ask() {
     fetch(apiBase() + '/api/auth/me', {
       headers: { 'Authorization': 'Bearer ' + t }
     }).then(function (r) {
-      if (r.ok) { shut(); return; }
+      if (r.ok) {
+        shut();
+        /* ⛔⛔⛔ الباج اللي كان بيطلّع المستخدم كل ساعتين وهو بيتصفح
+           عادي: التوكن عمره ساعتين، والجدولة كانت بتبدأ من وقت فتح
+           الصفحة بـ90 دقيقة **بدون ما تعرف الوقت اللي فاضل**.
+           يعني: دخلت 10:00 (التوكن يموت 12:00) → عملت refresh 11:20
+           → الجدولة اتحطت 12:50 → عند 12:00 التوكن مات وكل
+           المسارات المحمية رجّعت 401 → طرد من الحساب.
+           ⛌ الحل: أول ما نتحقق من التوكن نجدده فوراً، والباك يرجّع
+           expires_in الحقيقي فتصير الجدولة على endowaq fi alhyqiq. */
+        renew();
+        return;
+      }
+      /* ⛔⛔⛔ الباج اللي كان بيطرد المستخدم وقت إعادة النشر
+         الكود القديم كان بيعمل logoutLocal() عند **أي** رد مش
+         200 — فلما السيرفر بيعمل restart ويرد 503 كان بيمسح
+         التوكن ويطلّعه على شاشة الدخول. يعني ركلة شبكة واحدة = طرد.
+         دلوقتي: التوكن يتمسح عند 401/403 بس (رفض حقيقي)،
+         و5xx = السيرفر بيعمل restart → استنى ونعيد المحاولة. */
+      if (r.status >= 500) {
+        tries++;
+        if (tries <= 12) {
+          booting(tries);
+          setTimeout(ask, 3000 + tries * 1500);
+          return;
+        }
+        down('السيرفر');
+        return;
+      }
       logoutLocal();
       welcome();
       open();
     }).catch(function () {
       if (document.getElementById('gt-form')) down('السيرفر');
     });
+    })();
   }
 
 })();
