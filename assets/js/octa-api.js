@@ -109,10 +109,22 @@
         if (r.status >= 500) window.OCTAServer.failover();
         /* ⛔ ⛔ التوكن مرفوض أو مش موجود ← الموقع كله هيطلع فاضي
            والـuser مش هيعرف السبب. الحل الوحيد: نقوله ونرجّعه للبابة
-           بدل ما نسيبه قدام صفحة صامتة. */
-        if (guarded && r.status === 401 && r.path !== '/api/auth/me') {
+           بدل ما نسيبه قدام صفحة صامتة.
+           ⛔⛔⛔ الباج اللي كان مسبب رسالة «انتهت جلستك» أول ما تفتح الموقع:
+           · الرد (Response) مافيش فيه .path — فالمقارنة `r.path !== '/api/auth/me'`
+             كانت دايماً true، يعني 401 على /api/auth/me (أول حاجة البابة
+             بتعملها عند الفتح) كان بيطلّع الرسالة المرعبة.
+           · وكمان: البابة لما بتمسح التوكن، الطلبات اللي كانت طالعة
+             بترجّع 401 بعدها بحتة → الرسالة كانت بتظهر فوق شاشة الدخول.
+           ⛌ القواعد الصح: نتجاهل لو البابة شغالة · نتجاهل لو التوكن
+           اتمسح خلاص (يعني مفيش جلسة نحمّيها) · نتجاهل /api/auth/me. */
+        var _p = _pathOf(url);
+        var _tk = '';
+        try { _tk = localStorage.getItem('octa_token') || ''; } catch (e) { }
+        if (guarded && r.status === 401 && _p !== '/api/auth/me'
+            && !window.__octaGateBusy && _tk) {
           try {
-            if (typeof window.OCTAAuthFail === 'function') window.OCTAAuthFail(r.path);
+            if (typeof window.OCTAAuthFail === 'function') window.OCTAAuthFail(_p);
           } catch (e) { }
         }
         return r;
