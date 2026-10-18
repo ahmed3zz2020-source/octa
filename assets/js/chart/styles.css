@@ -1,0 +1,679 @@
+/* ══════════════════════════════════════════════════════════════
+   🎨 OCTA — ستايل الشارت (Phase 1 · T3)
+   ──────────────────────────────────────────────────────────────
+   ⛔ الوضع الأبيض فقط — مافيش dark theme.
+   🎨 الألوان (نفس TradingView):
+      خلفية #ffffff · نص #131722 · خطوط الشبكة #e0e3eb
+      صاعد #26a69a · هابط #ef5350
+   📱 الأساس: التابلت 768px · الموبايل 390px · اللاب تكبير
+   👆 كل زرار min 44×44px (touched)
+   🔢 كل الأرقام font-variant-numeric: tabular-nums
+   ══════════════════════════════════════════════════════════════ */
+
+:root {
+  --octa-bg: #ffffff;
+  --octa-text: #131722;
+  --octa-grid: #e0e3eb;
+  --octa-border: #d1d4dc;
+  --octa-up: #26a69a;
+  --octa-down: #ef5350;
+  --octa-muted: #787b86;
+  --octa-soft: #f7f8fb;
+  --octa-accent: #2962ff;
+  --octa-radius: 10px;
+  --octa-tap: 44px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🌍 الأساس
+   ═══════════════════════════════════════════════════════════ */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--octa-bg);
+  color: var(--octa-text);
+  font-family: 'Noto Naskh Arabic', 'Segoe UI', Tahoma, 'Cairo', 'Dubai', Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+
+body.octa-chart-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+svg,
+canvas {
+  max-width: 100%;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* 🔢 الأرقام بأعمدة ثابتة (tabular) */
+body.octa-chart-page,
+.octa-chart-page * {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🏗️ الهيكل
+   ═══════════════════════════════════════════════════════════ */
+.octa-chart-page .octa-wrap {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 10px 12px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* ── الترويسة ── */
+.octa-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.octa-head h1 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+}
+
+.octa-head .octa-tag {
+  font-size: 12px;
+  color: var(--octa-muted);
+  background: var(--octa-soft);
+  border: 1px solid var(--octa-grid);
+  border-radius: 999px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+
+/* ── شريط الأدوات ── */
+.octa-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.octa-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--octa-soft);
+  border: 1px solid var(--octa-grid);
+  border-radius: var(--octa-radius);
+  padding: 3px;
+  flex-wrap: nowrap;
+}
+
+.octa-group-label {
+  font-size: 12px;
+  color: var(--octa-muted);
+  padding: 0 6px 0 2px;
+  white-space: nowrap;
+}
+
+/* ── الأزرار ── */
+.octa-btn {
+  min-width: var(--octa-tap);
+  min-height: var(--octa-tap);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--octa-bg);
+  color: var(--octa-text);
+  border: 1px solid var(--octa-grid);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.octa-btn:hover {
+  background: #f2f4f9;
+  border-color: #c3c8d6;
+}
+
+.octa-btn:focus-visible {
+  outline: 2px solid var(--octa-accent);
+  outline-offset: 2px;
+}
+
+.octa-btn[aria-pressed='true'],
+.octa-btn.is-active {
+  background: var(--octa-accent);
+  border-color: var(--octa-accent);
+  color: #ffffff;
+}
+
+.octa-btn[disabled] {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.octa-btn-ghost {
+  background: transparent;
+}
+
+/* ── إدخال السهم ── */
+.octa-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 220px;
+  max-width: 340px;
+}
+
+.octa-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--octa-tap);
+  padding: 8px 12px;
+  border: 1px solid var(--octa-grid);
+  border-radius: 8px;
+  background: var(--octa-bg);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+}
+
+.octa-search input:focus {
+  outline: 2px solid var(--octa-accent);
+  outline-offset: 1px;
+  border-color: var(--octa-accent);
+}
+
+.octa-search input::placeholder {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  color: var(--octa-muted);
+}
+
+/* ── شريط الحالة ── */
+.octa-status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  background: var(--octa-soft);
+  border: 1px solid var(--octa-grid);
+  border-radius: var(--octa-radius);
+  min-width: 0;
+}
+
+.octa-status-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.octa-status-item .octa-k {
+  font-size: 12px;
+  color: var(--octa-muted);
+  white-space: nowrap;
+}
+
+.octa-status-item .octa-v {
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.octa-up { color: var(--octa-up); }
+.octa-down { color: var(--octa-down); }
+.octa-flat { color: var(--octa-muted); }
+
+/* ═══════════════════════════════════════════════════════════
+   📈 منطقة الشارت
+   ═══════════════════════════════════════════════════════════ */
+.octa-chart-box {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  height: clamp(320px, 52vh, 560px);
+  background: var(--octa-bg);
+  border: 1px solid var(--octa-grid);
+  border-radius: var(--octa-radius);
+  overflow: hidden;
+  touch-action: none;
+}
+
+.octa-chart-host {
+  position: absolute;
+  inset: 0;
+  direction: ltr;      /* الـlibrary بيرسم LTR جوّه */
+}
+
+/* الطبقة اللي فوق الـcanvas (tooltip + خطوط) */
+.octa-chart-overlay {
+  direction: rtl;
+}
+
+/* ── الـtooltip (HTML overlay — مش canvas) ── */
+.octa-chart-tip {
+  direction: rtl;
+  min-width: 158px;
+  max-width: 220px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, .97);
+  border: 1px solid var(--octa-border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(19, 23, 34, .12);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--octa-text);
+  font-variant-numeric: tabular-nums;
+  z-index: 6;
+}
+
+.octa-chart-tip-head {
+  font-weight: 700;
+  font-size: 13px;
+  text-align: center;
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--octa-grid);
+  direction: rtl;
+}
+
+.octa-chart-tip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  direction: rtl;
+}
+
+.octa-chart-tip-label {
+  color: var(--octa-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.octa-chart-tip-value {
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.octa-chart-tip-row.is-up .octa-chart-tip-value { color: var(--octa-up); }
+.octa-chart-tip-row.is-down .octa-chart-tip-value { color: var(--octa-down); }
+
+/* ── خط السعر / خط الوقت ── */
+.octa-chart-time-line {
+  direction: ltr;
+}
+
+/* ── طبقة crosshair اللمس ── */
+.octa-touch-cross {
+  direction: ltr;
+}
+
+.octa-touch-tip {
+  z-index: 7;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   📋 الرسائل
+   ═══════════════════════════════════════════════════════════ */
+.octa-msg {
+  padding: 10px 12px;
+  border-radius: var(--octa-radius);
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid var(--octa-grid);
+  background: var(--octa-soft);
+}
+
+.octa-msg.is-error {
+  border-color: #f3c2c2;
+  background: #fdf3f3;
+  color: #a32020;
+}
+
+.octa-msg.is-ok {
+  border-color: #bfe5df;
+  background: #f1faf8;
+  color: #0f6f64;
+}
+
+.octa-msg[hidden] { display: none; }
+
+/* ═══════════════════════════════════════════════════════════
+   🔗 رابط TradingView
+   ═══════════════════════════════════════════════════════════ */
+.octa-tv {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--octa-tap);
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--octa-grid);
+  background: var(--octa-bg);
+  color: var(--octa-text);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.octa-tv:hover { background: #f2f4f9; }
+
+/* ═══════════════════════════════════════════════════════════
+   🦶 التذييل
+   ═══════════════════════════════════════════════════════════ */
+.octa-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--octa-muted);
+  min-width: 0;
+}
+
+.octa-foot a { color: var(--octa-accent); }
+
+/* ═══════════════════════════════════════════════════════════
+   📱 الموبايل (390px) — مافيش تمرير أفقي
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 560px) {
+  .octa-chart-page .octa-wrap {
+    padding: 8px 8px 14px;
+    gap: 8px;
+  }
+
+  .octa-head h1 { font-size: 17px; }
+
+  .octa-search {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .octa-group {
+    flex: 1 1 100%;
+    justify-content: space-between;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .octa-group-label { display: none; }
+
+  .octa-btn {
+    flex: 1 1 auto;
+    padding: 8px 8px;
+    font-size: 13px;
+  }
+
+  .octa-chart-box { height: clamp(300px, 56vh, 460px); }
+
+  .octa-status { gap: 10px; padding: 8px 10px; }
+  .octa-status-item .octa-v { font-size: 15px; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🖥️ التابلت (768px هو الأساس) واللاب
+   ═══════════════════════════════════════════════════════════ */
+@media (min-width: 768px) {
+  .octa-chart-page .octa-wrap {
+    padding: 14px 18px 24px;
+    gap: 12px;
+  }
+
+  .octa-head h1 { font-size: 21px; }
+
+  .octa-chart-box { height: clamp(420px, 58vh, 680px); }
+}
+
+@media (min-width: 1200px) {
+  .octa-chart-page .octa-wrap { padding: 18px 24px 30px; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ♿ الوصولية + تقليل الحركة
+   ═══════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: .001ms !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+.octa-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🖌️ شريط أدوات الرسم + شريط المؤشرات + لوحة الحفظ
+   ═══════════════════════════════════════════════════════════ */
+.octa-toolstrip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background: var(--octa-soft);
+  border: 1px solid var(--octa-grid);
+  border-radius: var(--octa-radius);
+}
+
+.octa-toolstrip .octa-group-label {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--octa-muted);
+  padding-inline-end: 4px;
+  white-space: nowrap;
+}
+
+.octa-tool {
+  flex: 0 0 auto;
+  min-height: var(--octa-tap);
+  min-width: var(--octa-tap);
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--octa-text);
+  background: var(--octa-bg);
+  border: 1px solid var(--octa-border);
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+
+.octa-tool:hover {
+  border-color: var(--octa-accent);
+}
+
+.octa-tool[aria-pressed="true"] {
+  background: var(--octa-accent);
+  border-color: var(--octa-accent);
+  color: #fff;
+}
+
+.octa-tool-act {
+  color: var(--octa-muted);
+}
+
+.octa-tool-act[aria-pressed="true"] {
+  background: var(--octa-text);
+  border-color: var(--octa-text);
+  color: #fff;
+}
+
+.octa-sep {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 26px;
+  background: var(--octa-border);
+  margin: 0 4px;
+}
+
+/* ── لوحة الحفظ ── */
+.octa-savebox {
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--octa-soft);
+  border: 1px solid var(--octa-grid);
+  border-radius: var(--octa-radius);
+}
+
+.octa-save-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.octa-save-row input {
+  flex: 1 1 180px;
+  min-height: var(--octa-tap);
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--octa-text);
+  background: var(--octa-bg);
+  border: 1px solid var(--octa-border);
+  border-radius: 8px;
+}
+
+.octa-save-row input:focus,
+.octa-tool:focus-visible,
+.octa-btn:focus-visible {
+  outline: 2px solid var(--octa-accent);
+  outline-offset: 1px;
+}
+
+.octa-btn-main {
+  background: var(--octa-accent);
+  border-color: var(--octa-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.octa-chlist {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.octa-chlist:empty {
+  display: none;
+}
+
+.octa-chrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--octa-bg);
+  border: 1px solid var(--octa-grid);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.octa-chrow .octa-chname {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.octa-chrow .octa-chmeta {
+  flex: 0 0 auto;
+  color: var(--octa-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.octa-chrow .octa-chdel {
+  flex: 0 0 auto;
+  min-height: 34px;
+  min-width: 34px;
+  border: 1px solid var(--octa-border);
+  background: var(--octa-bg);
+  color: var(--octa-down);
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.octa-chempty {
+  color: var(--octa-muted);
+  font-size: 13px;
+  padding: 4px 2px;
+}
+
+/* على الموبايل: الشريط يفضل سكرول أفقي — مافيش تمدد */
+@media (max-width: 640px) {
+  .octa-toolstrip {
+    padding: 5px 6px;
+  }
+
+  .octa-tool {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+}

@@ -2,8 +2,11 @@
 const fs = require('fs');
 const F = 'index.html';
 let h = fs.readFileSync(F, 'utf8');
-const now = String(Date.now()).slice(-8);
-const stamp = `2026${new Date().toISOString().slice(5, 7).replace('-', '')}${now.slice(-4)}`;
+/* ⛔ كان بياخد آخر 4 أرقام من الـepoch ms — مش تاريخ، وبيرجع
+   لورا أحياناً. دلوقتي تاريخ+وقت حقيقي: YYYYMMDDHHmm (بيزيد كل مرة). */
+const _d = new Date();
+const _p = (n) => (n < 10 ? '0' : '') + n;
+const stamp = `${_d.getFullYear()}${_p(_d.getMonth() + 1)}${_p(_d.getDate())}${_p(_d.getHours())}${_p(_d.getMinutes())}`;
 
 // 1) الـmarker جوه السكربت
 // ⛔ الـregex القديم كان بيتوقع 'v=' + 'xxx' بس الكود كاتبه
