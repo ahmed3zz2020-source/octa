@@ -824,6 +824,51 @@ function fzRenderTabs(){
   }).join('');
 }
 
+/* ══════════════════════════════════════════════════════════════
+   🔒 البيانات الناقصة — لازم نقول للمستخدم بدل صفر صامت
+   ──────────────────────────────────────────────────────────────
+   ⛔⛔ الباج: لو الجلسة مش صالحة، الـdata_full والـegx_full بيرجعوا 401
+   فالـOS_DB بيتقرا من ٩ حقول بس بدل ٦٩ → **كل** الفلاتر بترجع صفر
+   والفيلتر شكله مكسور — والحقيقة إن مفيش داتا أصلاً.
+
+   ⛌ الحل: نقوله بوضوح «سجّل دخولك» بدل ما نعرض أصفار ملهاش معنى.
+   ══════════════════════════════════════════════════════════════ */
+function fzHasFullData(){
+  try {
+    var db = (typeof OS_DB !== 'undefined') ? OS_DB : null;
+    if (!db || !db.length) return false;
+    for (var i = 0; i < Math.min(db.length, 25); i++){
+      var s = db[i];
+      if (!s) continue;
+      if (s.mcap != null || s.pe != null || s.roe != null || s.av30 != null) return true;
+    }
+    return false;
+  } catch(e){ return false; }
+}
+
+function fzDataWarn(){
+  var tabs = document.getElementById('fzTabs');
+  if (!tabs) return;
+  var box = document.getElementById('fzDataWarn');
+  if (fzHasFullData()){ if (box) box.remove(); return; }
+  if (box) return;
+  var w = document.createElement('div');
+  w.id = 'fzDataWarn';
+  w.className = 'fz-datawarn';
+  w.innerHTML = '\u{1F512} <b>الفلتر محتاج بيانات كاملة</b>'
+    + '<span>أنت داخل من غير جلسة صالحة، فالسيرفر رجّع بيانات مختصرة '
+    + 'والفلاتر بترجع صفر — مش معناها مفيش أسهم.</span>';
+  var b = document.createElement('button');
+  b.type = 'button'; b.className = 'fz-datawarn-btn';
+  b.textContent = 'تسجيل الدخول';
+  b.onclick = function () {
+    try { if (window.OCTAGate && window.OCTAGate.login) window.OCTAGate.login(); }
+    catch (e) { location.reload(); }
+  };
+  w.appendChild(b);
+  tabs.parentNode.insertBefore(w, tabs.nextSibling);
+}
+
 function fzGo(id){
   const t = FZ_TABS.find(x=>x.id===id); if (!t) return;
   FZ_ACTIVE = id;
@@ -833,6 +878,7 @@ function fzGo(id){
     if (el) el.style.display = (x.id===id) ? 'block' : 'none';
   });
   fzRenderTabs();
+  fzDataWarn();
   /* وسيط القطاعات — لازم يتحسب قبل أي رسم */
   if (!FZ_SECTOR_MED || !Object.keys(FZ_SECTOR_MED).length){
     if (typeof fzComputeSectorMed === 'function') fzComputeSectorMed();
@@ -847,7 +893,13 @@ function fzGo(id){
 
 function fzInit(){
   if (typeof fzHeroRender === 'function') fzHeroRender();
+  fzDataWarn();
   fzGo(FZ_ACTIVE || 'safety');
+  /* ⛌ لو الجلسة اتجابت بعدين والداتا وصلت → شيل التحذير */
+  var iv = setInterval(function () {
+    if (fzHasFullData()){ var x = document.getElementById('fzDataWarn'); if (x) x.remove(); clearInterval(iv); }
+  }, 3000);
+  setTimeout(function () { clearInterval(iv); }, 120000);
 }
 
 
