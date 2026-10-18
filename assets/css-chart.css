@@ -164,3 +164,19 @@ body.light .gc-card .sb-t i .down { color: #d63d3d; }
   .ch-d-v { font-size: .95rem; }
   .ch-d-s { font-size: .68rem; padding-inline-start: 7px; }
 }
+
+
+/* 🔒 تحذير البيانات الناقصة في الفلتر */
+.fz-datawarn {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: 10px 0; padding: 12px 14px; border-radius: 12px;
+  background: rgba(234,179,8,.12); border: 1px solid rgba(234,179,8,.45);
+  font-size: .82rem; line-height: 1.7;
+}
+.fz-datawarn b { color: var(--gold); }
+.fz-datawarn span { color: var(--muted); flex: 1 1 220px; }
+.fz-datawarn-btn {
+  border: 0; border-radius: 9px; padding: 8px 14px; cursor: pointer;
+  background: var(--gold); color: var(--pri4); font-family: inherit;
+  font-weight: 800; font-size: .78rem;
+}
