@@ -2081,18 +2081,28 @@
       .toolbar { order: 2; }
       .tool-btn { padding: 7px 12px; font-size: .76rem; }
 
-      /* ④ إخفاء تلقائي عند النزول
-         ⛌ الكود القديم كان بيعمل translateY(-100%) على الـtopbar كله،
-         فشريط الأدوات كان بيختفي معاه — وده اللي كان بيحصل على الموبايل.
-         دلوقتي بنقفل الصفّين الفوقانيين بس (الشعار + الأذرع)
-         وشريط الأدوات بيفضل ظاهر في آخر الهيدر. */
+      /* ④ إخفاء تلقائي عند النزول — بالـtransform مش بالـmax-height ⛔
+         ─────────────────────────────────────────────────────────
+         الطي بـmax-height بيغيّر ارتفاع الصفحة → المتصفح بيعدّل scrollY
+         → الـscroll handler بيرد تاني → تذبذب لا نهائي:
+         الهيدر بيقفز والقائمة بتتحرك فوق والـau-bar بيخطف ويظهر.
+
+         الطي بـtransform مش بيغيّر ارتفاع الصفحة خالص → صفر تذبذب.
+         الطي بيتم على الـtopbar كله: الصفّين الفوقانيين (الشعار + الأذرع)
+         يطلعوا فوق، وشريط الأدوات ينزل مكانهم ويفضل ظاهر في آخر الهيدر.
+         --collapse-h بيتحسبه الـJS (ارتفاع الشعار + الأذرع). */
+      .octa-topbar {
+        transition: transform .25s cubic-bezier(.4,0,.2,1);
+        will-change: transform;
+      }
       .octa-topbar .octa-brand,
       .octa-topbar .arms-bar {
-        max-height: 520px; opacity: 1; overflow: hidden;
-        transition: max-height .25s cubic-bezier(.4,0,.2,1), opacity .18s linear;
+        opacity: 1;
+        transition: opacity .18s linear;
       }
+      .octa-topbar.hide-top { transform: translateY(calc(-1 * var(--collapse-h, 90px))); }
       .octa-topbar.hide-top .octa-brand,
-      .octa-topbar.hide-top .arms-bar { max-height: 0; opacity: 0; }
+      .octa-topbar.hide-top .arms-bar { opacity: 0; }
       .m-scrim { display: none; position: fixed; inset: 0; background: rgba(4,10,18,.5); z-index: 55; }
       .m-scrim.on { display: block; }
 
