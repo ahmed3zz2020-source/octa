@@ -425,3 +425,12 @@ body.light {
   .gsign  { font-size: 1.1rem; }
   .gsec   { padding-top: 12px; }
 }
+
+/* ⛔ حالة «الم السوق مقفول» — رمادي مش أزرق.
+   الأزرق معناه «حلّلنا وما لقيناش حاجة».
+   المقفول معناه «السوق مش شغال» — فرق كبير للمستخدم. */
+.gdot--closed {
+  background: #64748b !important;
+  box-shadow: 0 0 0 3px rgba(100,116,139,.22) !important;
+}
+.gdot--closed::after { background: radial-gradient(circle, rgba(100,116,139,.4), transparent 70%); }
