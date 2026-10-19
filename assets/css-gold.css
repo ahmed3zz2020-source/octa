@@ -854,3 +854,39 @@ button.ocm-shot:focus-visible { outline: 2px solid var(--gold, #d4af37); outline
   display: inline-flex !important; align-items: center; justify-content: center;
 }
 .ocm-head .ocm-row2 { gap: 8px; }
+
+/* ══════════════════════════════════════════════════════════════
+   ⏳ سكلتون تحميل الشارت (١٩ أكتوبر ٢٠٢٦)
+   بيبان أول ما الشارت يتفتح لحد ما الـiframe يخلص تحميله.
+   ───────────────────────────────────────────────────────────── */
+.octa-tv-skel {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 20px;
+  background: var(--pri2, #0a1929);
+  color: var(--g-txt, #e8eef5);
+  z-index: 2; direction: rtl; text-align: center;
+}
+.octa-tv-skel-spin {
+  width: 38px; height: 38px; border-radius: 50%;
+  border: 3px solid rgba(212,175,55,.18);
+  border-top-color: var(--gold, #d4af37);
+  animation: octa-tv-skel-rot .9s linear infinite;
+}
+@keyframes octa-tv-skel-rot { to { transform: rotate(360deg); } }
+.octa-tv-skel-text {
+  font-size: .92rem; color: var(--g-txt, #e8eef5); line-height: 1.6;
+}
+.octa-tv-skel-text span {
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .78rem;
+  color: var(--gold, #d4af37); direction: ltr; display: inline-block; margin-top: 4px;
+}
+.octa-tv-skel-err {
+  font-size: .94rem; color: #ff7a7a; line-height: 1.6; margin-bottom: 6px;
+}
+.octa-tv-skel-retry {
+  padding: 9px 22px; border-radius: 10px; border: 0;
+  background: var(--gold, #d4af37); color: #16202e; font-weight: 800; font-size: .86rem;
+  cursor: pointer; font-family: inherit;
+}
+.octa-tv-skel-retry:active { transform: scale(.96); }

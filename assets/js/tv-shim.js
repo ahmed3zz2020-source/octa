@@ -63,14 +63,21 @@
     q.set('style', o.style || '1');
     q.set('locale', o.locale || 'ar_AE');
     q.set('autosize', o.autosize === false ? 'false' : 'true');
-    q.set('withdateranges', 'true');
-    q.set('hide_side_toolbar', o.hideSideToolbar ? 'true' : 'false');
+    /* 📱 ١٩ أكتوبر ٢٠٢٦ — إصلاحات الموبايل من تقرير الفيديو:
+       📌 withdrawdates=false: التقويم اليدوي بيحرق ٤٠ بكسل + بيتعارض
+       مع العربية.
+       📌 hide_side_toolbar=true على الموبايل: عمود ١٢ أداة بياكل ١٢% من الرسمة.
+       📌 studies=false على الموبايل: المؤشرات بتاكل نصف المساحة.
+       على الشاشات الكبيرة (≥٩٠٠) كله يفضل زي ما كان. */
+    var compact = (o.compactMobile !== false) && (window.innerWidth < 900);
+    q.set('withdateranges', compact ? 'false' : 'true');
+    q.set('hide_side_toolbar', (o.hideSideToolbar || compact) ? 'true' : 'false');
     q.set('allow_symbol_change', o.allowSymbolChange ? '1' : '0');
     /* 📷 save_image=1: بيفعّل «التقط صورة الشاشة» جوّه قائمة إعدادات
        TradingView على الشاشات الكبيرة. على الموبايل القائمة دي
        مش موجودة في الـembed، فعشان كمان بنزوّر زرار تصوير فوق. */
     q.set('save_image', o.saveImage === false ? '0' : '1');
-    if (o.studies !== false) {
+    if (o.studies !== false && !compact) {
       q.set('studies', typeof o.studies === 'string' ? o.studies : DEFAULT_STUDIES);
     }
     return ENDPOINT + '?' + q.toString();
@@ -225,6 +232,26 @@
 
     host.innerHTML = '';
 
+    /* ⏳ ١٩ أكتوبر ٢٠٢٦ — سكلتون التحميل (محمد في تقرير الفيديو).
+       TradingView بياخد ١٫٧ ث على الشبكة أول مرة. من غير سكلتون
+       المستخدم بيبص على مربع أبيض فاضي. */
+    var skel = document.createElement('div');
+    skel.className = 'octa-tv-skel';
+    skel.innerHTML = '<div class="octa-tv-skel-spin"></div>' +
+      '<div class="octa-tv-skel-text">جاري تحميل الرسم البياني…<br>' +
+      '<span>' + sym + '</span></div>';
+    host.appendChild(skel);
+
+    /* ⏱ تايم-آوت ١٢ ثانية — لو الشبكة قطعت أو TradingView مردّش. */
+    var loadTimer = setTimeout(function () {
+      if (skel && skel.parentNode) {
+        skel.innerHTML = '<div class="octa-tv-skel-err">⚠️ الشارت مش متاح دلوقتي.</div>' +
+          '<button type="button" class="octa-tv-skel-retry">حاول تاني</button>';
+        var btn = skel.querySelector('.octa-tv-skel-retry');
+        if (btn) btn.onclick = function () { mount(host, o); };
+      }
+    }, 12000);
+
     var f = document.createElement('iframe');
     f.className = 'octa-tv-frame';
     f.src = buildUrl(Object.assign({}, o, { symbol: sym }));
@@ -242,6 +269,28 @@
        وب كانت بتسيب مستمعات دايمة على document مع كل mount من غير تنظيف. */
     f.dataset.tvSymbol = sym;
     f.dataset.tvInterval = normIv(o.interval);
+
+    /* ⏳ أول ما الإطار يخلص تحميله — نشيل السكلتون بعد ٤٠٠ مللي
+       عشان مايشتالشش قبل ما الداتا تبان فعلاً. */
+    var minShow = setTimeout(function () {
+      if (skel && skel.parentNode) skel.remove();
+    }, 400);
+    f.addEventListener('load', function () {
+      clearTimeout(loadTimer);
+      setTimeout(function () {
+        if (skel && skel.parentNode) skel.remove();
+      }, 350);
+    }, { once: true });
+    f.addEventListener('error', function () {
+      clearTimeout(loadTimer);
+      if (skel && skel.parentNode) {
+        skel.innerHTML = '<div class="octa-tv-skel-err">⚠️ فشل تحميل الشارت.</div>' +
+          '<button type="button" class="octa-tv-skel-retry">حاول تاني</button>';
+        var btn = skel.querySelector('.octa-tv-skel-retry');
+        if (btn) btn.onclick = function () { mount(host, o); };
+      }
+    }, { once: true });
+    clearTimeout(minShow);
     host.appendChild(f);
 
     /* 💡 تلميح الإيماءة — TradingView مش بيسمح بإيماءة سحب رأسي
@@ -257,9 +306,33 @@
     }
     fitToHost(f, host, tip);
 
-    if (o.link !== false) host.appendChild(makeLink(sym));
+    /* 🔗 ١٩ أكتوبر ٢٠٢٦ — نقل زرار «افتح على TradingView ↗» من
+       جوّه الحاوية (كان بيقع بره الشاشة عند 844px) إلى الترويسة
+       عن طريق makeShotBtn/yap السياقية. هنا بنرجّع الرابط بس
+       ونخلي الترويسة تقرّر تحطّه فين. */
+    if (o.link === true) {
+      var a = makeLink(sym);
+      a.style.display = 'none';
+      host.appendChild(a);
+    }
 
-    return { frame: f, url: f.src, symbol: sym, interval: f.dataset.tvInterval };
+    /* 🌓 ١٩ أكتوبر ٢٠٢٦ — تحديث الثيم لو المستخدم غيّره والمودال مفتوح.
+       الـbuildUrl بيقرأ isLight() وقت الـmount — بعد كده لو الـclass
+       على body اتغيّر، الـiframe لسه بالثيم القديم. */
+    if (window.MutationObserver) {
+      try {
+        var mo = new MutationObserver(function () {
+          if (!f || f.dataset.tvTheme === (document.body.classList.contains('light') ? 'light' : 'dark')) return;
+          f.dataset.tvTheme = document.body.classList.contains('light') ? 'light' : 'dark';
+          try { f.contentWindow.postMessage({ name: 'tv-widget-theme', value: f.dataset.tvTheme }, '*'); } catch (e0) {}
+        });
+        mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+        f.__octaTvThemeMO = mo;
+      } catch (e1) {}
+    }
+
+    return { frame: f, url: f.src, symbol: sym, interval: f.dataset.tvInterval,
+             openLink: (o.link === true ? makeLink(sym) : null) };
   }
 
   /* ── استبدال السهم/الفريم في نفس الحاوية من غير ما نعمل iframe جديد ── */
