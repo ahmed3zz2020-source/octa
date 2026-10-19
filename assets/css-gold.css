@@ -797,6 +797,10 @@ body.ocm-open { overflow:hidden; }
   font-size: .86rem; font-weight: 800; color: var(--g-txt, #e8eef5);
   direction: ltr; margin-inline-start: auto; flex: none;
 }
+.ocm-row1 .ocm-price:empty,
+.ocm-row1 .ocm-price[data-pending="1"] { display: none; }
+.ocm-row1 .ocm-title:empty { display: none; }
+.ocm-row1 .ocm-code:empty { display: none; }
 .ocm-row1 .ocm-price .ocm-change {
   font-size: .68rem; padding: 1px 5px; border-radius: 6px;
 }

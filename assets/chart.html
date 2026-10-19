@@ -126,7 +126,7 @@
     <div class="ocm-row1" id="chart-head">
       <span class="ocm-title" id="ch-title">البنك التجاري الدولي - مصر</span>
       <span class="ocm-code" id="ch-code">EGX:COMI</span>
-      <span class="ocm-price"><span id="ch-price-v">…</span><span class="ocm-change" id="ch-price-c">…</span></span>
+      <span class="ocm-price" id="ch-price-box" data-pending="1"><span id="ch-price-v"></span><span class="ocm-change" id="ch-price-c"></span></span>
     </div>
 
     <div class="msg" id="msg" hidden></div>
@@ -260,6 +260,7 @@
       var chgEl = document.getElementById('ch-price-c');
       var titleEl = document.getElementById('ch-title');
       var codeEl = document.getElementById('ch-code');
+      var priceBox = document.getElementById('ch-price-box');
       if (!priceEl) return;
       var API = 'https://octa-prices-production-4ccb.up.railway.app';
       function fmt(n) { if (n == null || isNaN(n)) return '—'; return Number(n).toFixed(2); }
@@ -279,6 +280,7 @@
               chgEl.textContent = (ch > 0 ? '▲ +' : ch < 0 ? '▼ ' : 'ـ ') + fmt(ch) + '%';
               chgEl.className = 'ocm-change ' + (ch > 0 ? 'up' : ch < 0 ? 'down' : 'flat');
             }
+            if (priceBox) priceBox.removeAttribute('data-pending');
           }).catch(function () {});
       }
       update();

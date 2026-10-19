@@ -1030,9 +1030,9 @@ window.openChart = function (code, name, market) {
       '<div class="ocm-row1">' +
       '<span class="ocm-title" id="ocm-title"></span>' +
       '<span class="ocm-code" id="ocm-code"></span>' +
-      '<span class="ocm-price" id="ocm-price">' +
-        '<span id="ocm-price-v">…</span>' +
-        '<span class="ocm-change" id="ocm-price-c">…</span>' +
+      '<span class="ocm-price" id="ocm-price" data-pending="1">' +
+        '<span id="ocm-price-v"></span>' +
+        '<span class="ocm-change" id="ocm-price-c"></span>' +
       '</span></div>' +
       '<div class="ocm-row2">' +
       '<span class="ocm-slot ocm-slot-search" id="ocm-pick"></span>' +
@@ -1129,6 +1129,7 @@ window.openChart = function (code, name, market) {
   function startPriceTicker(symbol) {
     var priceEl = document.getElementById('ocm-price-v');
     var chgEl = document.getElementById('ocm-price-c');
+    var priceBox = document.getElementById('ocm-price');
     if (!priceEl || !chgEl) return;
     function fmt(n) {
       if (n == null || isNaN(n)) return '—';
@@ -1151,6 +1152,7 @@ window.openChart = function (code, name, market) {
             chgEl.textContent = (ch > 0 ? '▲ +' : ch < 0 ? '▼ ' : 'ـ ') + fmt(ch) + '%';
             chgEl.className = 'ocm-change ' + (ch > 0 ? 'up' : ch < 0 ? 'down' : 'flat');
           }
+          if (priceBox) priceBox.removeAttribute('data-pending');
         }).catch(function () {});
     }
     update();
