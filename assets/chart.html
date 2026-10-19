@@ -262,7 +262,7 @@
       var codeEl = document.getElementById('ch-code');
       var priceBox = document.getElementById('ch-price-box');
       if (!priceEl) return;
-      var API = 'https://octa-prices-production-4ccb.up.railway.app';
+      var API = '';  /* same-origin: /api/stocks → worker proxy */
       function fmt(n) { if (n == null || isNaN(n)) return '—'; return Number(n).toFixed(2); }
       function update() {
         fetch(API + '/api/stocks', { credentials: 'omit' })

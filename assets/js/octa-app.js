@@ -1136,9 +1136,10 @@ window.openChart = function (code, name, market) {
       return Number(n).toFixed(2);
     }
     function update() {
-      var api = (typeof OCTA_API !== 'undefined' && OCTA_API) ||
-        'https://octa-prices-production-4ccb.up.railway.app';
-      fetch(api + '/api/stocks', { credentials: 'omit' })
+      /* 19 أكتوبر ٢٠٢٦ — same-origin: الـworker يعمل proxy.
+         يتفادى CORP same-site على الـAPI الأصلي. */
+      var api = '/api/stocks';
+      fetch(api, { credentials: 'omit' })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
           if (!d) return;
