@@ -972,7 +972,7 @@
      ⛌ requestFullscreen مش مدعوم في متصفحات كتير على الموبايل، فبنعمل
         fixed 100% + إخفاء كل حاجة تانية — ده اللي بيشتغل فعلاً. */
   function goldFullscreen() {
-    var box = document.getElementById('gmv-chart');
+    var box = goldChartHost();
     if (!box) return;
     if (box.classList.contains('gfull')) {
       box.classList.remove('gfull');
@@ -991,6 +991,10 @@
         try {
           box.style.setProperty('--gfull-h', window.innerHeight + 'px');
           if (TV_S && TV_S.resize) TV_S.resize();
+          /* ⛔ الإطار نفسه لازم ياخد الارتفاع الجديد */
+          var fr = box.querySelector('iframe.octa-tv-frame');
+          if (fr) { fr.style.height = '100%'; }
+          window.dispatchEvent(new Event('resize'));
         } catch (e) {}
       }, ms);
     });
@@ -1056,34 +1060,41 @@
   }
 
   var TV_S = null;
-  /* ⛔ 17 أكتوبر 2026 — وقفنا الـiframe بتاع TradingView.
-     ⛔ السبب: autosize مش بيشتغل على الموبايل (بيطلع ١٥٠ بكسل بس)،
-        وكل مرة بنضيف studies أو overrides كان بيتكسر التحميل بالكامل.
-     ✅ البديل: شارت canvas خالص (octa-chart-live.js):
-        · ١٠٠٪ على أي شاشة · خفيف · **بيقبل اللمس**: سحب + إصبعين للتكبير
-        · ألواننا نحن · مؤشرات: متوسطات ٥٠/٢٠٠ + شريط حجم + القوة النسبية
-     ⛔ نفس المصدر بالظبط: /api/gold/deep → bars
-     ⛔ ملاحظة: لو الـbasis فشل، الأسعار بتبقى آجلة مش مترجمة — والباك
-        بيعلّم tf[k]['translated'] وبينيقّل في الواجهة «خام». */
-  var TF_MAP = { '5': 'M5', '15': 'M15', '60': 'H1', 'D': 'D1' };
+  /* ✅ 19 أكتوبر 2026 — رجعنا لـTradingView، بس بالطريقة الصح.
+     ⛌ القديم: canvas بتاعنا (octa-chart.js) + iframe أبيض.
+     ⛌ الحل: نفس الـshim المستخدم في الفلتر وصفحة الشارت
+        (assets/js/tv-shim.js) → مصدر رسومات واحد للموقع كله.
+     ✅ OANDA:XAUUSD — الاسم بيبان عربي: «الذهب / دولار أمريكي». */
+  var GOLD_SYMBOL = 'OANDA:XAUUSD';
 
+  /* ⛔ المودال بتاع الذهب والمودال بتاع السهم بيستخدموا نفس الـid
+     (gmv-chart) — فلازم نلفّ على الحاوية جوّه مودال الذهب بس. */
+  function goldChartHost() {
+    var w = document.getElementById(ID);
+    if (!w) return null;
+    return w.querySelector('.gchart');
+  }
 
   function drawChart(interval) {
-    /* ✅ 18 أكتوبر 2026 — الشارت canvas بتاعنا (مش iframe).
-       ⛌ ليه مش TradingView iframe:
-          (١) autosize بيرجّع ١٥٠px على الموبايل (مصلحته بـheight صريح
-              بس الـCSP بيمنع طلباته الداخلية ⇒ أبيض)
-          (٢) مافيش حفظ للرسومات عندنا — أهم حاجة للمستخدم
-       ✅ المميزات: يشتغل ١٠٠٪ · بياناتنا الأصلية · قابل للحفظ · خفيف
-       📄 الملف: assets/js/octa-chart-live.js */
-    var tfMap = { '5': 'M5', '15': 'M15', '60': 'H1', 'D': 'D1' };
+    var host = goldChartHost();
+    if (!host) return;
     try {
-      if (window.octaChart) window.octaChart.setTf(tfMap[interval] || 'M15');
+      if (!window.OCTA_TV) return;
+      window.OCTA_TV.whenSized(host, function () {
+        window.OCTA_TV.mount(host, {
+          symbol: GOLD_SYMBOL,
+          interval: interval || '15',
+          link: false
+        });
+      });
     } catch (e) {}
   }
 
   function killChart() {
-    try { if (window.octaChart) window.octaChart.redraw(); } catch (e) { }
+    try {
+      var host = goldChartHost();
+      if (host) host.innerHTML = '';
+    } catch (e) { }
     TV_S = null;
   }
 

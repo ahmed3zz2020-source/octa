@@ -108,11 +108,16 @@ function openTradingView(code, name) {
   };
   const holder = wrap.querySelector('#tv-chart-holder');
   holder.innerHTML = '';
-  const s = document.createElement('script');
-  s.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-  s.async = true;
-  s.innerHTML = JSON.stringify(cfg);
-  holder.appendChild(s);
+  /* ✅ 19 أكتوبر 2026 — شارت TradingView واحد (tv-shim.js).
+     ⛌ القديم: s3.tradingview.com/external-embedding/... → widget
+        بيتولد ناقص ويفضل فاضي (∅) — نفس المشكلة في كل места. */
+  try {
+    window.OCTA_TV.whenSized(holder, function () {
+      window.OCTA_TV.mount(holder, { symbol: cfg.symbol, interval: '1D' });
+    });
+  } catch (e) {
+    holder.innerHTML = '<div class="si-empty">تعذر تحميل الرسم البياني</div>';
+  }
 }
 
 function lastCloseCell(a) {
@@ -3782,30 +3787,20 @@ function siTf(btn, res) {
 function siChart(res) {
   const host = document.getElementById('siChartHost');
   if (!host) return;
-  host.innerHTML = '';
-  const s = document.createElement('script');
-  s.src = 'https://s3.tradingview.com/tv.js';
-  s.async = true;
-  s.onload = () => {
-  try {
-  new TradingView.widget({
-  container_id: 'siChartHost',
-  symbol: 'EGX:' + SI_CODE,
-  interval: res,
-  theme: document.body.classList.contains('light') ? 'light' : 'dark',
-  style: '1', locale: 'ar', timezone: 'Africa/Cairo',
-  autosize: true, hide_side_toolbar: false,
-  allow_symbol_change: false,
-  studies: [
-  'RSI@tv-basicstudies', 'MACD@tv-basicstudies'
-  ],
-  withdateranges: true,
-  height: 420,
-  });
-  } catch (e) { host.innerHTML = '<div class="si-empty">تعذر تحميل الرسم البياني</div>'; }
+  /* ✅ 19 أكتوبر 2026 — نفس مصدر الرسومات الوحيد (tv-shim.js).
+     ⛌ القديم: s3.tradingview.com/tv.js → widget بيتولد ناقص ويفضل فاضي. */
+  const sym = 'EGX:' + (window.SI_CODE || '');
+  const paint = () => {
+    try {
+      window.OCTA_TV.mount(host, {
+        symbol: sym, interval: res || '1D', link: false, minHeight: 360
+      });
+    } catch (e) {
+      host.innerHTML = '<div class="si-empty">تعذر تحميل الرسم البياني</div>';
+    }
   };
-  s.onerror = () => { host.innerHTML = '<div class="si-empty">تعذر تحميل الرسم البياني — تحقق من الإنترنت</div>'; };
-  document.head.appendChild(s);
+  if (window.OCTA_TV && window.OCTA_TV.whenSized) window.OCTA_TV.whenSized(host, paint);
+  else paint();
 }
 
 /* ══════════ REDUNDANCY AUDIT ══════════ */

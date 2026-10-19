@@ -2435,13 +2435,37 @@ let bestPickSymbol = 'MFPC';
 function injectWidget(elementId, scriptFile, config, dataKey) {
   const el = document.getElementById(elementId);
   if (!el) return;
-  el.innerHTML = '';
-  const script = document.createElement('script');
-  script.src = 'https://s3.tradingview.com/external-embedding/' + scriptFile;
-  script.async = true;
-  script.setAttribute('data-bp', dataKey);
-  script.innerHTML = JSON.stringify(config);
-  el.appendChild(script);
+  /* ⛔ 19 أكتوبر 2026 — لازم الحاوية يكون ليها حجم قبل الحقن.
+     الـwidget لو اتولد جوه حاوية 0x0 (تبويب مخفي) بيطلع فاضي (∅)
+     ويفضل كده حتى بعد ما المستخدم يفتح التبويب.
+     ✅ الحل: نستنى لحد ما الحاوية تبان، وقتها الـwidget بيتولد صح. */
+  const doInject = () => {
+    if (!el.isConnected) return;
+    /* 🐙 شارت TradingView بييجي من tv-shim.js (نفس مصدر كل الرسومات).
+       سكربت s3 القديم كان بيطلع ∅ — من غير بيانات خالص. */
+    if (window.OCTA_TV && /advanced-chart/.test(scriptFile)) {
+      try {
+        window.OCTA_TV.mount(el, {
+          symbol: config.symbol,
+          interval: config.interval || '1D',
+          link: false
+        });
+        return;
+      } catch (e) { }
+    }
+    el.innerHTML = '';
+    const script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/external-embedding/' + scriptFile;
+    script.async = true;
+    script.setAttribute('data-bp', dataKey);
+    script.innerHTML = JSON.stringify(config);
+    el.appendChild(script);
+  };
+  if (window.OCTA_TV && window.OCTA_TV.whenSized) {
+    window.OCTA_TV.whenSized(el, doInject, { timeout: 30000, force: false });
+  } else {
+    doInject();
+  }
 }
 
 // ============ SCREENER ============
@@ -2799,10 +2823,31 @@ function renderEngineBars(scores, finalScore, extra) {
 function injectEngineWidget(elementId, scriptFile, config, dataKey) {
   const el = document.getElementById(elementId);
   if (!el) return;
-  const script = document.createElement('script');
-  script.src = 'https://s3.tradingview.com/external-embedding/' + scriptFile;
-  script.async = true;
-  script.setAttribute('data-engine-tv', dataKey);
-  script.innerHTML = JSON.stringify(config);
-  el.appendChild(script);
+  /* ⛔ نفس قاعدة injectWidget — الحاوية المخفية (0x0) بتولّد widget فاضي. */
+  const doInject = () => {
+    if (!el.isConnected) return;
+    /* 🐙 نفس القاعدة — شارت TradingView من tv-shim.js */
+    if (window.OCTA_TV && /advanced-chart/.test(scriptFile)) {
+      try {
+        window.OCTA_TV.mount(el, {
+          symbol: config.symbol,
+          interval: config.interval || '1D',
+          link: false
+        });
+        return;
+      } catch (e) { }
+    }
+    el.innerHTML = '';
+    const script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/external-embedding/' + scriptFile;
+    script.async = true;
+    script.setAttribute('data-engine-tv', dataKey);
+    script.innerHTML = JSON.stringify(config);
+    el.appendChild(script);
+  };
+  if (window.OCTA_TV && window.OCTA_TV.whenSized) {
+    window.OCTA_TV.whenSized(el, doInject, { timeout: 30000, force: false });
+  } else {
+    doInject();
+  }
 }

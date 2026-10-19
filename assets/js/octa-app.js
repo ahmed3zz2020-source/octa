@@ -980,12 +980,18 @@ function goFullAnalysis() {
    ⛌ دلوقتي: TradingView iframe بالظبط + زر يفتح نفس الأصل بره
       في تاب جديد (لحد ما الشارت الجديد يجهز).
    ⛌ fixCSP: الـiframe كان أبيض لأن الـCSP بيمنع طلباته الداخلية. */
-/* ✅ 18 أكتوبر 2026 — openChart بيفتح الشارت بتاعنا (canvas)
-   ⛌ والزر «افتح على TradingView ↗» بيفتح نفس الأصل في تاب جديد.
-   ⛌ الشارت canvas: assets/js/octa-chart-v2.js
-      · شموع · متوسطات · حجم · قوة نسبية · ٥ فريمات · سحب باللمس
-      · ⛔ مافيش أدوات رسم — دي جاي في شات «تطوير شارت OCTA»
-   ✅ واترفض: شارت الـcanvas أعز من iframe (iframe كان أبيض من الـCSP) */
+/* ✅ 19 أكتوبر 2026 — الشارت بقى TradingView واحد لكل الموقع.
+   ⛌ كان: canvas بتاعنا (octa-chart-v2.js) → «مفيش شموع» في الفلتر.
+   ⛌ السبب: الشارت كان بيتعمل على canvas من /api/candles، والـAPI
+      كان مش راجع للرمز ده → من غير شموع.
+   ✅ دلوقتي: shart TradingView واحد (assets/js/tv-shim.js) — نفس
+      المصدر اللي في صفحة الشارت وفي كارت الذهب. شموع + أدوات رسم. */
+/* ⛔ مودال الذهب ومودال السهم بيستخدموا نفس الـid (gmv-chart) —
+   فلازم نلفّ على الحاوية جوّه المودال بتاعنا بس. */
+function chartHost(modal) {
+  if (!modal) return null;
+  return modal.querySelector('.gchart');
+}
 window.openChart = function (code, name, market) {
   code = String(code || '').toUpperCase().trim();
   if (!code) return;
@@ -1033,15 +1039,21 @@ window.openChart = function (code, name, market) {
     var b = e.target.closest('[data-tf]'); if (!b) return;
     Array.prototype.forEach.call(tabs.querySelectorAll('.gtab'), function (x) { x.classList.remove('on'); });
     b.classList.add('on');
-    try { window.octaGoldChart.setStockTf(b.getAttribute('data-tf')); } catch (err) {}
+    try {
+      window.OCTA_TV.update(chartHost(m), {
+        symbol: sym, interval: b.getAttribute('data-tf'), link: false
+      });
+    } catch (err) {}
   };
 
-  /* ⛔ ارسم بالـcanvas بتاعنا — مش iframe */
+  /* ⛔ شارت TradingView — لازم الحاوية يكون ليها حجم قبل التركيب */
   setTimeout(function () {
     try {
-      window.octaGoldChart.init('gmv-chart', 'stock', code, 'D');
+      window.OCTA_TV.whenSized(chartHost(m), function () {
+        window.OCTA_TV.mount(chartHost(m), { symbol: sym, interval: '1D' });
+      });
     } catch (err) {
-      var g = document.getElementById('gmv-chart');
+      var g = chartHost(m);
       if (g) g.innerHTML = '<div class="gempty">الشارت مش متاح دلوقتي.</div>';
     }
   }, 60);
