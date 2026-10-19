@@ -66,8 +66,11 @@ async def main():
         await pg.screenshot(path=os.path.join(SHOT, "V2-search.png"))
         await pg.keyboard.press("Enter")
         await pg.wait_for_timeout(10000)
-        r["checks"]["afterSearch"] = await pg.evaluate("""()=>({code:document.getElementById('ocm-code').textContent,
-          iframe:(document.querySelector('#octaChartModal iframe')||{}).src||''})""")
+        r["checks"]["afterSearch"] = await pg.evaluate("""()=>{const c=document.getElementById('ocm-code');
+          return {code:c?c.textContent:'(لا يوجد)', modal: !!document.getElementById('octaChartModal'),
+                  goldOpen: !!document.getElementById('gmv'),
+                  pick:(document.querySelector('.octa-pick-in')||{}).value,
+                  iframe:(document.querySelector('#octaChartModal iframe')||{}).src||''};}""")
 
         # ③ قفل التمرير
         await pg.evaluate("()=>window.scrollTo(0,600)")
@@ -102,9 +105,10 @@ async def main():
         await pg.screenshot(path=os.path.join(SHOT, "V4-fs.png"))
         await pg.evaluate("()=>{var b=document.querySelector('.octa-tv-fs-exit');if(b)b.click()}")
         await pg.wait_for_timeout(2200)
-        r["checks"]["afterExit"] = await pg.evaluate("""()=>({off:!document.querySelector('.octa-tv-fs'),
+        r["checks"]["afterExit"] = await pg.evaluate("""()=>{const m=document.getElementById('octaChartModal');
+          return {off:!document.querySelector('.octa-tv-fs'),
           btnGone:!document.querySelector('.octa-tv-fs-exit'), unlocked:!document.body.classList.contains('octa-tv-fs-on'),
-          modal:document.getElementById('octaChartModal').style.display})""")
+          modal:m?m.style.display:'NO MODAL'};}""")
 
         r["errors"] = errs[:8]
         await b.close()

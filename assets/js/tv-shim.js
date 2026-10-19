@@ -91,19 +91,23 @@
      الـiframe بـheight:100% جوه حاوية ارتفاعها auto بيبقى قصير.
      نقيس ارتفاع الحاوية ونحطّه، ونتابع أي تغيّر في الحجم.
      reserve = عنصر جوّه نفس الحاوية (تلميح الإيماءة) لياخد مكانه. */
+  /* 🔴 قفل الرسم أثناء السحب (19 أكتوبر ٢٠٢٦).
+     أي تغيّر في ارتفاع الإطار أثناء رسم خط = TradingView بيعيد حساب
+     التخطيط = العلامة بتقف مكانها والرسم بيعلق.
+     ⛔ فبنمنع أي تغيير ارتفاع طالما إصبع المستخدم على الشاشة. */
   function fitToHost(f, host, reserve) {
     var last = -1;
-    function fit() {
+    function fit(force) {
       var extra = 0;
       if (reserve) { try { extra = reserve.offsetHeight || 0; } catch (e) { extra = 0; } }
       var h = host.clientHeight - extra;
-      if (h > 20 && h !== last) { last = h; f.style.height = h + 'px'; }
+      if (h > 20 && (h !== last || force)) { last = h; f.style.height = h + 'px'; }
     }
     f.__octaTvFit = fit;
-    fit();
+    fit(true);
     if (window.ResizeObserver) {
       try {
-        var ro = new ResizeObserver(function () { fit(); });
+        var ro = new ResizeObserver(function () { fit(false); });
         ro.observe(host);
         f.__octaTvRO = ro;
       } catch (e) {}
@@ -233,6 +237,9 @@
        وبتقف، والخط مش بيرسم. */
     f.style.cssText = 'display:block;width:100%;height:100%;border:0;' +
       'min-height:' + (o.minHeight || 300) + 'px;touch-action:none;overscroll-behavior:contain';
+    /* ⚠️ 19 أكتوبر ٢٠٢٦ — تجربة «قفل السلسلة + تجميد الارتفاع» اتشالت.
+       اتجرّبت وطلعت مالهاش أي تأثير على أدوات الرسم (نفس النتيجة بالحرف)،
+       وب كانت بتسيب مستمعات دايمة على document مع كل mount من غير تنظيف. */
     f.dataset.tvSymbol = sym;
     f.dataset.tvInterval = normIv(o.interval);
     host.appendChild(f);

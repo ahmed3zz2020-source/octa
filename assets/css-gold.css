@@ -781,10 +781,28 @@ body.ocm-open { overflow:hidden; }
 }
 /* على الموبايل: سطر مستقل فوق صف التحكّم — يضمن العرض الكامل */
 @media (max-width:640px) {
-  /* الاسم فوق، والرمز تحته — كده الاسم ياخد عرض السطر كله */
-  .ocm-titlewrap { flex: 1 1 100%; order: -1; flex-direction: column; align-items: flex-start; gap: 4px; }
-  .ocm-title, .ghead-t { flex: 0 0 auto; width: 100%; -webkit-line-clamp: 2; font-size: .78rem; }
+  .ocm-title, .ghead-t { font-size: .78rem; }
   .ocm-code { font-size: .66rem; padding: 2px 7px; }
+}
+/* ⭐ تخطيط الصفوف (طلب أحمد ١٩ أكتوبر ٢٠٢٦)
+   صف ١: الاسم + الرمز  |  صف ٢: السيرش + ⛶ + 📷 + × */
+.ocm-head, .ghead {
+  flex-direction: column; align-items: stretch; gap: 8px; flex-wrap: nowrap;
+  padding: 9px 12px;
+}
+.ocm-row1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ocm-row2 {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+}
+.ocm-row2 > * { flex: none; }
+.ocm-slot-search { flex: 1 1 auto !important; min-width: 0; display: flex; }
+.ocm-slot-search .octa-pick { flex: 1 1 auto; width: 100%; }
+.ocm-slot-shot { display: flex; align-items: center; }
+/* × و 📷 و ⛶ — نفس الحجم بالظبط و间距 منتظم */
+.ocm-fs, button.ocm-shot, .ocm-close {
+  width: 44px; height: 44px; flex: none;
+  border-radius: 11px; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1.05rem; line-height: 1; padding: 0; cursor: pointer;
 }
 /* 📷 زرار التصوير — جنب التكبير وقبل × */
 .ocm-shot { display: flex; align-items: center; }
@@ -808,13 +826,13 @@ button.ocm-shot:focus-visible { outline: 2px solid var(--gold, #d4af37); outline
   border-radius: 8px; padding: 4px 9px; direction: ltr; white-space: nowrap;
 }
 .ocm-fs {
-  flex: none; width: 40px; height: 40px; border-radius: 10px;
+  flex: none; border-radius: 11px;
   border: 1px solid var(--g-line, rgba(255,255,255,.09)); background: var(--pri3, #102a43);
-  color: var(--g-txt, #e8eef5); font-size: 1.15rem; line-height: 1; cursor: pointer;
+  color: var(--g-txt, #e8eef5); font-size: 1.05rem; line-height: 1; cursor: pointer;
 }
 .ocm-fs:hover { border-color: var(--g-gold-l, rgba(212,175,55,.55)); background: var(--pri3, #102a43); }
 .ocm-fs:focus-visible { outline: 2px solid var(--gold, #d4af37); outline-offset: 2px; }
-@media (max-width:640px) { .ocm-fs { width:44px; height:44px; } .ocm-code { font-size:.68rem; padding:3px 7px; } }
+.ocm-code { flex: none; }
 .ocm-tv { flex:none; display:inline-flex; align-items:center; gap:5px; min-height:40px;
   padding:0 13px; border-radius:9px; border:1px solid var(--g-gold-l);
   background:var(--goldBg); color:var(--g-gold); font-size:.78rem; font-weight:800;
@@ -825,3 +843,14 @@ button.ocm-shot:focus-visible { outline: 2px solid var(--gold, #d4af37); outline
 @media (max-width:640px) {
   .ocm-tv { font-size:.7rem; padding:0 9px; }
 }
+
+/* ⭐ توحيد أزرار الترويسة (⛶ 📷 ×) — نفس الحجم والمسافات بالظبط.
+   آخر الملف عشان تفوّق على أي قاعدة قبلها. */
+.ocm-head .ocm-row2 .ocm-fs,
+.ocm-head .ocm-row2 button.ocm-shot,
+.ocm-head .ocm-row2 .ocm-close {
+  width: 44px !important; height: 44px !important; flex: none;
+  border-radius: 11px !important; padding: 0;
+  display: inline-flex !important; align-items: center; justify-content: center;
+}
+.ocm-head .ocm-row2 { gap: 8px; }

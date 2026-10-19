@@ -1020,18 +1020,23 @@ window.openChart = function (code, name, market) {
        ⛌ اتشال: زرار «افتح على TradingView» (مش مطلوب).
        ⛌ اتشال: صف الفريمات (٥د/١٥د/ساعة/يوم/أسبوع) —
           TradingView عنده أزرار الفريم جوّه الرسمة نفسها. */
+    /* ⭐ تخطيط من صفين (طلب أحمد 19 أكتوبر ٢٠٢٦):
+       صف ١: الاسم العربي وبجانبه الرمز.
+       صف ٢: السيرش · التكبير · الاسكرين · × (بترتيب ثابت ومسافات منتظمة). */
     m.innerHTML =
       '<div class="ocm-back" data-close></div>' +
       '<div class="ocm-panel" role="dialog" aria-modal="true">' +
       '<div class="ocm-head">' +
-      '<span class="ocm-titlewrap">' +
+      '<div class="ocm-row1">' +
       '<span class="ocm-title" id="ocm-title"></span>' +
-      '<span class="ocm-code" id="ocm-code"></span></span>' +
-      '<span class="ocm-slot" id="ocm-pick"></span>' +
+      '<span class="ocm-code" id="ocm-code"></span></div>' +
+      '<div class="ocm-row2">' +
+      '<span class="ocm-slot ocm-slot-search" id="ocm-pick"></span>' +
       '<button class="ocm-fs" id="ocm-fs" type="button" aria-label="ملء الشاشة"' +
       ' title="ملء الشاشة">⛶</button>' +
-      '<span class="ocm-slot" id="ocm-shot"></span>' +
+      '<span class="ocm-slot ocm-slot-shot" id="ocm-shot"></span>' +
       '<button class="ocm-close" data-close aria-label="اقفل">✕</button></div>' +
+      '</div>' +
       '<div id="gmv-chart" class="gchart"></div>' +
       '</div>';
     document.body.appendChild(m);

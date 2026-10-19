@@ -986,14 +986,18 @@
     w.innerHTML =
       '<div class="gback" data-close></div>' +
       '<div class="gpanel" role="dialog" aria-modal="true" aria-label="تحليل الذهب">' +
-      '<div class="ghead"><div class="ghead-t" id="ghead-t">🥇 الذهب العالمي</div>' +
-      '<span class="octa-pick-slot" id="gpick"></span>' +
+      '<div class="ghead">' +
+      '<div class="ocm-row1"><div class="ghead-t" id="ghead-t">🥇 الذهب العالمي</div>' +
+      '<span class="ocm-code">OANDA:XAUUSD</span></div>' +
+      '<div class="ocm-row2">' +
+      '<span class="ocm-slot ocm-slot-search" id="gpick"></span>' +
       /* 🐙 19 أكتوبر ٢٠٢٦ — زر ⛶ في الترويسة (زي مودال السهم بالظبط).
          ⛔ القديم كان جوّه صف الفريمات وبيركّب مستمع جديد في كل مرة. */
       '<button class="ocm-fs" id="gfs-btn" type="button" aria-label="ملء الشاشة"' +
       ' title="ملء الشاشة">⛶</button>' +
-      '<span class="ocm-slot" id="gshot"></span>' +
-      '<button class="gclose" data-close aria-label="اقفل">✕</button></div>' +
+      '<span class="ocm-slot ocm-slot-shot" id="gshot"></span>' +
+      '<button class="gclose ocm-close" data-close aria-label="اقفل">✕</button>' +
+      '</div></div>' +
       '<div class="gbody"><div class="gload">🔄 بنجيب التحليل…</div></div>' +
       '</div>';
     document.body.appendChild(w);
