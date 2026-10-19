@@ -601,7 +601,10 @@ body.gfull-on .arms-filter, body.gfull-on #toolbar { display:none !important; }
 #gmv-chart { position: relative; }
 #gmv-chart .tradingview-widget-container,
 #gmv-chart .tradingview-widget-container__widget { height: 100% !important; width: 100% !important; }
-#gmv-chart iframe { display:block; border:0; height:100% !important; width:100% !important; min-height:100%; }
+/* ⛔ 19 أكتوبر ٢٠٢٦ — إطار tv-shim بيتحسب ارتفاعه بنفسه (عشان
+   يسيب مكان للتلميح تحت الشارت)، فممنوعاش نفرض عليه height !important. */
+#gmv-chart iframe:not(.octa-tv-frame) { display:block; border:0; height:100% !important; width:100% !important; min-height:100%; }
+#gmv-chart iframe.octa-tv-frame { display:block; border:0; width:100% !important; }
 
 /* ══════════════════════════════════════════════════════════════
    🔎 مستطيل البحث عن الأصول (١٩ أكتوبر ٢٠٢٦)
@@ -658,6 +661,21 @@ body.gfull-on .arms-filter, body.gfull-on #toolbar { display:none !important; }
 /* ⛔ قفل تمرير الصفحة — html + body مع بعض */
 html.octa-lock, html.octa-lock body { overflow: hidden !important; overscroll-behavior: contain !important; }
 
+/* 💡 التلميح جوه الحاوية — لازم الـiframe يسيبله مكان
+   (الحاوية بارتفاع ثابت، من غير كده التلميح بيروح بره الشاشة). */
+.gchart, #gmv-chart { overflow: hidden; }
+/* 💡 تلميح الإيماءة تحت الشارت */
+.octa-tv-hint {
+  display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center;
+  padding: 7px 4px 2px; font-size: .68rem; color: var(--muted, #8b9eb0);
+  line-height: 1.5;
+}
+.octa-tv-hint span { position: relative; }
+.octa-tv-hint span + span::before {
+  content: '•'; position: absolute; inset-inline-start: -9px; opacity: .55;
+}
+body.octa-tv-fs-on .octa-tv-hint { display: none; }   /* في ملء الشاشة مش محتاجه */
+
 /* ══════════════════════════════════════════════════════════════
    ⛶ ملء الشاشة — واحد للذهب والأسهم (١٩ أكتوبر ٢٠٢٦)
    ──────────────────────────────────────────────────────────────
@@ -696,7 +714,7 @@ body.octa-tv-fs-on .gmodal { overflow: hidden !important; overscroll-behavior: c
    الـiframe بياخد اللمسة (TradingView) والصفحة اللي وراه ماتتزحلقش. */
 .octa-chart-modal, .gmodal, .ocm-panel, .gbody { overscroll-behavior: contain; }
 .octa-chart-modal iframe, .gmodal iframe, .gchart iframe, #gmv-chart iframe {
-  touch-action: none; overscroll-behavior: contain;
+  overscroll-behavior: contain;
 }
 
 /* ═══ ⑬ مودال الشارت للسهم (١٨ أكتوبر ٢٠٢٦) ═══ */
@@ -709,7 +727,9 @@ body.octa-tv-fs-on .gmodal { overflow: hidden !important; overscroll-behavior: c
   display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.4); }
 .ocm-head { display:flex; align-items:center; gap:10px; padding:11px 13px;
   border-bottom:1px solid var(--g-line); font-weight:800; font-size:.95rem; color:var(--g-txt); }
-.ocm-head > span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* ⛔ 19 أكتوبر ٢٠٢٦ — استثنينا .ocm-title: Specificity أعلى من .ocm-title
+   فكان بيفرض nowrap+ellipsis والاسم بيتقصّ. */
+.ocm-head > span:not(.ocm-title) { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .ocm-close { width:40px; height:40px; flex:none; border-radius:9px; border:1px solid var(--g-line);
   background:var(--pri3); color:var(--g-txt); font-size:1.05rem; cursor:pointer; }
 .ocm-close:hover { border-color:var(--g-gold-l); }
@@ -736,7 +756,26 @@ body.ocm-open { overflow:hidden; }
   .ocm-panel { width:100vw; height:100dvh; height:100vh; border-radius:0; border:0; }
 }
 /* ⛔ 18 أكتوبر 2026 — زر «افتح على TradingView ↗» */
-.ocm-title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* ⛔ 19 أكتوبر ٢٠٢٦ — ⭐ الترويسة: اسم الشركة + الرمز + بحث + تكبير + ×
+   المطلوب: الاسم يظهر بالكامل (مش باقى ٣ نقط).
+   ✅ الحل: الاسم ياخد سطر كامل لوحده على الموبايل، ويلفّ على
+   سطرين على الشاشات الكبيرة. مفيش أي حاة تقصّه. */
+.ocm-head, .ghead { flex-wrap: wrap; align-items: center; row-gap: 7px; }
+.ocm-title, .ghead-t {
+  flex: 1 1 auto; min-width: 0;
+  white-space: normal;          /* ⛔ بدل nowrap — الاسم يلفّ */
+  overflow: visible; text-overflow: clip;
+  line-height: 1.32; font-weight: 800; font-size: .84rem;
+  overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+/* على الموبايل: سطر مستقل فوق صف التحكّم — يضمن العرض الكامل */
+@media (max-width:640px) {
+  .ocm-title, .ghead-t { flex: 1 1 100%; -webkit-line-clamp: 3; font-size: .8rem; order: -1; }
+}
+/* الذه: نفس المعاملة */
+.ghead-t { color: var(--g-gold-t); }
 /* 🐙 19 أكتوبر ٢٠٢٦ — اسم الشركة + الرمز + ⛶ (زي كارت الذهب بالظبط) */
 .ocm-code {
   flex: none; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .74rem;

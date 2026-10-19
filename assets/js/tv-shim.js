@@ -84,11 +84,14 @@
 
   /* ── خلّي الإطار等于 ارتفاع الحاوية بالظبط ──
      الـiframe بـheight:100% جوه حاوية ارتفاعها auto بيبقى قصير.
-     نقيس ارتفاع الحاوية ونحطّه، ونتابع أي تغيّر في الحجم. */
-  function fitToHost(f, host) {
+     نقيس ارتفاع الحاوية ونحطّه، ونتابع أي تغيّر في الحجم.
+     reserve = عنصر جوّه نفس الحاوية (تلميح الإيماءة) لياخد مكانه. */
+  function fitToHost(f, host, reserve) {
     var last = -1;
     function fit() {
-      var h = host.clientHeight;
+      var extra = 0;
+      if (reserve) { try { extra = reserve.offsetHeight || 0; } catch (e) { extra = 0; } }
+      var h = host.clientHeight - extra;
       if (h > 20 && h !== last) { last = h; f.style.height = h + 'px'; }
     }
     f.__octaTvFit = fit;
@@ -228,7 +231,19 @@
     f.dataset.tvSymbol = sym;
     f.dataset.tvInterval = normIv(o.interval);
     host.appendChild(f);
-    fitToHost(f, host);
+
+    /* 💡 تلميح الإيماءة — TradingView مش بيسمح بإيماءة سحب رأسي
+       نقي جوّه الشارت المتداخل (بتشتغل لما تبدأ بالعرضي الأول).
+       السطر ده بيقول للمستخدم الطريقة الصح بدل ما يتوه. */
+    var tip = null;
+    if (o.hint !== false) {
+      tip = document.createElement('div');
+      tip.className = 'octa-tv-hint';
+      tip.innerHTML = '<span>اسحب أفقياً على الشموع للتنقل في الزمن</span>' +
+        '<span>للتحرك في الأسعار: ابدأ السحب أفقياً ثم لفّ لفوق أو تحت</span>';
+      host.appendChild(tip);
+    }
+    fitToHost(f, host, tip);
 
     if (o.link !== false) host.appendChild(makeLink(sym));
 
