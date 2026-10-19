@@ -268,12 +268,12 @@
         fetch(API + '/api/stocks', { credentials: 'omit' })
           .then(function (r) { return r.ok ? r.json() : null; })
           .then(function (d) {
-            if (!d) return;
+            if (!d) { console.log('no d'); return; }
             var all = [].concat(d.egx30 || [], d.egx70 || [], d.egx33 || [], d.egx100 || [], d.amwal || [], d.dawabet || []);
             var cur = (symInput && symInput.value || 'COMI').toUpperCase();
             var stk = all.find(function (s) { return s && (s.code || '').toUpperCase() === cur; });
-            if (!stk) return;
-            if (titleEl) titleEl.textContent = '📈 ' + (stk.name || cur);
+            if (!stk) { console.log('no stk for', cur); return; }
+            console.log('upd', cur, stk.price, stk.change); if (titleEl) titleEl.textContent = '📈 ' + (stk.name || cur);
             if (priceEl) priceEl.textContent = fmt(stk.price) + ' EGP';
             if (chgEl) {
               var ch = stk.change;
