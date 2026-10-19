@@ -264,7 +264,7 @@
       if (!priceEl) return;
       var API = '';  /* same-origin: /api/stocks → worker proxy */
       function fmt(n) { if (n == null || isNaN(n)) return '—'; return Number(n).toFixed(2); }
-      function update() {
+      function update() { console.log('update tick');
         fetch(API + '/api/stocks', { credentials: 'omit' })
           .then(function (r) { return r.ok ? r.json() : null; })
           .then(function (d) {
@@ -283,6 +283,7 @@
             if (priceBox) priceBox.removeAttribute('data-pending');
           }).catch(function () {});
       }
+      console.log("init ticker");
       update();
       if (window.__chPriceTimer) clearInterval(window.__chPriceTimer);
       window.__chPriceTimer = setInterval(update, 15000);
