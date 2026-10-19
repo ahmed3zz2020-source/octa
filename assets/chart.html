@@ -83,6 +83,34 @@
       .wrap { padding: 12px 10px 30px; }
     }
   </style>
+  <style>
+    /* 19 أكتوبر ٢٠٢٦ — صف السعر اللحظي في ترويسة /chart */
+    .ocm-row1 {
+      display: flex; align-items: center; gap: 10px;
+      flex-wrap: wrap; margin-bottom: 12px;
+      background: var(--pri2, #0a1929);
+      border: 1px solid var(--line, rgba(255,255,255,.09));
+      border-radius: 12px; padding: 10px 14px;
+    }
+    .ocm-title { font-weight: 800; font-size: 1rem; color: var(--txt, #e8eef5); }
+    .ocm-code {
+      font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .78rem;
+      font-weight: 800; color: var(--gold, #d4af37);
+      background: var(--goldBg, rgba(212,175,55,.12));
+      border: 1px solid var(--goldLine, rgba(212,175,55,.32));
+      border-radius: 8px; padding: 3px 9px; direction: ltr;
+    }
+    .ocm-price {
+      display: inline-flex; align-items: baseline; gap: 6px;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 1.05rem; font-weight: 800; color: var(--txt, #e8eef5);
+      direction: ltr; margin-inline-start: auto;
+    }
+    .ocm-change { font-size: .78rem; padding: 2px 7px; border-radius: 6px; }
+    .ocm-change.up { background: rgba(20,180,90,.18); color: #2cd17e; }
+    .ocm-change.down { background: rgba(220,40,40,.18); color: #ff6e6e; }
+    .ocm-change.flat { background: rgba(150,150,150,.15); color: #b0b0b0; }
+  </style>
 </head>
 
 <body>
@@ -94,6 +122,12 @@
       <span class="sp"></span>
       <a class="btn" href="../index.html">رجوع للرئيسية</a>
     </header>
+
+    <div class="ocm-row1" id="chart-head">
+      <span class="ocm-title" id="ch-title">البنك التجاري الدولي - مصر</span>
+      <span class="ocm-code" id="ch-code">EGX:COMI</span>
+      <span class="ocm-price"><span id="ch-price-v">…</span><span class="ocm-change" id="ch-price-c">…</span></span>
+    </div>
 
     <div class="msg" id="msg" hidden></div>
 
@@ -217,6 +251,37 @@
       } catch (e) {}
 
       load('COMI');
+    })();
+
+    /* 19 أكتوبر ٢٠٢٦ — السعر اللحظي (legend) */
+    (function () {
+      var priceEl = document.getElementById('ch-price-v');
+      var chgEl = document.getElementById('ch-price-c');
+      var titleEl = document.getElementById('ch-title');
+      var codeEl = document.getElementById('ch-code');
+      if (!priceEl) return;
+      function fmt(n) { if (n == null || isNaN(n)) return '—'; return Number(n).toFixed(2); }
+      function update() {
+        fetch(API + '/api/stocks', { credentials: 'omit' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) {
+            if (!d) return;
+            var all = [].concat(d.egx30 || [], d.egx70 || [], d.egx33 || [], d.egx100 || [], d.amwal || [], d.dawabet || []);
+            var cur = (symInput && symInput.value || '').toUpperCase();
+            var stk = all.find(function (s) { return s && (s.code || '').toUpperCase() === cur; });
+            if (!stk) return;
+            if (titleEl) titleEl.textContent = '📈 ' + (stk.name || cur);
+            if (priceEl) priceEl.textContent = fmt(stk.price) + ' EGP';
+            if (chgEl) {
+              var ch = stk.change;
+              chgEl.textContent = (ch > 0 ? '▲ +' : ch < 0 ? '▼ ' : 'ـ ') + fmt(ch) + '%';
+              chgEl.className = 'ocm-change ' + (ch > 0 ? 'up' : ch < 0 ? 'down' : 'flat');
+            }
+          }).catch(function () {});
+      }
+      update();
+      if (window.__chPriceTimer) clearInterval(window.__chPriceTimer);
+      window.__chPriceTimer = setInterval(update, 15000);
     })();
   </script>
 
