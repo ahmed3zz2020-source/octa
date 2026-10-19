@@ -1080,6 +1080,13 @@ window.openChart = function (code, name, market) {
   /* ⭐ الرمز جنب الاسم — زي TradingView بالظبط */
   if (cEl) { cEl.textContent = sym; cEl.title = sym; }
 
+  /* 💰 19 أكتوبر ٢٠٢٦ (الجولة الثالثة) — شغّل تايكر السعر اللحظي.
+     بيحدّث العنصر مباشرة (مش من خلال loadChartSymbol). */
+  try { window.startPriceTicker && window.startPriceTicker(code); } catch (e1) {}
+  if (typeof startPriceTicker === 'function') {
+    try { startPriceTicker(code); } catch (e2) {}
+  }
+
   /* ⛔ لو كان ملء الشاشة مفتوح من قبل — اقفله قبل ما نعاود الرسم */
   try {
     if (window.OCTA_TV && window.OCTA_TV.isFullscreen(chartHost(m))) window.OCTA_TV.exitFullscreen();
