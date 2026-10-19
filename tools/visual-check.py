@@ -101,15 +101,48 @@ async def main():
             "hostIframes": await pg.evaluate("()=>{var m=document.getElementById('octaChartModal');var h=m&&m.querySelector('.gchart');return h?h.querySelectorAll('iframe.octa-tv-frame').length:-1;}"),
         }
 
-        # ── 2) تبديل الفريم ──
-        await pg.evaluate("()=>{var b=document.querySelector('#ocm-tabs [data-tf=\"15\"]');if(b)b.click();}")
-        await pg.wait_for_timeout(10000)
-        res["steps"]["filter_tf_switch"] = {
-            "shots": await shot(pg, "02b-filter-15m"),
-            "frames": await frames(pg, "filter-15m"),
+        # ── 2) ملء الشاشة على السهم + الخروج ──
+        await pg.evaluate("()=>{var b=document.getElementById('ocm-fs');if(b)b.click();}")
+        await pg.wait_for_timeout(6000)
+        res["steps"]["filter_fullscreen"] = {
+            "shots": await shot(pg, "02b-filter-fullscreen"),
+            "frames": await frames(pg, "filter-fs"),
+            "fsOn": await pg.evaluate("()=>!!document.querySelector('.octa-tv-fs')"),
+            "exitBtn": await pg.evaluate("()=>{var b=document.querySelector('.octa-tv-fs-exit');return b?b.textContent.trim():'MISSING';}"),
         }
+        await pg.evaluate("()=>{var b=document.querySelector('.octa-tv-fs-exit');if(b)b.click();}")
+        await pg.wait_for_timeout(2500)
+        res["steps"]["filter_fullscreen"]["afterExit"] = await pg.evaluate(
+            "()=>({fsOff:!document.querySelector('.octa-tv-fs'),btnGone:!document.querySelector('.octa-tv-fs-exit'),"
+            "unlocked:!document.body.classList.contains('octa-tv-fs-on'),modal:document.getElementById('octaChartModal').style.display})")
         await pg.evaluate("()=>{try{window.closeOctaChart()}catch(e){}}")
         await pg.wait_for_timeout(1500)
+
+        # ── 3) كارت الذهب ──
+        if "127.0.0.1" in BASE or "localhost" in BASE:
+            await pg.evaluate("()=>{try{window.OCTA_API='';}catch(e){}}")   # الـfailover بيعيد ضبطها
+        await pg.evaluate("()=>{try{if(window.OCTA_API!==undefined)window.OCTA_API='';}catch(e){} try{if(window.openGoldIntel)window.openGoldIntel();else if(window.openGold)window.openGold();}catch(e){window.__e2=String(e)}}")
+        await pg.wait_for_timeout(14000)
+        res["steps"]["gold"] = {
+            "shots": await shot(pg, "03-gold"),
+            "frames": await frames(pg, "gold"),
+            "err": await pg.evaluate("()=>window.__e2||''"),
+            "goldHost": await pg.evaluate("""()=>{var w=document.getElementById('gmv')||document.querySelector('.gmodal');
+              if(!w) return 'NO GOLD MODAL'; var h=w.querySelector('.gchart'); if(!h) return 'NO CHART HOST';
+              var r=h.getBoundingClientRect(); var f=h.querySelector('iframe.octa-tv-frame');
+              return 'host='+Math.round(r.width)+'x'+Math.round(r.height)+' iframe='+(f?(f.src||'').slice(0,60):'none');}"""),
+        }
+
+        # ── 1) فلتر الأسهم → مودال الشارت ──
+        await pg.evaluate("()=>{try{window.openChart('COMI','البنك التجاري الدولي','EGX')}catch(e){window.__e1=String(e)}}")
+        await pg.wait_for_timeout(12000)
+        res["steps"]["filter_chart"] = {
+            "shots": await shot(pg, "02-filter-chart"),
+            "frames": await frames(pg, "filter"),
+            "err": await pg.evaluate("()=>window.__e1||''"),
+            "hostIframes": await pg.evaluate("()=>{var m=document.getElementById('octaChartModal');var h=m&&m.querySelector('.gchart');return h?h.querySelectorAll('iframe.octa-tv-frame').length:-1;}"),
+        }
+
 
         # ── 4) تبويب المحرك (الـwidgets اللي كانت بتطلع ∅) ──
         await pg.evaluate("()=>{try{window.closeGold&&window.closeGold();}catch(e){}}")

@@ -91,6 +91,7 @@
       var h = host.clientHeight;
       if (h > 20 && h !== last) { last = h; f.style.height = h + 'px'; }
     }
+    f.__octaTvFit = fit;
     fit();
     if (window.ResizeObserver) {
       try {
@@ -99,6 +100,106 @@
         f.__octaTvRO = ro;
       } catch (e) {}
     }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     ⛶ ملء الشاشة — واحد للذهب والأسهم
+     ──────────────────────────────────────────────────────────────
+     ⛔ البتاعة الأولى كان فيها زرار خروج من غير ما يشتغل:
+        `#gmv-chart.gfull::after { pointer-events:none }` — يعني
+        مرسوم بس مش قابل للدوس. والنgage بيطلع المستخدم بره الشART.
+     ✅ هنا زرار حقيقي `<button>` بيتعمل وبيتشال، وقفل الصفحة
+        بيقفل معاه (مش زي ما كان بيتسجل في كل مرة). */
+  var FS_CLASS = 'octa-tv-fs';
+  var FS_BODY = 'octa-tv-fs-on';
+  var fsHost = null, fsExit = null, fsSaved = [];
+
+  function lockScroll(on) {
+    var i, s;
+    if (on) {
+      if (fsSaved.length) return;
+      var els = document.querySelectorAll('html, body, .gbody, .ocm-panel');
+      for (i = 0; i < els.length; i++) {
+        var el = els[i];
+        fsSaved.push({ el: el, o: el.style.overflow, os: el.style.overscrollBehavior });
+        el.style.overflow = 'hidden';
+        el.style.overscrollBehavior = 'contain';
+      }
+    } else {
+      for (i = 0; i < fsSaved.length; i++) {
+        s = fsSaved[i];
+        s.el.style.overflow = s.o;
+        s.el.style.overscrollBehavior = s.os;
+      }
+      fsSaved = [];
+    }
+  }
+
+  function refit(host) {
+    if (!host) return;
+    var f = host.querySelector('iframe.octa-tv-frame');
+    if (f && f.__octaTvFit) { try { f.__octaTvFit(); } catch (e) {} }
+  }
+
+  function makeExit() {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'octa-tv-fs-exit';
+    b.setAttribute('aria-label', 'اخرج من ملء الشاشة');
+    b.title = 'اخرج من ملء الشاشة';
+    b.textContent = '✕';
+    b.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      exitFullscreen();
+    });
+    return b;
+  }
+
+  function onFsKey(e) { if (e.key === 'Escape') exitFullscreen(); }
+
+  function fullscreen(host, onChange) {
+    if (typeof host === 'string') host = document.getElementById(host);
+    if (!host) return false;
+    if (fsHost === host) { exitFullscreen(); return false; }
+    fsHost = host;
+    host.classList.add(FS_CLASS);
+    document.body.classList.add(FS_BODY);
+    fsExit = makeExit();
+    document.body.appendChild(fsExit);
+    lockScroll(true);
+    document.addEventListener('keydown', onFsKey);
+    /* ندهِّر الشارت: نعيد القياس تلات مرات (TradingView محتاج فريم) */
+    [30, 220, 700].forEach(function (ms) {
+      setTimeout(function () {
+        refit(fsHost);
+        window.dispatchEvent(new Event('resize'));
+      }, ms);
+    });
+    if (typeof onChange === 'function') onChange(true);
+    return true;
+  }
+
+  function exitFullscreen() {
+    if (!fsHost) return;
+    var host = fsHost;
+    fsHost = null;
+    document.removeEventListener('keydown', onFsKey);
+    host.classList.remove(FS_CLASS);
+    document.body.classList.remove(FS_BODY);
+    if (fsExit && fsExit.parentNode) fsExit.parentNode.removeChild(fsExit);
+    fsExit = null;
+    lockScroll(false);
+    [30, 220].forEach(function (ms) {
+      setTimeout(function () {
+        refit(host);
+        window.dispatchEvent(new Event('resize'));
+      }, ms);
+    });
+  }
+
+  function isFullscreen(host) {
+    if (typeof host === 'string') host = document.getElementById(host);
+    return !!(host && fsHost === host);
   }
 
   /* ── التركيب: امسح القديم وحط الإطار ── */
@@ -118,8 +219,11 @@
     f.title = 'شارت TradingView — ' + sym;
     f.setAttribute('allowtransparency', 'true');
     f.setAttribute('scrolling', 'no');
+    /* ⛔ touch-action: none ← ده اللي بيمنع الصفحة اللي ورا الشارت
+       تتحرك لما المستخدم بيقرّب/بيسحب على الشموع. الـiframe نفسه
+       بيستقبل اللمسة TradingView. */
     f.style.cssText = 'display:block;width:100%;height:100%;border:0;' +
-      'min-height:' + (o.minHeight || 300) + 'px';
+      'min-height:' + (o.minHeight || 300) + 'px;touch-action:none;overscroll-behavior:contain';
     f.dataset.tvSymbol = sym;
     f.dataset.tvInterval = normIv(o.interval);
     host.appendChild(f);
@@ -207,6 +311,11 @@
     normSym: normSym,
     whenSized: whenSized,
     isLight: isLight,
+    /* ⛶ ملء الشاشة — للذهب والأسهم */
+    fullscreen: fullscreen,
+    exitFullscreen: exitFullscreen,
+    isFullscreen: isFullscreen,
+    refit: refit,
     ENDPOINT: ENDPOINT
   };
 

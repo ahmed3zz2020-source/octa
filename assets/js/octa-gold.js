@@ -867,17 +867,11 @@
       'المستويات' + (h.levels && h.levels.sl ? '' : '<span class="gsec-n">مراقبة — مفيش خطة دلوقتي</span>') +
       '</div>' + levelsBlock(h.levels, d) + '</div>';
 
-    /* ── الشارت ── */
-    h2 += '<div class="gsec"><div class="gsec-h"><span class="gsec-i">📊</span>الشارت</div>' +
-      '<div class="gtabs">' +
-      ['5', '15', '60', 'D'].map(function (i) {
-        return '<button class="gtab' + (i === '15' ? ' on' : '') +
-          '" data-int="' + i + '">' + ({ '5': '5د', '15': '15د', '60': 'ساعة', 'D': 'يوم' })[i] + '</button>';
-      }).join('') +
-      /* ⛔ 17 أكتوبر 2026 — زر ⛶ يفتح الشارت ملء الشاشة (زي شارت EMPC). */
-      '<button class="gfs" type="button" onclick="window.goldFullscreen&&window.goldFullscreen()" ' +
-      'aria-label="افتح الشارت بملء الشاشة" title="ملء الشاشة">⛶</button>' +
-      '</div>' +
+    /* ── الشارت ──
+       🐙 19 أكتوبر ٢٠٢٦ — صف الفريمات (٥د/١٥��/ساعة/يوم) اتشال:
+          TradingView عنده أزرار الفريم جوّه الرسمة نفسها.
+          وزر ⛶ اتنقل فوق في ترويسة المودال (جنب ×). */
+    h2 += '<div class="gsec">' +
       '<div id="gmv-chart" class="gchart"></div>' +
       '<div class="gnote">الشارت من TradingView — نفس مصدر بيانات الموقع.</div></div>';
 
@@ -967,47 +961,18 @@
   /* ══════════════════════════════════════════════════════════════════
      ⑤  المودال + الشارت
      ══════════════════════════════════════════════════════════════════ */
-  /* ═══ ⛶ ملء الشاشة (17 أكتوبر 2026) ═══
-     ⛔ طلب أحمد: الشارت يفتح ملء الشاشة على الموبايل زي شارت EMPC.
-     ⛌ requestFullscreen مش مدعوم في متصفحات كتير على الموبايل، فبنعمل
-        fixed 100% + إخفاء كل حاجة تانية — ده اللي بيشتغل فعلاً. */
+  /* ═══ ⛶ ملء الشاشة ═══
+     🐙 19 أكتوبر ٢٠٢٦ — بقى نفس التنفيذ بتاع tv-shim (اللي بيستخدمه
+        مودال السهم كمان) عشان كنا بنعمل نفس الحاجة مرتين.
+     ⛔ القديم كان بيرسم زرار الخروج بـ::after بـpointer-events:none
+        ⇒ مش شغال + Escape كان بيعمل مستمع جديد في كل مرة. */
   function goldFullscreen() {
     var box = goldChartHost();
     if (!box) return;
-    if (box.classList.contains('gfull')) {
-      box.classList.remove('gfull');
-      document.body.classList.remove('gfull-on');
-      if (TV_S && TV_S.resize) setTimeout(function () { try { TV_S.resize(); } catch (e) {} }, 60);
-      return;
-    }
-    box.classList.add('gfull');
-    document.body.classList.add('gfull-on');
-    /* ⛔ autosize مش بيتفاعل مع تغيّر الحجم المفاجئ ده.
-       الحل: نستنى فريم واحد، بعدين resize، بعدين مرة تانية بعد ٣٠٠ms
-       (TradingView بيحتاج ارتفاع ثابت قبل ما يرسم). */
-    var tries = [60, 320, 800];
-    tries.forEach(function (ms) {
-      setTimeout(function () {
-        try {
-          box.style.setProperty('--gfull-h', window.innerHeight + 'px');
-          if (TV_S && TV_S.resize) TV_S.resize();
-          /* ⛔ الإطار نفسه لازم ياخد الارتفاع الجديد */
-          var fr = box.querySelector('iframe.octa-tv-frame');
-          if (fr) { fr.style.height = '100%'; }
-          window.dispatchEvent(new Event('resize'));
-        } catch (e) {}
-      }, ms);
-    });
-    /* ⛔ لو الـiframe جوّه iframe جوّه — نحدّد الـcontainer تاني */
-    setTimeout(function () {
-      try {
-        var ifr = box.querySelector('iframe');
-        if (ifr && ifr.style) { ifr.style.width = '100%'; ifr.style.height = '100%'; }
-      } catch (e) {}
-    }, 200);
-    document.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Escape') goldFullscreen();
-    });
+    try {
+      if (window.OCTA_TV && window.OCTA_TV.isFullscreen(box)) window.OCTA_TV.exitFullscreen();
+      else if (window.OCTA_TV) window.OCTA_TV.fullscreen(box);
+    } catch (e) {}
   }
   window.goldFullscreen = goldFullscreen;
 
@@ -1021,7 +986,12 @@
     w.innerHTML =
       '<div class="gback" data-close></div>' +
       '<div class="gpanel" role="dialog" aria-modal="true" aria-label="تحليل الذهب">' +
-      '<div class="ghead"><div class="ghead-t">🥇 الذهب العالمي XAU/USD</div>' +
+      '<div class="ghead"><div class="ghead-t">🥇 الذهب العالمي</div>' +
+      '<span class="gcode">OANDA:XAUUSD</span>' +
+      /* 🐙 19 أكتوبر ٢٠٢٦ — زر ⛶ في الترويسة (زي مودال السهم بالظبط).
+         ⛔ القديم كان جوّه صف الفريمات وبيركّب مستمع جديد في كل مرة. */
+      '<button class="ocm-fs" id="gfs-btn" type="button" aria-label="ملء الشاشة"' +
+      ' title="ملء الشاشة">⛶</button>' +
       '<button class="gclose" data-close aria-label="اقفل">✕</button></div>' +
       '<div class="gbody"><div class="gload">🔄 بنجيب التحليل…</div></div>' +
       '</div>';
@@ -1030,14 +1000,18 @@
 
     w.addEventListener('click', function (e) {
       if (e.target.hasAttribute('data-close')) closeGold();
-      var tb = e.target.closest && e.target.closest('.gtab');
-      if (tb) {
-        w.querySelectorAll('.gtab').forEach(function (x) { x.classList.remove('on'); });
-        tb.classList.add('on');
-        drawChart(tb.getAttribute('data-int'));
-      }
+      /* ⛔ أزرار الفريم اتشالت — الـiframe لوحده هو اللي بيتحكم */
     });
     document.addEventListener('keydown', escClose);
+
+    /* ⛶ ملء الشاشة — نفس المودال بتاع السهم */
+    var fsBtn = document.getElementById('gfs-btn');
+    if (fsBtn) {
+      fsBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        try { window.OCTA_TV.fullscreen(goldChartHost()); } catch (err) {}
+      });
+    }
 
     getDeep(true).then(function (d) {
       var b = w.querySelector('.gbody');
@@ -1049,8 +1023,23 @@
       if (b) b.innerHTML = '<div class="gempty">فشل تحميل التقرير: ' + esc(err.message || err) + '</div>';
     });
   }
-  function escClose(e) { if (e.key === 'Escape') closeGold(); }
+  function escClose(e) {
+    /* ⛔ لو ملء الشاشة مفتوح — الـEscape يخرج منه بس (مش يقفل المودال).
+       مقاس الشارت هيبقى طبيعي تاني والدخول يبقى زي الأول. */
+    if (e.key !== 'Escape') return;
+    try {
+      if (window.OCTA_TV && window.OCTA_TV.isFullscreen(goldChartHost())) {
+        window.OCTA_TV.exitFullscreen();
+        return;
+      }
+    } catch (x) {}
+    closeGold();
+  }
   function closeGold() {
+    /* ⛔ اقفل ملء الشاشة الأول — عشان ما يفضلش شريط التمرير مقفول */
+    try {
+      if (window.OCTA_TV && window.OCTA_TV.isFullscreen(goldChartHost())) window.OCTA_TV.exitFullscreen();
+    } catch (e) {}
     var w = document.getElementById(ID);
     if (w) w.remove();
     document.body.style.overflow = '';

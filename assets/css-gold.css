@@ -152,6 +152,14 @@ body.light {
   flex: 0 0 auto;
 }
 .ghead-t { font-weight: 900; font-size: 1.02rem; color: var(--g-gold-t); }
+/* 🐙 19 أكتوبر ٢٠٢٦ — الرمز جنب اسم الذهب (زي مودال السهم) */
+.gcode {
+  flex: none; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .72rem;
+  font-weight: 800; color: var(--gold, #d4af37);
+  border: 1px solid var(--goldLine, rgba(212,175,55,.28)); background: var(--goldBg, rgba(212,175,55,.12));
+  border-radius: 8px; padding: 4px 9px; direction: ltr; white-space: nowrap;
+}
+@media (max-width:640px) { .gcode { font-size:.66rem; padding:3px 7px; } }
 .ghead-t small { font-weight: 700; font-size: .72rem; color: var(--muted); margin-inline-start: 6px; }
 .gclose {
   margin-inline-start: auto;
@@ -595,6 +603,47 @@ body.gfull-on .arms-filter, body.gfull-on #toolbar { display:none !important; }
 #gmv-chart .tradingview-widget-container__widget { height: 100% !important; width: 100% !important; }
 #gmv-chart iframe { display:block; border:0; height:100% !important; width:100% !important; min-height:100%; }
 
+/* ══════════════════════════════════════════════════════════════
+   ⛶ ملء الشاشة — واحد للذهب والأسهم (١٩ أكتوبر ٢٠٢٦)
+   ──────────────────────────────────────────────────────────────
+   ⛔ القديم كان `#gmv-chart.gfull::after` بـpointer-events:none
+      ⇒ زرار الخروج مرسوم بس مش شغال، والمستخدم بيتقفل جوّه.
+   ✅ دلوقتي: class على الحاوية + زرار `<button>` حقيقي من tv-shim.
+   ⛔ ملاحظة: `.ocm-panel #gmv-chart { height:auto !important }` أقوى
+      من `#gmv-chart.gfull` ⇒ لازم التحديد بالأخصSSIty الأعلى.
+   ══════════════════════════════════════════════════════════════ */
+.octa-tv-fs {
+  position: fixed !important; inset: 0 !important;
+  z-index: 2147483000 !important;
+  width: 100vw !important; height: 100dvh !important; height: 100vh !important;
+  border: 0 !important; border-radius: 0 !important; margin: 0 !important;
+  background: var(--pri4, #0b1220);
+}
+.octa-tv-fs > iframe.octa-tv-frame {
+  width: 100% !important; height: 100% !important; min-height: 100% !important;
+}
+/* ⛔ قفل الصفحة اللي ورا الشارت — عشان متبقاش بتتزحلقش وهي ملء الشاشة */
+body.octa-tv-fs-on, body.octa-tv-fs-on .gbody, body.octa-tv-fs-on .ocm-panel,
+body.octa-tv-fs-on .gmodal { overflow: hidden !important; overscroll-behavior: contain !important; }
+/* زرار الخروج — حقيقي وقابل للدوس */
+.octa-tv-fs-exit {
+  position: fixed; top: calc(10px + env(safe-area-inset-top)); inset-inline-start: 12px;
+  z-index: 2147483200; width: 44px; height: 44px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.28); background: rgba(12,20,33,.82);
+  color: #fff; font-size: 1.15rem; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.octa-tv-fs-exit:hover { background: rgba(30,41,59,.94); }
+.octa-tv-fs-exit:focus-visible { outline: 2px solid var(--gold, #d4af37); outline-offset: 2px; }
+
+/* ⛔ منع اسكرول الخلفية لما المستخدم بيسحب على الشارت:
+   الـiframe بياخد اللمسة (TradingView) والصفحة اللي وراه ماتتزحلقش. */
+.octa-chart-modal, .gmodal, .ocm-panel, .gbody { overscroll-behavior: contain; }
+.octa-chart-modal iframe, .gmodal iframe, .gchart iframe, #gmv-chart iframe {
+  touch-action: none; overscroll-behavior: contain;
+}
+
 /* ═══ ⑬ مودال الشارت للسهم (١٨ أكتوبر ٢٠٢٦) ═══ */
 .octa-chart-modal { position:fixed; inset:0; z-index:2147482000; display:none;
   align-items:center; justify-content:center; }
@@ -633,6 +682,21 @@ body.ocm-open { overflow:hidden; }
 }
 /* ⛔ 18 أكتوبر 2026 — زر «افتح على TradingView ↗» */
 .ocm-title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* 🐙 19 أكتوبر ٢٠٢٦ — اسم الشركة + الرمز + ⛶ (زي كارت الذهب بالظبط) */
+.ocm-code {
+  flex: none; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .74rem;
+  font-weight: 800; color: var(--gold, #d4af37); letter-spacing: .02em;
+  border: 1px solid var(--goldLine, rgba(212,175,55,.28)); background: var(--goldBg, rgba(212,175,55,.12));
+  border-radius: 8px; padding: 4px 9px; direction: ltr; white-space: nowrap;
+}
+.ocm-fs {
+  flex: none; width: 40px; height: 40px; border-radius: 10px;
+  border: 1px solid var(--g-line, rgba(255,255,255,.09)); background: var(--pri3, #102a43);
+  color: var(--g-txt, #e8eef5); font-size: 1.15rem; line-height: 1; cursor: pointer;
+}
+.ocm-fs:hover { border-color: var(--g-gold-l, rgba(212,175,55,.55)); background: var(--pri3, #102a43); }
+.ocm-fs:focus-visible { outline: 2px solid var(--gold, #d4af37); outline-offset: 2px; }
+@media (max-width:640px) { .ocm-fs { width:44px; height:44px; } .ocm-code { font-size:.68rem; padding:3px 7px; } }
 .ocm-tv { flex:none; display:inline-flex; align-items:center; gap:5px; min-height:40px;
   padding:0 13px; border-radius:9px; border:1px solid var(--g-gold-l);
   background:var(--goldBg); color:var(--g-gold); font-size:.78rem; font-weight:800;

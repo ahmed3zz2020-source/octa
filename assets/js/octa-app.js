@@ -1003,15 +1003,19 @@ window.openChart = function (code, name, market) {
     m = document.createElement('div');
     m.id = 'octaChartModal';
     m.className = 'octa-chart-modal';
+    /* 🐙 19 أكتوبر 2026 — الترويسة بقت: اسم الشركة + الرمز + ⛶ + ×
+       ⛌ اتشال: زرار «افتح على TradingView» (مش مطلوب).
+       ⛌ اتشال: صف الفريمات (٥د/١٥د/ساعة/يوم/أسبوع) —
+          TradingView عنده أزرار الفريم جوّه الرسمة نفسها. */
     m.innerHTML =
       '<div class="ocm-back" data-close></div>' +
       '<div class="ocm-panel" role="dialog" aria-modal="true">' +
       '<div class="ocm-head">' +
-      '<span class="ocm-title">📈 ' + esc(label) + '</span>' +
-      '<a class="ocm-tv" id="ocm-tv-open" target="_blank" rel="noopener"' +
-      ' title="افتح على TradingView في تاب جديد">افتح على TradingView ↗</a>' +
+      '<span class="ocm-title" id="ocm-title"></span>' +
+      '<span class="ocm-code" id="ocm-code"></span>' +
+      '<button class="ocm-fs" id="ocm-fs" type="button" aria-label="ملء الشاشة"' +
+      ' title="ملء الشاشة">⛶</button>' +
       '<button class="ocm-close" data-close aria-label="اقفل">✕</button></div>' +
-      '<div class="ocm-tabs" id="ocm-tabs"></div>' +
       '<div id="gmv-chart" class="gchart"></div>' +
       '</div>';
     document.body.appendChild(m);
@@ -1019,32 +1023,32 @@ window.openChart = function (code, name, market) {
       if (e.target.closest('[data-close]')) closeOctaChart();
     });
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && m.style.display === 'flex') closeOctaChart();
+      if (e.key === 'Escape' && m.style.display === 'flex' &&
+        !(window.OCTA_TV && window.OCTA_TV.isFullscreen(chartHost(m)))) {
+        closeOctaChart();
+      }
     });
+    var fsBtn = document.getElementById('ocm-fs');
+    if (fsBtn) {
+      fsBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        try { window.OCTA_TV.fullscreen(chartHost(m)); } catch (err) {}
+      });
+    }
   }
   m.style.display = 'flex';
   document.body.classList.add('ocm-open');
 
-  /* ⛔ الزر: نفس الأصل في TradingView */
-  document.getElementById('ocm-tv-open').href =
-    'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
+  /* الاسم + الرمز */
+  var tEl = document.getElementById('ocm-title');
+  var cEl = document.getElementById('ocm-code');
+  if (tEl) { tEl.textContent = '📈 ' + label; tEl.title = label; }
+  if (cEl) { cEl.textContent = sym; cEl.title = sym; }
 
-  /* الفريمات */
-  var TF = [['5', '٥د'], ['15', '١٥د'], ['60', 'ساعة'], ['D', 'يوم'], ['W', 'أسبوع']];
-  var tabs = document.getElementById('ocm-tabs');
-  tabs.innerHTML = TF.map(function (t) {
-    return '<button class="gtab' + (t[0] === 'D' ? ' on' : '') + '" data-tf="' + t[0] + '">' + t[1] + '</button>';
-  }).join('');
-  tabs.onclick = function (e) {
-    var b = e.target.closest('[data-tf]'); if (!b) return;
-    Array.prototype.forEach.call(tabs.querySelectorAll('.gtab'), function (x) { x.classList.remove('on'); });
-    b.classList.add('on');
-    try {
-      window.OCTA_TV.update(chartHost(m), {
-        symbol: sym, interval: b.getAttribute('data-tf'), link: false
-      });
-    } catch (err) {}
-  };
+  /* ⛔ لو كان ملء الشاشة مفتوح من قبل — اقفله قبل ما نعاود الرسم */
+  try {
+    if (window.OCTA_TV && window.OCTA_TV.isFullscreen(chartHost(m))) window.OCTA_TV.exitFullscreen();
+  } catch (e) {}
 
   /* ⛔ شارت TradingView — لازم الحاوية يكون ليها حجم قبل التركيب */
   setTimeout(function () {
@@ -1060,6 +1064,10 @@ window.openChart = function (code, name, market) {
 };
 window.closeOctaChart = function () {
   var m = document.getElementById('octaChartModal');
+  /* ⛔ لو ملء الشاشة مفتوح — اقفله الأول (عشان القفل ما يسيبش المستخدم نص الشاشة) */
+  try {
+    if (window.OCTA_TV && window.OCTA_TV.isFullscreen(chartHost(m))) window.OCTA_TV.exitFullscreen();
+  } catch (e) {}
   if (m) m.style.display = 'none';
   document.body.classList.remove('ocm-open');
   if (window.TV_STOCK) { try { window.TV_STOCK.remove(); } catch (e) {} window.TV_STOCK = null; }
