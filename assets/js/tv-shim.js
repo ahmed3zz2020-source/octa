@@ -219,11 +219,12 @@
     f.title = 'شارت TradingView — ' + sym;
     f.setAttribute('allowtransparency', 'true');
     f.setAttribute('scrolling', 'no');
-    /* ⛔ touch-action: none ← ده اللي بيمنع الصفحة اللي ورا الشارت
-       تتحرك لما المستخدم بيقرّب/بيسحب على الشموع. الـiframe نفسه
-       بيستقبل اللمسة TradingView. */
+    /* ⛔ ملاحظة: حطيناش touch-action:none هنا عن قصد.
+       القفل بيحصل من html/body overflow — وده أفضل من منع اللمسة
+       لأن المنع كان بيقفل حركات TradingView نفسها (زي التحرك الرأسي).
+       الـiframe ياخد اللمسة زي أي موقع تاني. */
     f.style.cssText = 'display:block;width:100%;height:100%;border:0;' +
-      'min-height:' + (o.minHeight || 300) + 'px;touch-action:none;overscroll-behavior:contain';
+      'min-height:' + (o.minHeight || 300) + 'px';
     f.dataset.tvSymbol = sym;
     f.dataset.tvInterval = normIv(o.interval);
     host.appendChild(f);
@@ -303,7 +304,266 @@
     }, 120);
   }
 
-  window.OCTA_TV = {
+  /* ══════════════════════════════════════════════════════════════
+     🔎 بحث الأصول — مستطيل البحث في ترويسة الشارت
+     ──────────────────────────────────────────────────────────────
+     ⛔ TradingView عنده endpoint للبحث بس راجع 403 من أي دومين،
+        فمبناش ن rely عليه. إحنا بنبحث في قائمة الأسهم عندنا
+        (286 سهم بأسمائهم العربية من OS_DB) + تمرير حر لأي رمز
+        تاني (NASDAQ:AAPL · OANDA:XAUUSD · EGX:MPRC).
+     ⭐ الميزة عن TradingView: بتكتب اسم الشركة بالعربي كمان —
+        «مدينه» بتلاقي مدينه الإنتاج الاعلامى.
+     ══════════════════════════════════════════════════════════════ */
+  var EXTRA_SYMBOLS = [
+    { code: 'XAUUSD', sym: 'OANDA:XAUUSD', name: 'الذهب / دولار أمريكي', sector: 'سلع' },
+    { code: 'XAGUSD', sym: 'OANDA:XAGUSD', name: 'الفضة / دولار أمريكي', sector: 'سلع' },
+    { code: 'EGX30', sym: 'EGX:EGX30', name: 'مؤشر EGX 30', sector: 'مؤشرات' },
+    { code: 'EGX70', sym: 'EGX:EGX70', name: 'مؤشر EGX 70', sector: 'مؤشرات' },
+    { code: 'EGX100', sym: 'EGX:EGX100', name: 'مؤشر EGX 100', sector: 'مؤشرات' },
+    { code: 'EGX33', sym: 'EGX:EGX33', name: 'مؤشر EGX 33', sector: 'مؤشرات' }
+  ];
+
+  function symbolList() {
+    var out = [], seen = {};
+    function add(sym, code, name, sector) {
+      var k = String(sym).toUpperCase();
+      if (seen[k]) return;
+      seen[k] = 1;
+      out.push({ sym: k, code: code || k.split(':')[1] || k, name: name || k, sector: sector || '' });
+    }
+    try {
+      var db = (typeof OS_DB !== 'undefined' && OS_DB) ? OS_DB : null;
+      if (db && db.length) {
+        for (var i = 0; i < db.length; i++) {
+          var s = db[i] || {};
+          if (s.code) add('EGX:' + s.code, s.code, s.name, s.sector);
+        }
+      }
+    } catch (e) {}
+    try {
+      var idx = (typeof EGX_SEARCH_INDEX !== 'undefined' && EGX_SEARCH_INDEX) ? EGX_SEARCH_INDEX : null;
+      if (idx && idx.length) {
+        for (var j = 0; j < idx.length; j++) {
+          var t = idx[j] || {};
+          if (t.code) add('EGX:' + t.code, t.code, t.name, t.sector);
+        }
+      }
+    } catch (e2) {}
+    for (var k2 = 0; k2 < EXTRA_SYMBOLS.length; k2++) {
+      var x = EXTRA_SYMBOLS[k2];
+      add(x.sym, x.code, x.name, x.sector);
+    }
+    return out;
+  }
+
+  function ar(s) {
+    /* بحث عربي بسيط: تشيل التشكيل وتوحّد الألف/الهاء/التاء */
+    return String(s || '')
+      .replace(/[ً-ْٰ]/g, '')
+      .replace(/[أإآٱ]/g, 'ا')
+      .replace(/ى/g, 'ي')
+      .replace(/ة/g, 'ه')
+      .replace(/[ؤئ]/g, 'ء')
+      .toLowerCase();
+  }
+
+  function searchSymbols(q, list, limit) {
+    var raw = String(q || '').trim();
+    if (!raw) return [];
+    var low = raw.toLowerCase();
+    var aq = ar(raw);
+    var res = [];
+    for (var i = 0; i < list.length; i++) {
+      var it = list[i];
+      var code = it.code.toLowerCase();
+      var name = ar(it.name);
+      var score = -1;
+      if (it.sym.toLowerCase() === low || code === low) score = 100;
+      else if (it.sym.toLowerCase().indexOf(low) === 0 || code.indexOf(low) === 0) score = 80;
+      else if (code.indexOf(low) >= 0) score = 60;
+      else if (aq && name.indexOf(aq) === 0) score = 55;
+      else if (aq && name.indexOf(aq) >= 0) score = 35;
+      else if (low.indexOf(code) === 0) score = 30;
+      if (score > 0) res.push({ it: it, s: score });
+    }
+    res.sort(function (a, b) { return b.s - a.s || a.it.code.length - b.it.code.length; });
+    return res.slice(0, limit || 8).map(function (r) { return r.it; });
+  }
+
+  function resolveSymbol(text) {
+    var t = String(text || '').trim();
+    if (!t) return null;
+    if (t.indexOf(':') > 0) {
+      var parts = t.split(':');
+      return { sym: parts[0].toUpperCase() + ':' + parts[1].toUpperCase(), code: parts[1].toUpperCase(), name: parts[0].toUpperCase() + ' · ' + parts[1].toUpperCase(), sector: '' };
+    }
+    var list = symbolList();
+    var m = searchSymbols(t, list, 1)[0];
+    if (m) return m;
+    return { sym: 'EGX:' + t.toUpperCase(), code: t.toUpperCase(), name: t.toUpperCase(), sector: '' };
+  }
+
+  function makePicker(opts) {
+    opts = opts || {};
+    var list = symbolList();
+
+    var wrap = document.createElement('div');
+    wrap.className = 'octa-pick';
+
+    var box = document.createElement('div');
+    box.className = 'octa-pick-box';
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'octa-pick-in';
+    input.dir = 'ltr';
+    input.setAttribute('aria-label', 'ابحث عن سهم أو أصل');
+    input.placeholder = opts.placeholder || 'ابحث عن سهم أو أصل…';
+    input.value = opts.value || '';
+
+    var icon = document.createElement('span');
+    icon.className = 'octa-pick-ic';
+    icon.textContent = '🔎';
+    icon.setAttribute('aria-hidden', 'true');
+
+    box.appendChild(icon);
+    box.appendChild(input);
+
+    var dd = document.createElement('div');
+    dd.className = 'octa-pick-dd';
+    dd.hidden = true;
+    /* ⛔ مهم: القائمة بتتمسّق بـdocument.body بـposition:fixed.
+       لو كانت جوّه المودال، الـiframe (TradingView) بيرسم فوقها
+       مهما الـz-index — سلوك طبقات في Chromium. */
+    document.body.appendChild(dd);
+
+    wrap.appendChild(box);
+
+    var cur = -1;
+
+    function place() {
+      var r = box.getBoundingClientRect();
+      dd.style.top = Math.round(r.bottom + 6) + 'px';
+      dd.style.left = 'auto';
+      dd.style.right = 'auto';
+      /* في RTL بنحاذي مع طرف المستطيل */
+      var w = dd.offsetWidth || 260;
+      var left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);
+      dd.style.left = Math.round(left) + 'px';
+    }
+
+    function close() { dd.hidden = true; cur = -1; }
+
+    function pick(it) {
+      input.value = it.sym;
+      close();
+      input.blur();
+      if (typeof opts.onChange === 'function') opts.onChange(it);
+    }
+
+    function paint(rows) {
+      dd.innerHTML = '';
+      if (!rows.length) {
+        var raw = input.value.trim();
+        if (!raw) { close(); return; }
+        var d = document.createElement('button');
+        d.type = 'button';
+        d.className = 'octa-pick-row';
+        d.innerHTML = '<b dir="ltr">' + esc(raw.toUpperCase()) + '</b><span>افتحه على TradingView</span>';
+        d.addEventListener('mousedown', function (e) { e.preventDefault(); pick(resolveSymbol(raw)); });
+        dd.appendChild(d);
+      } else {
+        rows.forEach(function (it, i) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'octa-pick-row' + (i === cur ? ' on' : '');
+          b.innerHTML = '<b dir="ltr">' + esc(it.code) + '</b><span>' + esc(it.name) +
+            '</span>' + (it.sector ? '<i>' + esc(it.sector) + '</i>' : '');
+          b.addEventListener('mousedown', function (e) { e.preventDefault(); pick(it); });
+          dd.appendChild(b);
+        });
+      }
+      dd.hidden = false;
+      place();
+    }
+
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+
+    input.addEventListener('input', function () {
+      cur = -1;
+      paint(searchSymbols(input.value, list, 8));
+    });
+    input.addEventListener('focus', function () {
+      paint(searchSymbols(input.value, list, 8));
+    });
+    input.addEventListener('blur', function () { setTimeout(close, 140); });
+    input.addEventListener('keydown', function (e) {
+      var rows = dd.querySelectorAll('.octa-pick-row');
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!rows.length) return;
+        cur += (e.key === 'ArrowDown' ? 1 : -1);
+        if (cur < 0) cur = rows.length - 1;
+        if (cur >= rows.length) cur = 0;
+        for (var i = 0; i < rows.length; i++) rows[i].classList.toggle('on', i === cur);
+        rows[cur].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (cur >= 0 && rows[cur]) { rows[cur].dispatchEvent(new MouseEvent('mousedown')); return; }
+        var v = input.value.trim();
+        if (v) pick(resolveSymbol(v));
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+        input.blur();
+      }
+    });
+
+    /* ⛌ تنظيف: لو المودال اتقفل والقائمة لسه مفتوحة — شيلها
+       عشان ما تفضلش معلقة على الشاشة. */
+    var obs = new MutationObserver(function () {
+      if (!document.body.contains(wrap) || document.hidden) {
+        if (dd.parentNode) dd.parentNode.removeChild(dd);
+        try { obs.disconnect(); } catch (e) {}
+      }
+    });
+    try { obs.observe(document.body, { childList: true }); } catch (e) {}
+
+    return {
+      el: wrap,
+      input: input,
+      setValue: function (sym) { input.value = sym || ''; },
+      focus: function () { try { input.focus(); input.select(); } catch (e) {} }
+    };
+  }
+
+  /* ═══ قفل تمرير الصفحة (html + body) ═══
+     ⛔ استخدمنا class في الأول — بس فيه كود في الموقع بيمسح
+        الـclasses من html/body فالقفل كان بيروح بعد ثانية.
+        ✅ inline styles أقوى: مفيش كود هيقدر يمسحها غيرنا. */
+  var pageLock = { on: false, prev: null };
+  function lockPage(on) {
+    var h = document.documentElement, b = document.body;
+    if (!h || !b) return;
+    if (on) {
+      if (pageLock.on) return;
+      pageLock.prev = { h: h.style.overflow, b: b.style.overflow };
+      h.style.overflow = 'hidden';
+      b.style.overflow = 'hidden';
+      pageLock.on = true;
+    } else if (pageLock.on) {
+      h.style.overflow = pageLock.prev ? pageLock.prev.h : '';
+      b.style.overflow = pageLock.prev ? pageLock.prev.b : '';
+      pageLock.prev = null;
+      pageLock.on = false;
+    }
+  }
+
+window.OCTA_TV = {
     mount: mount,
     update: update,
     buildUrl: buildUrl,
@@ -316,6 +576,11 @@
     exitFullscreen: exitFullscreen,
     isFullscreen: isFullscreen,
     refit: refit,
+    /* 🔎 بحث الأصول */
+    makePicker: makePicker,
+    symbolList: symbolList,
+    resolveSymbol: resolveSymbol,
+    lockPage: lockPage,
     ENDPOINT: ENDPOINT
   };
 

@@ -992,10 +992,23 @@ function chartHost(modal) {
   if (!modal) return null;
   return modal.querySelector('.gchart');
 }
+/* 🔎 اسم الشركة بالعربي من قاعدة الأسهم — عشان كل الفلاتر والأدوات
+   تفتح بنفس الطريقة حتى لو مانعتش الاسم. */
+function chartNameFor(code) {
+  var c = String(code || '').toUpperCase();
+  try {
+    if (typeof OS_DB !== 'undefined' && OS_DB && OS_DB.length) {
+      for (var i = 0; i < OS_DB.length; i++) {
+        if (OS_DB[i] && OS_DB[i].code === c) return OS_DB[i].name || c;
+      }
+    }
+  } catch (e) { }
+  return '';
+}
 window.openChart = function (code, name, market) {
   code = String(code || '').toUpperCase().trim();
   if (!code) return;
-  var label = name || code;
+  var label = name || chartNameFor(code) || code;
   var sym = 'EGX:' + code;
 
   var m = document.getElementById('octaChartModal');
@@ -1012,7 +1025,7 @@ window.openChart = function (code, name, market) {
       '<div class="ocm-panel" role="dialog" aria-modal="true">' +
       '<div class="ocm-head">' +
       '<span class="ocm-title" id="ocm-title"></span>' +
-      '<span class="ocm-code" id="ocm-code"></span>' +
+      '<span class="ocm-slot" id="ocm-pick"></span>' +
       '<button class="ocm-fs" id="ocm-fs" type="button" aria-label="ملء الشاشة"' +
       ' title="ملء الشاشة">⛶</button>' +
       '<button class="ocm-close" data-close aria-label="اقفل">✕</button></div>' +
@@ -1041,14 +1054,38 @@ window.openChart = function (code, name, market) {
 
   /* الاسم + الرمز */
   var tEl = document.getElementById('ocm-title');
-  var cEl = document.getElementById('ocm-code');
   if (tEl) { tEl.textContent = '📈 ' + label; tEl.title = label; }
-  if (cEl) { cEl.textContent = sym; cEl.title = sym; }
 
   /* ⛔ لو كان ملء الشاشة مفتوح من قبل — اقفله قبل ما نعاود الرسم */
   try {
     if (window.OCTA_TV && window.OCTA_TV.isFullscreen(chartHost(m))) window.OCTA_TV.exitFullscreen();
   } catch (e) {}
+
+  /* 🔎 مستطيل البحث — يتعمل مرة واحدة ويتحدّث في كل فتح */
+  var slot = document.getElementById('ocm-pick');
+  if (slot && window.OCTA_TV && window.OCTA_TV.makePicker) {
+    if (!window.__octaChartPick) {
+      window.__octaChartPick = window.OCTA_TV.makePicker({
+        value: sym,
+        onChange: function (it) { loadChartSymbol(it); }
+      });
+      slot.appendChild(window.__octaChartPick.el);
+    } else {
+      window.__octaChartPick.setValue(sym);
+    }
+  }
+
+  function loadChartSymbol(it) {
+    if (!it || !it.sym) return;
+    var t = document.getElementById('ocm-title');
+    if (t) { t.textContent = '📈 ' + (it.name || it.code); t.title = it.name || it.code; }
+    window.OCTA_TV.whenSized(chartHost(m), function () {
+      window.OCTA_TV.mount(chartHost(m), { symbol: it.sym, interval: '1D' });
+    });
+  }
+
+  /* ⛔ قفل تمرير الصفحة (html + body) عشان متبقاش بتتزحلقش ورا المودال */
+  try { if (window.OCTA_TV) window.OCTA_TV.lockPage(true); } catch (e2) {}
 
   /* ⛔ شارت TradingView — لازم الحاوية يكون ليها حجم قبل التركيب */
   setTimeout(function () {
@@ -1070,6 +1107,7 @@ window.closeOctaChart = function () {
   } catch (e) {}
   if (m) m.style.display = 'none';
   document.body.classList.remove('ocm-open');
+  try { if (window.OCTA_TV) window.OCTA_TV.lockPage(false); } catch (e2) {}
   if (window.TV_STOCK) { try { window.TV_STOCK.remove(); } catch (e) {} window.TV_STOCK = null; }
 };
 

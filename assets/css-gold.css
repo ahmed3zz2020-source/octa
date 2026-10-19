@@ -604,6 +604,61 @@ body.gfull-on .arms-filter, body.gfull-on #toolbar { display:none !important; }
 #gmv-chart iframe { display:block; border:0; height:100% !important; width:100% !important; min-height:100%; }
 
 /* ══════════════════════════════════════════════════════════════
+   🔎 مستطيل البحث عن الأصول (١٩ أكتوبر ٢٠٢٦)
+   ──────────────────────────────────────────────────────────────
+   ⭐ المستخدم يكتب رمز السهم أو جزء من اسمه بالعربي، والشارت
+      بيتحمّل أوتوماتيك. الميزة دي مش موجودة في TradingView نفسه.
+   ══════════════════════════════════════════════════════════════ */
+.octa-pick { position: relative; flex: 0 1 auto; min-width: 0; }
+/* ⛔ لازم الترويسة فوق الـiframe (الـiframe بيغطي أي حاجة
+   مجردة من الـz-index — جرّبنا: القائمة كانت مختفية وراه). */
+.ocm-head, .ghead { position: relative; z-index: 12; }
+.octa-pick-box {
+  display: flex; align-items: center; gap: 7px;
+  border: 1px solid var(--goldLine, rgba(212,175,55,.28));
+  background: var(--goldBg, rgba(212,175,55,.10));
+  border-radius: 10px; padding: 0 11px; height: 42px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.octa-pick-box:focus-within {
+  border-color: var(--gold, #d4af37);
+  box-shadow: 0 0 0 3px rgba(212,175,55,.16);
+}
+.octa-pick-ic { font-size: .95rem; line-height: 1; opacity: .85; flex: none; }
+.octa-pick-in {
+  border: 0; background: transparent; color: var(--g-txt, #e8eef5);
+  font: 800 .82rem/1 ui-monospace, Menlo, Consolas, monospace;
+  letter-spacing: .02em; min-width: 92px; width: 100%; height: 40px;
+  outline: none; text-align: left;
+}
+.octa-pick-in::placeholder { color: var(--muted, #8b9eb0); font-weight: 600; }
+.octa-pick-dd {
+  position: fixed; top: 0;
+  min-width: 180px; width: max-content; max-width: min(84vw, 340px);
+  background: var(--pri2, #0d2137); border: 1px solid var(--g-line, rgba(255,255,255,.09));
+  border-radius: 12px; box-shadow: 0 18px 44px rgba(0,0,0,.45);
+  overflow: hidden; z-index: 2147483100; max-height: 58vh; overflow-y: auto;
+}
+.octa-pick-row {
+  display: flex; align-items: baseline; gap: 9px; width: 100%;
+  padding: 10px 12px; background: transparent; border: 0; cursor: pointer;
+  color: var(--g-txt, #e8eef5); text-align: start; font-family: inherit;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.octa-pick-row:last-child { border-bottom: 0; }
+.octa-pick-row:hover, .octa-pick-row.on { background: var(--goldBg, rgba(212,175,55,.14)); }
+.octa-pick-row b { font: 800 .82rem/1.2 ui-monospace, Menlo, Consolas, monospace; color: var(--gold, #d4af37); flex: none; }
+.octa-pick-row span { font-size: .78rem; color: var(--g-txt, #e8eef5); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.octa-pick-row i { font-style: normal; font-size: .68rem; color: var(--muted, #8b9eb0); margin-inline-start: auto; flex: none; }
+@media (max-width:640px) {
+  .octa-pick { flex: 1 1 130px; }
+  .octa-pick-in { min-width: 74px; font-size: .76rem; }
+  .octa-pick-box { height: 44px; padding: 0 9px; }
+}
+/* ⛔ قفل تمرير الصفحة — html + body مع بعض */
+html.octa-lock, html.octa-lock body { overflow: hidden !important; overscroll-behavior: contain !important; }
+
+/* ══════════════════════════════════════════════════════════════
    ⛶ ملء الشاشة — واحد للذهب والأسهم (١٩ أكتوبر ٢٠٢٦)
    ──────────────────────────────────────────────────────────────
    ⛔ القديم كان `#gmv-chart.gfull::after` بـpointer-events:none

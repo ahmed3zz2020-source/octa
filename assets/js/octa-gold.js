@@ -986,8 +986,8 @@
     w.innerHTML =
       '<div class="gback" data-close></div>' +
       '<div class="gpanel" role="dialog" aria-modal="true" aria-label="تحليل الذهب">' +
-      '<div class="ghead"><div class="ghead-t">🥇 الذهب العالمي</div>' +
-      '<span class="gcode">OANDA:XAUUSD</span>' +
+      '<div class="ghead"><div class="ghead-t" id="ghead-t">🥇 الذهب العالمي</div>' +
+      '<span class="octa-pick-slot" id="gpick"></span>' +
       /* 🐙 19 أكتوبر ٢٠٢٦ — زر ⛶ في الترويسة (زي مودال السهم بالظبط).
          ⛔ القديم كان جوّه صف الفريمات وبيركّب مستمع جديد في كل مرة. */
       '<button class="ocm-fs" id="gfs-btn" type="button" aria-label="ملء الشاشة"' +
@@ -1012,6 +1012,27 @@
         try { window.OCTA_TV.fullscreen(goldChartHost()); } catch (err) {}
       });
     }
+
+    /* 🔎 مستطيل البحث — نفس بتاع مودال السهم */
+    var gslot = document.getElementById('gpick');
+    if (gslot && window.OCTA_TV && window.OCTA_TV.makePicker) {
+      var gt = document.getElementById('ghead-t');
+      var gPick = window.OCTA_TV.makePicker({
+        value: GOLD_SYMBOL,
+        onChange: function (it) {
+          if (!it || !it.sym) return;
+          if (gt) { gt.textContent = '📈 ' + (it.name || it.code); gt.title = it.name || it.code; }
+          var h = goldChartHost();
+          if (!h) return;
+          window.OCTA_TV.whenSized(h, function () {
+            window.OCTA_TV.mount(h, { symbol: it.sym, interval: '15', link: false });
+          });
+        }
+      });
+      gslot.appendChild(gPick.el);
+    }
+    /* ⛔ قفل تمرير الصفحة */
+    try { if (window.OCTA_TV) window.OCTA_TV.lockPage(true); } catch (e) {}
 
     getDeep(true).then(function (d) {
       var b = w.querySelector('.gbody');
@@ -1042,6 +1063,8 @@
     } catch (e) {}
     var w = document.getElementById(ID);
     if (w) w.remove();
+    /* ⛔ فكّ القفل الأول وبعدين نظّف الـstyle بتاع الذهب */
+    try { if (window.OCTA_TV) window.OCTA_TV.lockPage(false); } catch (e2) {}
     document.body.style.overflow = '';
     document.removeEventListener('keydown', escClose);
     killChart();
