@@ -84,14 +84,26 @@
     }
   </style>
   <style>
-    /* 19 أكتوبر ٢٠٢٦ — صف السعر اللحظي في ترويسة /chart */
-    .ocm-row1 {
-      display: flex; align-items: center; gap: 10px;
-      flex-wrap: wrap; margin-bottom: 12px;
+    /* 19 أكتوبر ٢٠٢٦ — ترويسة /chart موحّدة مع المودال (UTOP) */
+    .ocm-head {
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 11px 13px;
       background: var(--pri2, #0a1929);
-      border: 1px solid var(--line, rgba(255,255,255,.09));
-      border-radius: 12px; padding: 10px 14px;
+      border-bottom: 1px solid var(--line, rgba(255,255,255,.09));
+      margin: -16px -14px 12px;
     }
+    .ocm-row1 {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      min-width: 0;
+    }
+    .ocm-row1 .ocm-price {
+      display: inline-flex; align-items: baseline; gap: 4px;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: .86rem; font-weight: 800; color: var(--txt, #e8eef5);
+      direction: ltr; margin-inline-start: auto; flex: none;
+    }
+    .ocm-row1 .ocm-price:empty,
+    .ocm-row1 .ocm-price[data-pending="1"] { display: none; }
     .ocm-title { font-weight: 800; font-size: 1rem; color: var(--txt, #e8eef5); }
     .ocm-code {
       font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .78rem;
@@ -100,56 +112,46 @@
       border: 1px solid var(--goldLine, rgba(212,175,55,.32));
       border-radius: 8px; padding: 3px 9px; direction: ltr;
     }
-    .ocm-price {
-      display: inline-flex; align-items: baseline; gap: 6px;
-      font-family: ui-monospace, Menlo, Consolas, monospace;
-      font-size: 1.05rem; font-weight: 800; color: var(--txt, #e8eef5);
-      direction: ltr; margin-inline-start: auto;
-    }
-    .ocm-change { font-size: .78rem; padding: 2px 7px; border-radius: 6px; }
+    .ocm-change { font-size: .68rem; padding: 1px 5px; border-radius: 6px; }
     .ocm-change.up { background: rgba(20,180,90,.18); color: #2cd17e; }
     .ocm-change.down { background: rgba(220,40,40,.18); color: #ff6e6e; }
     .ocm-change.flat { background: rgba(150,150,150,.15); color: #b0b0b0; }
+    .ocm-row2 {
+      display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap;
+    }
+    .ocm-row2 > * { flex: none; }
+    .ocm-slot-search { flex: 1 1 auto !important; min-width: 0; display: flex; gap: 6px; align-items: center; }
+    .ocm-slot-search .inp { flex: 1; min-width: 0; }
   </style>
 </head>
 
 <body>
   <div class="wrap">
 
-    <div class="ocm-row1" id="chart-head">
-      <span class="ocm-title" id="ch-title">البنك التجاري الدولي - مصر</span>
-      <span class="ocm-code" id="ch-code">EGX:COMI</span>
-      <span class="ocm-price" id="ch-price-box" data-pending="1"><span id="ch-price-v"></span><span class="ocm-change" id="ch-price-c"></span></span>
-      <a class="btn" id="ch-back" href="../index.html" style="margin-inline-start:auto">رجوع</a>
+    <div class="ocm-head" id="chart-head">
+      <div class="ocm-row1">
+        <span class="ocm-title" id="ch-title">البنك التجاري الدولي - مصر</span>
+        <span class="ocm-code" id="ch-code">EGX:COMI</span>
+        <span class="ocm-price" id="ch-price-box" data-pending="1"><span id="ch-price-v"></span><span class="ocm-change" id="ch-price-c"></span></span>
+      </div>
+      <div class="ocm-row2">
+        <span class="ocm-slot ocm-slot-search" id="ch-pick">
+          <input id="sym" class="inp" type="text" list="stock-list" placeholder="COMI" maxlength="12"
+            value="COMI" autocomplete="off" spellcheck="false" dir="ltr">
+          <datalist id="stock-list"></datalist>
+          <button class="btn main" id="go" type="button">تحميل</button>
+        </span>
+        <span class="ocm-slot ocm-fs-row" id="ch-fs-row" style="display:flex;gap:6px">
+          <a class="btn main" id="ch-tv" href="https://www.tradingview.com/chart/?symbol=EGX%3ACOMI" target="_blank" rel="noopener noreferrer" style="padding:9px 14px">⛶ افتح TradingView</a>
+          <a class="btn" id="ch-back" href="../index.html">رجوع</a>
+        </span>
+      </div>
     </div>
 
     <div class="msg" id="msg" hidden></div>
 
-    <div class="bar">
-      <div class="group">
-        <label class="glabel" for="sym">كود السهم</label>
-        <input id="sym" class="inp" type="text" list="stock-list" placeholder="COMI" maxlength="12"
-          value="COMI" autocomplete="off" spellcheck="false" dir="ltr">
-        <datalist id="stock-list"></datalist>
-        <button class="btn main" id="go" type="button">تحميل</button>
-      </div>
-      <div class="group" role="group" aria-label="الفريم الزمني">
-        <span class="glabel">الفريم</span>
-        <button class="btn" type="button" data-tf="5">٥د</button>
-        <button class="btn" type="button" data-tf="15">١٥د</button>
-        <button class="btn" type="button" data-tf="60">ساعة</button>
-        <button class="btn" type="button" data-tf="1D" aria-pressed="true">يوم</button>
-        <button class="btn" type="button" data-tf="1W">أسبوع</button>
-        <button class="btn" type="button" data-tf="1M">شهر</button>
-      </div>
-    </div>
-
     <div class="chartbox">
       <div class="charthost" id="chart"></div>
-    </div>
-
-    <div class="tvbar">
-      <a class="btn main" id="ch-tv" href="https://www.tradingview.com/chart/?symbol=EGX%3ACOMI" target="_blank" rel="noopener noreferrer">⛶ افتح في TradingView (الرسم الكامل)</a>
     </div>
 
     <div class="tvbar">
@@ -208,7 +210,10 @@
         symInput.value = sym.indexOf(':') > 0 ? sym.split(':')[1] : sym;
         if (codeEl) codeEl.textContent = sym;
         var chTv = document.getElementById('ch-tv');
-        if (chTv) chTv.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
+        if (chTv) {
+          chTv.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
+          chTv.target = '_blank';
+        }
         try {
           window.OCTA_TV.whenSized(host, function () {
             window.OCTA_TV.mount(host, { symbol: sym, interval: tf });
