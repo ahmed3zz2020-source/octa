@@ -211,6 +211,7 @@
         if (!sym) { say('اكتب كود السهم الأول.'); return; }
         say('');
         symInput.value = sym.indexOf(':') > 0 ? sym.split(':')[1] : sym;
+        if (codeEl) codeEl.textContent = sym;
         tvLink.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
         try {
           window.OCTA_TV.whenSized(host, function () {
@@ -260,6 +261,7 @@
       var titleEl = document.getElementById('ch-title');
       var codeEl = document.getElementById('ch-code');
       if (!priceEl) return;
+      var API = 'https://octa-prices-production-4ccb.up.railway.app';
       function fmt(n) { if (n == null || isNaN(n)) return '—'; return Number(n).toFixed(2); }
       function update() {
         fetch(API + '/api/stocks', { credentials: 'omit' })
