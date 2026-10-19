@@ -116,17 +116,11 @@
 <body>
   <div class="wrap">
 
-    <header class="head">
-      <h1>شارت <span dir="ltr">OCTA</span></h1>
-      <span class="tag">تحليل فني · البورصة المصرية</span>
-      <span class="sp"></span>
-      <a class="btn" href="../index.html">رجوع للرئيسية</a>
-    </header>
-
     <div class="ocm-row1" id="chart-head">
       <span class="ocm-title" id="ch-title">البنك التجاري الدولي - مصر</span>
       <span class="ocm-code" id="ch-code">EGX:COMI</span>
       <span class="ocm-price" id="ch-price-box" data-pending="1"><span id="ch-price-v"></span><span class="ocm-change" id="ch-price-c"></span></span>
+      <a class="btn" id="ch-back" href="../index.html" style="margin-inline-start:auto">رجوع</a>
     </div>
 
     <div class="msg" id="msg" hidden></div>
@@ -155,13 +149,14 @@
     </div>
 
     <div class="tvbar">
+      <a class="btn main" id="ch-tv" href="https://www.tradingview.com/chart/?symbol=EGX%3ACOMI" target="_blank" rel="noopener noreferrer">⛶ افتح في TradingView (الرسم الكامل)</a>
+    </div>
+
+    <div class="tvbar">
       <span class="src">المصدر: TradingView · بيانات البورصة المصرية (EGX)</span>
     </div>
 
     <footer class="foot">
-      <a id="tv" href="https://www.tradingview.com/chart/" target="_blank" rel="noopener noreferrer">
-        افتح في <span dir="ltr">TradingView</span> (مقارنة)
-      </a>
       <span>تصميم وتنفيذ المهندس أحمد عز</span>
     </footer>
 
@@ -214,6 +209,8 @@
         symInput.value = sym.indexOf(':') > 0 ? sym.split(':')[1] : sym;
         if (codeEl) codeEl.textContent = sym;
         tvLink.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
+        var chTv = document.getElementById('ch-tv');
+        if (chTv) chTv.href = tvLink.href;
         try {
           window.OCTA_TV.whenSized(host, function () {
             window.OCTA_TV.mount(host, { symbol: sym, interval: tf });
