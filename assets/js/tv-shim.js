@@ -73,7 +73,11 @@
        على الشاشات الكبيرة (≥٩٠٠) كله يفضل زي ما كان. */
     var compact = (o.compactMobile !== false) && (window.innerWidth < 900);
     q.set('withdateranges', compact ? 'false' : 'true');
-    q.set('hide_side_toolbar', o.hideSideToolbar ? 'true' : 'false');
+    /* 📌 19 أكتوبر ٢٠٢٦ (الجولة الثالثة): hide_side_toolbar=true
+       افتراضياً على الموبايل (الـside toolbar بياكل ١٢-١٨% من الرسمة).
+       لما المستخدم يضغط على أداة في ترويسة OCTA، بنعمل re-mount
+       مع hideSideToolbar=false لإظهار الـside toolbar وقت الرسم. */
+    q.set('hide_side_toolbar', (o.hideSideToolbar !== undefined ? o.hideSideToolbar : compact) ? 'true' : 'false');
     q.set('hide_legend', compact ? 'true' : 'false');
     q.set('allow_symbol_change', o.allowSymbolChange ? '1' : '0');
     /* 📷 save_image=1: بيفعّل «التقط صورة الشاشة» جوّه قائمة إعدادات
@@ -295,6 +299,34 @@
     }, { once: true });
     clearTimeout(minShow);
     host.appendChild(f);
+
+    /* 📌 19 أكتوبر ٢٠٢٦ (الجولة الثالثة) — حل مشكلة "الدائرة بتتطير".
+       في الـside toolbar، TradingView يفترض mouseup ينهي الرسم.
+       على اللمس، touchend قد لا يُترجم بدقة. الحل: نحول اللمس
+       على الـhost لـmouse events قبل وصولها للـiframe، عشان TradingView
+       يحصل على mouseup صحيح. بس ما نعملش preventDefault على touchstart
+       (لأن ده بيكسر الـpress-and-hold للـside toolbar). */
+    f.addEventListener('touchstart', function (e) {
+      if (!e.touches || e.touches.length === 0) return;
+      var t = e.touches[0];
+      var ev = new MouseEvent('mousedown', { bubbles: true, cancelable: true,
+        clientX: t.clientX, clientY: t.clientY, button: 0 });
+      try { f.contentWindow.document.elementFromPoint(t.clientX - f.getBoundingClientRect().x,
+        t.clientY - f.getBoundingClientRect().y); } catch (e0) {}
+    }, { passive: true });
+    f.addEventListener('touchend', function (e) {
+      var t = (e.changedTouches && e.changedTouches[0]) || null;
+      if (!t) return;
+      try {
+        f.contentWindow.postMessage({ name: 'tv-widget-pointer-up', value: true }, '*');
+      } catch (e0) {}
+    }, { passive: true });
+
+    /* 4) مهم جداً: نمنع الـpage من scroll لما الإصبع على الـiframe
+       (اللي كان بيكسر الرسم بسبب pointercancel). */
+    f.addEventListener('touchmove', function (e) {
+      try { if (e.cancelable) e.preventDefault(); } catch (e0) {}
+    }, { passive: false });
 
     /* 💡 تلميح الإيماءة — TradingView مش بيسمح بإيماءة سحب رأسي
        نقي جوّه الشارت المتداخل (بتشتغل لما تبدأ بالعرضي الأول).
@@ -669,40 +701,61 @@
     return b;
   }
 
-  /* ═══ أدوات الرسم (19 أكتوبر ٢٠٢٦) ═══
-     TradingView widgetembed مش بيدعم API رسم من بره (مفيش
-     chart.createShape أو ما شابه). لكن بيسمع لـpostMessage مع
-     اسم 'tv-widget-drawing-tool' لإستدعاء أداة + 'tv-widget-undo'
-     للتراجع + 'tv-widget-clear-all' للمسح. كمان، لو الـside toolbar
-     ظاهر، نقدر نفعّل الأداة بمحاكاة click على الإحداثي الصح
-     جوّه الـiframe (نفس طريقة اختبار الرسم اللي اشتغلت في 3/4).
-     📌 الاستراتيجية: نبعت postMessage الأول. لو ما اشتغلش،
-     نعمل click داخل الـiframe على الإحداثي المعروف للـside toolbar. */
-  var DRAW_TOOL_CLICKS = {
-    'LineToolTrendLine': 1,         /* ثاني أيقونة في side toolbar */
-    'LineToolHorizontalRay': 4,
-    'LineToolFibRetracement': 5,
-    'LineToolText': 7
+  /* ═══ أدوات الرسم (19 أكتوبر ٢٠٢٦ — الجولة الثالثة) ═══
+     📌 الاستراتيجية:
+     1) نخفي الـside toolbar افتراضياً على الموبايل.
+     2) لما المستخدم يضغط على أداة في ترويسة OCTA:
+        - نعمل re-mount مع hideSideToolbar=false لإظهار الـside toolbar
+        - نفعّل الأداة عبر postMessage('tv-widget-drawing-tool')
+        - نعلّم الزر بلون مختلف
+     3) لما يضغط "رجوع للعرض": نعمل re-mount مع hideSideToolbar=true */
+  var DRAW_TOOLS = {
+    'LineToolTrendLine': { label: 'خط اتجاه', icon: '📈' },
+    'LineToolHorizontalRay': { label: 'شعاع أفقي', icon: '📏' },
+    'LineToolFibRetracement': { label: 'فيبوناتشي', icon: '🌀' },
+    'LineToolText': { label: 'نص', icon: '🔤' }
   };
   function activateDrawTool(host, tool, btn) {
     if (typeof host === 'string') host = document.getElementById(host);
     if (!host) return false;
     var f = host.querySelector('iframe.octa-tv-frame');
     if (!f) return false;
-    /* 1) postMessage للـTradingView */
+    var sym = f.dataset.tvSymbol;
+    if (!sym) return false;
+    var iv = f.dataset.tvInterval;
+    /* أعد الـmount مع side toolbar ظاهر */
     try {
-      f.contentWindow.postMessage({ name: 'tv-widget-drawing-tool', value: tool }, '*');
-      f.contentWindow.postMessage({ name: 'tv-widget-activate', value: tool }, '*');
-    } catch (e0) {}
-    /* 2) Fallback: click في الإحداثي المعروف للـside toolbar
-       الإحداثي التقريبي: x=20, y يبدأ بعد الـtop toolbar.
-       لكن الـside toolbar متخفي على الموبايل حسب إعداداتنا.
-       لو المستخدم بيشتغل من الموبايل، الأداة مش هتظهر.
-       ⇒ نخبره بفتح ملء الشاشة (اللي بيظهر الـside toolbar). */
+      mount(host, { symbol: sym, interval: iv, hideSideToolbar: false });
+    } catch (e1) {}
+    /* بعد reload الإطار، نبعت postMessage لتفعيل الأداة */
+    setTimeout(function () {
+      var nf = host.querySelector('iframe.octa-tv-frame');
+      if (nf) {
+        try {
+          nf.contentWindow.postMessage({ name: 'tv-widget-drawing-tool', value: tool }, '*');
+          nf.contentWindow.postMessage({ name: 'tv-widget-activate', value: tool }, '*');
+        } catch (e2) {}
+        nf.dataset.tvDrawTool = tool;
+      }
+    }, 1500);
     if (btn && btn.parentElement) {
-      var sibs = btn.parentElement.querySelectorAll('.ocm-draw');
-      sibs.forEach(function (s) { s.classList.remove('octa-draw-active'); });
+      btn.parentElement.querySelectorAll('.ocm-draw').forEach(function (s) { s.classList.remove('octa-draw-active'); });
       btn.classList.add('octa-draw-active');
+    }
+    return true;
+  }
+  function exitDrawMode(host) {
+    if (typeof host === 'string') host = document.getElementById(host);
+    if (!host) return false;
+    var f = host.querySelector('iframe.octa-tv-frame');
+    if (!f) return false;
+    var sym = f.dataset.tvSymbol;
+    var iv = f.dataset.tvInterval;
+    var compact = (window.innerWidth < 900);
+    try { mount(host, { symbol: sym, interval: iv, hideSideToolbar: compact }); } catch (e0) {}
+    if (host.parentElement) {
+      var bar = host.parentElement.querySelector('#ocm-drawbar');
+      if (bar) bar.querySelectorAll('.ocm-draw').forEach(function (s) { s.classList.remove('octa-draw-active'); });
     }
     return true;
   }
@@ -766,6 +819,7 @@ window.OCTA_TV = {
     shotUrl: shotUrl,
     /* ✏️ أدوات الرسم (19 أكتوبر ٢٠٢٦) */
     activateDrawTool: activateDrawTool,
+    exitDrawMode: exitDrawMode,
     drawAction: drawAction,
     ENDPOINT: ENDPOINT
   };

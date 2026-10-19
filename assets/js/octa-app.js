@@ -1029,7 +1029,11 @@ window.openChart = function (code, name, market) {
       '<div class="ocm-head">' +
       '<div class="ocm-row1">' +
       '<span class="ocm-title" id="ocm-title"></span>' +
-      '<span class="ocm-code" id="ocm-code"></span></div>' +
+      '<span class="ocm-code" id="ocm-code"></span>' +
+      '<span class="ocm-price" id="ocm-price">' +
+        '<span id="ocm-price-v">…</span>' +
+        '<span class="ocm-change" id="ocm-price-c">…</span>' +
+      '</span></div>' +
       '<div class="ocm-row2">' +
       '<span class="ocm-slot ocm-slot-search" id="ocm-pick"></span>' +
       '<button class="ocm-fs" id="ocm-fs" type="button" aria-label="ملء الشاشة"' +
@@ -1101,6 +1105,8 @@ window.openChart = function (code, name, market) {
     var c = document.getElementById('ocm-code');
     if (t) { t.textContent = '📈 ' + (it.name || it.code); t.title = it.name || it.code; }
     if (c) { c.textContent = it.sym; c.title = it.sym; }
+    /* 💰 19 أكتوبر ٢٠٢٦ — legend سعر لحظي */
+    try { startPriceTicker(it.code || (it.sym || '').split(':').pop()); } catch (e) {}
     var sh = document.getElementById('ocm-shot');
     if (sh && window.OCTA_TV) { sh.innerHTML = ''; sh.appendChild(window.OCTA_TV.makeShotBtn(it.sym)); }
     var fsb = document.getElementById('ocm-fs');
@@ -1118,6 +1124,42 @@ window.openChart = function (code, name, market) {
   }
   var fsb = document.getElementById('ocm-fs');
   if (fsb) fsb.setAttribute('data-sym', sym);
+
+  /* 💰 19 أكتوبر ٢٠٢٦ (الجولة الثالثة) — legend عربي بسعر لحظي.
+     TradingView widgetembed ما بيعرضش السعر اللحظي (refresh كل 15 دقيقة).
+     هنا بنجيب السعر من /api/stocks عند فتح الشارت + كل 15 ثانية. */
+  function startPriceTicker(symbol) {
+    var priceEl = document.getElementById('ocm-price-v');
+    var chgEl = document.getElementById('ocm-price-c');
+    if (!priceEl || !chgEl) return;
+    function fmt(n) {
+      if (n == null || isNaN(n)) return '—';
+      return Number(n).toFixed(2);
+    }
+    function update() {
+      var api = (typeof OCTA_API !== 'undefined' && OCTA_API) ||
+        'https://octa-prices-production-4ccb.up.railway.app';
+      fetch(api + '/api/stocks', { credentials: 'omit' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d) return;
+          var all = [].concat(d.egx30 || [], d.egx70 || [], d.egx33 || [], d.egx100 || [], d.amwal || [], d.dawabet || []);
+          var stk = all.find(function (s) { return s && s.code === symbol; });
+          if (!stk) return;
+          var p = stk.price;
+          var ch = stk.change;
+          if (p != null) priceEl.textContent = fmt(p) + ' EGP';
+          if (ch != null) {
+            chgEl.textContent = (ch > 0 ? '▲ +' : ch < 0 ? '▼ ' : 'ـ ') + fmt(ch) + '%';
+            chgEl.className = 'ocm-change ' + (ch > 0 ? 'up' : ch < 0 ? 'down' : 'flat');
+          }
+        }).catch(function () {});
+    }
+    update();
+    /* ⏱ تحديث كل 15 ثانية — نفس تردد TradingView */
+    if (window.__octaPriceTimer) clearInterval(window.__octaPriceTimer);
+    window.__octaPriceTimer = setInterval(update, 15000);
+  }
 
   /* ✏️ شريط أدوات الرسم (19 أكتوبر ٢٠٢٦) — 4 أدوات + تراجع + مسح.
      ده الحل العملي لمشكلة الـside toolbar المختفي على الموبايل.

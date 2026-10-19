@@ -790,7 +790,19 @@ body.ocm-open { overflow:hidden; }
   flex-direction: column; align-items: stretch; gap: 8px; flex-wrap: nowrap;
   padding: 9px 12px;
 }
-.ocm-row1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ocm-row1 { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.ocm-row1 .ocm-price {
+  display: inline-flex; align-items: baseline; gap: 4px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: .86rem; font-weight: 800; color: var(--g-txt, #e8eef5);
+  direction: ltr; margin-inline-start: auto; flex: none;
+}
+.ocm-row1 .ocm-price .ocm-change {
+  font-size: .68rem; padding: 1px 5px; border-radius: 6px;
+}
+.ocm-row1 .ocm-price .ocm-change.up { background: rgba(20,180,90,.18); color: #2cd17e; }
+.ocm-row1 .ocm-price .ocm-change.down { background: rgba(220,40,40,.18); color: #ff6e6e; }
+.ocm-row1 .ocm-price .ocm-change.flat { background: rgba(150,150,150,.15); color: #b0b0b0; }
 .ocm-row2 {
   display: flex; align-items: center; gap: 8px; min-width: 0;
 }
@@ -924,4 +936,6 @@ button.ocm-shot:focus-visible { outline: 2px solid var(--gold, #d4af37); outline
   font-size: 1.2rem;
 }
 @media (max-width:640px) {
-  .ocm-draw
+  .ocm-draw { width: 38px; height: 38px; font-size: 1rem; }
+  .ocm-row3 { padding: 5px 10px 9px; gap: 5px; }
+}
