@@ -270,7 +270,7 @@
           .then(function (d) {
             if (!d) return;
             var all = [].concat(d.egx30 || [], d.egx70 || [], d.egx33 || [], d.egx100 || [], d.amwal || [], d.dawabet || []);
-            var cur = (symInput && symInput.value || '').toUpperCase();
+            var cur = (symInput && symInput.value || 'COMI').toUpperCase();
             var stk = all.find(function (s) { return s && (s.code || '').toUpperCase() === cur; });
             if (!stk) return;
             if (titleEl) titleEl.textContent = '📈 ' + (stk.name || cur);
