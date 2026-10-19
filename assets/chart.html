@@ -129,6 +129,14 @@
       font-size: 1.05rem; line-height: 1; cursor: pointer;
       display: inline-flex; align-items: center; justify-content: center; padding: 0;
     }
+    .ocm-fs {
+      width: 40px; height: 40px; flex: none; border-radius: 9px;
+      border: 1px solid var(--line, rgba(255,255,255,.09));
+      background: var(--pri3, #102a43); color: var(--txt, #e8eef5);
+      font-size: 1.15rem; line-height: 1; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; padding: 0;
+      text-decoration: none;
+    }
   </style>
 </head>
 
@@ -143,6 +151,7 @@
       </div>
       <div class="ocm-row2">
         <button class="ocm-close" type="button" id="ch-close" aria-label="رجوع" title="رجوع">✕</button>
+        <a class="ocm-fs" id="ch-fs" href="https://www.tradingview.com/chart/?symbol=EGX%3ACOMI" target="_blank" rel="noopener noreferrer" aria-label="افتح في TradingView" title="افتح في TradingView (الرسم الكامل)">⛶</a>
         <span class="ocm-slot ocm-slot-search" id="ch-pick">
           <input id="sym" class="inp" type="text" list="stock-list" placeholder="COMI" maxlength="12"
             value="COMI" autocomplete="off" spellcheck="false" dir="ltr">
@@ -216,6 +225,8 @@
         if (codeEl) codeEl.textContent = sym;
         var chTv = document.getElementById('ch-tv-big');
         if (chTv) chTv.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
+        var chFs = document.getElementById('ch-fs');
+        if (chFs) chFs.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
         var chClose = document.getElementById('ch-close');
         if (chClose) chClose.onclick = function () { window.location.href = '../index.html'; };
         try {
