@@ -261,19 +261,20 @@
       var titleEl = document.getElementById('ch-title');
       var codeEl = document.getElementById('ch-code');
       var priceBox = document.getElementById('ch-price-box');
-      console.log('priceEl=', !!priceEl, 'chgEl=', !!chgEl, 'symInput=', !!symInput); if (!priceEl || !chgEl) return;
+      var symInput = document.getElementById('sym');
+      if (!priceEl || !chgEl) return;
       var API = '';  /* same-origin: /api/stocks → worker proxy */
       function fmt(n) { if (n == null || isNaN(n)) return '—'; return Number(n).toFixed(2); }
-      function update() { console.log('update tick');
+      function update() {
         fetch(API + '/api/stocks', { credentials: 'omit' })
           .then(function (r) { return r.ok ? r.json() : null; })
           .then(function (d) {
-            if (!d) { console.log('no d'); return; }
+            if (!d) return;
             var all = [].concat(d.egx30 || [], d.egx70 || [], d.egx33 || [], d.egx100 || [], d.amwal || [], d.dawabet || []);
             var cur = (symInput && symInput.value || 'COMI').toUpperCase();
             var stk = all.find(function (s) { return s && (s.code || '').toUpperCase() === cur; });
-            if (!stk) { console.log('no stk for', cur); return; }
-            console.log('upd', cur, stk.price, stk.change); if (titleEl) titleEl.textContent = '📈 ' + (stk.name || cur);
+            if (!stk) return;
+            if (titleEl) titleEl.textContent = '📈 ' + (stk.name || cur);
             if (priceEl) priceEl.textContent = fmt(stk.price) + ' EGP';
             if (chgEl) {
               var ch = stk.change;
@@ -283,7 +284,7 @@
             if (priceBox) priceBox.removeAttribute('data-pending');
           }).catch(function () {});
       }
-      console.log("init ticker");
+      
       update();
       if (window.__chPriceTimer) clearInterval(window.__chPriceTimer);
       window.__chPriceTimer = setInterval(update, 15000);
