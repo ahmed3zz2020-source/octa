@@ -729,7 +729,7 @@ body.octa-tv-fs-on .gmodal { overflow: hidden !important; overscroll-behavior: c
   border-bottom:1px solid var(--g-line); font-weight:800; font-size:.95rem; color:var(--g-txt); }
 /* ⛔ 19 أكتوبر ٢٠٢٦ — استثنينا .ocm-title: Specificity أعلى من .ocm-title
    فكان بيفرض nowrap+ellipsis والاسم بيتقصّ. */
-.ocm-head > span:not(.ocm-title) { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ocm-head > span:not(.ocm-title):not(.ocm-titlewrap):not(.ocm-slot) { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .ocm-close { width:40px; height:40px; flex:none; border-radius:9px; border:1px solid var(--g-line);
   background:var(--pri3); color:var(--g-txt); font-size:1.05rem; cursor:pointer; }
 .ocm-close:hover { border-color:var(--g-gold-l); }
@@ -761,19 +761,43 @@ body.ocm-open { overflow:hidden; }
    ✅ الحل: الاسم ياخد سطر كامل لوحده على الموبايل، ويلفّ على
    سطرين على الشاشات الكبيرة. مفيش أي حاة تقصّه. */
 .ocm-head, .ghead { flex-wrap: wrap; align-items: center; row-gap: 7px; }
+/* ⭐ الاسم والرمز في حزمة واحدة — الاسم ملّي والرمشitect شريحة صغيرة */
+.ocm-titlewrap { display: flex; align-items: baseline; gap: 8px; flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+.ocm-code {
+  flex: none; align-self: center;
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .72rem; font-weight: 800;
+  color: var(--gold, #d4af37); letter-spacing: .02em; direction: ltr; white-space: nowrap;
+  border: 1px solid var(--goldLine, rgba(212,175,55,.32));
+  background: var(--goldBg, rgba(212,175,55,.12));
+  border-radius: 8px; padding: 3px 8px;
+}
 .ocm-title, .ghead-t {
   flex: 1 1 auto; min-width: 0;
   white-space: normal;          /* ⛔ بدل nowrap — الاسم يلفّ */
-  overflow: visible; text-overflow: clip;
+  overflow: hidden; text-overflow: clip;
   line-height: 1.32; font-weight: 800; font-size: .84rem;
   overflow-wrap: anywhere;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
-  overflow: hidden;
 }
 /* على الموبايل: سطر مستقل فوق صف التحكّم — يضمن العرض الكامل */
 @media (max-width:640px) {
-  .ocm-title, .ghead-t { flex: 1 1 100%; -webkit-line-clamp: 3; font-size: .8rem; order: -1; }
+  /* الاسم فوق، والرمز تحته — كده الاسم ياخد عرض السطر كله */
+  .ocm-titlewrap { flex: 1 1 100%; order: -1; flex-direction: column; align-items: flex-start; gap: 4px; }
+  .ocm-title, .ghead-t { flex: 0 0 auto; width: 100%; -webkit-line-clamp: 2; font-size: .78rem; }
+  .ocm-code { font-size: .66rem; padding: 2px 7px; }
 }
+/* 📷 زرار التصوير — جنب التكبير وقبل × */
+.ocm-shot { display: flex; align-items: center; }
+.ocm-shot .ocm-shot, .ocm-shot { flex: none; }
+button.ocm-shot {
+  width: 40px; height: 40px; border-radius: 10px;
+  border: 1px solid var(--g-line, rgba(255,255,255,.09)); background: var(--pri3, #102a43);
+  color: var(--g-txt, #e8eef5); font-size: 1.05rem; line-height: 1; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0;
+}
+button.ocm-shot:hover { border-color: var(--g-gold-l, rgba(212,175,55,.55)); }
+button.ocm-shot:focus-visible { outline: 2px solid var(--gold, #d4af37); outline-offset: 2px; }
+@media (max-width:640px) { button.ocm-shot { width:44px; height:44px; } }
 /* الذه: نفس المعاملة */
 .ghead-t { color: var(--g-gold-t); }
 /* 🐙 19 أكتوبر ٢٠٢٦ — اسم الشركة + الرمز + ⛶ (زي كارت الذهب بالظبط) */

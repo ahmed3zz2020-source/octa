@@ -992,6 +992,7 @@
          ⛔ القديم كان جوّه صف الفريمات وبيركّب مستمع جديد في كل مرة. */
       '<button class="ocm-fs" id="gfs-btn" type="button" aria-label="ملء الشاشة"' +
       ' title="ملء الشاشة">⛶</button>' +
+      '<span class="ocm-slot" id="gshot"></span>' +
       '<button class="gclose" data-close aria-label="اقفل">✕</button></div>' +
       '<div class="gbody"><div class="gload">🔄 بنجيب التحليل…</div></div>' +
       '</div>';
@@ -1013,6 +1014,12 @@
       });
     }
 
+    /* 📷 زرار التصوير + شريحة الرمز جنب الاسم */
+    var gShot = document.getElementById('gshot');
+    if (gShot && window.OCTA_TV && window.OCTA_TV.makeShotBtn) {
+      gShot.appendChild(window.OCTA_TV.makeShotBtn(GOLD_SYMBOL));
+    }
+
     /* 🔎 مستطيل البحث — نفس بتاع مودال السهم */
     var gslot = document.getElementById('gpick');
     if (gslot && window.OCTA_TV && window.OCTA_TV.makePicker) {
@@ -1022,6 +1029,8 @@
         onChange: function (it) {
           if (!it || !it.sym) return;
           if (gt) { gt.textContent = '📈 ' + (it.name || it.code); gt.title = it.name || it.code; }
+          var gs = document.getElementById('gshot');
+          if (gs && window.OCTA_TV) { gs.innerHTML = ''; gs.appendChild(window.OCTA_TV.makeShotBtn(it.sym)); }
           var h = goldChartHost();
           if (!h) return;
           window.OCTA_TV.whenSized(h, function () {

@@ -1024,10 +1024,13 @@ window.openChart = function (code, name, market) {
       '<div class="ocm-back" data-close></div>' +
       '<div class="ocm-panel" role="dialog" aria-modal="true">' +
       '<div class="ocm-head">' +
+      '<span class="ocm-titlewrap">' +
       '<span class="ocm-title" id="ocm-title"></span>' +
+      '<span class="ocm-code" id="ocm-code"></span></span>' +
       '<span class="ocm-slot" id="ocm-pick"></span>' +
       '<button class="ocm-fs" id="ocm-fs" type="button" aria-label="ملء الشاشة"' +
       ' title="ملء الشاشة">⛶</button>' +
+      '<span class="ocm-slot" id="ocm-shot"></span>' +
       '<button class="ocm-close" data-close aria-label="اقفل">✕</button></div>' +
       '<div id="gmv-chart" class="gchart"></div>' +
       '</div>';
@@ -1054,7 +1057,10 @@ window.openChart = function (code, name, market) {
 
   /* الاسم + الرمز */
   var tEl = document.getElementById('ocm-title');
+  var cEl = document.getElementById('ocm-code');
   if (tEl) { tEl.textContent = '📈 ' + label; tEl.title = label; }
+  /* ⭐ الرمز جنب الاسم — زي TradingView بالظبط */
+  if (cEl) { cEl.textContent = sym; cEl.title = sym; }
 
   /* ⛔ لو كان ملء الشاشة مفتوح من قبل — اقفله قبل ما نعاود الرسم */
   try {
@@ -1078,11 +1084,26 @@ window.openChart = function (code, name, market) {
   function loadChartSymbol(it) {
     if (!it || !it.sym) return;
     var t = document.getElementById('ocm-title');
+    var c = document.getElementById('ocm-code');
     if (t) { t.textContent = '📈 ' + (it.name || it.code); t.title = it.name || it.code; }
+    if (c) { c.textContent = it.sym; c.title = it.sym; }
+    var sh = document.getElementById('ocm-shot');
+    if (sh && window.OCTA_TV) { sh.innerHTML = ''; sh.appendChild(window.OCTA_TV.makeShotBtn(it.sym)); }
+    var fsb = document.getElementById('ocm-fs');
+    if (fsb) fsb.setAttribute('data-sym', it.sym);
     window.OCTA_TV.whenSized(chartHost(m), function () {
       window.OCTA_TV.mount(chartHost(m), { symbol: it.sym, interval: '1D' });
     });
   }
+
+  /* 📷 زرار التصوير */
+  var shotSlot = document.getElementById('ocm-shot');
+  if (shotSlot && window.OCTA_TV && window.OCTA_TV.makeShotBtn) {
+    shotSlot.innerHTML = '';
+    shotSlot.appendChild(window.OCTA_TV.makeShotBtn(sym));
+  }
+  var fsb = document.getElementById('ocm-fs');
+  if (fsb) fsb.setAttribute('data-sym', sym);
 
   /* ⛔ قفل تمرير الصفحة (html + body) عشان متبقاش بتتزحلقش ورا المودال */
   try { if (window.OCTA_TV) window.OCTA_TV.lockPage(true); } catch (e2) {}

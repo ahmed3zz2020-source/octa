@@ -22,7 +22,9 @@
   'use strict';
 
   var ENDPOINT = 'https://s.tradingview.com/widgetembed/';
-  var DEFAULT_STUDIES = 'MASimple@tv-basicstudies%5CRSI@tv-basicstudies%5CMACD@tv-basicstudies';
+  /* ⛔ فاصل المؤشرات في TradingView هو backslash واحد.
+     كنا بنكتبه %5C وURLSearchParams بيبعّدله تاني ⇒ %255C غلط. */
+  var DEFAULT_STUDIES = 'MASimple@tv-basicstudies\\RSI@tv-basicstudies\\MACD@tv-basicstudies';
 
   /* ── الوضع الفاتح/الداكن ── */
   function isLight() {
@@ -64,7 +66,10 @@
     q.set('withdateranges', 'true');
     q.set('hide_side_toolbar', o.hideSideToolbar ? 'true' : 'false');
     q.set('allow_symbol_change', o.allowSymbolChange ? '1' : '0');
-    q.set('save_image', '0');
+    /* 📷 save_image=1: بيفعّل «التقط صورة الشاشة» جوّه قائمة إعدادات
+       TradingView على الشاشات الكبيرة. على الموبايل القائمة دي
+       مش موجودة في الـembed، فعشان كمان بنزوّر زرار تصوير فوق. */
+    q.set('save_image', o.saveImage === false ? '0' : '1');
     if (o.studies !== false) {
       q.set('studies', typeof o.studies === 'string' ? o.studies : DEFAULT_STUDIES);
     }
@@ -222,12 +227,12 @@
     f.title = 'شارت TradingView — ' + sym;
     f.setAttribute('allowtransparency', 'true');
     f.setAttribute('scrolling', 'no');
-    /* ⛔ ملاحظة: حطيناش touch-action:none هنا عن قصد.
-       القفل بيحصل من html/body overflow — وده أفضل من منع اللمسة
-       لأن المنع كان بيقفل حركات TradingView نفسها (زي التحرك الرأسي).
-       الـiframe ياخد اللمسة زي أي موقع تاني. */
+    /* ⛔ touch-action:none — ده إصلاح أدوات الرسم (19 أكتوبر ٢٠٢٦).
+       من غيره، Chrome بيحاول يعمل scroll باللمسة على الـiframe
+       فيقطع المؤشر (pointercancel) → العلامة بتظهر مكانها
+       وبتقف، والخط مش بيرسم. */
     f.style.cssText = 'display:block;width:100%;height:100%;border:0;' +
-      'min-height:' + (o.minHeight || 300) + 'px';
+      'min-height:' + (o.minHeight || 300) + 'px;touch-action:none;overscroll-behavior:contain';
     f.dataset.tvSymbol = sym;
     f.dataset.tvInterval = normIv(o.interval);
     host.appendChild(f);
@@ -556,6 +561,31 @@
     };
   }
 
+  /* 📷 تصوير الشارت.
+     ⛔ الحقيقة التقنية: الإطار ده من دومين تاني (s.tradingview.com)،
+       فالمتصفح بيمنع أي محاولة ناخد بيه صورة (canvas tainting) —
+       مستحيل من غير ما نخلي الدومين نفسه.
+     ✅ اللي بنعمله: بنفتح نفس الشارت على موقع TradingView في تاب جديد،
+      那里的 زرار التصوير الأصلي شغال 100% (وجاهز للصورة بعد الرسمة).
+     ⛔ وكمان بنفعّل save_image=1 في الرابط — بيبقّي «التقط صورة الشاشة»
+       متاح في قائمة الإعدادات بتاعة TradingView على الشاشات الكبيرة. */
+  function shotUrl(sym) {
+    return 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
+  }
+
+  function makeShotBtn(sym) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ocm-shot';
+    b.setAttribute('aria-label', 'افتح الشارت في TradingView عشان تاخد صورة');
+    b.title = 'افتح في TradingView — من هناك تاخد صورة للشارت';
+    b.innerHTML = '<span aria-hidden="true">📷</span>';
+    b.addEventListener('click', function () {
+      window.open(shotUrl(sym), '_blank', 'noopener');
+    });
+    return b;
+  }
+
   /* ═══ قفل تمرير الصفحة (html + body) ═══
      ⛔ استخدمنا class في الأول — بس فيه كود في الموقع بيمسح
         الـclasses من html/body فالقفل كان بيروح بعد ثانية.
@@ -596,6 +626,9 @@ window.OCTA_TV = {
     symbolList: symbolList,
     resolveSymbol: resolveSymbol,
     lockPage: lockPage,
+    /* 📷 التصوير */
+    makeShotBtn: makeShotBtn,
+    shotUrl: shotUrl,
     ENDPOINT: ENDPOINT
   };
 
