@@ -935,6 +935,20 @@ button.ocm-shot:focus-visible { outline: 2px solid var(--gold, #d4af37); outline
   background: var(--pri4, #1c3b58);
   font-size: 1.2rem;
 }
+.ocm-draw-exit { background: rgba(20,180,90,.2); color: #2cd17e; font-size: 1.05rem; }
+.ocm-draw-hint { font-size: .72rem; color: var(--g-mut, #8b9eb0); margin-inline-end: 4px; }
+.ocm-draw-toggle {
+  width: 44px; height: 44px; flex: none;
+  border-radius: 11px; border: 1px solid var(--g-line, rgba(255,255,255,.09));
+  background: var(--pri3, #102a43); color: var(--g-txt, #e8eef5);
+  font-size: 1.05rem; line-height: 1; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; transition: background .15s;
+}
+.ocm-draw-toggle:hover { background: var(--pri4, #1c3b58); }
+.ocm-draw-toggle.octa-draw-toggle-on {
+  background: rgba(212,175,55,.25); border-color: var(--gold, #d4af37);
+}
 @media (max-width:640px) {
   .ocm-draw { width: 38px; height: 38px; font-size: 1rem; }
   .ocm-row3 { padding: 5px 10px 9px; gap: 5px; }
