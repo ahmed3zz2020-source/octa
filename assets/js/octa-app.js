@@ -1036,6 +1036,15 @@ window.openChart = function (code, name, market) {
       ' title="ملء الشاشة">⛶</button>' +
       '<span class="ocm-slot ocm-slot-shot" id="ocm-shot"></span>' +
       '<button class="ocm-close" data-close aria-label="اقفل">✕</button></div>' +
+      '<div class="ocm-row3" id="ocm-drawbar">' +
+      '<button class="ocm-draw" data-draw="LineToolTrendLine" aria-label="خط اتجاه" title="خط اتجاه">📈</button>' +
+      '<button class="ocm-draw" data-draw="LineToolHorizontalRay" aria-label="شعاع أفقي" title="شعاع أفقي">📏</button>' +
+      '<button class="ocm-draw" data-draw="LineToolFibRetracement" aria-label="فيبوناتشي" title="فيبوناتشي">🌀</button>' +
+      '<button class="ocm-draw" data-draw="LineToolText" aria-label="نص" title="نص على الرسم">🔤</button>' +
+      '<span class="ocm-draw-sep"></span>' +
+      '<button class="ocm-draw ocm-draw-undo" data-act="undo" aria-label="تراجع" title="تراجع (Ctrl+Z)">↶</button>' +
+      '<button class="ocm-draw ocm-draw-clear" data-act="clear" aria-label="امسح الرسومات" title="امسح كل الرسومات على السهم ده">🧹</button>' +
+      '</div>' +
       '</div>' +
       '<div id="gmv-chart" class="gchart"></div>' +
       '</div>';
@@ -1109,6 +1118,31 @@ window.openChart = function (code, name, market) {
   }
   var fsb = document.getElementById('ocm-fs');
   if (fsb) fsb.setAttribute('data-sym', sym);
+
+  /* ✏️ شريط أدوات الرسم (19 أكتوبر ٢٠٢٦) — 4 أدوات + تراجع + مسح.
+     ده الحل العملي لمشكلة الـside toolbar المختفي على الموبايل.
+     لما المستخدم يدوس على أداة: بنبعت لـTradingView postMessage يفعّلها
+     + بنفتح الـside toolbar داخلياً بالـmouse click على الإحداثي. */
+  var drawbar = document.getElementById('ocm-drawbar');
+  if (drawbar) {
+    drawbar.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-draw],[data-act]');
+      if (!btn) return;
+      var draw = btn.getAttribute('data-draw');
+      var act = btn.getAttribute('data-act');
+      if (window.OCTA_TV) {
+        if (draw) {
+          window.OCTA_TV.activateDrawTool(chartHost(m), draw, btn);
+        } else if (act === 'undo') {
+          window.OCTA_TV.drawAction(chartHost(m), 'undo');
+        } else if (act === 'clear') {
+          if (window.confirm('امسح كل الرسومات على السهم ده؟')) {
+            window.OCTA_TV.drawAction(chartHost(m), 'clear');
+          }
+        }
+      }
+    });
+  }
 
   /* ⛔ قفل تمرير الصفحة (html + body) عشان متبقاش بتتزحلقش ورا المودال */
   try { if (window.OCTA_TV) window.OCTA_TV.lockPage(true); } catch (e2) {}

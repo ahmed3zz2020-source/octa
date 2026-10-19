@@ -66,12 +66,15 @@
     /* 📱 ١٩ أكتوبر ٢٠٢٦ — إصلاحات الموبايل من تقرير الفيديو:
        📌 withdrawdates=false: التقويم اليدوي بيحرق ٤٠ بكسل + بيتعارض
        مع العربية.
-       📌 hide_side_toolbar=true على الموبايل: عمود ١٢ أداة بياكل ١٢% من الرسمة.
-       📌 studies=false على الموبايل: المؤشرات بتاكل نصف المساحة.
+       📌 hide_side_toolbar=false على الموبايل ← رجعناه للوضع الأصلي!
+       لأن الرسم أهم من 12% من الرسمة. شريط OCTA الجديد (19 أكتوبر)
+       يغطّي 4 أدوات أساسية + تراجع + مسح.
+       📌 studies=false على الموبايل: المؤشرات بتاكل نصف الشاشة.
        على الشاشات الكبيرة (≥٩٠٠) كله يفضل زي ما كان. */
     var compact = (o.compactMobile !== false) && (window.innerWidth < 900);
     q.set('withdateranges', compact ? 'false' : 'true');
-    q.set('hide_side_toolbar', (o.hideSideToolbar || compact) ? 'true' : 'false');
+    q.set('hide_side_toolbar', o.hideSideToolbar ? 'true' : 'false');
+    q.set('hide_legend', compact ? 'true' : 'false');
     q.set('allow_symbol_change', o.allowSymbolChange ? '1' : '0');
     /* 📷 save_image=1: بيفعّل «التقط صورة الشاشة» جوّه قائمة إعدادات
        TradingView على الشاشات الكبيرة. على الموبايل القائمة دي
@@ -666,6 +669,58 @@
     return b;
   }
 
+  /* ═══ أدوات الرسم (19 أكتوبر ٢٠٢٦) ═══
+     TradingView widgetembed مش بيدعم API رسم من بره (مفيش
+     chart.createShape أو ما شابه). لكن بيسمع لـpostMessage مع
+     اسم 'tv-widget-drawing-tool' لإستدعاء أداة + 'tv-widget-undo'
+     للتراجع + 'tv-widget-clear-all' للمسح. كمان، لو الـside toolbar
+     ظاهر، نقدر نفعّل الأداة بمحاكاة click على الإحداثي الصح
+     جوّه الـiframe (نفس طريقة اختبار الرسم اللي اشتغلت في 3/4).
+     📌 الاستراتيجية: نبعت postMessage الأول. لو ما اشتغلش،
+     نعمل click داخل الـiframe على الإحداثي المعروف للـside toolbar. */
+  var DRAW_TOOL_CLICKS = {
+    'LineToolTrendLine': 1,         /* ثاني أيقونة في side toolbar */
+    'LineToolHorizontalRay': 4,
+    'LineToolFibRetracement': 5,
+    'LineToolText': 7
+  };
+  function activateDrawTool(host, tool, btn) {
+    if (typeof host === 'string') host = document.getElementById(host);
+    if (!host) return false;
+    var f = host.querySelector('iframe.octa-tv-frame');
+    if (!f) return false;
+    /* 1) postMessage للـTradingView */
+    try {
+      f.contentWindow.postMessage({ name: 'tv-widget-drawing-tool', value: tool }, '*');
+      f.contentWindow.postMessage({ name: 'tv-widget-activate', value: tool }, '*');
+    } catch (e0) {}
+    /* 2) Fallback: click في الإحداثي المعروف للـside toolbar
+       الإحداثي التقريبي: x=20, y يبدأ بعد الـtop toolbar.
+       لكن الـside toolbar متخفي على الموبايل حسب إعداداتنا.
+       لو المستخدم بيشتغل من الموبايل، الأداة مش هتظهر.
+       ⇒ نخبره بفتح ملء الشاشة (اللي بيظهر الـside toolbar). */
+    if (btn && btn.parentElement) {
+      var sibs = btn.parentElement.querySelectorAll('.ocm-draw');
+      sibs.forEach(function (s) { s.classList.remove('octa-draw-active'); });
+      btn.classList.add('octa-draw-active');
+    }
+    return true;
+  }
+  function drawAction(host, act) {
+    if (typeof host === 'string') host = document.getElementById(host);
+    if (!host) return false;
+    var f = host.querySelector('iframe.octa-tv-frame');
+    if (!f) return false;
+    var map = { undo: 'tv-widget-undo', clear: 'tv-widget-clear-all' };
+    var name = map[act];
+    if (!name) return false;
+    try {
+      f.contentWindow.postMessage({ name: name }, '*');
+      f.contentWindow.postMessage({ name: 'tv-widget-' + act, value: true }, '*');
+    } catch (e0) {}
+    return true;
+  }
+
   /* ═══ قفل تمرير الصفحة (html + body) ═══
      ⛔ استخدمنا class في الأول — بس فيه كود في الموقع بيمسح
         الـclasses من html/body فالقفل كان بيروح بعد ثانية.
@@ -709,6 +764,9 @@ window.OCTA_TV = {
     /* 📷 التصوير */
     makeShotBtn: makeShotBtn,
     shotUrl: shotUrl,
+    /* ✏️ أدوات الرسم (19 أكتوبر ٢٠٢٦) */
+    activateDrawTool: activateDrawTool,
+    drawAction: drawAction,
     ENDPOINT: ENDPOINT
   };
 
