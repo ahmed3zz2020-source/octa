@@ -183,7 +183,6 @@
       'use strict';
       var host = document.getElementById('chart');
       var msg = document.getElementById('msg');
-      var tvLink = document.getElementById('tv');
       var symInput = document.getElementById('sym');
       var codeEl = document.getElementById('ch-code');
       var tf = '1D';
@@ -208,9 +207,8 @@
         say('');
         symInput.value = sym.indexOf(':') > 0 ? sym.split(':')[1] : sym;
         if (codeEl) codeEl.textContent = sym;
-        tvLink.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
         var chTv = document.getElementById('ch-tv');
-        if (chTv) chTv.href = tvLink.href;
+        if (chTv) chTv.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
         try {
           window.OCTA_TV.whenSized(host, function () {
             window.OCTA_TV.mount(host, { symbol: sym, interval: tf });
