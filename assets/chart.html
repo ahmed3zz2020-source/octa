@@ -261,7 +261,7 @@
       var titleEl = document.getElementById('ch-title');
       var codeEl = document.getElementById('ch-code');
       var priceBox = document.getElementById('ch-price-box');
-      if (!priceEl) return;
+      console.log('priceEl=', !!priceEl, 'chgEl=', !!chgEl, 'symInput=', !!symInput); if (!priceEl || !chgEl) return;
       var API = '';  /* same-origin: /api/stocks → worker proxy */
       function fmt(n) { if (n == null || isNaN(n)) return '—'; return Number(n).toFixed(2); }
       function update() { console.log('update tick');
