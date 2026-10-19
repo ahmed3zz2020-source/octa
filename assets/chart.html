@@ -122,6 +122,13 @@
     .ocm-row2 > * { flex: none; }
     .ocm-slot-search { flex: 1 1 auto !important; min-width: 0; display: flex; gap: 6px; align-items: center; }
     .ocm-slot-search .inp { flex: 1; min-width: 0; }
+    .ocm-close {
+      width: 40px; height: 40px; flex: none; border-radius: 9px;
+      border: 1px solid var(--line, rgba(255,255,255,.09));
+      background: var(--pri3, #102a43); color: var(--txt, #e8eef5);
+      font-size: 1.05rem; line-height: 1; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; padding: 0;
+    }
   </style>
 </head>
 
@@ -135,15 +142,12 @@
         <span class="ocm-price" id="ch-price-box" data-pending="1"><span id="ch-price-v"></span><span class="ocm-change" id="ch-price-c"></span></span>
       </div>
       <div class="ocm-row2">
+        <button class="ocm-close" type="button" id="ch-close" aria-label="رجوع" title="رجوع">✕</button>
         <span class="ocm-slot ocm-slot-search" id="ch-pick">
           <input id="sym" class="inp" type="text" list="stock-list" placeholder="COMI" maxlength="12"
             value="COMI" autocomplete="off" spellcheck="false" dir="ltr">
           <datalist id="stock-list"></datalist>
           <button class="btn main" id="go" type="button">تحميل</button>
-        </span>
-        <span class="ocm-slot ocm-fs-row" id="ch-fs-row" style="display:flex;gap:6px">
-          <a class="btn main" id="ch-tv" href="https://www.tradingview.com/chart/?symbol=EGX%3ACOMI" target="_blank" rel="noopener noreferrer" style="padding:9px 14px">⛶ افتح TradingView</a>
-          <a class="btn" id="ch-back" href="../index.html">رجوع</a>
         </span>
       </div>
     </div>
@@ -154,8 +158,9 @@
       <div class="charthost" id="chart"></div>
     </div>
 
-    <div class="tvbar">
-      <span class="src">المصدر: TradingView · بيانات البورصة المصرية (EGX)</span>
+    <div class="tvbar" style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="btn main" id="ch-tv-big" href="https://www.tradingview.com/chart/?symbol=EGX%3ACOMI" target="_blank" rel="noopener noreferrer" style="flex:1;padding:11px 14px">⛶ افتح في TradingView (الرسم الكامل)</a>
+      <span class="src" style="align-self:center">المصدر: TradingView · البورصة المصرية (EGX)</span>
     </div>
 
     <footer class="foot">
@@ -209,11 +214,10 @@
         say('');
         symInput.value = sym.indexOf(':') > 0 ? sym.split(':')[1] : sym;
         if (codeEl) codeEl.textContent = sym;
-        var chTv = document.getElementById('ch-tv');
-        if (chTv) {
-          chTv.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
-          chTv.target = '_blank';
-        }
+        var chTv = document.getElementById('ch-tv-big');
+        if (chTv) chTv.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
+        var chClose = document.getElementById('ch-close');
+        if (chClose) chClose.onclick = function () { window.location.href = '../index.html'; };
         try {
           window.OCTA_TV.whenSized(host, function () {
             window.OCTA_TV.mount(host, { symbol: sym, interval: tf });
