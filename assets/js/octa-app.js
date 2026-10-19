@@ -1043,7 +1043,7 @@ window.openChart = function (code, name, market) {
       '<span class="ocm-slot ocm-slot-shot" id="ocm-shot"></span>' +
       '<button class="ocm-close" data-close aria-label="اقفل">✕</button></div>' +
       '<div class="ocm-row3" id="ocm-drawbar" style="display:none">' +
-      '<span class="ocm-draw-hint">ارسم على الشارت:</span>' +
+      '<span class="ocm-draw-hint">ارسم</span>' +
       '<button class="ocm-draw" data-draw="LineToolTrendLine" aria-label="خط اتجاه" title="خط اتجاه">📈</button>' +
       '<button class="ocm-draw" data-draw="LineToolHorizontalRay" aria-label="شعاع أفقي" title="شعاع أفقي">📏</button>' +
       '<button class="ocm-draw" data-draw="LineToolFibRetracement" aria-label="فيبوناتشي" title="فيبوناتشي">🌀</button>' +

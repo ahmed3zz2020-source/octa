@@ -936,7 +936,12 @@ button.ocm-shot:focus-visible { outline: 2px solid var(--gold, #d4af37); outline
   font-size: 1.2rem;
 }
 .ocm-draw-exit { background: rgba(20,180,90,.2); color: #2cd17e; font-size: 1.05rem; }
-.ocm-draw-hint { font-size: .72rem; color: var(--g-mut, #8b9eb0); margin-inline-end: 4px; }
+.ocm-draw-hint {
+  font-size: .72rem; color: var(--g-mut, #8b9eb0);
+  margin-inline-end: 6px; flex: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0; max-width: 100%;
+}
 .ocm-draw-toggle {
   width: 44px; height: 44px; flex: none;
   border-radius: 11px; border: 1px solid var(--g-line, rgba(255,255,255,.09));
