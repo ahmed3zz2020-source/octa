@@ -73,11 +73,10 @@
        على الشاشات الكبيرة (≥٩٠٠) كله يفضل زي ما كان. */
     var compact = (o.compactMobile !== false) && (window.innerWidth < 900);
     q.set('withdateranges', compact ? 'false' : 'true');
-    /* 📌 19 أكتوبر ٢٠٢٦ (الجولة الثالثة): hide_side_toolbar=true
-       افتراضياً على الموبايل (الـside toolbar بياكل ١٢-١٨% من الرسمة).
-       لما المستخدم يضغط على أداة في ترويسة OCTA، بنعمل re-mount
-       مع hideSideToolbar=false لإظهار الـside toolbar وقت الرسم. */
-    q.set('hide_side_toolbar', (o.hideSideToolbar !== undefined ? o.hideSideToolbar : compact) ? 'true' : 'false');
+    /* 📌 19 أكتوبر ٢٠٢٦ (الجولة الثالثة، تراجع): أحمد طلب إبقاء
+       أدوات TradingView الأصلية (الـside toolbar) — فرجعناه للوضع
+       الأصلي. hide_side_toolbar=false دائماً. */
+    q.set('hide_side_toolbar', o.hideSideToolbar ? 'true' : 'false');
     q.set('hide_legend', compact ? 'true' : 'false');
     q.set('allow_symbol_change', o.allowSymbolChange ? '1' : '0');
     /* 📷 save_image=1: بيفعّل «التقط صورة الشاشة» جوّه قائمة إعدادات
@@ -701,78 +700,10 @@
     return b;
   }
 
-  /* ═══ أدوات الرسم (19 أكتوبر ٢٠٢٦ — الجولة الثالثة) ═══
-     📌 الاستراتيجية:
-     1) نخفي الـside toolbar افتراضياً على الموبايل.
-     2) لما المستخدم يضغط على أداة في ترويسة OCTA:
-        - نعمل re-mount مع hideSideToolbar=false لإظهار الـside toolbar
-        - نفعّل الأداة عبر postMessage('tv-widget-drawing-tool')
-        - نعلّم الزر بلون مختلف
-     3) لما يضغط "رجوع للعرض": نعمل re-mount مع hideSideToolbar=true */
-  var DRAW_TOOLS = {
-    'LineToolTrendLine': { label: 'خط اتجاه', icon: '📈' },
-    'LineToolHorizontalRay': { label: 'شعاع أفقي', icon: '📏' },
-    'LineToolFibRetracement': { label: 'فيبوناتشي', icon: '🌀' },
-    'LineToolText': { label: 'نص', icon: '🔤' }
-  };
-  function activateDrawTool(host, tool, btn) {
-    if (typeof host === 'string') host = document.getElementById(host);
-    if (!host) return false;
-    var f = host.querySelector('iframe.octa-tv-frame');
-    if (!f) return false;
-    var sym = f.dataset.tvSymbol;
-    if (!sym) return false;
-    var iv = f.dataset.tvInterval;
-    /* أعد الـmount مع side toolbar ظاهر */
-    try {
-      mount(host, { symbol: sym, interval: iv, hideSideToolbar: false });
-    } catch (e1) {}
-    /* بعد reload الإطار، نبعت postMessage لتفعيل الأداة */
-    setTimeout(function () {
-      var nf = host.querySelector('iframe.octa-tv-frame');
-      if (nf) {
-        try {
-          nf.contentWindow.postMessage({ name: 'tv-widget-drawing-tool', value: tool }, '*');
-          nf.contentWindow.postMessage({ name: 'tv-widget-activate', value: tool }, '*');
-        } catch (e2) {}
-        nf.dataset.tvDrawTool = tool;
-      }
-    }, 1500);
-    if (btn && btn.parentElement) {
-      btn.parentElement.querySelectorAll('.ocm-draw').forEach(function (s) { s.classList.remove('octa-draw-active'); });
-      btn.classList.add('octa-draw-active');
-    }
-    return true;
-  }
-  function exitDrawMode(host) {
-    if (typeof host === 'string') host = document.getElementById(host);
-    if (!host) return false;
-    var f = host.querySelector('iframe.octa-tv-frame');
-    if (!f) return false;
-    var sym = f.dataset.tvSymbol;
-    var iv = f.dataset.tvInterval;
-    var compact = (window.innerWidth < 900);
-    try { mount(host, { symbol: sym, interval: iv, hideSideToolbar: compact }); } catch (e0) {}
-    if (host.parentElement) {
-      var bar = host.parentElement.querySelector('#ocm-drawbar');
-      if (bar) bar.querySelectorAll('.ocm-draw').forEach(function (s) { s.classList.remove('octa-draw-active'); });
-    }
-    return true;
-  }
-  function drawAction(host, act) {
-    if (typeof host === 'string') host = document.getElementById(host);
-    if (!host) return false;
-    var f = host.querySelector('iframe.octa-tv-frame');
-    if (!f) return false;
-    var map = { undo: 'tv-widget-undo', clear: 'tv-widget-clear-all' };
-    var name = map[act];
-    if (!name) return false;
-    try {
-      f.contentWindow.postMessage({ name: name }, '*');
-      f.contentWindow.postMessage({ name: 'tv-widget-' + act, value: true }, '*');
-    } catch (e0) {}
-    return true;
-  }
+  /* 📌 19 أكتوبر ٢٠٢٦ — أحمد طلب الإبقاء على أدوات TradingView الأصلية
+     (الـside toolbar بتاعه). شِلت شريط OCTA اللي كنت عامله (أيقونات
+     📈📏🌀🔤 + تراجع + مسح) لأن أدواته الأصلية أدق وأشمل.
+     بُنيان الـside toolbar بيظهر دايماً على الموبايل والديسكتوب. */
 
   /* ═══ قفل تمرير الصفحة (html + body) ═══
      ⛔ استخدمنا class في الأول — بس فيه كود في الموقع بيمسح
@@ -817,10 +748,7 @@ window.OCTA_TV = {
     /* 📷 التصوير */
     makeShotBtn: makeShotBtn,
     shotUrl: shotUrl,
-    /* ✏️ أدوات الرسم (19 أكتوبر ٢٠٢٦) */
-    activateDrawTool: activateDrawTool,
-    exitDrawMode: exitDrawMode,
-    drawAction: drawAction,
+    /* ✏️ أدوات الرسم (شِيلت 19 أكتوبر ٢٠٢٦ — أدوات TradingView الأصلية تكفي) */
     ENDPOINT: ENDPOINT
   };
 

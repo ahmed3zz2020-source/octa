@@ -1038,21 +1038,8 @@ window.openChart = function (code, name, market) {
       '<span class="ocm-slot ocm-slot-search" id="ocm-pick"></span>' +
       '<button class="ocm-fs" id="ocm-fs" type="button" aria-label="ملء الشاشة"' +
       ' title="ملء الشاشة">⛶</button>' +
-      '<button class="ocm-draw-toggle" id="ocm-draw-toggle" type="button"' +
-      ' aria-label="أدوات الرسم" title="أدوات الرسم">✏️</button>' +
       '<span class="ocm-slot ocm-slot-shot" id="ocm-shot"></span>' +
       '<button class="ocm-close" data-close aria-label="اقفل">✕</button></div>' +
-      '<div class="ocm-row3" id="ocm-drawbar" style="display:none">' +
-      '<span class="ocm-draw-hint">ارسم</span>' +
-      '<button class="ocm-draw" data-draw="LineToolTrendLine" aria-label="خط اتجاه" title="خط اتجاه">📈</button>' +
-      '<button class="ocm-draw" data-draw="LineToolHorizontalRay" aria-label="شعاع أفقي" title="شعاع أفقي">📏</button>' +
-      '<button class="ocm-draw" data-draw="LineToolFibRetracement" aria-label="فيبوناتشي" title="فيبوناتشي">🌀</button>' +
-      '<button class="ocm-draw" data-draw="LineToolText" aria-label="نص" title="نص على الرسم">🔤</button>' +
-      '<span class="ocm-draw-sep"></span>' +
-      '<button class="ocm-draw ocm-draw-undo" data-act="undo" aria-label="تراجع" title="تراجع (Ctrl+Z)">↶</button>' +
-      '<button class="ocm-draw ocm-draw-clear" data-act="clear" aria-label="امسح الرسومات" title="امسح كل الرسومات على السهم ده">🧹</button>' +
-      '<button class="ocm-draw ocm-draw-exit" id="ocm-draw-exit" aria-label="تم" title="إخفاء شريط الرسم">✅</button>' +
-      '</div>' +
       '</div>' +
       '<div id="gmv-chart" class="gchart"></div>' +
       '</div>';
@@ -1172,73 +1159,11 @@ window.openChart = function (code, name, market) {
     window.__octaPriceTimer = setInterval(update, 15000);
   }
 
-  /* ✏️ شريط أدوات الرسم (19 أكتوبر ٢٠٢٦) — 4 أدوات + تراجع + مسح.
-     الحل العملي لمشكلة الـside toolbar المختفي على الموبايل:
-     1) نخفي الـside toolbar افتراضياً.
-     2) لما المستخدم يدوس على "أدوات الرسم" في الترويسة: نعمل re-mount
-        مع hideSideToolbar=false فيُظهر الـside toolbar.
-     3) لما يدوس "تم الرسم": نرجع للوضع الافتراضي. */
-  var drawbar = document.getElementById('ocm-drawbar');
-  var drawToggle = document.getElementById('ocm-draw-toggle');
-  var drawExit = document.getElementById('ocm-draw-exit');
-  function setDrawBarVisible(on) {
-    if (!drawbar) return;
-    drawbar.style.display = on ? 'flex' : 'none';
-    if (drawToggle) drawToggle.classList.toggle('octa-draw-toggle-on', on);
-  }
-  if (drawToggle) {
-    drawToggle.addEventListener('click', function () {
-      var on = drawbar.style.display !== 'none';
-      setDrawBarVisible(!on);
-      if (!on) { try { window.OCTA_TV.activateDrawTool(chartHost(m), null, null); } catch (e0) {} }
-      else { try { window.OCTA_TV.exitDrawMode(chartHost(m)); } catch (e1) {} }
-    });
-  }
-  if (drawExit) {
-    drawExit.addEventListener('click', function () {
-      setDrawBarVisible(false);
-      try { window.OCTA_TV.exitDrawMode(chartHost(m)); } catch (e1) {}
-    });
-  }
-  if (drawbar) {
-    drawbar.addEventListener('click', function (e) {
-      var btn = e.target.closest('[data-draw],[data-act]');
-      if (!btn) return;
-      var draw = btn.getAttribute('data-draw');
-      var act = btn.getAttribute('data-act');
-      if (window.OCTA_TV) {
-        if (draw) {
-          window.OCTA_TV.activateDrawTool(chartHost(m), draw, btn);
-        } else if (act === 'undo') {
-          window.OCTA_TV.drawAction(chartHost(m), 'undo');
-        } else if (act === 'clear') {
-          if (window.confirm('امسح كل الرسومات على السهم ده؟')) {
-            window.OCTA_TV.drawAction(chartHost(m), 'clear');
-          }
-        }
-      }
-    });
-  }
-  var drawbar = document.getElementById('ocm-drawbar');
-  if (drawbar) {
-    drawbar.addEventListener('click', function (e) {
-      var btn = e.target.closest('[data-draw],[data-act]');
-      if (!btn) return;
-      var draw = btn.getAttribute('data-draw');
-      var act = btn.getAttribute('data-act');
-      if (window.OCTA_TV) {
-        if (draw) {
-          window.OCTA_TV.activateDrawTool(chartHost(m), draw, btn);
-        } else if (act === 'undo') {
-          window.OCTA_TV.drawAction(chartHost(m), 'undo');
-        } else if (act === 'clear') {
-          if (window.confirm('امسح كل الرسومات على السهم ده؟')) {
-            window.OCTA_TV.drawAction(chartHost(m), 'clear');
-          }
-        }
-      }
-    });
-  }
+  /* 📌 19 أكتوبر ٢٠٢٦ — شِيلنا شريط أدوات الرسم OCTA بناءً على طلب
+     أحمد. أدوات TradingView الأصلية في الـside toolbar تكفي. */
+
+  /* 📌 19 أكتوبر ٢٠٢٦ — شِيلنا شريط أدوات الرسم OCTA بناءً على طلب
+     أحمد. أدوات TradingView الأصلية في الـside toolbar تكفي. */
 
   /* ⛔ قفل تمرير الصفحة (html + body) عشان متبقاش بتتزحلقش ورا المودال */
   try { if (window.OCTA_TV) window.OCTA_TV.lockPage(true); } catch (e2) {}
