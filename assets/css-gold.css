@@ -22,6 +22,29 @@
   --g-scrim:  color-mix(in srgb, var(--pri4) 90%, transparent);
 
   --g-hair: 1px;             /* سُمك الخط الشعري بين الخلايا */
+    /* ⛔ 17 أكتوبر 2026 — توكنز ناقصة كانت مستعملة ومعرّفةش.
+       ⛔ var(--up) و var(--dn2) مش في النظام — الصح var(--sec) و var(--red2).
+       ⛔ و --r2 و --pri4 و --slot مش موجودين — عُرّفوا هنا. */
+    --up:   var(--sec);
+    --dn2:  var(--red2);
+    --r2:   10px;
+    --pri4: rgba(0,0,0,.42);
+    --slot: rgba(255,255,255,.035);
+    --g-mut:   var(--muted);
+    --g-txt:   var(--txt);
+    --g-card:  var(--pri2);
+    --g-card2: var(--pri3);
+    --g-gold:  var(--gold);
+    --g-gold-l: var(--gold2);
+    --g-hair2: 6px;
+    --g-hair3: 10px;
+    /* ⛔ أزرق «مفيش قياس كافي» — مالوش توكن بالنظام (octa.css)
+       ⇒ اتعرّف هنا.027 بتاع الفيدرالي هو أزرق فاتح أحسن للقراءة. */
+    --g-blue:  #38bdf8;
+    /* ⛔ 17 أكتوبر 2026 — --g-green و --g-red كانو مستعملين ومش معرّفين
+       ⇒ كروت مفتاح الألوان بتطلع سودا. عرّفناهم هنا. */
+    --g-green: #16a34a;   /* أخضر «اشترِ» */
+    --g-red:   #dc2626;   /* أحمر «بِع» */
 }
 :root[data-theme="light"],
 body.light {
@@ -271,7 +294,7 @@ body.light {
 .gtab:hover { color: var(--txt); }
 .gtab.on { background: var(--goldBg); border-color: var(--goldLine); color: var(--g-gold-t); }
 .gtab:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-.gchart { height: 380px; border-radius: var(--r2); overflow: hidden; border: 1px solid var(--g-line); background: var(--pri2); }
+.gchart { height: 560px; border-radius: var(--r2); overflow: hidden; border: 1px solid var(--g-line); background: var(--pri2); }
 .gchart .tradingview-widget-container { height: 100%; }
 
 /* ═══ ⑨  الفريمات — ٤ أعمدة، صفوف جوّهها شعري بس ═══ */
@@ -389,7 +412,7 @@ body.light {
   .gpn       { grid-template-columns: 1fr; }
   .gpn-c + .gpn-c { border-inline-start: 0; border-top: 1px solid var(--g-line); }
   .gsess     { grid-template-columns: repeat(2, 1fr); }
-  .glearn-st { grid-template-columns: repeat(2, 1fr); }  .gchart    { height: 280px; }
+  .glearn-st { grid-template-columns: repeat(2, 1fr); }  .gchart    { height: 440px; }
   .gtab      { padding: 0 14px; }
 }
 
@@ -407,7 +430,7 @@ body.light {
 @media (min-width: 1024px) {
   .gstrip--a { grid-template-columns: repeat(6, 1fr); }
   .gstrip--i { grid-template-columns: repeat(4, 1fr); }
-  .gchart   { height: 420px; }
+  .gchart   { height: 620px; }
   .gbody    { padding: 0 20px 22px; }
   .gcell    { padding: 12px 14px; }
 }
@@ -420,17 +443,203 @@ body.light {
   .ghead-t { font-size: .9rem; }
   .gclose { width: 44px; height: 44px; }
   .gbody { padding: 0 12px 14px; }
-  .gchart { height: 240px; }
+  .gchart { height: 460px; }
   .gprice { font-size: 1.45rem; }
   .gsign  { font-size: 1.1rem; }
   .gsec   { padding-top: 12px; }
 }
 
-/* ⛔ حالة «الم السوق مقفول» — رمادي مش أزرق.
-   الأزرق معناه «حلّلنا وما لقيناش حاجة».
-   المقفول معناه «السوق مش شغال» — فرق كبير للمستخدم. */
-.gdot--closed {
-  background: #64748b !important;
-  box-shadow: 0 0 0 3px rgba(100,116,139,.22) !important;
+/* ═══ ⑩  أزرار المقترحات الثلاثة + مفتاح الألوان (17 أكتوبر 2026) ═══ */
+.glegend { display:flex; flex-wrap:wrap; gap:var(--g-hair) var(--g-hair2);
+  padding:var(--g-hair2) 0 var(--g-hair3); border-bottom:1px solid var(--g-line); margin-bottom:var(--g-hair2); }
+.glegend-i { display:inline-flex; align-items:center; gap:5px; font-size:.74rem;
+  color:var(--g-mut); padding:2px 0; }
+.glegend-d { width:9px; height:9px; border-radius:50%; flex:none; box-shadow:0 0 0 1px rgba(0,0,0,.12); }
+.glegend-d--green { background:var(--g-green); }
+.glegend-d--red   { background:var(--g-red); }
+.glegend-d--blue  { background:var(--g-blue); }
+
+.gtrade { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:var(--g-hair2); margin:var(--g-hair2) 0; }
+.gtrade-b { position:relative; display:flex; flex-direction:column; gap:5px;
+  padding:12px 13px; border-radius:var(--r2); border:1px solid var(--g-line);
+  background:var(--g-card); cursor:pointer; text-align:start; min-height:44px;
+  font-family:inherit; transition:background .15s, border-color .15s; }
+.gtrade-b:hover:not(:disabled) { border-color:var(--g-gold-l); background:var(--g-card2); }
+.gtrade-b:focus-visible { outline:2px solid var(--g-gold); outline-offset:2px; }
+.gtrade-b:disabled { cursor:not-allowed; opacity:.72; }
+.gtrade-b.on { border-color:var(--g-gold-l); background:var(--goldBg); }
+.gtrade-t { display:flex; align-items:center; gap:6px; font-weight:800; font-size:.86rem; color:var(--g-txt); }
+.gtrade-s { font-size:.72rem; color:var(--g-mut); line-height:1.5; }
+.gtrade-p { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:.74rem; }
+.gtrade-p span { background:var(--pri3); border-radius:6px; padding:2px 7px; color:var(--g-txt); }
+.gtrade-off { font-size:.72rem; color:var(--g-mut); font-weight:700; }
+@media (max-width:640px) {
+  .gtrade { grid-template-columns:1fr; }
 }
-.gdot--closed::after { background: radial-gradient(circle, rgba(100,116,139,.4), transparent 70%); }
+
+/* ═══ ⑪  كارت الذهب — الحالة جوّه الكارت نفسه (17 أكتوبر 2026) ═══
+   ⛔ أحمد: «النقطة أو الزر الأزرق وكلمة خامل والدرجة تبقى في محتوى
+      الكارت نفسه · بلا هيدر · الكارت ميبقاش واخد مساحة · يبقى في
+      حجمه كما هو الأول مع إضافة زر اللون على حسب حالة الأصل».
+   ✅ الحل: لون الكارت كله حسب الحالة + شريط لوني تحت + سطر صغير
+      جوه الكارت فيه النطق + الدرجة. مافيش هيدر · مافيش مساحة زيادة. */
+.mini.gmini { position: relative; overflow: hidden; cursor: pointer;
+  transition: transform .14s, box-shadow .14s, border-color .14s; }
+.mini.gmini:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.20); }
+.mini.gmini:active { transform: translateY(0); }
+.mini.gmini:focus-visible { outline: 2px solid var(--g-gold); outline-offset: 2px; }
+/* لون الكارت حسب الحالة */
+.mini.gmini.gmini--green { border-color: var(--g-green) !important; background: color-mix(in srgb, var(--g-green) 11%, var(--pri2)) !important; }
+.mini.gmini.gmini--red   { border-color: var(--g-red) !important;   background: color-mix(in srgb, var(--g-red)   11%, var(--pri2)) !important; }
+.mini.gmini.gmini--blue  { border-color: var(--g-blue) !important;  background: color-mix(in srgb, var(--g-blue)  11%, var(--pri2)) !important; }
+/* شريط الحالة تحت الكارت */
+.mini.gmini::after { content:''; position:absolute; inset-inline:0; bottom:0; height:4px; background:var(--g-mut); }
+.mini.gmini.gmini--green::after { background: var(--g-green) !important; }
+.mini.gmini.gmini--red::after   { background: var(--g-red) !important; }
+.mini.gmini.gmini--blue::after  { background: var(--g-blue) !important; }
+/* سطر الحالة جوه الكارت — تحت النسبة */
+.mini.gmini { padding: 10px 11px 13px; }
+.mini.gmini .gsig { display:flex; align-items:center; justify-content:space-between;
+  gap:6px; margin-top:7px; padding:5px 8px; border-radius:8px;
+  font-size:.70rem; font-weight:800; }
+/* خلفية سطر الحالة = لون الحالة نفسه */
+.mini.gmini.gmini--green .gsig { background:color-mix(in srgb, var(--g-green) 17%, transparent) !important; }
+.mini.gmini.gmini--red   .gsig { background:color-mix(in srgb, var(--g-red)   17%, transparent) !important; }
+.mini.gmini.gmini--blue  .gsig { background:color-mix(in srgb, var(--g-blue)  17%, transparent) !important; }
+.mini.gmini .gdot { width:13px; height:13px; border-radius:50%; flex:none;
+  box-shadow:0 0 0 2px color-mix(in srgb, currentColor 22%, transparent); }
+.mini.gmini .gdot--green { background:var(--g-green); color:var(--g-green); }
+.mini.gmini .gdot--red   { background:var(--g-red);   color:var(--g-red); }
+.mini.gmini .gdot--blue  { background:var(--g-blue);  color:var(--g-blue); }
+.mini.gmini .gtxt { display:inline-flex; align-items:center; gap:5px; min-width:0; }
+.mini.gmini .gtxt b { font-weight:800; color:var(--g-txt); white-space:nowrap; }
+.mini.gmini .gsc { font-style:normal; font-weight:800; color:var(--g-mut);
+  background:var(--pri3); border-radius:5px; padding:1px 5px; white-space:nowrap; }
+.mini.gmini .gwarn, .mini.gmini .gfroze { font-style:normal; font-weight:800;
+  background:var(--pri3); border-radius:5px; padding:1px 5px; white-space:nowrap; }
+
+/* مفتاح الألوان — كارت لكل لون */
+.glegend { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:var(--g-hair2); }
+.glegend-c { display:flex; flex-direction:column; gap:4px; padding:11px 12px;
+  border-radius:var(--r2); border:1px solid var(--g-line); background:var(--pri2); }
+.glegend-c--green { border-color:var(--g-green); background:color-mix(in srgb, var(--g-green) 9%, var(--pri2)); }
+.glegend-c--red   { border-color:var(--g-red);   background:color-mix(in srgb, var(--g-red)   9%, var(--pri2)); }
+.glegend-c--blue  { border-color:var(--g-blue);  background:color-mix(in srgb, var(--g-blue)  9%, var(--pri2)); }
+.glegend-t { display:flex; align-items:center; gap:6px; font-weight:800; font-size:.88rem; color:var(--g-txt); }
+.glegend-c--green .glegend-t { color:var(--g-green); }
+.glegend-c--red   .glegend-t { color:var(--g-red); }
+.glegend-c--blue  .glegend-t { color:var(--g-blue); }
+.glegend-d { width:11px; height:11px; border-radius:50%; flex:none; background:currentColor; }
+.glegend-w { font-size:.71rem; font-weight:700; color:var(--g-txt); line-height:1.6; }
+.glegend-m { font-size:.68rem; color:var(--g-mut); line-height:1.6; }
+@media (max-width:820px) { .glegend { grid-template-columns:1fr; } }
+
+/* ═══ ⑫  الشارت — أبيض + زر ⛶ + ملء الشاشة (17 أكتوبر 2026) ═══ */
+.gtabs { display:flex; align-items:center; gap:var(--g-hair2); flex-wrap:wrap; }
+.gfs { flex:none; width:40px; height:40px; border-radius:10px; margin-inline-start:auto;
+  border:1px solid var(--g-line); background:var(--pri2); color:var(--g-txt);
+  font-size:1.15rem; line-height:1; cursor:pointer; transition:background .15s, border-color .15s; }
+.gfs:hover { border-color:var(--g-gold-l); background:var(--pri3); }
+.gfs:focus-visible { outline:2px solid var(--g-gold); outline-offset:2px; }
+
+/* ⛶ ملء الشاشة — الموبايل بيخفي كل حاجة تانية */
+#gmv-chart.gfull {
+  position: fixed !important; inset: 0 !important; z-index: 2147483000 !important;
+  height: 100dvh !important; height: 100vh !important; width: 100vw !important;
+  border-radius: 0 !important; border: 0 !important; margin: 0 !important;
+}
+#gmv-chart.gfull::after {
+  content: '✕  خروج'; position:absolute; top:calc(8px + env(safe-area-inset-top)); inset-inline-end:10px;
+  z-index: 2; background:rgba(0,0,0,.62); color:#fff; font-size:.78rem; font-weight:800;
+  padding:7px 12px; border-radius:20px; cursor:pointer; pointer-events:none;
+}
+/* ⛔ التصحيح: الـchart جوه #gpanel جوّه #gwrap — لو أخفينا #gwrap
+      بيختفي الـchart كمان. الحل: ما نخفيش الأبوين؛ نخفي
+      الـsiblings بس من غير ما نلمس السلسلة اللي فيها الـchart.
+   ⛔ أبسط وأضمن: نخفي كل حاجة عدا سلسلة #gmv-chart نفسها. */
+body.gfull-on #gwrap { position:static !important; }
+body.gfull-on #gback { background:transparent !important; }
+body.gfull-on #gpanel {
+  position: static !important; max-width:none !important; width:auto !important;
+  height:auto !important; max-height:none !important; overflow:visible !important;
+  background:transparent !important; border:0 !important; box-shadow:none !important;
+  margin:0 !important; padding:0 !important;
+}
+/* ⛔ السلسلة: #gmv-chart ← .gsec ← #gbody ← #gpanel ← #gmv ← body
+   ⇒ لازم نخفي الـsiblings على كل مستوى، ونترك السلسلة كلها. */
+body.gfull-on .gbody > *:not(.gsec),
+body.gfull-on .gsec:not(:has(> #gmv-chart)),
+body.gfull-on .gsec > *:not(.gtabs):not(#gmv-chart) { display:none !important; }
+body.gfull-on .gsec:has(> #gmv-chart) {
+  display:block !important; background:transparent !important;
+  border:0 !important; box-shadow:none !important; padding:0 !important; margin:0 !important;
+}
+body.gfull-on #gmv-chart { display:block !important; }
+body.gfull-on .octa-topbar, body.gfull-on .arms-bar, body.gfull-on .octa-sidebar,
+body.gfull-on .toast, body.gfull-on #gate, body.gfull-on .octa-bottom,
+body.gfull-on .arms-filter, body.gfull-on #toolbar { display:none !important; }
+/* ⛔ 17 أكتوبر 2026 — TradingView autosize بيتجاهل الـheight لما الحاوية
+   تتحوّل لـfixed فجأة ⇒ الـiframe يفضل 150px الافتراضي.
+   ✅ الحل: في ملء الشاشة بنحدّد ارتفاع صريح بالبكسل بعد القياس. */
+#gmv-chart.gfull .tradingview-widget-container,
+#gmv-chart.gfull .tradingview-widget-container__widget,
+#gmv-chart.gfull iframe { width: 100% !important; }
+#gmv-chart.gfull { height: 100dvh !important; height: 100vh !important; }
+#gmv-chart.gfull .tradingview-widget-container { height: var(--gfull-h, 100vh) !important; }
+#gmv-chart.gfull .tradingview-widget-container__widget { height: var(--gfull-h, 100vh) !important; }
+/* ⛔ 18 أكتوبر 2026 — TradingView autosize بيتجاهل height لو الحاوية
+   مالهاش ارتفاع صريح. الحل: ارتفاع بالبكسل + !important على الـiframe.
+   ده اللي بيخلي الشارت ياخد ٤٣٨px بدل ١٥٠px. */
+#gmv-chart { position: relative; }
+#gmv-chart .tradingview-widget-container,
+#gmv-chart .tradingview-widget-container__widget { height: 100% !important; width: 100% !important; }
+#gmv-chart iframe { display:block; border:0; height:100% !important; width:100% !important; min-height:100%; }
+
+/* ═══ ⑬ مودال الشارت للسهم (١٨ أكتوبر ٢٠٢٦) ═══ */
+.octa-chart-modal { position:fixed; inset:0; z-index:2147482000; display:none;
+  align-items:center; justify-content:center; }
+.octa-chart-modal[style*="flex"] { display:flex; }
+.ocm-back { position:absolute; inset:0; background:rgba(15,23,42,.62); }
+.ocm-panel { position:relative; width:min(96vw, 860px); height:min(92dvh, 92vh);
+  background:var(--pri2); border:1px solid var(--g-line); border-radius:14px;
+  display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.4); }
+.ocm-head { display:flex; align-items:center; gap:10px; padding:11px 13px;
+  border-bottom:1px solid var(--g-line); font-weight:800; font-size:.95rem; color:var(--g-txt); }
+.ocm-head > span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ocm-close { width:40px; height:40px; flex:none; border-radius:9px; border:1px solid var(--g-line);
+  background:var(--pri3); color:var(--g-txt); font-size:1.05rem; cursor:pointer; }
+.ocm-close:hover { border-color:var(--g-gold-l); }
+.ocm-close:focus-visible { outline:2px solid var(--g-gold); outline-offset:2px; }
+.ocm-tabs { display:flex; gap:6px; padding:9px 13px; border-bottom:1px solid var(--g-line); flex-wrap:wrap; }
+.ocm-tabs .gtab { padding:7px 14px; border-radius:9px; border:1px solid var(--g-line);
+  background:var(--pri2); color:var(--g-txt); font-size:.82rem; font-weight:700; cursor:pointer; min-height:44px; }
+.ocm-tabs .gtab.on { background:var(--goldBg); border-color:var(--g-gold-l); color:var(--g-gold); }
+.ocm-panel #gmv-chart { flex:1; min-height:0; height:auto !important; border:0; border-radius:0; }
+.ocm-foot { display:flex; align-items:center; gap:10px; padding:9px 13px;
+  border-top:1px solid var(--g-line); font-size:.74rem; color:var(--g-mut); }
+.ocm-foot > span { flex:1; min-width:0; }
+.ocm-mini { flex:none; min-height:40px; padding:0 13px; border-radius:9px;
+  border:1px solid var(--g-line); background:var(--pri3); color:var(--g-txt);
+  font-size:.8rem; font-weight:700; cursor:pointer; }
+.ocm-mini:hover { border-color:var(--g-gold-l); }
+.ocm-mini:focus-visible { outline:2px solid var(--g-gold); outline-offset:2px; }
+/* ملء الشاشة */
+#gmv-chart.gfull { position:fixed !important; inset:0 !important; z-index:2147482500 !important;
+  width:100vw !important; height:100dvh !important; height:100vh !important;
+  border-radius:0 !important; }
+body.ocm-open { overflow:hidden; }
+@media (max-width:640px) {
+  .ocm-panel { width:100vw; height:100dvh; height:100vh; border-radius:0; border:0; }
+}
+/* ⛔ 18 أكتوبر 2026 — زر «افتح على TradingView ↗» */
+.ocm-title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ocm-tv { flex:none; display:inline-flex; align-items:center; gap:5px; min-height:40px;
+  padding:0 13px; border-radius:9px; border:1px solid var(--g-gold-l);
+  background:var(--goldBg); color:var(--g-gold); font-size:.78rem; font-weight:800;
+  text-decoration:none; white-space:nowrap; }
+.ocm-tv:hover { background:var(--goldBg); filter:brightness(.96); }
+.ocm-tv:focus-visible { outline:2px solid var(--g-gold); outline-offset:2px; }
+.ocm-tabs .gtab.on { background:var(--goldBg); border-color:var(--g-gold-l); color:var(--g-gold); }
+@media (max-width:640px) {
+  .ocm-tv { font-size:.7rem; padding:0 9px; }
+}

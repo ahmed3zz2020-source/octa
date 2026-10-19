@@ -29,6 +29,9 @@
 .sv-marks {
   display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
   margin-bottom: 11px; scrollbar-width: none;
+  /* ⛔ contain: شريط الأسواق بيتزحلق أفقياً. من غير contain السحب في آخره
+     بتهرّب للصفحة → المحتوى بيتزحزاح كله في RTL. */
+  overscroll-behavior-x: contain;
 }
 .sv-marks::-webkit-scrollbar { display: none; }
 .sv-mk {
@@ -109,6 +112,7 @@
 .sv-sects {
   display: flex; gap: 5px; overflow-x: auto; padding-bottom: 4px;
   margin-bottom: 12px; scrollbar-width: none;
+  overscroll-behavior-x: contain;   /* ⛔ نفس السبب: امنع هروب السحب للصفحة */
 }
 .sv-sects::-webkit-scrollbar { display: none; }
 .sv-sect {
@@ -126,6 +130,10 @@
   overflow-x: auto; border: 1px solid var(--line);
   border-radius: 11px; background: var(--card);
   -webkit-overflow-scrolling: touch; max-height: 68vh;
+  /* ⛔⛔⛔ الأهم: جدول الفلتر min-width:1100px — أعرض من أي تابلت.
+     من غير contain، سحب آخر الجدول بيزحلق الصفحة كلها لليمين
+     (في RTL) ويطلع الهيدر وشريط الأذرع بره المحاذاة. */
+  overscroll-behavior-x: contain;
 }
 .sv-tbl {
   width: 100%; border-collapse: collapse;
@@ -237,6 +245,7 @@ td.sn {
 .sv-grps {
   display: flex; gap: 5px; overflow-x: auto; padding-bottom: 4px;
   margin-bottom: 10px; scrollbar-width: none;
+  overscroll-behavior-x: contain;   /* ⛔ شريط مجموعات الفلاتر */
 }
 .sv-grps::-webkit-scrollbar { display: none; }
 .sv-grp-b {
@@ -465,6 +474,7 @@ body.light .sv-wrap { border-color: #d8e0e8; }
 .sv-lvls {
   display: flex; gap: 5px; overflow-x: auto; padding-bottom: 5px;
   margin-bottom: 14px; scrollbar-width: none;
+  overscroll-behavior-x: contain;   /* ⛔ أزرار المستويات */
 }
 .sv-lvls::-webkit-scrollbar { display: none; }
 .sv-lvl {
@@ -750,6 +760,7 @@ html[data-dev="1"] .octa-devbar::after {
     -webkit-overflow-scrolling: touch !important;
     padding: 4px 0 8px !important;
     scrollbar-width: none !important;
+    overscroll-behavior-x: contain !important;  /* ⛔ نسخة الموبايل — نفس السبب */
   }
   .sv-lvls::-webkit-scrollbar { display: none; }
   .sv-lvl {
@@ -927,3 +938,13 @@ html[data-dev="1"] .octa-devbar::after {
 /* القوائم النقطية: العلامة على يمين السطر مش شمال */
 .sv-dl { padding-inline-start: 0; }
 .sv-dl li { text-align: right; }
+
+/* ⛔ مصدرنا ماجابش سعر محدّث — الرقم آخر سعر وصلنا، مش سعر النهاردة */
+.sv-halt {
+  display: inline-block; margin-inline-start: 5px; padding: 1px 7px;
+  font-size: 10px; font-weight: 700; line-height: 1.6;
+  color: #8a93a3; background: rgba(138,147,163,.14);
+  border: 1px solid rgba(138,147,163,.32); border-radius: 5px;
+  white-space: nowrap; vertical-align: middle;
+}
+td.n b.halt { color: #8a93a3; text-decoration: line-through; text-decoration-thickness: 1px; }

@@ -1,15 +1,4 @@
-# Cloudflare Workers — لا تُرفع
 node_modules/
-.wrangler/
-
-# البناء (ينتج تلقائياً)
 dist/
-
-# ملفات محلية
+.wrangler/
 *.log
-.DS_Store
-.env
-.env.*
-
-# ⛔ أسرار — ما تحطش هنا أبداً
-# التوكن في Railway Variables فقط/workspace/octa-secrets/

@@ -6,117 +6,90 @@
   <meta name="theme-color" content="#0a1929">
   <script id="octaDiag">
 /* ═══════════════════════════════════════════════════════════
-   🩺 كارت الفحص — بيتفتح بـ ?diag=1 في شريط العنوان
-   ───────────────────────────────────────────────────────────
-   ⛔ ليش؟ كان أي حاجة بتبقى فاضية وال��ستخدم مبيعرفش السبب.
-   ⛌ الكارت ده بيعمل ٥ فحوصات ويقول النتيجة بالعربي — من غير
-   ما يحتاج يفتح DevTools ولا يفهم في أي حاجة تقنية.
-   ═══════════════════════════════════════════════════════════ */
+  🩺 كارت الفحص — بيتفتح بـ ?diag=1 في شريط العنوان
+  ───────────────────────────────────────────────────────────
+  ⛔ ليش؟ كان أي حاجة بتبقى فاضية وال��ستخدم مبيعرفش السبب.
+  ⛌ الكارت ده بيعمل ٥ فحوصات ويقول النتيجة بالعربي — من غير
+  ما يحتاج يفتح DevTools ولا يفهم في أي حاجة تقنية.
+  ═══════════════════════════════════════════════════════════ */
 window.__octaDiag = function () {
   var box = document.createElement('div');
   box.id = '__octaDiag';
   box.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(8,12,18,.94);'
-    + 'padding:16px;font:13px/1.9 system-ui;direction:rtl;color:#e8edf5;overflow:auto';
+  + 'padding:16px;font:13px/1.9 system-ui;direction:rtl;color:#e8edf5;overflow:auto';
   box.innerHTML = '<div style="max-width:520px;margin:0 auto">'
-    + '<div style="font-size:19px;font-weight:700;margin-bottom:4px">🩺 فحص OCTA</div>'
-    + '<div id="__dgList"></div>'
-    + '<button id="__dgClose" style="margin-top:16px;width:100%;padding:12px;border:0;'
-    + 'border-radius:10px;background:#d4af37;color:#16202e;font-weight:700;font-size:15px">'
-    + 'اقفل</button></div>';
+  + '<div style="font-size:19px;font-weight:700;margin-bottom:4px">🩺 فحص OCTA</div>'
+  + '<div id="__dgList"></div>'
+  + '<button id="__dgClose" style="margin-top:16px;width:100%;padding:12px;border:0;'
+  + 'border-radius:10px;background:#d4af37;color:#16202e;font-weight:700;font-size:15px">'
+  + 'اقفل</button></div>';
   document.body.appendChild(box);
   box.querySelector('#__dgClose').onclick = function(){ box.remove(); };
   var L = box.querySelector('#__dgList');
   var API = (typeof OCTA_API !== 'undefined' && OCTA_API)
-    || 'https://octa-prices-production-4ccb.up.railway.app';
+  || 'https://octa-prices-production-4ccb.up.railway.app';
 
   function line(txt, cls) {
-    var d = document.createElement('div');
-    d.style.cssText = 'padding:7px 10px;border-radius:8px;margin-bottom:6px;background:#16202e;'
-      + 'border-right:3px solid ' + (cls === 'ok' ? '#51cf66' : cls === 'no' ? '#ff6b6b' : '#ffd43b');
-    d.textContent = txt;
-    L.appendChild(d);
+  var d = document.createElement('div');
+  d.style.cssText = 'padding:7px 10px;border-radius:8px;margin-bottom:6px;background:#16202e;'
+  + 'border-right:3px solid ' + (cls === 'ok' ? '#51cf66' : cls === 'no' ? '#ff6b6b' : '#ffd43b');
+  d.textContent = txt;
+  L.appendChild(d);
   }
 
   function head(p) {
-    var h = new Headers();
-    var t = '';
-    try { t = localStorage.getItem('octa_token') || ''; } catch (e) {}
-    if (t) h.set('Authorization', 'Bearer ' + t);
-    return h;
+  var h = new Headers();
+  var t = '';
+  try { t = localStorage.getItem('octa_token') || ''; } catch (e) {}
+  if (t) h.set('Authorization', 'Bearer ' + t);
+  return h;
   }
 
   line('▶ السيرفر…');
   fetch(API + '/').then(function (r) { return r.json(); }).then(function (d) {
-    line('✅ السيرفر: ' + d.status + ' · السوق ' + d.market_phase + ' · ' + d.cairo_time, 'ok');
+  line('✅ السيرفر: ' + d.status + ' · السوق ' + d.market_phase + ' · ' + d.cairo_time, 'ok');
   }).catch(function (e) {
-    line('❌ السيرفر: ' + (e && e.message), 'no');
+  line('❌ السيرفر: ' + (e && e.message), 'no');
   });
 
   line('▶ التوكن…');
   fetch(API + '/api/auth/me', { headers: head() }).then(function (r) {
-    return r.json().then(function (d) { return { s: r.status, d: d }; });
+  return r.json().then(function (d) { return { s: r.status, d: d }; });
   }).then(function (o) {
-    if (o.s === 200) line('✅ دخولك: ' + (o.d.user && o.d.user.name || 'مستخدم'), 'ok');
-    else line('⛔ مش داخل (كود ' + o.s + ') — لازم تعمل دخول تاني', 'no');
+  if (o.s === 200) line('✅ دخولك: ' + (o.d.user && o.d.user.name || 'مستخدم'), 'ok');
+  else line('⛔ مش داخل (كود ' + o.s + ') — لازم تعمل دخول تاني', 'no');
   }).catch(function (e) { line('❌ التوكن: ' + (e && e.message), 'no'); });
 
   [['الأسهم كاملة', '/api/data_full'],
-   ['الترتيب', '/api/rank?limit=5'],
-   ['الأسعار', '/api/quotes?market=egypt']
+  ['الترتيب', '/api/rank?limit=5'],
+  ['الأسعار', '/api/quotes?market=egypt']
   ].forEach(function (p) {
-    fetch(API + p[1], { headers: head() }).then(function (r) {
-      return r.text().then(function (t) { return { s: r.status, t: t }; });
-    }).then(function (o) {
-      var n = 0;
-      /* ⛔⛔ الكارت ده كان بيقول «الأسعار: 0 سجل» والسبب مش في السيرفر:
-         رد /api/quotes شكله markets:{egypt:{...}} — مفيش stocks ولا results
-         ولا count في الأعلى، فكان العدّاد دايماً صفر وده كاذب.
-         ⛌ دلوقتي بنعدّ كل Shapes الردود اللي في الموقع. */
-      try {
-        var j = JSON.parse(o.t);
-        n = (j.stocks && Object.keys(j.stocks).length)
-         || (j.results && j.results.length)
-         || (j.count || 0)
-         || (j.markets && Object.keys(j.markets).reduce(function (a, k) {
-              return a + Object.keys(j.markets[k] || {}).length; }, 0))
-         || (j.egx30 && j.egx30.length)
-         || (Array.isArray(j) && j.length)
-         || 0;
-      } catch (e) {}
-      if (o.s === 200) line('✅ ' + p[0] + ': ' + n + ' سجل', 'ok');
-      else line('⛔ ' + p[0] + ' → ' + o.s, 'no');
-    }).catch(function (e) { line('❌ ' + p[0] + ': ' + (e && e.message), 'no'); });
+  fetch(API + p[1], { headers: head() }).then(function (r) {
+  return r.text().then(function (t) { return { s: r.status, t: t }; });
+  }).then(function (o) {
+  var n = 0;
+  try { var j = JSON.parse(o.t); n = (j.stocks && Object.keys(j.stocks).length)
+  || (j.results && j.results.length) || (j.count || 0); } catch (e) {}
+  if (o.s === 200) line('✅ ' + p[0] + ': ' + n + ' سجل', 'ok');
+  else line('⛔ ' + p[0] + ' → ' + o.s, 'no');
+  }).catch(function (e) { line('❌ ' + p[0] + ': ' + (e && e.message), 'no'); });
   });
 
   setTimeout(function () {
-    line('▶ الصفحات…');
-    try {
-      var pages = document.querySelectorAll('[id$="Page"], .page');
-      line('📄 عدد صفحات الموقع: ' + pages.length, 'ok');
-      if (typeof switchPage === 'function') {
-        /* ⛔⛔ الكارت ده كان بيقول «زر الأسهم → مقفل ❌» بعد 350 مللي بس،
-           والصفحة على موبايل 4G مش بتتعبّى في الوقت ده — فكان كاذب.
-           ⛌ دلوقتي بنستنى لحد ما تظهر أو تعدي 4 ثواني. */
-        switchPage('stocks');
-        var tries = 0;
-        (function waitStock() {
-          /* ⛔⛔⛔ الفحص ده كان بيتكلم على stockPage — وده مش صفحة
-             الأسهم! ده لوح تحليل السهم المستقل (بينفتح لما تدوس على
-             سهم)، وswitchPage بيخفيه عن قصد في switchPage فيه
-             ['stockPage','auditPage',...]ForEach بيقفلها.
-             صفحة الأسهم الحقيقية = #page-stocks.
-             ⛌ دلوقتي بنفحص الصح، والرسالة بتقول الحالة بوضوح. */
-          var el = document.getElementById('page-stocks');
-          var on = !!(el && el.classList.contains('active'));
-          var filled = !!(el && el.querySelectorAll('*').length > 8);
-          if (on && filled) { line('🔘 صفحة الأسهم → مفتوحة ومحمّلة ✅', 'info'); return; }
-          tries++;
-          if (tries < 8) { setTimeout(waitStock, 500); return; }
-          line('🔘 صفحة الأسهم → ' + (!el ? 'مفيش #page-stocks في الـHTML ❌'
-            : (on ? 'مفتوحة بس لسه بتحمّل ❌' : 'مقفولة ❌')), 'info');
-        })();
-      } else { line('⛔ دالة switchPage مش موجودة', 'no'); }
-    } catch (e) { line('❌ ' + (e && e.message), 'no'); }
+  line('▶ الصفحات…');
+  try {
+  var pages = document.querySelectorAll('[id$="Page"], .page');
+  line('📄 عدد صفحات الموقع: ' + pages.length, 'ok');
+  if (typeof switchPage === 'function') {
+  switchPage('stocks');
+  setTimeout(function () {
+  var el = document.getElementById('stockPage');
+  line('🔘 زر الأسهم → ' + (el
+  ? (getComputedStyle(el).display === 'none' ? 'مقفل ❌' : 'فتح ✅')
+  : 'مفيش صفحة stocks في الـHTML'), 'info');
+  }, 350);
+  } else { line('⛔ دالة switchPage مش موجودة', 'no'); }
+  } catch (e) { line('❌ ' + (e && e.message), 'no'); }
   }, 1200);
 };
 if (/[?&]diag=1/.test(location.search)) {
@@ -125,62 +98,59 @@ if (/[?&]diag=1/.test(location.search)) {
 </script>
 <script id="octaErrTrap">
 /* ⛔⛔ لحد دلوقتي أي خطأ JavaScript كان بيختفي تمامًا — المستخدم بيشوف
-   صفحة زي الصورة ومحدش بيعرف السبب. الكارت ده بيوريه فوق.
-   ⛌ مش بيظهر أخطاء الشبكة (fetch) — دي ليها رسائلها. */
+  صفحة زي الصورة ومحدش بيعرف السبب. الكارت ده بيوريه فوق.
+  ⛌ مش بيظهر أخطاء الشبكة (fetch) — دي ليها رسائلها. */
 window.addEventListener('error', function (e) {
   try {
-    var m = (e && e.message) || 'خطأ غير معروف';
-    var f = (e && e.filename || '').split('/').pop();
-    var l = (e && e.lineno) || 0;
-    var b = document.getElementById('__octaErr');
-    if (!b) {
-      b = document.createElement('div');
-      b.id = '__octaErr';
-      b.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;'
-        + 'background:#2a0f12;color:#ffd7d7;border:1px solid #a33;border-radius:12px;'
-        + 'padding:10px 12px;font:13px/1.7 system-ui;direction:rtl;text-align:right';
-      (document.body || document.documentElement).appendChild(b);
-    }
-    b.textContent = '\u26a0\ufe0f ' + m + (f ? '  (' + f + ':' + l + ')' : '');
+  var m = (e && e.message) || 'خطأ غير معروف';
+  var f = (e && e.filename || '').split('/').pop();
+  var l = (e && e.lineno) || 0;
+  var b = document.getElementById('__octaErr');
+  if (!b) {
+  b = document.createElement('div');
+  b.id = '__octaErr';
+  b.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;'
+  + 'background:#2a0f12;color:#ffd7d7;border:1px solid #a33;border-radius:12px;'
+  + 'padding:10px 12px;font:13px/1.7 system-ui;direction:rtl;text-align:right';
+  (document.body || document.documentElement).appendChild(b);
+  }
+  b.textContent = '\u26a0\ufe0f ' + m + (f ? '  (' + f + ':' + l + ')' : '');
   } catch (x) { }
 }, true);
-</script>
-<script id="octa-auth-boot">
-  /* 🔒 البابة هي اللي بتقرّر في التوكن — من أول مللي.
-     ⛔ أول ما الصفحة تفتح، التطبيق بيبعت طلبات محمية والتوكن
-     ممكن يكون منتهي (عمره ساعتين). لو الرد 401 وصل قبل ما
-     البابة تتحقق، كانت الرسالة «انتهت جلستك» بتظهر فوق شاشة
-     الدخول بالظبط — وده اللي كان بيحصله أحمد كل ما يفتح الموقع.
-     ⛌ العلامة دي بتخلي الطلبات تستنى البابة تحسم. */
-  window.__octaGateBusy = true;
-  /* ⛌ شبكة أمان: لو البابة-real ماحصلتش، بعد ٢٠ ثانية
-     نرجّع الصلاحية لقاعدة الـ401 العادية. */
-  setTimeout(function () { window.__octaGateBusy = false; }, 20000);
 </script>
 <script id="octa-cache-clear">
   /* 🧹 مسح كاش التطبيق — يخلي أي تعديل جديد يوصل فوراً */
   (function () {
-    var BUILD = 'v=202610182209';
-    var KEY = 'octa_build_v1';
-    try {
-      var prev = localStorage.getItem(KEY);
-      if (prev && prev !== BUILD) {
-        ['assets/js/octa-screener.js','assets/css-screener.css',
-         'assets/css-chart.css','assets/css-decide.css','assets/octa.css',
-         'assets/js/octa-chart.js','assets/js/octa-pages.js',
-         'assets/js/octa-app.js','assets/js/octa-filters.js',
-         'assets/js/octa-watch.js','assets/js/octa-decide.js',
-         'assets/js/octa-core.js','assets/js/octa-api.js',
-         'assets/js/octa-clock.js','assets/js/octa-config.js',
-         'assets/js/octa-settings.js','assets/js/octa-sidebar.js',
-         'assets/js/octa-gold.js','assets/js/octa-indicators.js',
-         'assets/css-gold.css','assets/octa-tokens.css'
-        ].forEach(function (u) {
-          if (window.caches) caches.open('octa-v1').then(function (c) { c.delete(u); });
-        });
-      }
-      localStorage.setItem(KEY, BUILD);
-    } catch (e) {}
+  var BUILD = 'v=2026102600';
+  var KEY = 'octa_build_v1';
+  try {
+  var prev = localStorage.getItem(KEY);
+  if (prev && prev !== BUILD) {
+  ['assets/js/octa-screener.js','assets/css-screener.css',
+  'assets/css-chart.css','assets/css-decide.css','assets/octa.css',
+  'assets/js/octa-chart.js','assets/js/octa-pages.js',
+  'assets/js/octa-app.js','assets/js/octa-filters.js',
+  'assets/js/octa-watch.js','assets/js/octa-decide.js',
+  'assets/js/octa-core.js','assets/js/octa-api.js',
+  'assets/js/octa-clock.js','assets/js/octa-config.js',
+  'assets/js/octa-settings.js','assets/js/octa-sidebar.js',
+  /* ⛌ الستة دول كانوا ناقصين من المسح — فأي تعديل فيهم
+  بيفضل الكاش القديم جايبه. اتضافوا عشان التعديل يوصل. */
+  'assets/js/octa-auth.js','assets/js/octa-gate.js',
+  'assets/js/octa-stats.js','assets/js/octa-dev.js',
+  'assets/js/octa-csp.js','assets/js/octa-armsfilter.js',
+  /* 🆕 محرك إشارة الذهب (16 أكتوبر 2026) — الشارة + المودال
+     ⛌ اتضافوا لقائمة المسح عشان تعديلاتهم توصل متأخرش. */
+  'assets/js/octa-gold.js','assets/css-gold.css',
+  'assets/js/octa-chart-v2.js','assets/js/octa-chart.js',
+  'assets/js/octa-copy.js',
+  'assets/octa-tokens.css'
+  ].forEach(function (u) {
+  if (window.caches) caches.open('octa-v1-' + BUILD).then(function (c) { c.delete(u); });
+  });
+  }
+  localStorage.setItem(KEY, BUILD);
+  } catch (e) {}
   })();
   </script>
 
@@ -188,14 +158,15 @@ window.addEventListener('error', function (e) {
   <link rel="icon" type="image/png" href="assets/octa-logo.png">
   <!-- CSS → assets/octa.css -->
 <!-- tokens أولاً — كل الألوان هنا -->
-<link rel="stylesheet" href="assets/octa-tokens.css?v=202610182209">
-<link rel="stylesheet" href="assets/octa.css?v=202610182209">
-  <link rel="stylesheet" href="assets/css-decide.css?v=202610182209">
-  <link rel="stylesheet" href="assets/css-screener.css?v=202610182209">
-  <link rel="stylesheet" href="assets/css-chart.css?v=202610182209">
-<link rel="stylesheet" href="assets/css-gold.css">
+<link rel="stylesheet" href="assets/octa-tokens.css?v=2026101502">
+<link rel="stylesheet" href="assets/octa.css?v=2026101610">
+  <link rel="stylesheet" href="assets/css-decide.css?v=2026101502">
+  <link rel="stylesheet" href="assets/css-screener.css?v=2026102603">
+  <link rel="stylesheet" href="assets/css-chart.css?v=2026101502">
+<!-- 🆕 محرك إشارة الذهب (16 أكتوبر 2026) — شارة + مودال التحليل -->
+<link rel="stylesheet" href="assets/css-gold.css?v=2026102600">
   <!-- 🔒 سياسة الأمان — بتتقرأ وتتركّب من octa-csp.js (report-only) -->
-  <meta name="octa-csp-report" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; img-src 'self' data: blob: https://*.tradingview.com https://*.tradingview-widget.com; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://s3.tradingview.com https://static.cloudflareinsights.com; connect-src 'self' https://octa-prices-production-4ccb.up.railway.app https://octa-prices.onrender.com https://scanner.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://news.google.com https://api.rss2json.com https://foudalens.com https://api.cors.lol https://feeds.finance.yahoo.com https://efghldg.com https://www.efghldg.com https://www.egx.com.eg; frame-src https://s3.tradingview.com https://www.tradingview.com https://*.tradingview-widget.com https://*.tradingview.com; media-src 'self' blob:; worker-src 'self' blob:">
+  <meta name="octa-csp-report" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com https://s.tradingview.com https://www.tradingview.com; frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com; form-action 'self'; img-src 'self' data: blob: https://*.tradingview.com https://*.tradingview-widget.com; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' https://s3.tradingview.com; connect-src 'self' https://octa-prices-production-4ccb.up.railway.app https://scanner.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://www.tradingview-widget.com https://*.tradingview.com https://news.google.com https://api.rss2json.com https://foudalens.com https://api.cors.lol; frame-src https://s3.tradingview.com https://www.tradingview.com https://*.tradingview-widget.com https://*.tradingview.com; media-src 'self' blob:; worker-src 'self' blob:">
 </head>
 <body>
 
@@ -204,148 +175,158 @@ window.addEventListener('error', function (e) {
 <div class="sb-scrim" onclick="sbToggle()"></div>
 
 <!-- ══════════════════════════════════════════════════════════════
-     🚪 بوابة الدخول — لازم تسجّل قبل ما تشوف الموقع
-     ⛌ الهيكل ده مكتوب مرتين: هنا (قبل أي JS عشان المحتوى
-        المحمي ما يظهرش لثانية واحدة)، وفي SHELL بـocta-gate.js
-        (لو الـDOM اتشال واتفتح تاني). عدّل الاتنين مع بعض.
-     ══════════════════════════════════════════════════════════════ -->
+  🚪 بوابة الدخول — لازم تسجّل قبل ما تشوف الموقع
+  ⛌ الهيكل ده مكتوب مرتين: هنا (قبل أي JS عشان المحتوى
+  المحمي ما يظهرش لثانية واحدة)، وفي SHELL بـocta-gate.js
+  (لو الـDOM اتشال واتفتح تاني). عدّل الاتنين مع بعض.
+  ══════════════════════════════════════════════════════════════ -->
 <div id="gate" class="gt-wrap" style="position:fixed;inset:0;z-index:999999;background:var(--bg,#0a1929)">
   <div class="gt-top">
-    <div class="gt-top-t" id="gtTopT">تسجيل الدخول</div>
-    <button class="gt-top-b" id="gtTopB" type="button">أريد مساعدة</button>
+  <div class="gt-top-t" id="gtTopT">تسجيل الدخول</div>
+  <button class="gt-top-b" id="gtTopB" type="button">أريد مساعدة</button>
   </div>
   <div class="gt-body">
-    <div class="gt-box" id="gtBox">
-      <div id="gt-form"></div>
-    </div>
+  <div class="gt-box" id="gtBox">
+  <div id="gt-form"></div>
+  </div>
   </div>
 </div>
 
   <!-- HEADER -->
   <div class="top-bar">
-    <div class="top-bar-inner">
-      <div class="logo">
-        <img src="assets/octa-logo.png" alt="OCTA">
-        <span class="logo-text">OCTA</span>
-      </div>
-    </div>
+  <div class="top-bar-inner">
+  <div class="logo">
+  <img src="assets/octa-logo.png" alt="OCTA">
+  <span class="logo-text">OCTA</span>
+  </div>
+  </div>
   </div>
 
   <!-- ══════════ OCTA v3 — TOP BAR ══════════ -->
   <header class="octa-topbar">
-    <div class="octa-brand">
-      <div class="octa-logo" onclick="switchPage('home')" style="cursor:pointer">
-        <span class="octa-mark">🐙</span>
-        <span class="octa-wordmark">
-          <span class="w1">OCTA</span>
-          <span class="w2">ONE BRAIN · EIGHT ARMS</span>
-        </span>
-      </div>
-      <div class="octa-brand-right">
-        <div class="octa-clock" id="octaClock"><b>—</b>آخر تحديث</div>
-        <button class="theme-toggle" id="lightBtn" onclick="toggleLight()" title="الوضع النهاري">🌙</button>
-        <!-- ⛌ الزر القديم بتاع التقرير اتشال —
-             /api/audit/redundancy, which now requires a token, so the
-             button could only ever produce an error for a user. -->
-      </div>
-    </div>
+  <!-- 🆕 شريط الذهب (16 أكتوبر 2026) — جوّه الـtopbar الثابت
+       ⛔ مكانه الأول جوّه #homeHidden (octa-core.js:579 بيخفيه)
+       ⛔ مكانه التاني جوّه #page-home المحذوفة (octa-core.js:2411)
+       ✅ هنا: الـtopbar بيترسم في كل الصفحات وبيفضل ثابت. -->
+    <!-- 🆕 ticker-wrap اتشال (17 أكتوبر 2026):
+       شريط متحرك فوق الصفحة الرئيسية ماكانش موجود قبل شغل الذهب
+       وأحمد طلب شيله. الكارت بقى جوّه «الأصول العالمية» بس. -->
+  <div class="octa-brand">
+  <div class="octa-logo" onclick="switchPage('home')" style="cursor:pointer">
+  <span class="octa-mark">🐙</span>
+  <span class="octa-wordmark">
+  <span class="w1">OCTA</span>
+  <span class="w2">ONE BRAIN · EIGHT ARMS</span>
+  </span>
+  </div>
+  <div class="octa-brand-right">
+  <div class="octa-clock" id="octaClock"><b>—</b>آخر تحديث</div>
+  <!-- 👤 كارت الحساب — مكانه جوّه الهيدر (مش طفو فوقيه).
+       octa-auth.js بيملا الـslot ده، ولو مش مسجّل دخول بيبقى فاضي. -->
+  <div class="au-slot" id="auSlot"></div>
+  <button class="theme-toggle" id="lightBtn" onclick="toggleLight()" title="الوضع النهاري">🌙</button>
+  <!-- ⛌ الزر القديم بتاع التقرير اتشال —
+  /api/audit/redundancy, which now requires a token, so the
+  button could only ever produce an error for a user. -->
+  </div>
+  </div>
 
-    <!-- الثمانية أذرع -->
-    <nav class="arms-bar" id="armsBar">
-      <button class="arm-btn active" data-arm="market"     onclick="openArm('market')">
-        <span class="a-num">1</span><span class="a-ico">🌊</span><span class="a-name">السوق</span>
-      </button>
-      <button class="arm-btn" data-arm="technical"  onclick="openArm('technical')">
-        <span class="a-num">2</span><span class="a-ico">📈</span><span class="a-name">الفني</span>
-      </button>
-      <button class="arm-btn" data-arm="fundamental" onclick="openArm('fundamental')">
-        <span class="a-num">3</span><span class="a-ico">💰</span><span class="a-name">الأساسي</span>
-      </button>
-      <button class="arm-btn" data-arm="liquidity"  onclick="openArm('liquidity')">
-        <span class="a-num">4</span><span class="a-ico">💧</span><span class="a-name">السيولة</span>
-      </button>
-      <button class="arm-btn" data-arm="news"       onclick="openArm('news')">
-        <span class="a-num">5</span><span class="a-ico">📰</span><span class="a-name">الأخبار</span>
-      </button>
-      <button class="arm-btn" data-arm="risk"       onclick="openArm('risk')">
-        <span class="a-num">6</span><span class="a-ico">⚠️</span><span class="a-name">المخاطر</span>
-      </button>
-      <button class="arm-btn" data-arm="portfolio"  onclick="openArm('portfolio')">
-        <span class="a-num">7</span><span class="a-ico">💼</span><span class="a-name">المحفظة</span>
-      </button>
-      <button class="arm-btn" data-arm="opportunity" onclick="openArm('opportunity')">
-        <span class="a-num">8</span><span class="a-ico">🎯</span><span class="a-name">الفرص</span>
-      </button>
-    </nav>
+  <!-- الثمانية أذرع -->
+  <nav class="arms-bar" id="armsBar">
+  <button class="arm-btn active" data-arm="market"  onclick="openArm('market')">
+  <span class="a-num">1</span><span class="a-ico">🌊</span><span class="a-name">السوق</span>
+  </button>
+  <button class="arm-btn" data-arm="technical"  onclick="openArm('technical')">
+  <span class="a-num">2</span><span class="a-ico">📈</span><span class="a-name">الفني</span>
+  </button>
+  <button class="arm-btn" data-arm="fundamental" onclick="openArm('fundamental')">
+  <span class="a-num">3</span><span class="a-ico">💰</span><span class="a-name">الأساسي</span>
+  </button>
+  <button class="arm-btn" data-arm="liquidity"  onclick="openArm('liquidity')">
+  <span class="a-num">4</span><span class="a-ico">💧</span><span class="a-name">السيولة</span>
+  </button>
+  <button class="arm-btn" data-arm="news"  onclick="openArm('news')">
+  <span class="a-num">5</span><span class="a-ico">📰</span><span class="a-name">الأخبار</span>
+  </button>
+  <button class="arm-btn" data-arm="risk"  onclick="openArm('risk')">
+  <span class="a-num">6</span><span class="a-ico">⚠️</span><span class="a-name">المخاطر</span>
+  </button>
+  <button class="arm-btn" data-arm="portfolio"  onclick="openArm('portfolio')">
+  <span class="a-num">7</span><span class="a-ico">💼</span><span class="a-name">المحفظة</span>
+  </button>
+  <button class="arm-btn" data-arm="opportunity" onclick="openArm('opportunity')">
+  <span class="a-num">8</span><span class="a-ico">🎯</span><span class="a-name">الفرص</span>
+  </button>
+  </nav>
 
-    <!-- ══════════ شريط الأدوات والفلاتر (من الرابط القديم — زي ما هو) ══════════ -->
-    <div class="toolbar-wrap">
-      <!-- ☰ ⚙️ جنب بعض في صف أفقي — على نفس مستوى الأدوات -->
-      <div class="tb-row">
-        <div class="toolbar" id="toolbar"></div>
-        <div class="tb-btns">
-          <button class="tb-btn" onclick="sbToggle()" title="القائمة الجانبية">☰</button>
-          <button class="tb-btn" id="toolCfg" onclick="OCTASettings.open()" title="إعدادات المشروع">⚙️</button>
-        </div>
-      </div>
+  <!-- ══════════ شريط الأدوات والفلاتر (من الرابط القديم — زي ما هو) ══════════ -->
+  <div class="toolbar-wrap">
+  <!-- ☰ ⚙️ جنب بعض في صف أفقي — على نفس مستوى الأدوات -->
+  <div class="tb-row">
+  <div class="toolbar" id="toolbar"></div>
+  <div class="tb-btns">
+  <button class="tb-btn" onclick="sbToggle()" title="القائمة الجانبية">☰</button>
+  <button class="tb-btn" id="toolCfg" onclick="OCTASettings.open()" title="إعدادات المشروع">⚙️</button>
+  </div>
+  </div>
 
-    </div>
+  </div>
   </header>
 
 <!-- ══════════ شاشة الذراع (موحدة لكل الأذرع) ══════════ -->
   <!-- ══════════ REDUNDANCY AUDIT PAGE ══════════ -->
   <div id="auditPage" class="aud-wrap" data-dev style="display:none!important">
-    <div class="si-load" id="audLoad">🔄 جاري التحليل...</div>
-    <div id="audContent" style="display:none"></div>
+  <div class="si-load" id="audLoad">🔄 جاري التحليل...</div>
+  <div id="audContent" style="display:none"></div>
   </div>
 
   <!-- ══════════ STOCK INTELLIGENCE PAGE ══════════ -->
   <div id="stockPage" class="si-wrap" style="display:none;position:relative;z-index:70;background:var(--pri);min-height:100vh">
-    <div class="si-load" id="siLoad">🔄 جاري تحميل التحليل الكامل...</div>
-    <div id="siContent" style="display:none"></div>
+  <div class="si-load" id="siLoad">🔄 جاري تحميل التحليل الكامل...</div>
+  <div id="siContent" style="display:none"></div>
   </div>
 
   <!-- ↓ armView — جوّه بس الذراع والهرو والتنبيه ↓ -->
   <div id="armView" class="arm-view" style="display:none">
-    <div class="arm-hero">
-      <div class="ah-ico" id="armHeroIco">🌊</div>
-      <div class="ah-q" id="armHeroQ"></div>
-      <div class="ah-lead" id="armHeroLead"></div>
-    </div>
-    <div id="armBody"></div>
+  <div class="arm-hero">
+  <div class="ah-ico" id="armHeroIco">🌊</div>
+  <div class="ah-q" id="armHeroQ"></div>
+  <div class="ah-lead" id="armHeroLead"></div>
+  </div>
+  <div id="armBody"></div>
 
   <!-- ══════════ التنبيه التعليمي ══════════ -->
   <div class="edu-banner">
-    <div class="edu-inner">
-      <span class="edu-icon">⚖️</span>
-      <div class="edu-text">
-        <span class="edu-h">تنبيه تعليمي</span>
-        جميع البيانات والتحليلات والسيناريوهات والفرص المعروضة على OCTA مقدمة لأغراض تعليمية وتحليلية فقط، ولا تُعد توصية مباشرة بالشراء أو البيع أو الاحتفاظ بأي أصل مالي.
-        <button class="edu-toggle" onclick="toggleEdu()">اقرأ التفاصيل ▾</button>
-        <div class="edu-more" id="eduMore">
-          <b style="color:var(--gold)">ما تفعله OCTA:</b>
-          <ul style="padding-right:18px;margin:6px 0">
-            <li>تحليل بيانات السوق المعلنة من مصادرها الرسمية</li>
-            <li>حساب مؤشرات فنية وأساسية بقواعد رياضية واضحة</li>
-            <li>توضيح العلاقات بين الأصول والمؤشرات الاقتصادية</li>
-            <li>عرض مخاطر كل سهم بشكل صريح — حتى لو كانت سلبية</li>
-          </ul>
-          <b style="color:var(--gold)">ما لا تفعله OCTA:</b>
-          <ul style="padding-right:18px;margin:6px 0">
-            <li>لا تعطي أمر شراء أو بيع مباشر</li>
-            <li>لا تعرف نية المؤسسات أو الأموال الذكية بشكل مؤكد</li>
-            <li>لا تتنبأ بالأسعار المستقبلية</li>
-            <li>لا تستبدل بحثك الشخصي ولا مسؤوليتك عن قراراتك</li>
-          </ul>
-          <b style="color:var(--gold)">عليك:</b>
-          <ul style="padding-right:18px;margin:6px 0 0">
-            <li>إجراء بحثك وتحليلك المستقل</li>
-            <li>اتخاذ قراراتك حسب أهدافك ومستوى تحملك للمخاطر</li>
-            <li>الاستشارة مستشار مالي مرخّص قبل أي قرار استثماري</li>
-          </ul>
-        </div>
-      </div>
-    </div>
+  <div class="edu-inner">
+  <span class="edu-icon">⚖️</span>
+  <div class="edu-text">
+  <span class="edu-h">تنبيه تعليمي</span>
+  جميع البيانات والتحليلات والسيناريوهات والفرص المعروضة على OCTA مقدمة لأغراض تعليمية وتحليلية فقط، ولا تُعد توصية مباشرة بالشراء أو البيع أو الاحتفاظ بأي أصل مالي.
+  <button class="edu-toggle" onclick="toggleEdu()">اقرأ التفاصيل ▾</button>
+  <div class="edu-more" id="eduMore">
+  <b style="color:var(--gold)">ما تفعله OCTA:</b>
+  <ul style="padding-right:18px;margin:6px 0">
+  <li>تحليل بيانات السوق المعلنة من مصادرها الرسمية</li>
+  <li>حساب مؤشرات فنية وأساسية بقواعد رياضية واضحة</li>
+  <li>توضيح العلاقات بين الأصول والمؤشرات الاقتصادية</li>
+  <li>عرض مخاطر كل سهم بشكل صريح — حتى لو كانت سلبية</li>
+  </ul>
+  <b style="color:var(--gold)">ما لا تفعله OCTA:</b>
+  <ul style="padding-right:18px;margin:6px 0">
+  <li>لا تعطي أمر شراء أو بيع مباشر</li>
+  <li>لا تعرف نية المؤسسات أو الأموال الذكية بشكل مؤكد</li>
+  <li>لا تتنبأ بالأسعار المستقبلية</li>
+  <li>لا تستبدل بحثك الشخصي ولا مسؤوليتك عن قراراتك</li>
+  </ul>
+  <b style="color:var(--gold)">عليك:</b>
+  <ul style="padding-right:18px;margin:6px 0 0">
+  <li>إجراء بحثك وتحليلك المستقل</li>
+  <li>اتخاذ قراراتك حسب أهدافك ومستوى تحملك للمخاطر</li>
+  <li>الاستشارة مستشار مالي مرخّص قبل أي قرار استثماري</li>
+  </ul>
+  </div>
+  </div>
+  </div>
   </div>
 
 
@@ -353,780 +334,911 @@ window.addEventListener('error', function (e) {
 </div>
 
   <!-- ============ HOME (SLIM) ============ -->
-    <div class="home-slim-hide" id="homeHidden">
+  <div class="home-slim-hide" id="homeHidden">
+<!-- 🆕 شريط الذهب والنفط والمؤشرات — كان جوّه page-home المحذوفة
+     (octa-core.js:2411 بيقول «مفيش عنصر page-home») فمش كان بيترسم.
+     نقلناه هنا — الـhomeHidden بيظهر في كل الصفحات فالكارت بقى ظاهر. -->
+<!-- ticker اتنقل خارج homeHidden (16 أكتوبر 2026) -->
+  
+
   <div class="page" id="page-home">
-    <!-- Hero -->
-    <div class="hero">
-      <div class="hero-logo"><img src="assets/octa-logo.png" alt="OCTA"></div>
-      <h1>OCTA</h1>
-      <p class="hero-tagline">منصة التوصيات الذكية في البورصة المصرية</p>
-      <div class="pillars">
-        <span class="pillar big">يحلّل</span>
-        <span class="dot big"></span>
-        <span class="pillar">يخطط</span>
-        <span class="dot small"></span>
-        <span class="pillar small">ينفّذ</span>
-        <span class="dot big"></span>
-        <span class="pillar big">ينمو</span>
-      </div>
-      <a class="hero-cta" href="#" onclick="event.preventDefault(); switchPage('engine')">🚀 ابدأ التحليل</a>
-    </div>
+  <!-- Hero -->
+  <div class="hero">
+  <div class="hero-logo"><img src="assets/octa-logo.png" alt="OCTA"></div>
+  <h1>OCTA</h1>
+  <p class="hero-tagline">منصة التوصيات الذكية في البورصة المصرية</p>
+  <div class="pillars">
+  <span class="pillar big">يحلّل</span>
+  <span class="dot big"></span>
+  <span class="pillar">يخطط</span>
+  <span class="dot small"></span>
+  <span class="pillar small">ينفّذ</span>
+  <span class="dot big"></span>
+  <span class="pillar big">ينمو</span>
+  </div>
+  <a class="hero-cta" href="#" onclick="event.preventDefault(); switchPage('engine')">🚀 ابدأ التحليل</a>
+  </div>
 
-    <!-- 0. Ticker Tape (شريط متحرك) -->
-    <!-- TV Widgets (مخفية) عشان نقرأ الأسعار الحقيقية -->
-    <div style="display: none;">
-      <div id="tv-gold-quote"></div>
-      <div id="tv-usd-quote"></div>
-      <div id="tv-egx-quote"></div>
-      <div id="tv-oil-quote"></div>
-    </div>
+  <!-- 0. Ticker Tape (شريط متحرك) -->
+  <!-- TV Widgets (مخفية) عشان نقرأ الأسعار الحقيقية -->
+  <div style="display: none;">
+  <div id="tv-gold-quote"></div>
+  <div id="tv-usd-quote"></div>
+  <div id="tv-egx-quote"></div>
+  <div id="tv-oil-quote"></div>
+  </div>
 
-    <div class="ticker-wrap">
-      <div class="ticker-bar">
-        <div class="ticker-tape" id="tickerTape">
-          <span class="ticker-item"><b>🟡 جولد</b> <span class="ticker-asset">XAU/USD</span> <strong id="tk-gold">—</strong> <span class="ticker-change" id="tk-gold-chg">—</span></span>
-          <span class="ticker-sep">●</span>
-          <span class="ticker-item"><b>💵 دولار/جنيه</b> <span class="ticker-asset">USD/EGP</span> <strong id="tk-usd">—</strong> <span class="ticker-change" id="tk-usd-chg">—</span></span>
-          <span class="ticker-sep">●</span>
-          <span class="ticker-item"><b>📊 EGX30</b> <span class="ticker-asset">مؤشر السوق</span> <strong id="tk-egx">—</strong> <span class="ticker-change" id="tk-egx-chg">—</span></span>
-          <span class="ticker-sep">●</span>
-          <span class="ticker-item"><b>🛢️ نفط WTI</b> <span class="ticker-asset">Crude</span> <strong id="tk-oil">—</strong> <span class="ticker-change" id="tk-oil-chg">—</span></span>
-        </div>
-        <button class="ticker-ctl" id="tickerCtl" onclick="toggleTicker()" title="إيقاف / تشغيل">⏸</button>
-      </div>
-    </div>
+  <!-- ticker انتقل لـ #homeHidden (16 أكتوبر 2026) -->
 
-    <!-- الـ 10 ميزات الجديدة (A → I) -->
-    <!-- A. Portfolio Tracker -->
-    <div class="home-feature">
-      <div class="hf-header">
-        <span class="hf-icon">A</span>
-        <div>
-          <div class="hf-title">Portfolio Tracker</div>
-          <div class="hf-sub">يضيف أسهمه ويتابع ربحه/خسارته</div>
-        </div>
-      </div>
-      <div class="hf-content" id="home-portfolio">
-        <button class="hf-add-btn" onclick="openPortfolioAdd()">➕ أضف صفقة</button>
-        <div id="home-portfolio-list" style="margin-top: 12px; color: var(--muted); text-align: center; padding: 12px; font-size: 0.85rem;">لا توجد صفقات بعد — ابدأ بإضافة صفقة</div>
-      </div>
-    </div>
+  <!-- الـ 10 ميزات الجديدة (A → I) -->
+  <!-- A. Portfolio Tracker -->
+  <div class="home-feature">
+  <div class="hf-header">
+  <span class="hf-icon">A</span>
+  <div>
+  <div class="hf-title">Portfolio Tracker</div>
+  <div class="hf-sub">يضيف أسهمه ويتابع ربحه/خسارته</div>
+  </div>
+  </div>
+  <div class="hf-content" id="home-portfolio">
+  <button class="hf-add-btn" onclick="openPortfolioAdd()">➕ أضف صفقة</button>
+  <div id="home-portfolio-list" style="margin-top: 12px; color: var(--muted); text-align: center; padding: 12px; font-size: 0.85rem;">لا توجد صفقات بعد — ابدأ بإضافة صفقة</div>
+  </div>
+  </div>
 
-    <!-- B. Alerts -->
-    <div class="home-feature">
-      <div class="hf-header">
-        <span class="hf-icon">B</span>
-        <div>
-          <div class="hf-title">Alerts</div>
-          <div class="hf-sub">إشعار لمّا سهم يوصل سعر معيّن</div>
-        </div>
-      </div>
-      <div class="hf-content">
-        <button class="hf-add-btn" onclick="openAlertAdd()">➕ أضف تنبيه</button>
-        <div id="home-alerts-list" style="margin-top: 12px; color: var(--muted); text-align: center; padding: 12px; font-size: 0.85rem;">لا توجد تنبيهات — أضف سعر مستهدف</div>
-      </div>
-    </div>
+  <!-- B. Alerts -->
+  <div class="home-feature">
+  <div class="hf-header">
+  <span class="hf-icon">B</span>
+  <div>
+  <div class="hf-title">Alerts</div>
+  <div class="hf-sub">إشعار لمّا سهم يوصل سعر معيّن</div>
+  </div>
+  </div>
+  <div class="hf-content">
+  <button class="hf-add-btn" onclick="openAlertAdd()">➕ أضف تنبيه</button>
+  <div id="home-alerts-list" style="margin-top: 12px; color: var(--muted); text-align: center; padding: 12px; font-size: 0.85rem;">لا توجد تنبيهات — أضف سعر مستهدف</div>
+  </div>
+  </div>
 
-    <!-- C. Watchlist -->
-    <div class="home-feature">
-      <div class="hf-header">
-        <span class="hf-icon">C</span>
-        <div>
-          <div class="hf-title">Watchlist</div>
-          <div class="hf-sub">قائمة أسهم مفضلة لكل بوزر</div>
-        </div>
-      </div>
-      <div class="hf-content">
-        <button class="hf-add-btn" onclick="openWatchlistAdd()">➕ أضف للسلة</button>
-        <div id="home-watchlist" style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px;"></div>
-      </div>
-    </div>
+  <!-- C. Watchlist -->
+  <div class="home-feature">
+  <div class="hf-header">
+  <span class="hf-icon">C</span>
+  <div>
+  <div class="hf-title">Watchlist</div>
+  <div class="hf-sub">قائمة أسهم مفضلة لكل بوزر</div>
+  </div>
+  </div>
+  <div class="hf-content">
+  <button class="hf-add-btn" onclick="openWatchlistAdd()">➕ أضف للسلة</button>
+  <div id="home-watchlist" style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px;"></div>
+  </div>
+  </div>
 
-    <!-- D. Top Movers -->
-    <div class="home-feature">
-      <div class="hf-header">
-        <span class="hf-icon">D</span>
-        <button class="tm-toggle" id="tm-toggle" onclick="toggleTMCard()" aria-expanded="true">
-          <div>
-            <div class="hf-title">Top Movers</div>
-            <div class="hf-sub" id="tm-sub">أعلى 10 أسهم ارتفاعاً/انخفاضاً</div>
-          </div>
-          <span class="tm-chevron" id="tm-chevron">▾</span>
-        </button>
-      </div>
-      <div class="hf-content">
-        <div class="tm-toolbar">
-          <div class="tm-periods" id="tm-periods">
-            <button class="tm-period active" data-period="change" onclick="switchTMPeriod('change')">يوم</button>
-            <button class="tm-period" data-period="perf_w" onclick="switchTMPeriod('perf_w')">أسبوع</button>
-            <button class="tm-period" data-period="perf_1m" onclick="switchTMPeriod('perf_1m')">شهر</button>
-            <button class="tm-period" data-period="perf_3m" onclick="switchTMPeriod('perf_3m')">٣ شهور</button>
-            <button class="tm-period" data-period="perf_6m" onclick="switchTMPeriod('perf_6m')">٦ شهور</button>
-            <button class="tm-period" data-period="perf_y" onclick="switchTMPeriod('perf_y')">سنة</button>
-          </div>
-          <div class="tm-meta" id="tm-meta">
-            <span class="tm-phase" id="tm-phase">⏳</span>
-            <span class="tm-time" id="tm-time">—</span>
-          </div>
-        </div>
-        <div class="tm-split" id="tm-split">
-          <div class="tm-half tm-gainers">
-            <div class="tm-half-head"><span>📈</span> أعلى 10 ارتفاعاً</div>
-            <div id="tm-gainers-list" class="tm-list"></div>
-          </div>
-          <div class="tm-half tm-losers">
-            <div class="tm-half-head"><span>📉</span> أعلى 10 انخفاضاً</div>
-            <div id="tm-losers-list" class="tm-list"></div>
-          </div>
-        </div>
-      </div>
-    </div>
+  <!-- D. Top Movers -->
+  <div class="home-feature">
+  <div class="hf-header">
+  <span class="hf-icon">D</span>
+  <button class="tm-toggle" id="tm-toggle" onclick="toggleTMCard()" aria-expanded="true">
+  <div>
+  <div class="hf-title">Top Movers</div>
+  <div class="hf-sub" id="tm-sub">أعلى 10 أسهم ارتفاعاً/انخفاضاً</div>
+  </div>
+  <span class="tm-chevron" id="tm-chevron">▾</span>
+  </button>
+  </div>
+  <div class="hf-content">
+  <div class="tm-toolbar">
+  <div class="tm-periods" id="tm-periods">
+  <button class="tm-period active" data-period="change" onclick="switchTMPeriod('change')">يوم</button>
+  <button class="tm-period" data-period="perf_w" onclick="switchTMPeriod('perf_w')">أسبوع</button>
+  <button class="tm-period" data-period="perf_1m" onclick="switchTMPeriod('perf_1m')">شهر</button>
+  <button class="tm-period" data-period="perf_3m" onclick="switchTMPeriod('perf_3m')">٣ شهور</button>
+  <button class="tm-period" data-period="perf_6m" onclick="switchTMPeriod('perf_6m')">٦ شهور</button>
+  <button class="tm-period" data-period="perf_y" onclick="switchTMPeriod('perf_y')">سنة</button>
+  </div>
+  <div class="tm-meta" id="tm-meta">
+  <span class="tm-phase" id="tm-phase">⏳</span>
+  <span class="tm-time" id="tm-time">—</span>
+  </div>
+  </div>
+  <div class="tm-split" id="tm-split">
+  <div class="tm-half tm-gainers">
+  <div class="tm-half-head"><span>📈</span> أعلى 10 ارتفاعاً</div>
+  <div id="tm-gainers-list" class="tm-list"></div>
+  </div>
+  <div class="tm-half tm-losers">
+  <div class="tm-half-head"><span>📉</span> أعلى 10 انخفاضاً</div>
+  <div id="tm-losers-list" class="tm-list"></div>
+  </div>
+  </div>
+  </div>
+  </div>
 
-    <!-- E. Sector Heatmap -->
-    <div class="home-feature">
-      <div class="hf-header">
-        <span class="hf-icon">E</span>
-        <div>
-          <div class="hf-title">Sector Heatmap</div>
-          <div class="hf-sub">خريطة حرارية للقطاعات</div>
-        </div>
-      </div>
-      <div class="hf-content" id="home-sector-heatmap">
-        <!-- يتملأ من JS -->
-      </div>
-    </div>
+  <!-- E. Sector Heatmap -->
+  <div class="home-feature">
+  <div class="hf-header">
+  <span class="hf-icon">E</span>
+  <div>
+  <div class="hf-title">Sector Heatmap</div>
+  <div class="hf-sub">خريطة حرارية للقطاعات</div>
+  </div>
+  </div>
+  <div class="hf-content" id="home-sector-heatmap">
+  <!-- يتملأ من JS -->
+  </div>
+  </div>
 
-    <!-- F. Compare Snapshot -->
-    <div class="home-feature">
-      <div class="hf-header">
-        <span class="hf-icon">F</span>
-        <div>
-          <div class="hf-title">Compare Snapshot</div>
-          <div class="hf-sub">مقارنة 2-3 أسهم جنب بعض</div>
-        </div>
-      </div>
-      <div class="hf-content" id="home-compare-snapshot">
-        <button class="hf-add-btn" onclick="switchPage('compare')">⚖️ قارن أسهمك</button>
-      </div>
-    </div>
+  <!-- F. Compare Snapshot -->
+  <div class="home-feature">
+  <div class="hf-header">
+  <span class="hf-icon">F</span>
+  <div>
+  <div class="hf-title">Compare Snapshot</div>
+  <div class="hf-sub">مقارنة 2-3 أسهم جنب بعض</div>
+  </div>
+  </div>
+  <div class="hf-content" id="home-compare-snapshot">
+  <button class="hf-add-btn" onclick="switchPage('compare')">⚖️ قارن أسهمك</button>
+  </div>
+  </div>
 
-    <!-- G. Fundamentals Tab -->
-    <div class="home-feature">
-      <div class="hf-header">
-        <span class="hf-icon">G</span>
-        <div>
-          <div class="hf-title">Fundamentals Tab</div>
-          <div class="hf-sub">جدول P/E, ROE, Growth</div>
-        </div>
-      </div>
-      <div class="hf-content" id="home-fundamentals">
-        <table class="home-fundamentals-table">
-          <thead>
-            <tr>
-              <th>الرمز</th>
-              <th>P/E</th>
-              <th>ROE</th>
-              <th>النمو</th>
-              <th>التوزيعات</th>
-            </tr>
-          </thead>
-          <tbody id="home-fundamentals-tbody">
-            <!-- يتملأ من JS -->
-          </tbody>
-        </table>
-      </div>
-    </div>
+  <!-- G. Fundamentals Tab -->
+  <div class="home-feature">
+  <div class="hf-header">
+  <span class="hf-icon">G</span>
+  <div>
+  <div class="hf-title">Fundamentals Tab</div>
+  <div class="hf-sub">جدول P/E, ROE, Growth</div>
+  </div>
+  </div>
+  <div class="hf-content" id="home-fundamentals">
+  <table class="home-fundamentals-table">
+  <thead>
+  <tr>
+  <th>الرمز</th>
+  <th>P/E</th>
+  <th>ROE</th>
+  <th>النمو</th>
+  <th>التوزيعات</th>
+  </tr>
+  </thead>
+  <tbody id="home-fundamentals-tbody">
+  <!-- يتملأ من JS -->
+  </tbody>
+  </table>
+  </div>
+  </div>
 
-    <!-- H. News per Stock -->
-    <div class="home-feature">
-      <div class="hf-header">
-        <span class="hf-icon">H</span>
-        <div>
-          <div class="hf-title">News per Stock</div>
-          <div class="hf-sub">أخبار مختصرة لكل سهم</div>
-        </div>
-      </div>
-      <div class="hf-content" id="home-news-per-stock">
-        <p style="color: var(--muted); text-align: center; padding: 12px; font-size: 0.85rem;">📰 الأخبار تختفي هنا لما تضغط على أي سهم</p>
-      </div>
-    </div>
+  <!-- H. News per Stock -->
+  <div class="home-feature">
+  <div class="hf-header">
+  <span class="hf-icon">H</span>
+  <div>
+  <div class="hf-title">News per Stock</div>
+  <div class="hf-sub">أخبار مختصرة لكل سهم</div>
+  </div>
+  </div>
+  <div class="hf-content" id="home-news-per-stock">
+  <p style="color: var(--muted); text-align: center; padding: 12px; font-size: 0.85rem;">📰 الأخبار تختفي هنا لما تضغط على أي سهم</p>
+  </div>
+  </div>
 
-    <!-- I. Dividend Calendar (ذكي) -->
-    <div class="home-feature" onclick="switchPage('dividends')" style="cursor:pointer;">
-      <div class="hf-header">
-        <span class="hf-icon">I</span>
-        <div style="flex:1;min-width:0;">
-          <div class="hf-title">تقويم التوزيعات <span style="color:var(--gold);">←</span></div>
-          <div class="hf-sub" id="hd-sub">اضغط للدخول للتفاصيل</div>
-        </div>
-      </div>
-      <div class="hf-content" id="home-dividend-calendar">
-        <div class="div-stats" style="grid-template-columns:repeat(2,1fr);gap:8px;">
-          <div class="div-stat" style="padding:10px;">
-            <div class="div-stat-lbl" style="font-size:0.66rem;">🔔 قادمة</div>
-            <div class="div-stat-val" style="font-size:1.15rem;" id="hd-count">—</div>
-          </div>
-          <div class="div-stat" style="padding:10px;">
-            <div class="div-stat-lbl" style="font-size:0.66rem;">💰 نقدي (EGP)</div>
-            <div class="div-stat-val" style="font-size:1.15rem;" id="hd-cash">—</div>
-          </div>
-          <div class="div-stat" style="padding:10px;">
-            <div class="div-stat-lbl" style="font-size:0.66rem;">⏰ خلال ٧ أيام</div>
-            <div class="div-stat-val" style="font-size:1.15rem;" id="hd-week">—</div>
-          </div>
-          <div class="div-stat" style="padding:10px;">
-            <div class="div-stat-lbl" style="font-size:0.66rem;">📅 أقرب</div>
-            <div class="div-stat-val" style="font-size:1.15rem;" id="hd-next">—</div>
-          </div>
-        </div>
-        <div id="hd-list" style="margin-top:10px;display:flex;flex-direction:column;gap:5px;"></div>
-      </div>
-    </div>
+  <!-- I. Dividend Calendar (ذكي) -->
+  <div class="home-feature" onclick="switchPage('dividends')" style="cursor:pointer;">
+  <div class="hf-header">
+  <span class="hf-icon">I</span>
+  <div style="flex:1;min-width:0;">
+  <div class="hf-title">تقويم التوزيعات <span style="color:var(--gold);">←</span></div>
+  <div class="hf-sub" id="hd-sub">اضغط للدخول للتفاصيل</div>
+  </div>
+  </div>
+  <div class="hf-content" id="home-dividend-calendar">
+  <div class="div-stats" style="grid-template-columns:repeat(2,1fr);gap:8px;">
+  <div class="div-stat" style="padding:10px;">
+  <div class="div-stat-lbl" style="font-size:0.66rem;">🔔 قادمة</div>
+  <div class="div-stat-val" style="font-size:1.15rem;" id="hd-count">—</div>
+  </div>
+  <div class="div-stat" style="padding:10px;">
+  <div class="div-stat-lbl" style="font-size:0.66rem;">💰 نقدي (EGP)</div>
+  <div class="div-stat-val" style="font-size:1.15rem;" id="hd-cash">—</div>
+  </div>
+  <div class="div-stat" style="padding:10px;">
+  <div class="div-stat-lbl" style="font-size:0.66rem;">⏰ خلال ٧ أيام</div>
+  <div class="div-stat-val" style="font-size:1.15rem;" id="hd-week">—</div>
+  </div>
+  <div class="div-stat" style="padding:10px;">
+  <div class="div-stat-lbl" style="font-size:0.66rem;">📅 أقرب</div>
+  <div class="div-stat-val" style="font-size:1.15rem;" id="hd-next">—</div>
+  </div>
+  </div>
+  <div id="hd-list" style="margin-top:10px;display:flex;flex-direction:column;gap:5px;"></div>
+  </div>
+  </div>
 
-    <!-- Quick Access (الأيقونات الـ 8) -->
-    <div class="section-title" style="margin-top: 24px;">⚡ وصول سريع</div>
-    <div class="quick-grid">
-      <div class="quick-card" onclick="switchPage('engine')">
-        <div class="quick-icon">🧠</div><div class="quick-name">المحرك الذكي</div>
-        <div class="quick-desc">تحليل 8 محاور</div>
-      </div>
-      <div class="quick-card" onclick="switchPage('search')">
-        <div class="quick-icon">📊</div><div class="quick-name">الأسهم</div>
-        <div class="quick-desc">17 سهم مصري</div>
-      </div>
-      <div class="quick-card" onclick="switchPage('compare')">
-        <div class="quick-icon">⚖️</div><div class="quick-name">مقارنة</div>
-        <div class="quick-desc">حتى 3 أسهم</div>
-      </div>
-      <div class="quick-card" onclick="switchPage('screener')">
-        <div class="quick-icon">🔍</div><div class="quick-name">فلتر</div>
-        <div class="quick-desc">5 فئات</div>
-      </div>
-      <div class="quick-card" onclick="switchPage('bestpick')">
-        <div class="quick-icon">🏆</div><div class="quick-name">أفضل فرصة</div>
-        <div class="quick-desc">17 سهم</div>
-      </div>
-      <div class="quick-card" onclick="switchPage('news')">
-        <div class="quick-icon">📰</div><div class="quick-name">أخبار</div>
-        <div class="quick-desc">3 مصادر</div>
-      </div>
-      <div class="quick-card" onclick="switchPage('calc')">
-        <div class="quick-icon">🧮</div><div class="quick-name">حاسبات</div>
-        <div class="quick-desc">4 حاسبات</div>
-      </div>
-      <div class="quick-card" onclick="switchPage('arms')">
-        <div class="quick-icon">🐙</div><div class="quick-name">الأذرع</div>
-        <div cla</div>ss="quick-desc">8 أدوات</div>
-      </div>
-    </div>
+  <!-- Quick Access (الأيقونات الـ 8) -->
+  <div class="section-title" style="margin-top: 24px;">⚡ وصول سريع</div>
+  <div class="quick-grid">
+  <div class="quick-card" onclick="switchPage('engine')">
+  <div class="quick-icon">🧠</div><div class="quick-name">المحرك الذكي</div>
+  <div class="quick-desc">تحليل 8 محاور</div>
+  </div>
+  <div class="quick-card" onclick="switchPage('search')">
+  <div class="quick-icon">📊</div><div class="quick-name">الأسهم</div>
+  <div class="quick-desc">17 سهم مصري</div>
+  </div>
+  <div class="quick-card" onclick="switchPage('compare')">
+  <div class="quick-icon">⚖️</div><div class="quick-name">مقارنة</div>
+  <div class="quick-desc">حتى 3 أسهم</div>
+  </div>
+  <div class="quick-card" onclick="switchPage('screener')">
+  <div class="quick-icon">🔍</div><div class="quick-name">فلتر</div>
+  <div class="quick-desc">5 فئات</div>
+  </div>
+  <div class="quick-card" onclick="switchPage('bestpick')">
+  <div class="quick-icon">🏆</div><div class="quick-name">أفضل فرصة</div>
+  <div class="quick-desc">17 سهم</div>
+  </div>
+  <div class="quick-card" onclick="switchPage('news')">
+  <div class="quick-icon">📰</div><div class="quick-name">أخبار</div>
+  <div class="quick-desc">3 مصادر</div>
+  </div>
+  <div class="quick-card" onclick="switchPage('calc')">
+  <div class="quick-icon">🧮</div><div class="quick-name">حاسبات</div>
+  <div class="quick-desc">4 حاسبات</div>
+  </div>
+  <div class="quick-card" onclick="switchPage('arms')">
+  <div class="quick-icon">🐙</div><div class="quick-name">الأذرع</div>
+  <div cla</div>ss="quick-desc">8 أدوات</div>
+  </div>
+  </div>
   </div>
 
   <!-- ============ ENGINE ============ -->
   <div class="page" id="page-engine">
-    <h1 class="page-title">🧠 المحرك الذكي</h1>
-    <p class="page-subtitle">قرار عقل الأخطبوط بناءً على 8 محاور — بيانات حية من TradingView</p>
+  <h1 class="page-title">🧠 المحرك الذكي</h1>
+  <p class="page-subtitle">قرار عقل الأخطبوط بناءً على 8 محاور — بيانات حية من TradingView</p>
 
-    <!-- 1) الـ Search في الأول (فوق خالص) — خانة بحث + dropdown للنتايج -->
-    <div class="section" style="background: linear-gradient(135deg, rgba(212,175,55,0.1), rgba(77,171,247,0.05));">
-      <div class="section-title">🔍 اختر السهم للتحليل</div>
-      <div class="search-box" style="margin-bottom: 0;">
-        <input type="text" id="engineSearch" placeholder="اكتب كود السهم (COMI, AMOC, EAST...)" oninput="filterEngineStocks(this.value)" style="font-size: 1rem; padding: 14px 48px 14px 16px;">
-        <span class="icon">🔍</span>
-      </div>
-      <div id="engineStockPicker" style="margin-top: 8px;"></div>
-      <!-- Quick chips: الأسهم الـ 8 الأشهر للاختيار السريع -->
-      <div style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px;">
-        <span style="font-size: 0.78rem; color: var(--muted); margin-left: 8px;">⚡ سريع:</span>
-        <span class="engine-quick-chip" onclick="analyzeStock('COMI'); document.getElementById('engineSearch').value='COMI'; filterEngineStocks('');">COMI</span>
-        <span class="engine-quick-chip" onclick="analyzeStock('TMGH'); document.getElementById('engineSearch').value='TMGH'; filterEngineStocks('');">TMGH</span>
-        <span class="engine-quick-chip" onclick="analyzeStock('SWDY'); document.getElementById('engineSearch').value='SWDY'; filterEngineStocks('');">SWDY</span>
-        <span class="engine-quick-chip" onclick="analyzeStock('EAST'); document.getElementById('engineSearch').value='EAST'; filterEngineStocks('');">EAST</span>
-        <span class="engine-quick-chip" onclick="analyzeStock('CLHO'); document.getElementById('engineSearch').value='CLHO'; filterEngineStocks('');">CLHO</span>
-        <span class="engine-quick-chip" onclick="analyzeStock('ESRS'); document.getElementById('engineSearch').value='ESRS'; filterEngineStocks('');">ESRS</span>
-        <span class="engine-quick-chip" onclick="analyzeStock('HRHO'); document.getElementById('engineSearch').value='HRHO'; filterEngineStocks('');">HRHO</span>
-        <span class="engine-quick-chip" onclick="analyzeStock('PIOH'); document.getElementById('engineSearch').value='PIOH'; filterEngineStocks('');">PIOH</span>
-      </div>
-    </div>
+  <!-- 1) الـ Search في الأول (فوق خالص) — خانة بحث + dropdown للنتايج -->
+  <div class="section" style="background: linear-gradient(135deg, rgba(212,175,55,0.1), rgba(77,171,247,0.05));">
+  <div class="section-title">🔍 اختر السهم للتحليل</div>
+  <div class="search-box" style="margin-bottom: 0;">
+  <input type="text" id="engineSearch" placeholder="اكتب كود السهم (COMI, AMOC, EAST...)" oninput="filterEngineStocks(this.value)" style="font-size: 1rem; padding: 14px 48px 14px 16px;">
+  <span class="icon">🔍</span>
+  </div>
+  <div id="engineStockPicker" style="margin-top: 8px;"></div>
+  <!-- Quick chips: الأسهم الـ 8 الأشهر للاختيار السريع -->
+  <div style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px;">
+  <span style="font-size: 0.78rem; color: var(--muted); margin-left: 8px;">⚡ سريع:</span>
+  <span class="engine-quick-chip" onclick="analyzeStock('COMI'); document.getElementById('engineSearch').value='COMI'; filterEngineStocks('');">COMI</span>
+  <span class="engine-quick-chip" onclick="analyzeStock('TMGH'); document.getElementById('engineSearch').value='TMGH'; filterEngineStocks('');">TMGH</span>
+  <span class="engine-quick-chip" onclick="analyzeStock('SWDY'); document.getElementById('engineSearch').value='SWDY'; filterEngineStocks('');">SWDY</span>
+  <span class="engine-quick-chip" onclick="analyzeStock('EAST'); document.getElementById('engineSearch').value='EAST'; filterEngineStocks('');">EAST</span>
+  <span class="engine-quick-chip" onclick="analyzeStock('CLHO'); document.getElementById('engineSearch').value='CLHO'; filterEngineStocks('');">CLHO</span>
+  <span class="engine-quick-chip" onclick="analyzeStock('ESRS'); document.getElementById('engineSearch').value='ESRS'; filterEngineStocks('');">ESRS</span>
+  <span class="engine-quick-chip" onclick="analyzeStock('HRHO'); document.getElementById('engineSearch').value='HRHO'; filterEngineStocks('');">HRHO</span>
+  <span class="engine-quick-chip" onclick="analyzeStock('PIOH'); document.getElementById('engineSearch').value='PIOH'; filterEngineStocks('');">PIOH</span>
+  </div>
+  </div>
 
-    <!-- 1.5) جدول الأسهم الاحترافي (نفس design الصور) -->
-    <div class="engine-stocks-table-wrap" id="engineStocksTableWrap">
-      <!-- العنوان + السورت -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-        <div class="section-title" style="margin: 0;">📊 رابع الأساسي وشراء 19 سهم</div>
-        <button onclick="sortEngineStocks('change')" style="background: rgba(212,175,55,0.15); color: var(--gold); padding: 6px 12px; border-radius: 8px; border: 1px solid var(--gold); font-size: 0.78rem; font-weight: 700; cursor: pointer;">⇅ التغير %</button>
-      </div>
-      <!-- الجدول -->
-      <div class="engine-table-scroll">
-        <table class="engine-stocks-table" id="engineStocksTable">
-          <thead>
-            <tr>
-              <th class="th-action"></th>
-              <th class="th-action"></th>
-              <th>النسبة</th>
-              <th>الكمية المتداولة</th>
-              <th>الصفقات</th>
-              <th>القيمة</th>
-              <th>الحجم</th>
-              <th class="th-change">التغير %</th>
-              <th>السعر</th>
-              <th>الاسم</th>
-              <th class="th-code">الرمز</th>
-            </tr>
-          </thead>
-          <tbody id="engineStocksTableBody">
-            <!-- يتملأ من JS -->
-          </tbody>
-        </table>
-      </div>
-    </div>
+  <!-- 1.5) جدول الأسهم الاحترافي (نفس design الصور) -->
+  <div class="engine-stocks-table-wrap" id="engineStocksTableWrap">
+  <!-- العنوان + السورت -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+  <div class="section-title" style="margin: 0;">📊 رابع الأساسي وشراء 19 سهم</div>
+  <button onclick="sortEngineStocks('change')" style="background: rgba(212,175,55,0.15); color: var(--gold); padding: 6px 12px; border-radius: 8px; border: 1px solid var(--gold); font-size: 0.78rem; font-weight: 700; cursor: pointer;">⇅ التغير %</button>
+  </div>
+  <!-- الجدول -->
+  <div class="engine-table-scroll">
+  <table class="engine-stocks-table" id="engineStocksTable">
+  <thead>
+  <tr>
+  <th class="th-action"></th>
+  <th class="th-action"></th>
+  <th>النسبة</th>
+  <th>الكمية المتداولة</th>
+  <th>الصفقات</th>
+  <th>القيمة</th>
+  <th>الحجم</th>
+  <th class="th-change">التغير %</th>
+  <th>السعر</th>
+  <th>الاسم</th>
+  <th class="th-code">الرمز</th>
+  </tr>
+  </thead>
+  <tbody id="engineStocksTableBody">
+  <!-- يتملأ من JS -->
+  </tbody>
+  </table>
+  </div>
+  </div>
 
-    <!-- 2) الـ Engine Card -->
-    <div class="engine-card">
-      <div class="engine-title" id="engineTitle">تحليل سهم: CIB</div>
-      <div class="engine-sub" id="engineSub">البنك التجاري الدولي • EGX:COMI • TradingView Live</div>
+  <!-- 2) الـ Engine Card -->
+  <div class="engine-card">
+  <div class="engine-title" id="engineTitle">تحليل سهم: CIB</div>
+  <div class="engine-sub" id="engineSub">البنك التجاري الدولي • EGX:COMI • TradingView Live</div>
 
-      <!-- TradingView Mini Symbol Overview (السعر الحقيقي + شارت) -->
-      <div style="margin-bottom: 16px;">
-        <div id="engine-tv-symbol-info"></div>
-      </div>
+  <!-- TradingView Mini Symbol Overview (السعر الحقيقي + شارت) -->
+  <div style="margin-bottom: 16px;">
+  <div id="engine-tv-symbol-info"></div>
+  </div>
 
-      <div class="section-title" style="margin-bottom: 12px; display:flex; justify-content:space-between; align-items:center;">
-        <span>🐙 الـ 8 محاور (تحليل محرك OCTA)</span>
-        <button onclick="AI_LOADING=false; fetchAiAnalysis(currentEngineSymbol || 'COMI')" style="background:rgba(212,175,55,0.15);color:var(--gold);padding:5px 12px;border-radius:100px;border:1px solid var(--gold);font-size:0.72rem;font-weight:700;cursor:pointer;">🔄 تحديث</button>
-      </div>
-      <div class="engine-bars" id="engineBars"></div>
-      <div class="engine-decision" id="engineDecision"></div>
-    </div>
+  <div class="section-title" style="margin-bottom: 12px; display:flex; justify-content:space-between; align-items:center;">
+  <span>🐙 الـ 8 محاور (تحليل محرك OCTA)</span>
+  <button onclick="AI_LOADING=false; fetchAiAnalysis(currentEngineSymbol || 'COMI')" style="background:rgba(212,175,55,0.15);color:var(--gold);padding:5px 12px;border-radius:100px;border:1px solid var(--gold);font-size:0.72rem;font-weight:700;cursor:pointer;">🔄 تحديث</button>
+  </div>
+  <div class="engine-bars" id="engineBars"></div>
+  <div class="engine-decision" id="engineDecision"></div>
+  </div>
 
-    <!-- التحليل الفني من TradingView -->
-    <div class="section">
-      <div class="section-title">🧠 التحليل الفني من TradingView</div>
-      <div class="tradingview-widget-container" style="min-height: 480px;">
-        <div id="engine-tv-tech-analysis"></div>
-      </div>
-    </div>
+  <!-- التحليل الفني من TradingView -->
+  <div class="section">
+  <div class="section-title">🧠 التحليل الفني من TradingView</div>
+  <div class="tradingview-widget-container" style="min-height: 480px;">
+  <div id="engine-tv-tech-analysis"></div>
+  </div>
+  </div>
 
-    <!-- الرسم البياني التفاعلي -->
-    <div class="section">
-      <div class="section-title">📊 الرسم البياني التفاعلي</div>
-      <div class="tradingview-widget-container" style="min-height: 600px;">
-        <div id="engine-tv-advanced-chart"></div>
-      </div>
-    </div>
+  <!-- الرسم البياني التفاعلي -->
+  <div class="section">
+  <div class="section-title">📊 الرسم البياني التفاعلي</div>
+  <div class="tradingview-widget-container" style="min-height: 600px;">
+  <div id="engine-tv-advanced-chart"></div>
+  </div>
+  </div>
   </div>
 
   <!-- ============ STOCKS ============ -->
   <div class="page" id="page-stocks">
-    <div class="pt-hero">
-      <div class="pt-ico">📊</div>
-      <h1 class="pt-t">كل أسهم البورصة</h1>
-      <p class="pt-s">285 سهم — مع قرار OCTA والأرقام المالية. دوس على أي سهم تشوف تحليله الكامل.</p>
-    </div>
+  <div class="pt-hero">
+  <div class="pt-ico">📊</div>
+  <h1 class="pt-t">كل أسهم البورصة</h1>
+  <p class="pt-s">285 سهم — مع قرار OCTA والأرقام المالية. دوس على أي سهم تشوف تحليله الكامل.</p>
+  </div>
 
-    <div class="sp-bar">
-      <div class="sp-search">
-        <span>🔍</span>
-        <input id="spQ" placeholder="ابحث بالكود أو الاسم أو القطاع..." oninput="spRender()" autocomplete="off">
-      </div>
-      <select class="sp-select" id="spSort" onchange="spRender()">
-        <option value="score">ترتيب: نتيجة OCTA</option>
-        <option value="change">ترتيب: التغير</option>
-        <option value="pe">ترتيب: P/E (الأرخص)</option>
-        <option value="mcap">ترتيب: القيمة السوقية</option>
-        <option value="yield">ترتيب: العائد</option>
-        <option value="volume">ترتيب: التداول</option>
-        <option value="name">ترتيب: الاسم</option>
-        <optgroup label="── 📊 بالأرقام الحقيقية ──">
-          <option value="roe">أعلى ROE</option>
-          <option value="pb">أرخص P/B</option>
-          <option value="growth">أعلى نمو الإيرادات</option>
-          <option value="rsi">⚡ RSI الأدنى — تشبع بيعي</option>
-          <option value="vol">🛡️ أقل تذبذب — أهدأ سهم</option>
-          <option value="mdd">🛡️ أقل أقصى هبوط</option>
-          <option value="sharpe">⭐ أعلى شارب — عائد مقابل مخاطرة</option>
-        </optgroup>
-      </select>
-      <select class="sp-select" id="spSect" onchange="spRender()"></select>
-    </div>
+  <div class="sp-bar">
+  <div class="sp-search">
+  <span>🔍</span>
+  <input id="spQ" placeholder="ابحث بالكود أو الاسم أو القطاع..." oninput="spRender()" autocomplete="off">
+  </div>
+  <select class="sp-select" id="spSort" onchange="spRender()">
+  <option value="score">ترتيب: نتيجة OCTA</option>
+  <option value="change">ترتيب: التغير</option>
+  <option value="pe">ترتيب: P/E (الأرخص)</option>
+  <option value="mcap">ترتيب: القيمة السوقية</option>
+  <option value="yield">ترتيب: العائد</option>
+  <option value="volume">ترتيب: التداول</option>
+  <option value="name">ترتيب: الاسم</option>
+  <optgroup label="── 📊 بالأرقام الحقيقية ──">
+  <option value="roe">أعلى ROE</option>
+  <option value="pb">أرخص P/B</option>
+  <option value="growth">أعلى نمو الإيرادات</option>
+  <option value="rsi">⚡ RSI الأدنى — تشبع بيعي</option>
+  <option value="vol">🛡️ أقل تذبذب — أهدأ سهم</option>
+  <option value="mdd">🛡️ أقل أقصى هبوط</option>
+  <option value="sharpe">⭐ أعلى شارب — عائد مقابل مخاطرة</option>
+  </optgroup>
+  </select>
+  <select class="sp-select" id="spSect" onchange="spRender()"></select>
+  </div>
 
-    <div class="sp-chips" id="spChips"></div>
-    <div class="sp-count"><span id="spCount">…</span><span id="spDataInfo"></span></div>
-    <div class="sp-grid" id="spGrid"><div class="sp-load">⏳ جاري تحميل الأسهم…</div></div>
+  <div class="sp-chips" id="spChips"></div>
+  <div class="sp-count"><span id="spCount">…</span><span id="spDataInfo"></span></div>
+  <div class="sp-grid" id="spGrid"><div class="sp-load">⏳ جاري تحميل الأسهم…</div></div>
   </div>
   <!-- ============ COMPARE ============ -->
   <div class="page" id="page-compare">
-    <div class="pt-hero">
-      <div class="pt-ico">⚖️</div>
-      <h1 class="pt-t">مقارنة الأصول</h1>
-      <p class="pt-s">لحد 6 أسهم جنب بعض — وOCTA يقولك مين فايز في إيه</p>
-    </div>
-    <div id="cmpPick"></div>
-    <div id="cmpOut"></div>
+  <div class="pt-hero">
+  <div class="pt-ico">⚖️</div>
+  <h1 class="pt-t">مقارنة الأصول</h1>
+  <p class="pt-s">لحد 6 أسهم جنب بعض — وOCTA يقولك مين فايز في إيه</p>
+  </div>
+  <div id="cmpPick"></div>
+  <div id="cmpOut"></div>
   </div>
 
   <!-- ============ PICK: صندوق المرشحين ============ -->
   <div class="page" id="page-pick">
-    <div class="pt-hero pt-hero-q">
-      <div class="pt-ico">⭐</div>
-      <h1 class="pt-t">صندوق المرشحين</h1>
-      <p class="pt-s">اكتب الكود أو الاسم — الموقع بيجمع بيانات السهم وقت الإضافة ويقيّمه ويشرحه لك</p>
-    </div>
-    <div class="pick-box" id="pickBox"></div>
-    <div id="pickOut"></div>
+  <div class="pt-hero pt-hero-q">
+  <div class="pt-ico">⭐</div>
+  <h1 class="pt-t">🆚 المقارنة الذكية</h1>
+  <p class="pt-s">اكتب الكود أو الاسم — الموقع بيجمع بيانات السهم وقت الإضافة ويقيّمه ويشرحه لك</p>
+  </div>
+  <div class="pick-box" id="pickBox"></div>
+  <div id="pickOut"></div>
   </div>
 
   <!-- ============ CALC ============ -->
   <div class="page" id="page-calc">
-    <h1 class="page-title">🧮 الحاسبات</h1>
-    <p class="page-subtitle">4 حاسبات استثمارية مهمة</p>
-    <div class="calc-tabs">
-      <button class="calc-tab active" data-calc="profit">💰 الربح</button>
-      <button class="calc-tab" data-calc="dividend">💵 التوزيعات</button>
-      <button class="calc-tab" data-calc="pe">📊 P/E</button>
-      <button class="calc-tab" data-calc="position">⚖️ حجم المركز</button>
-    </div>
-    <div class="section" id="calcContainer"></div>
+  <h1 class="page-title">🧮 الحاسبات</h1>
+  <p class="page-subtitle">4 حاسبات استثمارية مهمة</p>
+  <div class="calc-tabs">
+  <button class="calc-tab active" data-calc="profit">💰 الربح</button>
+  <button class="calc-tab" data-calc="dividend">💵 التوزيعات</button>
+  <button class="calc-tab" data-calc="pe">📊 P/E</button>
+  <button class="calc-tab" data-calc="position">⚖️ حجم المركز</button>
+  </div>
+  <div class="section" id="calcContainer"></div>
   </div>
 
   <!-- ============ ACADEMY ============ -->
   <div class="page" id="page-academy">
-    <h1 class="page-title">🎓 الأكاديمية</h1>
-    <p class="page-subtitle">من عمالقة الاستثمار</p>
-    <div class="section">
-      <div class="section-title">📚 كتب مهمة</div>
-      <div class="book-card">
-        <div class="book-title">📖 المستثمر الذكي — The Intelligent Investor</div>
-        <div class="book-author">بنجامين جراهام (1949)</div>
-        <div class="book-desc">أهم كتاب استثماري في التاريخ. يعلّمك تفكير "مستثمر القيمة": اشترِ أسهم بأسعار أقل من قيمتها الحقيقية. جراهام كان أستاذ بافيت.</div>
-      </div>
-      <div class="book-card">
-        <div class="book-title">📖 سهم ومش عايز تبيع — One Up On Wall Street</div>
-        <div class="book-author">بيتر لينش (1989)</div>
-        <div class="book-desc">صاحب أفضل أداء في تاريخ صناديق الاستثمار. فلسفته: "اشترِ اللي تعرفه".</div>
-      </div>
-      <div class="book-card">
-        <div class="book-title">📖 فكر وبطيء — Thinking, Fast and Slow</div>
-        <div class="book-author">دانيال كانيمان (2011)</div>
-        <div class="book-desc">نوبل في الاقتصاد. يشرح إزاي دماغك بيخدعك في قرارات الاستثمار.</div>
-      </div>
-    </div>
-    <div class="section">
-      <div class="section-title">👤 أعظم المستثمرين</div>
-      <div class="arm-card" onclick="openInvestorModal('buffett')">
-        <div class="arm-num">WB</div>
-        <div class="arm-info">
-          <div class="arm-name">وارن بافيت</div>
-          <div class="arm-desc">"ملك القيمة" • +<span class="flt-ltr">20%</span> سنوياً لمدة 60 سنة</div>
-        </div>
-        <div class="arm-arrow">←</div>
-      </div>
-      <div class="arm-card" onclick="openInvestorModal('lynch')">
-        <div class="arm-num">PL</div>
-        <div class="arm-info">
-          <div class="arm-name">بيتر لينش</div>
-          <div class="arm-desc">"صاحب الأسهم العشر أضعاف" • 13 سنة بـ <span class="flt-ltr">29%</span></div>
-        </div>
-        <div class="arm-arrow">←</div>
-      </div>
-      <div class="arm-card" onclick="openInvestorModal('graham')">
-        <div class="arm-num">BG</div>
-        <div class="arm-info">
-          <div class="arm-name">بنجامين جراهام</div>
-          <div class="arm-desc">"أبو الاستثمار في القيمة" • أستاذ بافيت</div>
-        </div>
-        <div class="arm-arrow">←</div>
-      </div>
-    </div>
+  <h1 class="page-title">🎓 الأكاديمية</h1>
+  <p class="page-subtitle">من عمالقة الاستثمار</p>
+  <div class="section">
+  <div class="section-title">📚 كتب مهمة</div>
+  <div class="book-card">
+  <div class="book-title">📖 المستثمر الذكي — The Intelligent Investor</div>
+  <div class="book-author">بنجامين جراهام (1949)</div>
+  <div class="book-desc">أهم كتاب استثماري في التاريخ. يعلّمك تفكير "مستثمر القيمة": اشترِ أسهم بأسعار أقل من قيمتها الحقيقية. جراهام كان أستاذ بافيت.</div>
+  </div>
+  <div class="book-card">
+  <div class="book-title">📖 سهم ومش عايز تبيع — One Up On Wall Street</div>
+  <div class="book-author">بيتر لينش (1989)</div>
+  <div class="book-desc">صاحب أفضل أداء في تاريخ صناديق الاستثمار. فلسفته: "اشترِ اللي تعرفه".</div>
+  </div>
+  <div class="book-card">
+  <div class="book-title">📖 فكر وبطيء — Thinking, Fast and Slow</div>
+  <div class="book-author">دانيال كانيمان (2011)</div>
+  <div class="book-desc">نوبل في الاقتصاد. يشرح إزاي دماغك بيخدعك في قرارات الاستثمار.</div>
+  </div>
+  </div>
+  <div class="section">
+  <div class="section-title">👤 أعظم المستثمرين</div>
+  <div class="arm-card" onclick="openInvestorModal('buffett')">
+  <div class="arm-num">WB</div>
+  <div class="arm-info">
+  <div class="arm-name">وارن بافيت</div>
+  <div class="arm-desc">"ملك القيمة" • +<span class="flt-ltr">20%</span> سنوياً لمدة 60 سنة</div>
+  </div>
+  <div class="arm-arrow">←</div>
+  </div>
+  <div class="arm-card" onclick="openInvestorModal('lynch')">
+  <div class="arm-num">PL</div>
+  <div class="arm-info">
+  <div class="arm-name">بيتر لينش</div>
+  <div class="arm-desc">"صاحب الأسهم العشر أضعاف" • 13 سنة بـ <span class="flt-ltr">29%</span></div>
+  </div>
+  <div class="arm-arrow">←</div>
+  </div>
+  <div class="arm-card" onclick="openInvestorModal('graham')">
+  <div class="arm-num">BG</div>
+  <div class="arm-info">
+  <div class="arm-name">بنجامين جراهام</div>
+  <div class="arm-desc">"أبو الاستثمار في القيمة" • أستاذ بافيت</div>
+  </div>
+  <div class="arm-arrow">←</div>
+  </div>
+  </div>
   </div>
 
   <!-- ============ ARMS ============ -->
   <div class="page" id="page-arms">
-    <h1 class="page-title">🐙 فلتر الأذرع</h1>
-    <p class="page-subtitle">اختار ذراع واحد — وشوف كل الأسهم مرتبة بيه</p>
-    <div id="armsList"></div>
+  <h1 class="page-title">🐙 فلتر الأذرع</h1>
+  <p class="page-subtitle">اختار ذراع واحد — وشوف كل الأسهم مرتبة بيه</p>
+  <div id="armsList"></div>
   </div>
 
   <!-- ============ NEWS ============ -->
   <div class="page" id="page-news">
-    <h1 class="page-title">📰 آخر الأخبار</h1>
-    <p class="page-subtitle">أخبار حية من 3 مصادر — تحديث كل 5 دقايق</p>
+  <h1 class="page-title">📰 آخر الأخبار</h1>
+  <p class="page-subtitle">أخبار حية من 3 مصادر — تحديث كل 5 دقايق</p>
 
-    <!-- Live Status -->
-    <div class="live-bar" style="margin-bottom: 16px;">
-      <div class="live-dot"></div>
-      <span id="newsLiveStatus" class="live-text">⏳ جاري التحميل...</span>
-      <span class="live-meta">| 3 مصادر: Google News + Yahoo + Mubasher</span>
-      <button onclick="fetchAllNews()" style="margin-right: auto; background: rgba(212,175,55,0.2); color: var(--gold); padding: 6px 14px; border-radius: 100px; border: 1px solid var(--gold); font-size: 0.78rem; font-weight: 700; cursor: pointer;">🔄 تحديث الآن</button>
-    </div>
+  <!-- Live Status -->
+  <div class="live-bar" style="margin-bottom: 16px;">
+  <div class="live-dot"></div>
+  <span id="newsLiveStatus" class="live-text">⏳ جاري التحميل...</span>
+  <span class="live-meta">| 3 مصادر: Google News + Yahoo + Mubasher</span>
+  <button onclick="fetchAllNews()" style="margin-right: auto; background: rgba(212,175,55,0.2); color: var(--gold); padding: 6px 14px; border-radius: 100px; border: 1px solid var(--gold); font-size: 0.78rem; font-weight: 700; cursor: pointer;">🔄 تحديث الآن</button>
+  </div>
 
-    <!-- Filters -->
-    <div class="news-filters" style="display: flex; gap: 6px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px;">
-      <button class="news-filter-btn active" data-filter="all" onclick="setNewsFilter('all')">🌐 الكل</button>
-      <button class="news-filter-btn" data-filter="بنوك" onclick="setNewsFilter('بنوك')">🏦 بنوك</button>
-      <button class="news-filter-btn" data-filter="عقار" onclick="setNewsFilter('عقار')">🏢 عقار</button>
-      <button class="news-filter-btn" data-filter="اتصالات" onclick="setNewsFilter('اتصالات')">📡 اتصالات</button>
-      <button class="news-filter-btn" data-filter="طاقة" onclick="setNewsFilter('طاقة')">⚡ طاقة</button>
-      <button class="news-filter-btn" data-filter="صناعة" onclick="setNewsFilter('صناعة')">🏭 صناعة</button>
-      <button class="news-filter-btn" data-filter="تكنولوجيا" onclick="setNewsFilter('تكنولوجيا')">💻 تكنولوجيا</button>
-      <button class="news-filter-btn" data-filter="أغذية" onclick="setNewsFilter('أغذية')">🍔 أغذية</button>
-      <button class="news-filter-btn" data-filter="عام" onclick="setNewsFilter('عام')">📰 عام</button>
-    </div>
+  <!-- Filters -->
+  <div class="news-filters" style="display: flex; gap: 6px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px; overscroll-behavior-x: contain;">
+  <button class="news-filter-btn active" data-filter="all" onclick="setNewsFilter('all')">🌐 الكل</button>
+  <button class="news-filter-btn" data-filter="بنوك" onclick="setNewsFilter('بنوك')">🏦 بنوك</button>
+  <button class="news-filter-btn" data-filter="عقار" onclick="setNewsFilter('عقار')">🏢 عقار</button>
+  <button class="news-filter-btn" data-filter="اتصالات" onclick="setNewsFilter('اتصالات')">📡 اتصالات</button>
+  <button class="news-filter-btn" data-filter="طاقة" onclick="setNewsFilter('طاقة')">⚡ طاقة</button>
+  <button class="news-filter-btn" data-filter="صناعة" onclick="setNewsFilter('صناعة')">🏭 صناعة</button>
+  <button class="news-filter-btn" data-filter="تكنولوجيا" onclick="setNewsFilter('تكنولوجيا')">💻 تكنولوجيا</button>
+  <button class="news-filter-btn" data-filter="أغذية" onclick="setNewsFilter('أغذية')">🍔 أغذية</button>
+  <button class="news-filter-btn" data-filter="عام" onclick="setNewsFilter('عام')">📰 عام</button>
+  </div>
 
-    <div id="newsList"></div>
+  <div id="newsList"></div>
   </div>
 
   <!-- ══════════ PAGE: بحث OCTA — تحليل كامل ══════════ -->
   <div class="page" id="page-octasearch">
-    <div class="pt-hero">
-      <div class="pt-ico">🐙</div>
-      <h1 class="pt-t">بحث OCTA — تحليل كامل</h1>
-      <p class="pt-s">اكتب الكود أو اسم السهم — التحليل الكامل بيحلّلك: الرسم البياني · المحاور · مقارنة الأكواد · أعلى السهم · التحليل الفني</p>
-    </div>
+  <div class="pt-hero">
+  <div class="pt-ico">🐙</div>
+  <h1 class="pt-t">بحث OCTA — تحليل كامل</h1>
+  <p class="pt-s">اكتب الكود أو اسم السهم — التحليل الكامل بيحلّلك: الرسم البياني · المحاور · مقارنة الأكواد · أعلى السهم · التحليل الفني</p>
+  </div>
 
-    <!-- شريط البحث -->
-    <div class="os-bar">
-      <div class="os-input-wrap" id="osWrap">
-        <span class="os-ico">🔍</span>
-        <input id="osInput" class="os-input" type="text" autocomplete="off"
-               placeholder="اكتب الكود أو اسم السهم — مثال: بنك أو COMI"
-               oninput="octaQ(this.value)" onkeydown="octaKey(event)">
-        <button class="os-clear" id="osClear" onclick="octaClear()" aria-label="مسح">✕</button>
-      </div>
-      <div class="os-hint" id="osHint">من 296 سهم، 252 منهم بسعر لحظي — البيانات من محرك OCTA</div>
-      <div class="os-results" id="osResults"></div>
-    </div>
+  <!-- شريط البحث -->
+  <div class="os-bar">
+  <div class="os-input-wrap" id="osWrap">
+  <span class="os-ico">🔍</span>
+  <input id="osInput" class="os-input" type="text" autocomplete="off"
+  placeholder="اكتب الكود أو اسم السهم — مثال: بنك أو COMI"
+  oninput="octaQ(this.value)" onkeydown="octaKey(event)">
+  <button class="os-clear" id="osClear" onclick="octaClear()" aria-label="مسح">✕</button>
+  </div>
+  <div class="os-hint" id="osHint">من 296 سهم، 252 منهم بسعر لحظي — البيانات من محرك OCTA</div>
+  <div class="os-results" id="osResults"></div>
+  </div>
 
-    <!-- الأقسام -->
-    <div class="os-sec" id="osSectors"></div>
+  <!-- الأقسام -->
+  <div class="os-sec" id="osSectors"></div>
 
-    <!-- الأسهم المقترحة -->
-    <div class="os-sec">
-      <div class="os-sec-h">⚡ أسهم مقترحة</div>
-      <div class="os-chips" id="osQuick"></div>
-    </div>
+  <!-- الأسهم المقترحة -->
+  <div class="os-sec">
+  <div class="os-sec-h">⚡ أسهم مقترحة</div>
+  <div class="os-chips" id="osQuick"></div>
+  </div>
 
-    <!-- أفضل الأسهم -->
-    <div class="os-sec">
-      <div class="os-sec-h">🏆 أفضل الأسهم اليوم <span class="os-sec-s" id="osTopSub"></span></div>
-      <div class="os-top" id="osTop"><div class="os-load"><span class="vspin"></span> جاري التحميل...</div></div>
-    </div>
+  <!-- أفضل الأسهم -->
+  <div class="os-sec">
+  <div class="os-sec-h">🏆 أفضل الأسهم اليوم <span class="os-sec-s" id="osTopSub"></span></div>
+  <div class="os-top" id="osTop"><div class="os-load"><span class="vspin"></span> جاري التحميل...</div></div>
+  </div>
   </div>
 
   <!-- ══════════ PAGE: كارت القرار ══════════ -->
   <div class="page" id="page-verdict">
-    <div class="pt-hero">
-      <div class="pt-ico">🃏</div>
-      <h1 class="pt-t">كارت القرار</h1>
-      <p class="pt-s">بيتحسب وقت الفتح — مش ثابت</p>
-    </div>
-    <div class="vtop">
-      <div class="vphase" id="vPhaseBadge"><span class="dot"></span><span id="vPhaseTxt">⏳ جاري الفحص</span></div>
-    </div>
-    <div class="vpicker">
-      <input id="vCodeInput" placeholder="كود السهم — مثال COMI" maxlength="12" autocomplete="off">
-      <button onclick="vLoadCard()">تقييم</button>
-    </div>
-    <div class="vquick" id="vQuickRow"></div>
-    <div id="vOut"><div class="vload"><span class="vspin"></span> بجيب بيانات حيّة من المحرك...</div></div>
-    <div class="vfoot">
-      <div>المصدر: <b>محرك OCTA</b> · من 296 سهم، 252 بسعر لحظي</div>
-      <div>⚠️ لأغراض التحليل والتعلّم فقط — مش نصيحة استثمارية.</div>
-    </div>
+  <div class="pt-hero">
+  <div class="pt-ico">🃏</div>
+  <h1 class="pt-t">كارت القرار</h1>
+  <p class="pt-s">بيتحسب وقت الفتح — مش ثابت</p>
+  </div>
+  <div class="vtop">
+  <div class="vphase" id="vPhaseBadge"><span class="dot"></span><span id="vPhaseTxt">⏳ جاري الفحص</span></div>
+  </div>
+  <div class="vpicker">
+  <input id="vCodeInput" placeholder="كود السهم — مثال COMI" maxlength="12" autocomplete="off">
+  <button onclick="vLoadCard()">تقييم</button>
+  </div>
+  <div class="vquick" id="vQuickRow"></div>
+  <div id="vOut"><div class="vload"><span class="vspin"></span> بجيب بيانات حيّة من المحرك...</div></div>
+  <div class="vfoot">
+  <div>المصدر: <b>محرك OCTA</b> · من 296 سهم، 252 بسعر لحظي</div>
+  <div>⚠️ لأغراض التحليل والتعلّم فقط — مش نصيحة استثمارية.</div>
+  </div>
   </div>
 
   <!-- ══════════ PAGE: SCREENER ══════════ -->
   <div class="page" id="page-screener">
-    <div class="sc-hd">
-      <div style="flex:1;min-width:200px">
-        <div class="sc-hd-t">🔍 فلتر الأسهم</div>
-        <div class="sc-hd-s">صفّي كل الأسهم المسجلة في بورصة مصر بالأساسيات والزخم والمخاطرة</div>
-      </div>
-      <div class="sc-hd-n">
-        <span>الأسهم <b id="scTotal">—</b></span>
-        <span>النتيجة <b id="scCount">—</b></span>
-        <span>حالة السوق <b id="scMkt">—</b></span>
-        <span>آخر تحديث <b id="scUpd">—</b></span>
-      </div>
-    </div>
-    <div class="sc-mkt-note" id="scMktNote">
-      <span class="dot"></span>
-      <span class="txt">بنتحقق من حالة السوق...</span>
-    </div>
-    <div id="scHead"></div>
-    <div id="scBody"><div class="sc-empty">⏳ بنحمّل البيانات...<br><small>ثانيتين بس</small></div></div>
+  <div class="sc-hd">
+  <div style="flex:1;min-width:200px">
+  <div class="sc-hd-t">🔍 فلتر الأسهم</div>
+  <div class="sc-hd-s">صفّي كل الأسهم المسجلة في بورصة مصر بالأساسيات والزخم والمخاطرة</div>
+  </div>
+  <div class="sc-hd-n">
+  <span>الأسهم <b id="scTotal">—</b></span>
+  <span>النتيجة <b id="scCount">—</b></span>
+  <span>حالة السوق <b id="scMkt">—</b></span>
+  <span>آخر تحديث <b id="scUpd">—</b></span>
+  </div>
+  </div>
+  <div class="sc-mkt-note" id="scMktNote">
+  <span class="dot"></span>
+  <span class="txt">بنتحقق من حالة السوق...</span>
+  </div>
+  <div id="scHead"></div>
+  <div id="scBody"><div class="sc-empty">⏳ بنحمّل البيانات...<br><small>ثانيتين بس</small></div></div>
   </div>
 
-  <!-- ═══ ⭐ الفرصة المثالية — صفحة مستقلة ═══ -->
+  <!-- ═══ ⭐ رابط قديم — الصفحة بقت تبويب جوّه صفحة الفلاتر ═══
+       الكارت اتنقل لـ #fltIdealBox جوّه #fzPane (تحت 👇).
+       الصفحة دي فاضية عمداً: fzBestInit() بيوديه للتبويب عند أول فتح،
+       فما بيحصلش شاشة بيضا ولا رابط ميت. -->
   <div class="page" id="page-best">
-    <div class="fz-best-wrap">
-      <button class="fz-back" onclick="switchPage('filter')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-        رجوع للفلاتر
-      </button>
-      <div id="fltBestBox"></div>
-    </div>
+  <div class="fz-best-wrap">
+  <button class="fz-back" onclick="switchPage('filter');fzGo('best')">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+  رجوع للفلاتر
+  </button>
+  <p class="fz-moved">الفرصة المثالية بقت تبويب جوّه صفحة الفلاتر — تحت ⭐ في الصف التاني.</p>
+  </div>
   </div>
 
-  <!-- ═══ فلاتر — صفحة واحدة بالتبويبات ═══ -->
+  <!-- ═══ فلاتر — صفحة واحدة بالتبويبات ═══
+       ⛔ ترتيب الصفحة (قرار أحمد 16 أكتوبر 2026 — ملزم):
+         ① العنوان + الشرح
+         ② صف 1 — التبويبات الثمانية
+         ③ صف 2 — ⭐ الفرصة المثالية
+         ④ كارت «قرار OCTA» — آخر حاجة في الصفحة
+       ⛔ والـ8 محاور: ترتيب + اسم + أيقونة — ما يتلمسوش. -->
   <div class="page" id="page-filter">
-    <!-- ══ ⭐ الهيرو: الفرصة المثالية — منفصل وبارز ══ -->
-    <div class="fz-hero" id="fzHero"></div>
+  <div class="fz-wrap">
 
-    <div class="fz-wrap">
-      <!-- عنوان الفلاتر + شريط التبويبات -->
-      <div class="fz-sec-head">
-        <span class="fz-sec-i">🔬</span>
-        <div><h3>الفلاتر الثمانية</h3>
-          <p>كل فلتر بيجاوب سؤال — اضغط عشان تشوف كل واحد لوحده</p></div>
-      </div>
-      <div class="fz-tabs" id="fzTabs"></div>
-      <!-- محتوى التبويب النشط — الفلاتر الـ3 موجودين -->
-      <div class="fz-pane" id="fzPane">
-        <div id="fltBox"></div>
-        <div id="fltIncBox" style="display:none"></div>
-        <div id="fltMomBox" style="display:none"></div>
-        <!-- الفلاتر الجاية هتتخزن هنا -->
-        <div id="fltValBox" style="display:none"></div>
-        <div id="fltQuaBox" style="display:none"></div>
-        <div id="fltLiqBox" style="display:none"></div>
-        <div id="fltGroBox" style="display:none"></div>
-        <div id="fltCfwBox" style="display:none"></div>
-      </div>
-    </div>
+  <!-- ① العنوان + الشرح — كل سطر لوحده عشان ما يتلخبطش -->
+  <div class="fz-sec-head">
+  <span class="fz-sec-i">🔬</span>
+  <div>
+  <h3>الفلاتر الثمانية</h3>
+  <p>دوس على أي محور — كل سهم هيبان في محوره هو.</p>
+  <p>وآخر حاجة في الصفحة: كارت «قرار OCTA» — أعلى 5 فرص.</p>
   </div>
+  </div>
+
+  <!-- ② صف 1 (المحاور الثمانية) + ③ صف 2 (⭐ الفرصة) — الاتنين في حاوية واحدة
+       عشان الـsticky يلزق الصفين مع بعض. قبل كده كل صف كان sticky لوحده
+       بـtop:0 ⇒ كانوا بيتراكبوا وقت النزول. -->
+  <div class="fz-tabs-sticky">
+  <div class="fz-tabs" id="fzTabs"></div>
+  <!-- ⭐ الصف التاني — فاضي = مخفي تماماً (#fzTabsStar:empty في الـCSS) -->
+  <div class="fz-tabs fz-tabs-r2" id="fzTabsStar"></div>
+  </div>
+
+  <!-- محتوى التبويب النشط -->
+  <div class="fz-pane" id="fzPane">
+  <div id="fltBox"></div>
+  <div id="fltIncBox" style="display:none"></div>
+  <div id="fltMomBox" style="display:none"></div>
+  <!-- الفلاتر الجاية هتتخزن هنا -->
+  <div id="fltValBox" style="display:none"></div>
+  <div id="fltQuaBox" style="display:none"></div>
+  <div id="fltLiqBox" style="display:none"></div>
+  <div id="fltGroBox" style="display:none"></div>
+  <div id="fltCfwBox" style="display:none"></div>
+  <!-- ═══ الصف التاني: ٣ تبويبات — كل واحد في صفحة لوحده ═══
+       ⭐⭐⭐ الفرصة المثالية  →  #fltIdealBox   (بتقيّم كل الـ8 وتشوفهم كلهم)
+       ⭐  أفضل 5 فرص        →  #fltFiveBox    (أول ٥ صفوف بس)
+       📊 أفضل 3 فرص        →  #fltThreeBox   (نمط فني صعود)
+       ⛔ التلاتة موجودين كلهم في الـDOM — الفرق بين التبويبات هو display بس.
+       ⛔ الصف الأول (الـ8 أذرع) ما اتلمسش: نفس الترتيب ونفس الأسماء. -->
+
+  <!-- ⭐⭐⭐ الفرصة المثالية — التقييم الكامل لكل الفلاتر الثمانية -->
+  <div id="fltIdealBox" style="display:none"></div>
+
+  <!-- ⭐ أفضل 5 فرص — نفس الحساب، أول ٥ صفوف في جدول مستقل -->
+  <div id="fltFiveBox" style="display:none"></div>
+
+  <!-- 📊 أفضل 3 فرص — نمط فني صعود (كان #fltTripleBox) -->
+  <div id="fltThreeBox" style="display:none"></div>
+
+  <!-- ═══ 📖 شريط المعايير — تحت الجدول (سلمى · 16 أكتوبر 2026) ═══
+       ⛔ ده شريط رفيع مش كارت: خط فاصل من فوق + خلفية شفافة خفيفة.
+       ⛔ كل سطر قصير (٣ أو ٤ أسطر بالكتير) — والشرح الكامل في نافذة (؟).
+       ⛌ الدالة openWhy() موجودة في assets/js/octa-copy.js وبتفتح الشرح.
+       ⛎ ياسر (المحتوى): بدّل جمل السطور من غير ما تلمس الـclass
+          ولا الـdata-for — دي عقدة الشكل بس.
+       ⛎ نور: لو الجدول الجديد اترسم جوّه الـbox بتاعه، شيل شريط
+          الـHTML من هنا وحطّه جوه الـbox — الـCSS بيشتغل في الحالتين. -->
+  <!-- ⭐⭐⭐ الفر��ة المثالية — شريط المعايير بتاعها.
+       ⛔ مافيش شريط هنا: التبويب ده بيوري التفاصيل (كل فلتر لوحده)
+          وشريط المعايير بيظهر جوّه الـbox بتاعه وقت العرض. -->
+  <div class="fz-crit" data-for="best">
+    <div class="fz-crit-t">
+      <b class="fz-crit-h">المعايير</b>
+      <ul class="fz-crit-l">
+        <li>كل سهم بيعدّي على الفلاتر الثمانية، وتشوفله نتيجة كل فلتر لوحده: يعدّي ولا لا، وبأي رقم.</li>
+        <li>الدرجة النهائية من 100 بتتوزّع: أساسيات 30٪ · مخاطرة 25٪ · فني 20٪ · تقييم 15٪ · توزيع وسيولة 10٪</li>
+        <li>المحور اللي مؤشراته ناقصة بيتشال ووزنه بيتوزّع على الباقي — مش بيبقى صفر.</li>
+      </ul>
+    </div>
+    <button type="button" class="octa-q fz-crit-why" onclick="openWhy('TABBEST')"
+    aria-haspopup="dialog" aria-label="اقرأ معايير الفرصة المثالية"
+    title="معايير الفرصة المثالية"><span>؟</span></button>
+  </div>
+
+  <!-- ⭐ أفضل 5 فرص — نفس معايير الفرصة المثالية، أول ٥ صفوف بس -->
+  <div class="fz-crit" data-for="five">
+    <div class="fz-crit-t">
+      <b class="fz-crit-h">المعايير</b>
+      <ul class="fz-crit-l">
+        <li>الدرجة من 100 تتوزّع: أساسيات 30٪ · مخاطرة 25٪ · فني 20٪ · تقييم 15٪ · توزيع وسيولة 10٪</li>
+        <li>السهم اللي سعره تحت سعره العادل بيتقدّم على اللي فوقه.</li>
+        <li>الترتيب قياس ومقارنة — مش توصية شراء.</li>
+      </ul>
+    </div>
+    <button type="button" class="octa-q fz-crit-why" onclick="openWhy('TAB5')"
+    aria-haspopup="dialog" aria-label="اقرأ معايير أعلى 5 فرص"
+    title="معايير أعلى 5 فرص"><span>؟</span></button>
+  </div>
+
+  <!-- 📊 أفضل 3 فرص — نمط فني، معايير مختلفة تماماً -->
+  <div class="fz-crit" data-for="triple">
+    <div class="fz-crit-t">
+      <b class="fz-crit-h">المعايير</b>
+      <ul class="fz-crit-l">
+        <li>السهم لازم يعدّي 6 شروط مع بعض — مش واحد فيهم.</li>
+        <li>نقطة الدخول مش سعر النهارده — دي مستوى لازم السعر يكسره ويقفل فوقه.</li>
+        <li>الترتيب بـ4 أوزان: قرب القمة 40٪ · قوة الاتجاه 25٪ · تأكيد الحجم 20٪ · اتزان الزخم 15٪</li>
+      </ul>
+    </div>
+    <button type="button" class="octa-q fz-crit-why" onclick="openWhy('TAB3')"
+    aria-haspopup="dialog" aria-label="اقرأ معايير أفضل 3 فرص"
+    title="معايير أفضل 3 فرص"><span>؟</span></button>
+  </div>
+  </div>
+
+  <!-- ═══ 📖 قاعدة القراءة — تحت جدول كل محور ═══
+       نص ثابت بالعربي المبسّط: الدرجة من 100 = 5 محاور بأوزانها.
+       ⛌ مافيش رقم مخترع هنا — الأوزان من قرار أحمد 2026-10-15. -->
+  <section class="rd" aria-label="قاعدة القراءة">
+  <header class="rd-h">
+  <span class="rd-i">📖</span>
+  <div>
+  <h4>قاعدة القراءة — الدرجة من 100 إزاي بتتحسب؟</h4>
+  <p>كل سهم بيتقيّم على 5 محاور، وكل محور ليه وزن. الدرجة النهائية = مجموع الأوزان دي.</p>
+  </div>
+  </header>
+  <ul class="rd-list">
+  <li class="rd-r rd-g" style="--c: var(--gold); --w: 30%">
+  <div class="rd-r-t"><span class="rd-r-n">الأساسيات</span><span class="rd-r-w">30%</span></div>
+  <div class="rd-bar"><i></i></div>
+  <span class="rd-r-d">الشركة بتجيب فلوسها من <b>شغلها</b> ولا من القرض؟ بتقيس العائد على حقوق الملكية، وهامش الربح، ونسبة الديون.</span>
+  </li>
+  <li class="rd-r rd-rk" style="--c: var(--dn2); --w: 25%">
+  <div class="rd-r-t"><span class="rd-r-n">المخاطرة</span><span class="rd-r-w">25%</span></div>
+  <div class="rd-bar"><i></i></div>
+  <span class="rd-r-d">السهم بيتذبذب قد إيه، و<b>أقصى هبوط</b> كان كام، والمخاطرة بتتوزّع على السوق كله ولا عليه لوحده.</span>
+  </li>
+  <li class="rd-r rd-t" style="--c: var(--up2); --w: 20%">
+  <div class="rd-r-t"><span class="rd-r-n">الفني</span><span class="rd-r-w">20%</span></div>
+  <div class="rd-bar"><i></i></div>
+  <span class="rd-r-d">شكل <b>السعر</b> دلوقتي: فوق المتوسطات المتحركة ولا تحت؟ في منطقة شراء ولا بيع؟</span>
+  </li>
+  <li class="rd-r rd-v" style="--c: var(--gold2); --w: 15%">
+  <div class="rd-r-t"><span class="rd-r-n">التقييم</span><span class="rd-r-w">15%</span></div>
+  <div class="rd-bar"><i></i></div>
+  <span class="rd-r-d">السعر <b>غالي ولا رخيص</b> مقارنةً بدخل الشركة وقيمة أصولها في الدفاتر.</span>
+  </li>
+  <li class="rd-r rd-d" style="--c: var(--ntr); --w: 10%">
+  <div class="rd-r-t"><span class="rd-r-n">التوزيع والسيولة</span><span class="rd-r-w">10%</span></div>
+  <div class="rd-bar"><i></i></div>
+  <span class="rd-r-d">فيه <b>قسيمة سنوية</b>؟ وهل تقدر تبيع أي كمية في أي يوم من غير ما السعر يطيح؟</span>
+  </li>
+  </ul>
+  <p class="rd-f">
+  🔹 <b>العلامة</b> <span class="na">—</span> معناها الرقم <b>مش موجود</b> في البيانات دي — مش صفر. أي رقم بتشوفه في الجدول مصدره مكتوب فوقه لما تمرّ عليه.
+  <br>⚠️ الدرجة قياس ومقارنة، مش نصيحة استثمارية — القرار قرارك أنت.
+  </p>
+  </section>
+
+  </div><!-- /fz-wrap -->
+
+  <!-- ④ كارت ⭐ قرار OCTA — آخر حاجة في صفحة الفلاتر.
+       ⛔ بيعرض أعلى 5 فرص بنفس ترتيب تبويب ⭐ فوق — كارت واحد، مش اتنين. -->
+  <div class="fz-hero" id="fzHero"></div>
+  </div><!-- /page-filter -->
 
   <!-- ============ PAGE: SEARCH ============ -->
   <div class="page" id="page-search">
-    <h1 class="page-title">🔎 بحث الأسهم</h1>
-    <p class="page-subtitle">اكتب كود السهم واضغط Enter — بيانات لحظية من TradingView</p>
+  <h1 class="page-title">🔎 بحث الأسهم</h1>
+  <p class="page-subtitle">اكتب كود السهم واضغط Enter — بيانات لحظية من TradingView</p>
 
-    <div class="search-box" style="padding: 16px;">
-      <input type="text" id="stock-search-input" class="search-input" placeholder="اكتب رمز السهم (COMI / TMGH / HRHO)..." onkeydown="if(event.key==='Enter') searchStock(this.value)" style="padding: 18px 22px; font-size: 16px;" />
-    </div>
+  <div class="search-box" style="padding: 16px;">
+  <input type="text" id="stock-search-input" class="search-input" placeholder="اكتب رمز السهم (COMI / TMGH / HRHO)..." onkeydown="if(event.key==='Enter') searchStock(this.value)" style="padding: 18px 22px; font-size: 16px;" />
+  </div>
 
-    <div id="search-result" style="margin-top: 20px;"></div>
+  <div id="search-result" style="margin-top: 20px;"></div>
 
-    <!-- معلومات الأسهم المتاحة + quick picks -->
-    <div class="section" style="margin-top: 24px;">
-      <div class="section-title">⚡ أسهم مصرية متاحة</div>
-      <div class="quick-picks" id="quickPicksContainer" style="border-top: none; margin-top: 0; padding-top: 0;"></div>
-      <p style="color: var(--muted); font-size: 0.82rem; margin-top: 12px;">💡 اضغط على أي سهم أو اكتب كوده يدوياً</p>
-    </div>
+  <!-- معلومات الأسهم المتاحة + quick picks -->
+  <div class="section" style="margin-top: 24px;">
+  <div class="section-title">⚡ أسهم مصرية متاحة</div>
+  <div class="quick-picks" id="quickPicksContainer" style="border-top: none; margin-top: 0; padding-top: 0;"></div>
+  <p style="color: var(--muted); font-size: 0.82rem; margin-top: 12px;">💡 اضغط على أي سهم أو اكتب كوده يدوياً</p>
+  </div>
   </div>
 
   <!-- ============ PAGE: DIVIDENDS ============ -->
   <div class="page" id="page-dividends">
-    <div class="pt-hero">
-      <div class="pt-ico">📅</div>
-      <h1 class="pt-t">التوزيعات والإجراءات</h1>
-      <p class="pt-s">إعلانات البورصة المصرية الرسمية — نقدي · أسهم مجانية · زيادة رأس مال · تقسيم</p>
-    </div>
+  <div class="pt-hero">
+  <div class="pt-ico">📅</div>
+  <h1 class="pt-t">التوزيعات والإجراءات</h1>
+  <p class="pt-s">إعلانات البورصة المصرية الرسمية — نقدي · أسهم مجانية · زيادة رأس مال · تقسيم</p>
+  </div>
 
-    <div class="dv-kpis" id="dvKpis"></div>
-    <div class="dv-next" id="dvNext"></div>
+  <div class="dv-kpis" id="dvKpis"></div>
+  <div class="dv-next" id="dvNext"></div>
 
-    <div class="dv-book" id="dvBook"></div>
+  <div class="dv-book" id="dvBook"></div>
 
-    <div class="dv-tabs" id="dvTabs"></div>
+  <div class="dv-tabs" id="dvTabs"></div>
 
-    <div class="dv-sec-h" id="dvSecH">📋 كل الإجراءات · 📌 تاريخ القيد (الاستحقاق) هو الأهم</div>
-    <div class="dv-list" id="dvList"><div class="dv-empty">⏳ جاري التحميل…</div></div>
-    <div class="dv-src" id="dvSrc"></div>
+  <div class="dv-sec-h" id="dvSecH">📋 كل الإجراءات · 📌 تاريخ القيد (الاستحقاق) هو الأهم</div>
+  <div class="dv-list" id="dvList"><div class="dv-empty">⏳ جاري التحميل…</div></div>
+  <div class="dv-src" id="dvSrc"></div>
   </div>
 
   <!-- ============ PAGE: BEST PICK ============ -->
   <div class="page" id="page-bestpick">
-    <h1 class="page-title">🏆 أفضل فرصة</h1>
-    <p class="page-subtitle">اختر السهم — كل البيانات من TradingView مباشرة</p>
-    <div class="bestpick-hero">
-      <div class="bestpick-badge">🐙 TradingView Only</div>
-      <p style="color: var(--muted); font-size: 0.92rem;">اختر السهم — كل البيانات من TradingView مباشرة</p>
-    </div>
-    <div class="symbol-selector">
-      <h3 style="color: var(--gold); margin-bottom: 14px;">📊 الأسهم المتاحة على TradingView (EGX):</h3>
-      <div class="symbol-buttons" id="symbolButtonsContainer"></div>
-    </div>
-    <div id="bestpick-container">
-      <div class="bestpick-card">
-        <h3 class="card-section-title">💰 السعر والمعلومات (Live)</h3>
-        <div class="tradingview-widget-container" style="min-height: 200px;">
-          <div id="bp-symbol-info"></div>
-        </div>
-      </div>
-      <div class="bestpick-card">
-        <h3 class="card-section-title">🧠 التحليل الفني + التوصية</h3>
-        <div class="tradingview-widget-container" style="min-height: 480px;">
-          <div id="bp-tech-analysis"></div>
-        </div>
-      </div>
-      <div class="bestpick-card">
-        <h3 class="card-section-title">📊 الرسم البياني التفاعلي</h3>
-        <div class="tradingview-widget-container" style="min-height: 600px;">
-          <div id="bp-advanced-chart"></div>
-        </div>
-      </div>
-    </div>
+  <h1 class="page-title">🏆 أفضل فرصة</h1>
+  <p class="page-subtitle">اختر السهم — كل البيانات من TradingView مباشرة</p>
+  <div class="bestpick-hero">
+  <div class="bestpick-badge">🐙 TradingView Only</div>
+  <p style="color: var(--muted); font-size: 0.92rem;">اختر السهم — كل البيانات من TradingView مباشرة</p>
+  </div>
+  <div class="symbol-selector">
+  <h3 style="color: var(--gold); margin-bottom: 14px;">📊 الأسهم المتاحة على TradingView (EGX):</h3>
+  <div class="symbol-buttons" id="symbolButtonsContainer"></div>
+  </div>
+  <div id="bestpick-container">
+  <div class="bestpick-card">
+  <h3 class="card-section-title">💰 السعر والمعلومات (Live)</h3>
+  <div class="tradingview-widget-container" style="min-height: 200px;">
+  <div id="bp-symbol-info"></div>
+  </div>
+  </div>
+  <div class="bestpick-card">
+  <h3 class="card-section-title">🧠 التحليل الفني + التوصية</h3>
+  <div class="tradingview-widget-container" style="min-height: 480px;">
+  <div id="bp-tech-analysis"></div>
+  </div>
+  </div>
+  <div class="bestpick-card">
+  <h3 class="card-section-title">📊 الرسم البياني التفاعلي</h3>
+  <div class="tradingview-widget-container" style="min-height: 600px;">
+  <div id="bp-advanced-chart"></div>
+  </div>
+  </div>
+  </div>
   </div>
 
   <!-- ============ MODAL ============ -->
   <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this) closeModal()">
-    <div class="modal" id="modalContent"></div>
+  <div class="modal" id="modalContent"></div>
   </div>
 
   <!-- FOOTER -->
   <div class="footer">
-    <p><span class="brand">OCTA</span> — Egyptian Stock Intelligence Platform</p>
-    <p style="margin-top: 4px;">الأسعار محدثة • كل القرارات استثمارية على مسؤوليتك</p>
+  <p><span class="brand">OCTA</span> — Egyptian Stock Intelligence Platform</p>
+  <p style="margin-top: 4px;">الأسعار محدثة • كل القرارات استثمارية على مسؤوليتك</p>
   </div>
 
 
-    <!-- ════════ PHASE 18: صفحة التحليل الكامل ════════ -->
-    <div id="intelPage" class="intel-page" style="display:none;">
-      <div class="intel-loading" id="intelLoading">🔄 جاري التحميل...</div>
-      <div id="intelBody" style="display:none;"></div>
-    </div>
+  <!-- ════════ PHASE 18: صفحة التحليل الكامل ════════ -->
+  <div id="intelPage" class="intel-page" style="display:none;">
+  <div class="intel-loading" id="intelLoading">🔄 جاري التحميل...</div>
+  <div id="intelBody" style="display:none;"></div>
+  </div>
 
 
-    <!-- ════════ PHASE 13: أفضل الفرص ════════ -->
-    <div class="opps-head">
-      <div>
-        <h3>🏆 أفضل الفرص الآن</h3>
-        <div class="sub">مرتّبة بالنتيجة النهائية المدمجة (فني + أساسي + سيولة + مخاطر)</div>
-      </div>
-      <button onclick="loadOpportunities()" style="padding:8px 18px;background:rgba(212,175,55,.1);
-        border:1px solid rgba(212,175,55,.3);border-radius:9px;color:var(--gold);
-        font-weight:800;font-size:.82rem;cursor:pointer">🔄 تحديث</button>
-    </div>
-    <div class="opps-grid" id="oppsGrid"><div class="opps-loading">جاري التحميل...</div></div>
+  <!-- ════════ PHASE 13: أفضل الفرص ════════ -->
+  <div class="opps-head">
+  <div>
+  <h3>🏆 أفضل الفرص الآن</h3>
+  <div class="sub">مرتّبة بالنتيجة النهائية المدمجة (فني + أساسي + سيولة + مخاطر)</div>
+  </div>
+  <button onclick="loadOpportunities()" style="padding:8px 18px;background:rgba(212,175,55,.1);
+  border:1px solid rgba(212,175,55,.3);border-radius:9px;color:var(--gold);
+  font-weight:800;font-size:.82rem;cursor:pointer">🔄 تحديث</button>
+  </div>
+  <div class="opps-grid" id="oppsGrid"><div class="opps-loading">جاري التحميل...</div></div>
 
 <!-- JS → assets/js/octa-config.js -->
 
 <!-- JS → assets/js/octa-core.js -->
 
 <!-- ⛌ كومنتات Removal اتشالت — أي ذكر لاسم شركة أوTracker
-     في كود الموقع بيخلّي المشروع يبان مبني على حاجة برّه.
-     القاعدة: اللي مش بيخدم المستخدم ما يظهرش في الكود. -->
+  في كود الموقع بيخلّي المشروع يبان مبني على حاجة برّه.
+  القاعدة: اللي مش بيخدم المستخدم ما يظهرش في الكود. -->
 <!-- CSS → assets/octa.css -->
 <!-- ⛌ الكرة العائمة اتشالت -->
 <!-- JS → assets/js/octa-pages.js -->
 
-    <!-- ════════ PHASE 18: لوحة التحكم ════════ -->
-    <div id="dashPage" style="display:none;">
-      <div class="dash-loading" id="dashLoading">🔄 جاري تحميل لوحة التحكم...</div>
-      <div id="dashBody" style="display:none"></div>
-    </div>
+  <!-- ════════ PHASE 18: لوحة التحكم ════════ -->
+  <div id="dashPage" style="display:none;">
+  <div class="dash-loading" id="dashLoading">🔄 جاري تحميل لوحة التحكم...</div>
+  <div id="dashBody" style="display:none"></div>
+  </div>
 
-    <!-- ════════ PHASE 12: الفرص المبكرة ════════ -->
-    <div class="opps-head">
-      <div>
-        <h3>🔎 فرص مبكرة — قبل ما تتحرك</h3>
-        <div class="sub">تراكم + ضغط قبل الكسر — مش بنطارد الحركة</div>
-      </div>
-      <button onclick="loadEarlyOpps(true)" style="padding:8px 18px;background:rgba(22,199,154,.1);
-        border:1px solid rgba(22,199,154,.3);border-radius:9px;color:var(--sec);
-        font-weight:800;font-size:.82rem;cursor:pointer">🔄 تحديث</button>
-    </div>
-    <div class="opp-grid" id="earlyOpps"><div class="opps-loading">جاري التحميل...</div></div>
+  <!-- ════════ PHASE 12: الفرص المبكرة ════════ -->
+  <div class="opps-head">
+  <div>
+  <h3>🔎 فرص مبكرة — قبل ما تتحرك</h3>
+  <div class="sub">تراكم + ضغط قبل الكسر — مش بنطارد الحركة</div>
+  </div>
+  <button onclick="loadEarlyOpps(true)" style="padding:8px 18px;background:rgba(22,199,154,.1);
+  border:1px solid rgba(22,199,154,.3);border-radius:9px;color:var(--sec);
+  font-weight:800;font-size:.82rem;cursor:pointer">🔄 تحديث</button>
+  </div>
+  <div class="opp-grid" id="earlyOpps"><div class="opps-loading">جاري التحميل...</div></div>
 
 
 
@@ -1135,12 +1247,12 @@ window.addEventListener('error', function (e) {
 
   <!-- ══════ صفحة الأسواق ══════ -->
   <div class="page" id="page-markets" style="display:none;">
-    <div id="marketsRoot">
+  <div id="marketsRoot">
 <div class="wrap">
 
   <div class="hd">
-    <h1>🐙 OCTA — لوحة الأسواق</h1>
-    <div class="sub">كل سوق بــ مؤشره · نفس كارت القرار</div>
+  <h1>🐙 OCTA — لوحة الأسواق</h1>
+  <div class="sub">كل سوق بــ مؤشره · نفس كارت القرار</div>
   </div>
 
   <div class="mktbar" id="mktbar"></div>
@@ -1153,30 +1265,30 @@ window.addEventListener('error', function (e) {
 
   <!-- السيرش -->
   <div class="srch">
-    <input id="q" placeholder="دوّر على سهم…" autocomplete="off">
+  <input id="q" placeholder="دوّر على سهم…" autocomplete="off">
   </div>
 
   <div class="count" id="cnt"></div>
   <div id="out"><div class="load"><span class="spin"></span> جاري التحميل...</div></div>
 
   <div class="foot">
-    <div>مصادر: <b>Railway API</b> (مصر) · <b>TradingView Scanner</b> (عالمي)</div>
-    <div>⚠️ تحليل وتعلّم فقط — مش نصيحة استثمارية.</div>
+  <div>مصادر: <b>Railway API</b> (مصر) · <b>TradingView Scanner</b> (عالمي)</div>
+  <div>⚠️ تحليل وتعلّم فقط — مش نصيحة استثمارية.</div>
   </div>
   <!-- ══════ كارت القرار ══════ -->
   <div class="mlay" id="mlay">
-    <div class="mbox">
-      <div class="mbar">
-        <button class="mbtn" onclick="closeCard()">✕ رجوع</button>
-        <span class="ttl" id="mTtl">كارت القرار</span>
-        <button class="mbtn tv" onclick="tvLink()">📈 TradingView</button>
-      </div>
-      <div id="mBody"></div>
-    </div>
+  <div class="mbox">
+  <div class="mbar">
+  <button class="mbtn" onclick="closeCard()">✕ رجوع</button>
+  <span class="ttl" id="mTtl">كارت القرار</span>
+  <button class="mbtn tv" onclick="tvLink()">📈 TradingView</button>
+  </div>
+  <div id="mBody"></div>
+  </div>
   </div>
 
 </div>
-    </div>
+  </div>
   </div>
   <!-- JS → assets/js/octa-app.js + octa-filters.js -->
 
@@ -1184,45 +1296,50 @@ window.addEventListener('error', function (e) {
 
   <!-- ══════════ 🎯 نافذة قرار اليوم ══════════ -->
   <div id="decideModal" class="dc-modal" onclick="if(event.target===this) closeDecide()">
-    <div class="dc-modal-box">
-      <div class="dc-mhead">
-        <div>
-          <div class="dc-mtitle">🎯 قرار اليوم</div>
-          <div class="dc-msub">3 فرص محسوبة — سبب، خطة، وشرط خروج لكل واحدة</div>
-        </div>
-        <button class="dc-mclose" onclick="closeDecide()" title="اقفل (Esc)">✕</button>
-      </div>
-      <div id="decideBody"><div class="dc-loading">⏳ بنحمّل بيانات كل الأسهم المسجلة...<br><small>ثانيتين بس</small></div></div>
-    </div>
+  <div class="dc-modal-box">
+  <div class="dc-mhead">
+  <div>
+  <div class="dc-mtitle">🎯 قرار اليوم</div>
+  <div class="dc-msub">3 فرص محسوبة — سبب، خطة، وشرط خروج لكل واحدة</div>
+  </div>
+  <button class="dc-mclose" onclick="closeDecide()" title="اقفل (Esc)">✕</button>
+  </div>
+  <div id="decideBody"><div class="dc-loading">⏳ بنحمّل بيانات كل الأسهم المسجلة...<br><small>ثانيتين بس</small></div></div>
+  </div>
   </div>
 
-<script src="assets/js/octa-api.js?v=202610182209"></script>
-<script src="assets/js/octa-config.js?v=202610182209"></script>
-<script src="assets/js/octa-core.js?v=202610182209"></script>
-<script src="assets/js/octa-stats.js?v=202610182209"></script>
-<script src="assets/js/octa-auth.js?v=202610182209"></script>
-<script src="assets/js/octa-gate.js?v=202610182209"></script>
-<script src="assets/js/octa-sidebar.js?v=202610182209"></script>
-<script src="assets/js/octa-dev.js?v=202610182209"></script>
-<script src="assets/js/octa-clock.js?v=202610182209"></script>
-<script src="assets/js/octa-screener.js?v=202610182209"></script>
-<script src="assets/js/octa-chart.js?v=202610182209"></script>
-<script src="assets/js/octa-indicators.js"></script>
-<script src="assets/js/octa-pages.js?v=202610182209"></script>
-<script src="assets/js/octa-app.js?v=202610182209"></script>
-<script src="assets/js/octa-filters.js?v=202610182209"></script>
-<script src="assets/js/octa-watch.js?v=202610182209"></script>
-<script src="assets/js/octa-decide.js?v=202610182209"></script>
-<script src="assets/js/octa-settings.js?v=202610182209"></script>
-<script src="assets/js/octa-csp.js?v=202610182209"></script>
-<script src="assets/js/octa-armsfilter.js?v=202610182209"></script>
+<script src="assets/js/octa-api.js?v=2026101502"></script>
+<script src="assets/js/octa-config.js?v=2026101502"></script>
+<script src="assets/js/octa-core.js?v=2026101502"></script>
+<script src="assets/js/octa-stats.js?v=2026101502"></script>
+<script src="assets/js/octa-auth.js?v=2026101502"></script>
+<script src="assets/js/octa-gate.js?v=2026101502"></script>
+<script src="assets/js/octa-sidebar.js?v=2026101502"></script>
+<script src="assets/js/octa-dev.js?v=2026101502"></script>
+<script src="assets/js/octa-clock.js?v=2026101502"></script>
+<script src="assets/js/octa-screener.js?v=2026102604"></script>
+<script src="assets/js/octa-pages.js?v=2026101502"></script>
+<script src="assets/js/octa-app.js?v=2026102010"></script>
+<script src="assets/js/octa-filters.js?v=2026102400"></script>
+<!-- ❓ شرح تبويبات الصف التاني (؟) — لازم بعد octa-filters.js عشان
+     fzRenderTabs/fzGo يبقوا موجودين وقت الـhook. الـmount بيعيد نفسه
+     لواحد صفر، فمحتاجش تعديل في نظام الخمسة ولا التلاتة. -->
+<!-- 🆕 محرك إشارة الذهب (16 أكتوبر 2026) — الشارة + المودال + الرسم -->
+<script src="assets/js/octa-chart.js?v=2026102600"></script>
+<script src="assets/js/octa-chart-v2.js?v=2026102600"></script>
+<script src="assets/js/octa-gold.js?v=2026102600"></script>
+<script src="assets/js/octa-copy.js?v=2026102600"></script>
+<script src="assets/js/octa-watch.js?v=2026101502"></script>
+<script src="assets/js/octa-decide.js?v=2026101502"></script>
+<script src="assets/js/octa-settings.js?v=2026101502"></script>
+<script src="assets/js/octa-csp.js?v=2026101502"></script>
+<script src="assets/js/octa-armsfilter.js?v=2026101502"></script>
 <!-- 🛠️ أدوات المطوّر — بتظهر بالمصادفة ولا ما فيش زرار عادي -->
 <div class="octa-devbar">
   <button class="dev-hidden-gate" onclick="OCTADev.toggle()"
-          title="أدوات المطوّر" aria-label="أدوات المطوّر"></button>
+  title="أدوات المطوّر" aria-label="أدوات المطوّر"></button>
   <span class="octa-devhint" id="devHint"></span>
 </div>
 
-<script src="assets/js/octa-gold.js"></script>
 </body>
 </html>

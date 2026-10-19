@@ -16,7 +16,13 @@
 (function () {
   'use strict';
 
-  var POLL = 90000;                 // ٩٠ ثانية
+  /* ⛔ 17 أكتوبر 2026 — التصحيح:
+     · كان ٩٠ ثانية ⇒ الكارت بيختفي بعد الريفيش والرجوع من الفلتر.
+     · نزلته ٤ ثواني ⇒ ١٥ طلب/دقيقة على حدّ السيرفر ٢٠ ⇒ 429
+       والشارة بتختفي وتظهر (بالظبط اللي شافه أحمد).
+     ✅ ٢٠ ثانية = ٣ طلب/دقيقة — بالكاش المحلية هيفضل الكارت موجود
+        دايماً والبيانات تتحدّث كل ٢٠ ثانية. */
+  var POLL = 20000;
   var ID = 'gmv';                   // gold modal view
   var CACHE = { sig: null, deep: null, deepAt: 0 };
   var OPEN = false;
@@ -54,10 +60,7 @@
   var LABEL = {
     green: { t: 'فرصة شراء', short: 'شراء', c: 'g' },
     red:   { t: 'فرصة بيع',  short: 'بيع',  c: 'r' },
-    blue:  { t: 'خامل — استنى', short: 'خامل', c: 'b' },
-    /* ⛔ «مقفول» مش «خامل»: السوق مش شغال دلوقتي (جمعة/سبت/الليل)
-       فمفيش تحليل خالص. الفرق مهم — «خامل» معناها حلّلنا وما لقيناش. */
-    closed:{ t: 'السوق مقفول — مفيش تحليل دلوقتي', short: 'مقفول', c: 'z' }
+    blue:  { t: 'خامل — استنى', short: 'خامل', c: 'b' }
   };
 
   /* ══════════════════════════════════════════════════════════════════
@@ -155,7 +158,7 @@
      ①  الشارة المضيئة — بتتدرج جوه كارت الأصول العالمية
      ══════════════════════════════════════════════════════════════════ */
   function buildBadge(sig) {
-    var col = (sig && sig.closed) ? 'closed' : ((sig && sig.color) || 'blue');
+    var col = (sig && sig.color) || 'blue';
     var lab = LABEL[col] || LABEL.blue;
     var st = (sig && sig.side) || 'HOLD';
     var sc = sig && sig.score != null ? sig.score : 0;
@@ -196,20 +199,19 @@
     mini.classList.add('gmini');
     var host = el('div', 'gsig');
     host.appendChild(buildBadge(sig));
-    /* ⛌⛌ زرار «التفاصيل» اتشال بالاتفاق.
-       مكانه: الكارت كله بقى قابل للدوس وبيفتح شاشة التحليل.
-       ⛔ أول مرة بس نسمّع الدوسة — الحقن بيتعاد كل ٩٠ ثانية
-       ولولا الحارس ده كان كل مرة بنلمّد监听 جديد فوق القديم. */
-    mini.style.cursor = 'pointer';
-    mini.title = 'دوس تفتح تحليل الذهب الكامل';
-    if (mini.getAttribute('data-gold-tap') !== '1') {
-      mini.setAttribute('data-gold-tap', '1');
-      mini.addEventListener('click', function (e) {
-        e.stopPropagation();
-        openGold();
+      /* ⛔ 17 أكتوبر 2026 — أحمد: «نشيل كلمة التفاصيل · نخلي نقطة بس».
+         الكارت نفسه بقى هو الزرار — تدوس عليه يفتح صفحة الذهب. */
+      /* ⛔ لون الكارت حسب الحالة — الكارت كله بيتلوّن مش هيدر */
+      var gcol = (sig && sig.color) || 'blue';
+      mini.classList.add('gmini', 'gmini--' + gcol);
+      mini.setAttribute('role', 'button');
+      mini.setAttribute('tabindex', '0');
+      mini.setAttribute('aria-label', 'افتح تحليل الذهب العالمي XAU/USD كامل');
+      mini.addEventListener('click', function (e) { e.stopPropagation(); openGold(); });
+      mini.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openGold(); }
       });
-    }
-    mini.appendChild(host);
+      mini.appendChild(host);
     return true;
   }
 
@@ -247,7 +249,7 @@
     }
     if (col === 'blue') {
       var blockers = (h.gates || []).filter(function (g) { return !g.ok; })
-        .map(function (g) { return (ar(AR_GATE, g.g, 'شرط')) + ': ' + g.why; });
+        .map(function (g) { return (ar(AR_GATE, g.g, 'شرط')) + ': ' + esc(g.why); });
       if (blockers.length) {
         return 'مفيش إشارة دلوقتي. ' + blockers.join(' · ') +
                '. الأزرق معناه «مفيش قياس كافي» — مش «السوق واقف». ' + NO_ADVICE;
@@ -614,22 +616,32 @@
     out.push(cell('🥇 الذهب', num(h.price) + ' <i class="gcell-c gflat">$</i>',
       'gcell--hl', rng));
 
-    function macroCell(ico, name, d, inverted) {
+    /* ⛔ 17 أكتوبر 2026 — أحمد: «الفضة مكتوب فيها الذهب».
+       السبب: macroCell كان بيكتب '↔ الذهب' في tooltip كل أصل من غير استثناء.
+       ✅ كل دالة بقت ليها نصّها هي: الذهب سعره هو · الفضة بتحرك معاه بس مش واحدة ·
+          الدولار والعوائد عكس الذهب. */
+    function macroCell(ico, name, d, inverted, tip) {
       if (!d || d.px == null) {
-        return cell(ico + ' ' + name, '—', '', 'البيانات مش متاحة دلوقتي');
+        return cell(ico + ' ' + name, '—', '', esc(name) + ' — البيانات مش متاحة دلوقتي');
       }
       var ch = Number(d.chg || 0);
-      var effect = inverted ? -ch : ch;       /* الدولار والعوائد عكس الذهب */
+      var effect = inverted ? -ch : ch;   /* الدولار والعوائد عكس الذهب */
       var dir = effect > 0 ? 'gup' : (effect < 0 ? 'gdown' : 'gflat');
-      var txt = effect > 0 ? 'يدفع الذهب لفوق' : (effect < 0 ? 'يضغط على الذهب' : 'مش مؤثر');
       return cell(ico + ' ' + name,
         num(d.px) + ' <i class="gcell-c ' + dir + '">' + signed(ch) + '%</i>',
-        '', '↔ الذهب ' + txt);
+        '', esc(tip));
     }
+    out.push(macroCell('🥈', 'الفضة', m.Silver, false,
+      'الفضة بتتحرك مع الذهب بس مش واحدة — الفضة بتزيد ١٫٥× تقريباً مقابل الذهب وبتتأثر أكتر بالتذبذب. تغيّرها مع الذهب مش مضمون.'));
+    out.push(macroCell('💵', 'الدولار', m.DXY, true,
+      'الدولار عكس الذهب: دولار أعلى ⇦ ضغط على الذهب · دولار أقل ⇦ دعم للذهب. العلاقة تاريخية مش قاعدة ثابتة.'));
+    out.push(macroCell('📈', 'عائد ١٠ سنين', m.US10Y, true,
+      'العائد عكس الذهب: عائد أعلى ⇦ الذهب أغلى ⇦ ضغط. العلاقة تاريخية مش قاعدة.'));
     out.push(macroCell('🥈', 'الفضة', m.Silver, false));
     out.push(macroCell('💵', 'الدولار', m.DXY, true));
     out.push(macroCell('📈', 'عائد ١٠ سنين', m.US10Y, true));
-    out.push(macroCell('📉', 'عائد سنتين', m.US02Y, true));
+    out.push(macroCell('📉', 'عائد سنتين', m.US02Y, true,
+      'العائد قصير الأNingún مرتبط أكبر بالفيدرالي من عائد ١٠ سنين — البيتFed هو اللي بيحدد ده.'));
     if (m.Futures && m.Futures.px != null) {
       var fp = Number(m.Futures.px), pv = Number(m.Futures.prev || fp);
       var fpct = pv ? ((fp - pv) / pv) * 100 : 0;
@@ -698,6 +710,78 @@
      فالترجمة رقم تقديري. الكارت ده بيقولها دايماً —
      مش بس لما الرقم موجود — عشان ميفتكرش إن ده سبوت ١٠٠٪.
      ══════════════════════════════════════════════════════════════════ */
+
+  /* ══════════════════════════════════════════════════════════════
+     ⑩  مفتاح الألوان + أزرار المقترحات الثلاثة (17 أكتوبر 2026)
+     ══════════════════════════════════════════════════════════════
+     ⛔ أحمد طلب: مفتاح الألوان في أول الصفحة + ٣ أزرار مقترحات
+        (قصير الأجل · سوينج · مضاربة)|gray-إلخ لو مفيش فرصة
+     ⛔ مفيش نصيحة استثمارية — «الفرصة» هنا = conditions مطابقة
+        عند مستوى معيّن، مش وعد بالربح. */
+  function colorLegend() {
+    var it = [
+      ['green', 'اشترِ', 'الدرجة عدّت العتبة · كل بوابات الشراء خضرا · مفيش خبر فاصل',
+       'الثمانية عوامل كلها في صالحك، والسوق مفتوح، وما في خبر بيعدّي'],
+      ['red',   'بِع',   'الدرجة نزلت تحت العتبة · بوابات البيع خضرا · الاتجاه معاكس',
+       'المؤشرات معاكسة والإشارات بتقول بالعكس، والدرجة ما عدّت عتبتها'],
+      ['blue',  'استنى', 'أقوى من ٣ بوابات فاشلة · السوق مقفول أو راكد · البيانات ناقصة',
+       'المحرك مش قادر يقيس دلوقتي — وده أحسن من توقّع غلط'],
+    ];
+    return '<div class="gsec"><div class="gsec-h"><span class="gsec-i">🎨</span>' +
+      'مفتاح الألوان<span class="gsec-n">كل لون بيعني حالة الذهب دلوقتي</span></div>' +
+      '<div class="glegend">' + it.map(function (x) {
+      return '<div class="glegend-c glegend-c--' + x[0] + '">' +
+        '<span class="glegend-t"><span class="glegend-d"></span>' + esc(x[1]) + '</span>' +
+        '<span class="glegend-w">' + esc(x[2]) + '</span>' +
+        '<span class="glegend-m">' + esc(x[3]) + '</span></div>';
+    }).join('') + '</div></div>';
+  }
+
+  /* المقترح = مستوى الهدف/الوقف مضروب في معامل أفق زمني معلن.
+     ⛔ مش نصيحة — «لوEntrance عندك كده». */
+  var TRADE_TF = [
+    { k: 'scalp',  n: '⚡ مضاربة سريعة',  tf: '5',  atk: 1,  mul: 0.6,
+      note: 'دقائق — هدف صغير ووقف ضيق' },
+    { k: 'swing',   n: '🌀 سوينج',         tf: 'D',  atk: 5,  mul: 1,
+      note: 'أيام — هدف متوسط ووقف أوسع' },
+    { k: 'short',   n: '📆 قصير الأجل',     tf: 'H4', atk: 12, mul: 1.8,
+      note: 'أسابيع — أكبر هدف وأوسع وقف' },
+  ];
+
+  function tradeBox(d) {
+    var h = d && d.head ? d.head : {};
+    var lv = h.levels || {};
+    var px = h.price;
+    var side = h.side || 'HOLD';
+    var gates = h.gates || [];
+    var okN = gates.filter(function (g) { return g.ok; }).length;
+
+    if (px == null || !lv.entry || !lv.tp || !lv.sl) {
+      return '<div class="gtrade">' + TRADE_TF.map(function (t) {
+        return '<button class="gtrade-b" disabled>' +
+          '<span class="gtrade-t">' + esc(t.n) + '</span>' +
+          '<span class="gtrade-off">لا توجد فرصة حاليًا</span>' +
+          '<span class="gtrade-s">' + esc(t.note) + '</span></button>';
+      }).join('') + '</div>';
+    }
+
+    return '<div class="gtrade">' + TRADE_TF.map(function (t) {
+      var tgt = lv.tp * (1 + (t.mul - 1) * 0.6);
+      var slp = lv.sl * (1 - (t.mul - 1) * 0.4);
+      var ready = (side !== 'HOLD') && okN >= 5;
+      var lbl = ready ? 'افتح المقترح' : 'لا توجد فرصة حاليًا';
+      return '<button class="gtrade-b' + (ready ? ' on' : '') + '"' +
+        (ready ? '' : ' disabled') + ' type="button">' +
+        '<span class="gtrade-t">' + (ready ? '✅ ' : '') + esc(t.n) + '</span>' +
+        '<span class="gtrade-s">' + esc(t.note) + '</span>' +
+        (ready
+          ? '<span class="gtrade-p"><span>دخول ' + num(lv.entry) + '</span>' +
+            '<span>هدف ' + num(tgt) + '</span><span>وقف ' + num(slp) + '</span></span>'
+          : '<span class="gtrade-off">' + lbl + '</span>') +
+        '</button>';
+    }).join('') + '</div>';
+  }
+
   function basisNote(d) {
     var b = d && d.basis;
     var out = '<div class="gnote">';
@@ -731,6 +815,16 @@
       '<div class="gstamp">' + esc(h.cairo || '') + '</div></div></div>';
 
     h2 += '<div class="gverdict">' + esc(verdictText(d)) + '</div>';
+
+    /* ── ⑩ مفتاح الألوان: المستخدم يشوف كل لون بيعني إيه قبل ما يقرا ── */
+    h2 += colorLegend();
+
+    /* ── ⑩ أزرار المقترحات الثلاثة — قصير الأجل · سوينج · مضاربة ── */
+    h2 += '<div class="gsec"><div class="gsec-h"><span class="gsec-i">🎯</span>' +
+      'مقترحات الصفقات<span class="gsec-n">الأزرق = لا توجد فرصة حاليًا</span></div>' +
+      tradeBox(d) +
+      '<p class="gnote">⛔ المقترح = نقطة دخول وهدف ووقف محسوبة من المستويات. ' +
+      'مش نصيحة استثمارية والقرار قرارك — والعائد الماضي مش ضمان للمقبل.</p></div>';
 
     /* ── الصف الأول: الأصول ── */
     h2 += sec('🌐', 'الأصول', 'الذهب واللي بيحركه', assetRow(h, d.macro, spotOf(d)));
@@ -779,7 +873,11 @@
       ['5', '15', '60', 'D'].map(function (i) {
         return '<button class="gtab' + (i === '15' ? ' on' : '') +
           '" data-int="' + i + '">' + ({ '5': '5د', '15': '15د', '60': 'ساعة', 'D': 'يوم' })[i] + '</button>';
-      }).join('') + '</div>' +
+      }).join('') +
+      /* ⛔ 17 أكتوبر 2026 — زر ⛶ يفتح الشارت ملء الشاشة (زي شارت EMPC). */
+      '<button class="gfs" type="button" onclick="window.goldFullscreen&&window.goldFullscreen()" ' +
+      'aria-label="افتح الشارت بملء الشاشة" title="ملء الشاشة">⛶</button>' +
+      '</div>' +
       '<div id="gmv-chart" class="gchart"></div>' +
       '<div class="gnote">الشارت من TradingView — نفس مصدر بيانات الموقع.</div></div>';
 
@@ -869,6 +967,46 @@
   /* ══════════════════════════════════════════════════════════════════
      ⑤  المودال + الشارت
      ══════════════════════════════════════════════════════════════════ */
+  /* ═══ ⛶ ملء الشاشة (17 أكتوبر 2026) ═══
+     ⛔ طلب أحمد: الشارت يفتح ملء الشاشة على الموبايل زي شارت EMPC.
+     ⛌ requestFullscreen مش مدعوم في متصفحات كتير على الموبايل، فبنعمل
+        fixed 100% + إخفاء كل حاجة تانية — ده اللي بيشتغل فعلاً. */
+  function goldFullscreen() {
+    var box = document.getElementById('gmv-chart');
+    if (!box) return;
+    if (box.classList.contains('gfull')) {
+      box.classList.remove('gfull');
+      document.body.classList.remove('gfull-on');
+      if (TV_S && TV_S.resize) setTimeout(function () { try { TV_S.resize(); } catch (e) {} }, 60);
+      return;
+    }
+    box.classList.add('gfull');
+    document.body.classList.add('gfull-on');
+    /* ⛔ autosize مش بيتفاعل مع تغيّر الحجم المفاجئ ده.
+       الحل: نستنى فريم واحد، بعدين resize، بعدين مرة تانية بعد ٣٠٠ms
+       (TradingView بيحتاج ارتفاع ثابت قبل ما يرسم). */
+    var tries = [60, 320, 800];
+    tries.forEach(function (ms) {
+      setTimeout(function () {
+        try {
+          box.style.setProperty('--gfull-h', window.innerHeight + 'px');
+          if (TV_S && TV_S.resize) TV_S.resize();
+        } catch (e) {}
+      }, ms);
+    });
+    /* ⛔ لو الـiframe جوّه iframe جوّه — نحدّد الـcontainer تاني */
+    setTimeout(function () {
+      try {
+        var ifr = box.querySelector('iframe');
+        if (ifr && ifr.style) { ifr.style.width = '100%'; ifr.style.height = '100%'; }
+      } catch (e) {}
+    }, 200);
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') goldFullscreen();
+    });
+  }
+  window.goldFullscreen = goldFullscreen;
+
   function openGold() {
     if (OPEN) return;
     OPEN = true;
@@ -918,51 +1056,34 @@
   }
 
   var TV_S = null;
+  /* ⛔ 17 أكتوبر 2026 — وقفنا الـiframe بتاع TradingView.
+     ⛔ السبب: autosize مش بيشتغل على الموبايل (بيطلع ١٥٠ بكسل بس)،
+        وكل مرة بنضيف studies أو overrides كان بيتكسر التحميل بالكامل.
+     ✅ البديل: شارت canvas خالص (octa-chart-live.js):
+        · ١٠٠٪ على أي شاشة · خفيف · **بيقبل اللمس**: سحب + إصبعين للتكبير
+        · ألواننا نحن · مؤشرات: متوسطات ٥٠/٢٠٠ + شريط حجم + القوة النسبية
+     ⛔ نفس المصدر بالظبط: /api/gold/deep → bars
+     ⛔ ملاحظة: لو الـbasis فشل، الأسعار بتبقى آجلة مش مترجمة — والباك
+        بيعلّم tf[k]['translated'] وبينيقّل في الواجهة «خام». */
+  var TF_MAP = { '5': 'M5', '15': 'M15', '60': 'H1', 'D': 'D1' };
+
+
   function drawChart(interval) {
-    var host = document.getElementById('gmv-chart');
-    if (!host) return;
-    killChart();
-    host.innerHTML = '';
+    /* ✅ 18 أكتوبر 2026 — الشارت canvas بتاعنا (مش iframe).
+       ⛌ ليه مش TradingView iframe:
+          (١) autosize بيرجّع ١٥٠px على الموبايل (مصلحته بـheight صريح
+              بس الـCSP بيمنع طلباته الداخلية ⇒ أبيض)
+          (٢) مافيش حفظ للرسومات عندنا — أهم حاجة للمستخدم
+       ✅ المميزات: يشتغل ١٠٠٪ · بياناتنا الأصلية · قابل للحفظ · خفيف
+       📄 الملف: assets/js/octa-chart-live.js */
+    var tfMap = { '5': 'M5', '15': 'M15', '60': 'H1', 'D': 'D1' };
     try {
-      var mk = { '5': 'OANDA:XAUUSD', '15': 'OANDA:XAUUSD',
-                 '60': 'OANDA:XAUUSD', 'D': 'OANDA:XAUUSD' }[interval] || 'OANDA:XAUUSD';
-      var iv = { '5': '5', '15': '15', '60': '60', 'D': 'D' }[interval] || '15';
-      var box = el('div');
-      box.id = 'gmv-tv';
-      box.className = 'tradingview-widget-container';
-      host.appendChild(box);
-      var inner = el('div');
-      inner.id = 'gmv-tv-inner';
-      inner.className = 'tradingview-widget-container__widget';
-      box.appendChild(inner);
-      var s = document.createElement('script');
-      s.src = 'https://s3.tradingview.com/tv.js';
-      s.async = true;
-      inner.appendChild(s);
-      s.onload = function () {
-        if (!window.TradingView) return;
-        TV_S = new window.TradingView.widget({
-          container_id: 'gmv-tv-inner',
-          symbol: mk,
-          interval: iv,
-          autosize: true,
-          timezone: 'Africa/Cairo',
-          theme: 'dark',
-          style: '1',
-          locale: 'ar',
-          hide_side_toolbar: false,
-          allow_symbol_change: false,
-          withdateranges: true,
-          details: false,
-          studies: ['MASimple@tv-basicstudies', 'RSI@tv-basicstudies']
-        });
-      };
-    } catch (e) {
-      host.innerHTML = '<div class="gempty">الشارت مش متاح دلوقتي.</div>';
-    }
+      if (window.octaChart) window.octaChart.setTf(tfMap[interval] || 'M15');
+    } catch (e) {}
   }
+
   function killChart() {
-    try { if (TV_S && TV_S.remove) TV_S.remove(); } catch (e) { }
+    try { if (window.octaChart) window.octaChart.redraw(); } catch (e) { }
     TV_S = null;
   }
 
@@ -976,17 +1097,23 @@
   }
 
   function boot() {
-    tick();
-    setInterval(tick, POLL);
-    /* ⛌ كارت الأصول العالمية (glbCard) بيتبنى بعد ما البيانات توصل،
-       والـtick الأول بيحصل قبل كده بيكمل فاضي وال injections bet go out.
-       بنجرّب كل ثانيتين أول ٣٠ ثانية لحد ما الكارت يظهر فعلاً. */
-    var tries = 0;
-    var warm = setInterval(function () {
-      if (++tries > 15) { clearInterval(warm); return; }
-      tick();
-    }, 2000);
-    window.addEventListener('visibilitychange', function () { if (!document.hidden) tick(); });
+    tick(true);
+    setInterval(function () { tick(true); }, POLL);
+    window.addEventListener('visibilitychange', function () { if (!document.hidden) tick(true); });
+
+    /* ⛔ 17 أكتوبر 2026 — الكارت بيتبنى من جديد كل مرة ترجع من الفلتر،
+       فالـbadge بتروح معاه. الحل: مراقب بس بيلاحظ، وبيستدعي tick
+       مرة واحدة لا أكتر — مش كل تغيير في الـDOM.
+       ⛔ throttle ٨ ثواني عشان مافيش طلبات كتير. */
+    var lastTry = 0;
+    try {
+      var mo = new MutationObserver(function () {
+        if (Date.now() - lastTry < 8000) return;
+        var c = document.getElementById('glbCard');
+        if (c && !c.querySelector('.gsig')) { lastTry = Date.now(); tick(false); }
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    } catch (e) {}
     window.openGoldIntel = openGold;
   }
 
