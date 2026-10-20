@@ -136,7 +136,7 @@ try:
     d, t = ts.split(' ')
     y, mo, dd = d.split('-')
     months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
-    ar = lambda n: ''.join(chr(0x0660+int(c)) for c in n)
+    ar = lambda n: ''.join(chr(0x0660+int(c)) if c.isdigit() else c for c in n)
     print(f'{ar(dd)} {months[int(mo)-1]} {ar(y)} · {ar(t[:5])} UTC')
 except Exception:
     print(ts)
