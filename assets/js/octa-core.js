@@ -906,6 +906,21 @@ function _isFullShape(f){
   if (f._shape) return f._shape === 'full';
   const k = Object.keys(f.stocks)[0];
   const s = k ? f.stocks[k] : null;
+  if (!s) return false;
+  /* ⛔⛔⛔ ٢١ أكتوبر ٢٠٢٦ — تصليح بعد إخفاء المخرجات
+  ⛌ كان بيفحص s.total أو s.verdict — والتنين في _HIDDEN_KEYS_OUTPUT،
+  ⛌ فاتشالوا من رد الـAPI عشان نخبي الدرجة عن الزائر.
+  ⛌ النتيجة: data_full كان بيتعامل معاه كأنه «مش full»
+  ⛌ فالدرجة كانت بتتحسب 0 وبتطلع «—» في كارت السهم.
+  ⛌ ⛌ الحل: نفحص حقول ما بتتخفاش (المحاور · الدرجات الفرعية)
+  ⛌ فـdata_full الحقيقي يتعرف، والدرجة تظهر تاني. */
+  /* ⛌ ملاحظة: technical_score و fund_score و safety_score
+  ⛌ كلهم في _HIDDEN_KEYS_OUTPUT على السيرفر — فمفتيشش هنا.
+  ⛌ الحقول اللي بتتخفيش:-sector / pe / roe / eps / sma200
+  ⛌ دي الحقول اللي بتقول «ده ملف كامل» مش «ده ملف ناقص». */
+  if (s.pe != null || s.roe != null || s.eps != null || s.sma200 != null
+      || s.rsi != null || s.macd != null || s.industry != null
+      || s.sector != null) return true;
   return !!(s && (s.total != null || s.verdict != null || s.conf != null));
 }
 

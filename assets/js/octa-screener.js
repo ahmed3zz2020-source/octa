@@ -1227,7 +1227,12 @@
 
   function tbl(rows) {
   const cols = (S.mode === 'octa') ? COLS_O : COLS;
-  return '<div class="sv-wrap"><table class="sv-tbl"><thead><tr>' +
+  /* ⛔⛔⛔ ٢١ أكتوبر ٢٠٢٦ — مؤشّر السحب على الموبايل
+     ⛌ الجدول أعرض من الشاشة — والمستخدم مش عارف إن في سحب.
+     ⛌ دلوقتي: شريط صغير فوق الجدول بيقول «اسحب» وبيختفي بعد أول حركة. */
+  return '<div class="sv-scroll-hint" id="svScrollHint">' +
+  '<span>←</span> اسحب الجدول عشان تشوف باقي الأعمدة <span>←</span>' +
+  '</div><div class="sv-wrap"><table class="sv-tbl"><thead><tr>' +
   cols.map(function (c) {
   const sk = c.k2 || c.k;
   const sortable = c.k !== 'act';
@@ -1423,4 +1428,43 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', window.scInit);
   else setTimeout(window.scInit, 300);
 
+})();
+/* ══════════════════════════════════════════════════════════════
+  👆 إخفاء مؤشّر السحب بعد أول حركة
+  ──────────────────────────────────────────────────────────────
+  ⛔ ٢١ أكتوبر ٢٠٢٦ — المؤشّر بيشيل نفسه أول ما المستخدم يسحب
+  ⛌ عشان مايفضلش Fraud في الشاشة بعد ما فهم.
+  ══════════════════════════════════════════════════════════════ */
+(function () {
+  if (typeof document === 'undefined') return;
+  let done = false;
+
+  function hideHint() {
+    if (done) return;
+    done = true;
+    const h = document.getElementById('svScrollHint');
+    if (!h) return;
+    h.style.transition = 'opacity .3s, max-height .3s';
+    h.style.opacity = '0';
+    h.style.maxHeight = '0';
+    h.style.padding = '0';
+    h.style.marginBottom = '0';
+    h.style.overflow = 'hidden';
+    setTimeout(function () { h.remove(); }, 350);
+  }
+
+  document.addEventListener('touchstart', function (e) {
+    if (e.target && e.target.closest && e.target.closest('.sv-wrap')) hideHint();
+  }, { passive: true, once: true });
+
+  document.addEventListener('wheel', function (e) {
+    if (e.target && e.target.closest && e.target.closest('.sv-wrap') && Math.abs(e.deltaX) > 12) {
+      hideHint();
+    }
+  }, { passive: true, once: true });
+
+  /* على الموبايل بس — بعد ١٠ ثواني نخفيه عشو كمان */
+  if (window.matchMedia && window.matchMedia('(max-width: 680px)').matches) {
+    setTimeout(hideHint, 10000);
+  }
 })();

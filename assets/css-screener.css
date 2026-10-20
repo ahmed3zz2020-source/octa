@@ -127,14 +127,29 @@
    📊 الجدول
    ══════════════════════════════════════════════════════════════ */
 .sv-wrap {
-  overflow-x: auto; border: 1px solid var(--line);
+  overflow-x: auto; overflow-y: auto; border: 1px solid var(--line);
   border-radius: 11px; background: var(--card);
   -webkit-overflow-scrolling: touch; max-height: 68vh;
   /* ⛔⛔⛔ الأهم: جدول الفلتر min-width:1100px — أعرض من أي تابلت.
      من غير contain، سحب آخر الجدول بيزحلق الصفحة كلها لليمين
      (في RTL) ويطلع الهيدر وشريط الأذرع بره المحاذاة. */
   overscroll-behavior-x: contain;
+  /* ⛔⛔⛔ إصلاح ٢١ أكتوبر ٢٠٢٦ — السحب الأفقي مش شغّال على الموبايل.
+     ⛌ السبب: Chrome على Android بيعتبر أي سحب داخل عنصر عادي
+     ⛌ سحب للصفحة (scroll) افتراضياً — فالسحب الأفقي بينزلق تحت
+     ⛌ صباع المستخدم ومايحرّكش الجدول.
+     ⛌ touch-action: pan-x = «اسمح بسحب أفقي هنا، وده بتاعي».
+     ⛌ pan-y = «السحب الرأسي يفضل للصفحة» عشان الـstacking يفضل شغّال. */
+  touch-action: pan-x pan-y;
+  /* ⛌ scrollbar واضحة على الموبايل عشان المستخدم يشوف إن فيHorizontal scroll */
+  scrollbar-width: thin;
 }
+.sv-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+.sv-wrap::-webkit-scrollbar-track { background: transparent; }
+.sv-wrap::-webkit-scrollbar-thumb {
+  background: var(--line); border-radius: 3px;
+}
+.sv-wrap::-webkit-scrollbar-thumb:active { background: var(--gold); }
 .sv-tbl {
   width: 100%; border-collapse: collapse;
   min-width: 1100px; font-variant-numeric: tabular-nums;
@@ -388,6 +403,45 @@ td.sn {
   .sv-bell { width: 32px; height: 32px; opacity: .7; }
   .sv-tr:hover .sv-bell { opacity: 1; }
   .sv-wrap { max-height: none; }
+
+  /* ⛔⛔⛔ ٢١ أكتوبر ٢٠٢٦ — موبايل: الـscroll الجانبي مش شغّال
+     ⛌ السبب: الجدول لسه ١١٥٠px والعرض المتاح ٣٦٠px
+     ⛌ المستخدم مش عارف إن في سحب — بيحس إن الجدول مقصوص.
+     ⛌ الحل: 
+        ① مؤشّر بصري «← اسحب» فوق الجدول
+        ② نزّل أول ٤ أعمدة تثبيت (sticky) عشان يفضل السعر ظاهر
+        ③ السحب الأفقي بـtouch-action */
+  .sv-scroll-hint {
+    display: flex !important; align-items: center; justify-content: center;
+    gap: 7px; padding: 8px; margin-bottom: 6px;
+    background: linear-gradient(180deg, rgba(212,175,55,.16), rgba(212,175,55,.04));
+    border: 1px solid rgba(212,175,55,.3); border-radius: 9px;
+    font-size: .74rem; color: var(--gold); font-weight: 600;
+    animation: svHintPulse 2.4s ease-in-out infinite;
+  }
+  @keyframes svHintPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .62; }
+  }
+  .sv-scroll-hint span { font-size: 1rem; }
+
+  /* ⭐ الأعمدة الأساسية تثبت — السعر والاسم يبانوا دايماً */
+  .sv-tbl th:nth-child(1), .sv-tbl td:nth-child(1),
+  .sv-tbl th:nth-child(2), .sv-tbl td:nth-child(2) {
+    position: sticky; background: var(--card); z-index: 2;
+  }
+  .sv-tbl th:nth-child(1), .sv-tbl td:nth-child(1) {
+    right: 0; box-shadow: 6px 0 10px -6px rgba(0,0,0,.45);
+  }
+  .sv-tbl th:nth-child(2), .sv-tbl td:nth-child(2) {
+    right: 62px; box-shadow: 6px 0 10px -6px rgba(0,0,0,.28);
+  }
+  .sv-tbl thead th:nth-child(1), .sv-tbl thead th:nth-child(2) {
+    background: var(--pri2); z-index: 4;
+  }
+  /* ⛌ نخفي المؤشّر بعد ما المستخدم يحرّك الجدول */
+  .sv-tbl tr td { transition: none; }
+  .sv-tbl tr:hover td:nth-child(1), .sv-tbl tr:hover td:nth-child(2) { background: var(--card2); }
 
   .sv-ab-tbl { grid-template-columns: 1fr; }
   .sv-about-b { padding: 0 13px 13px; }
