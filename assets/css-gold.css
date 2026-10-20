@@ -814,7 +814,7 @@ body.ocm-open { overflow:hidden; }
 .ocm-slot-search { flex: 1 1 auto !important; min-width: 0; display: flex; }
 .ocm-slot-search .octa-pick { flex: 1 1 auto; width: 100%; }
 .ocm-slot-shot { display: flex; align-items: center; }
-/* × و 📷 و ⛶ — نفس الحجم بالظبط و间距 منتظم */
+/* × و 📷 و ⛶ — نفس الحجم بالظبط والمسافات منتظمة */
 .ocm-fs, button.ocm-shot, .ocm-close {
   width: 44px; height: 44px; flex: none;
   border-radius: 11px; display: inline-flex; align-items: center; justify-content: center;

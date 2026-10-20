@@ -66,11 +66,11 @@ octa/
 ├── DECISIONS.md            ← سجل القرارات
 ├── SESSION-NOTES.md        ← يوميات العمل
 ├── PROJECT-RULES.md        ← (قديم — دمج في AGENTS)
-├── PROJECT_STATE.md        ← (قديم — حدّث آلي)
+├── PROJECT_STATE.md        ← (قديم — سجل المشروع الدائم في octa-prices/)
 ├── index.html              ← الصفحة الرئيسية
 ├── worker.js               ← proxy للـAPI (نفس origin)
 ├── assets/
-│   ├── js/                 ← ٢٢ ملف · ٢٤٬٠٥٤ سطر
+│   ├── js/                 ← ٢٢ ملف · ٢٤٬٠٧٧ سطر
 │   │   ├── octa-core.js    ← المحرك + تحميل البيانات
 │   │   ├── octa-app.js     ← المودالات + openChart
 │   │   ├── tv-shim.js      ← ⭐ مصدر الشارت الوحيد
@@ -78,25 +78,25 @@ octa/
 │   │   ├── octa-filters.js ← الفلاتر المتقدمة
 │   │   ├── octa-pages.js   ← صفحات الأسهم + gold_signal
 │   │   └── ...
-│   ├── css*.css            ← ٦ ملفات
-│   └── data/
+│   └── css*.css            ← ٦ ملفات
 ├── tools/
 │   ├── devserver.py        ← سيرفر محلي + API proxy
 │   ├── visual-check.py     ← فحص بصري آلي
 │   └── chart-check.py      ← فحص الشارت
-└── dist/                   ← build output
+└── dist/                   ← build output (مولّد — gitignore)
 ```
 
 ### `octa-prices/` — الباك
 ```
 octa-prices/
-├── update_prices.py       ← ١٠٬٠٠٠+ سطر — المحرك كله
+├── update_prices.py       ← ١١٬٥٩٦ سطر — المحرك كله
 │   ├── المحاور الستة + الأوزان
 │   ├── محرك التوصيات
 │   ├── بوت تيليجرام
-│   └── ٨٨ endpoint
+│   └── ١٠٠ endpoint
 ├── octa_app.py            ← مسارات إضافية
 ├── data_full.json         ← ٢٨٥ سهم (full)
+├── PROJECT_STATE.md       ← سجل المشروع الدائم بالأرقام
 ├── div_actions.py         ← بيانات التوزيعات
 ├── Procfile               ← gunicorn
 └── requirements.txt
@@ -167,8 +167,8 @@ python3 tools/devserver.py 8811
 
 ```
 الأسهم المصرية:     ٢٨٥-٢٩٠
-إجمالي الأسهم:     ٢٨٦ من API · ٢٬٢٨٩ من data_markets
-endpoints الباك:     ٨٨
+إجمالي الأسهم:     ٢٨٥ من API · ٢٬٢٨٩ من data_markets
+endpoints الباك:     ١٠٠
 commit الحالي:      596c665
 آخر تحديث للبيانات: ٢٠ أكتوبر ٢٠٢٦ · ١٠:١٣ UTC
 ```
@@ -224,7 +224,7 @@ grep -A5 "شهر" DECISIONS.md | tail -30          # ٤) إيه القرارات
 | `DOMAINS.md` | محرك التقييم + المحاور + قوانين السوق |
 | `DECISIONS.md` | كل قرار سوّاناه والسبب |
 | `SESSION-NOTES.md` | يوميات آخر ٣٠ يوم |
-| `PROJECT-STATE.md` | الـstats المحدّثة آلياً |
+| `octa-prices/PROJECT_STATE.md` | سجل المشروع الدائم بالأرقام |
 
 ---
 

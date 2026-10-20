@@ -125,7 +125,7 @@ de06b17  trigger redeploy
 ### ✅ خلص
 - **tv-shim.js v1** — أول مصدر موحّد للشارت
 - **`s.tradingview.com/widgetembed`** بعد تجربة ٣ مصادر تانية
-- **بحث عربي/لاتيني** على `OS_DB` (٢٨٦ سهم)
+- **بحث عربي/لاتيني** على `OS_DB` (٢٨٥ سهم)
 - **زر 📷** يفتح TradingView (لأن parent مش يقدر يصوّر cross-origin iframe)
 - **`save_image=1`** مفعّل
 

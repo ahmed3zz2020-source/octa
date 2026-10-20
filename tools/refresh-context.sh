@@ -57,8 +57,38 @@ if [ -d /workspace/octa-prices ]; then
     echo "endpoints الباك: $EP_COUNT"
 fi
 
-# ─── ٥) عدد平日 التوصيات ───
+# ─── ٥) عدد أيام التوصيات ───
 DEC_COUNT=$(grep -c '^\s*"[^"]*"\s*:\s*[0-9]' /workspace/octa-prices/update_prices.py 2>/dev/null || echo "؟")
+
+# ─── ٥-ب) أرقام الباك: أسطر + endpoints + عدد الأسهم الحي ───
+BACK="/workspace/octa-prices"
+UP_LINES=$(wc -l < "$BACK/update_prices.py" 2>/dev/null | tr -d ' ' || echo "0")
+EP_LIVE=$(curl -s --max-time 12 "$API/api/health" 2>/dev/null \
+  | python3 -c "import json,sys
+try:
+    d=json.load(sys.stdin)
+    print(d.get('stocks','غير متاح'))
+except Exception:
+    print('غير متاح')" 2>/dev/null || echo "غير متاح")
+if [ -n "$EP_COUNT" ] && [ "$EP_COUNT" != "غير معروف" ]; then
+    echo "أسطر update_prices.py: $UP_LINES · أسهم حية: $EP_LIVE"
+fi
+
+# تحويل الأرقام لصيغة عربية (٢٨٥)
+to_ar() {
+    python3 -c "
+import sys
+s=sys.argv[1]
+print(''.join(chr(0x0660+int(c)) if c.isdigit() else c for c in s))
+" "$1" 2>/dev/null || echo "$1"
+}
+
+AR_EP=$(to_ar "$EP_COUNT")
+AR_UP=$(to_ar "$UP_LINES")
+AR_JS_LINES=$(to_ar "$JS_LINES")
+AR_STOCKS=$(to_ar "$EP_LIVE")
+AR_JS_COUNT=$(to_ar "$JS_COUNT")
+AR_CSS_COUNT=$(to_ar "$CSS_COUNT")
 
 # ─── ٦) تحديث الملفات ───
 TODAY=$(date +"%Y-%m-%d")
@@ -71,6 +101,16 @@ update_file() {
     echo "  ✅ حدّثت $file"
 }
 
+# تحديث الأرقام جوّه ملف (السطر الأول بس اللي بيتباعل)
+set_num() {
+    local file="$1" pattern="$2" value="$3"
+    [ -f "$file" ] || return 0
+    if grep -q "$pattern" "$file"; then
+        sed -i "s|$pattern|$value|" "$file"
+        echo "  ✅ $file ← $value"
+    fi
+}
+
 echo ""
 echo "تحديث الملفات:"
 update_file "AGENTS.md"
@@ -78,6 +118,26 @@ update_file "ARCHITECTURE.md"
 update_file "DOMAINS.md"
 update_file "DECISIONS.md"
 update_file "SESSION-NOTES.md"
+
+echo ""
+echo "تحديث الأرقام:"
+# AGENTS.md
+set_num "AGENTS.md" "^\*\*آخر تحديث:\*\*.*" "**آخر تحديث:** ${TODAY} · \`${COMMIT_SHA}\`"
+set_num "AGENTS.md" "^│   ├── js/.*" "│   ├── js/                 ← ${AR_JS_COUNT} ملف · ${AR_JS_LINES} سطر"
+set_num "AGENTS.md" "^│   └── css\*.css.*" "│   └── css*.css            ← ${AR_CSS_COUNT} ملفات"
+set_num "AGENTS.md" "^├── update_prices.py .*" "├── update_prices.py       ← ${AR_UP} سطر — المحرك كله"
+set_num "AGENTS.md" "^│   └── [٠-٩]+ endpoint" "│   └── ${AR_EP} endpoint"
+set_num "AGENTS.md" "^endpoints الباك:.*" "endpoints الباك:     ${AR_EP}"
+set_num "AGENTS.md" "^إجمالي الأسهم:.*" "إجمالي الأسهم:     ${AR_STOCKS} من API · ٢٬٢٨٩ من data_markets"
+set_num "AGENTS.md" "^الأسهم المصرية:.*" "الأسهم المصرية:     ${AR_STOCKS}"
+# PROJECT_STATE.md في الباك
+if [ -f "$BACK/PROJECT_STATE.md" ]; then
+    set_num "$BACK/PROJECT_STATE.md" "^\*\*آخر تحديث:\*\*.*" "**آخر تحديث:** ${TODAY}"
+    set_num "$BACK/PROJECT_STATE.md" "^| \.commit الحالي .*" "| .commit الحالي | \`${COMMIT_SHA}\` |"
+    set_num "$BACK/PROJECT_STATE.md" "^| عدد الـ endpoints .*" "| عدد الـ endpoints | ${AR_EP} |"
+    set_num "$BACK/PROJECT_STATE.md" "^| أسطر الكود .*" "| أسطر الكود | ${AR_UP} |"
+    set_num "$BACK/PROJECT_STATE.md" "^| الأسهم المحللة .*" "| الأسهم المحللة | ${AR_STOCKS} |"
+fi
 
 # ─── ٧) فحص شامل ───
 echo ""

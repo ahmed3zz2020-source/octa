@@ -211,7 +211,7 @@
   host.innerHTML = h;
   }
 
-  /* ══ كارت الشرح — نفس فكرة كارت الفلتر筛查 ══ */
+  /* ══ كارت الشرح — نفس فكرة كارت الفلتر (الفحص) ══ */
   function aboutBox() {
   var o = !!AF.about;
   var h = '<div class="af-about' + (o ? ' open' : '') + '">';

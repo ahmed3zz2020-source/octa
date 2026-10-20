@@ -524,7 +524,7 @@ function octaPageInit(id) {
 
      الحل: نستنى الداتا **بالفعل** قبل ما نرسم.
      octaLoadDB بترجّع فوراً لو الداتا جاهزة (بتعمل Promise_cache جواها)
-     فمفيش أي تأخير إضافي على第二次 فتح. */
+     فمفيش أي تأخير إضافي على الفتح الثاني. */
   if (id === 'filter' || id === 'best') setTimeout(async ()=>{
   try { if (typeof octaLoadDB === 'function') await octaLoadDB(); } catch(e) { console.warn('data:', e.message); }
   if (id === 'filter' && typeof fzInit==='function') fzInit();
