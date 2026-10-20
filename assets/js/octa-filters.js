@@ -1002,6 +1002,11 @@ const FZ_PACKS = {
   note:'القطاعات الدورية بتتقاس بـEV/EBITDA — الـP/E بيتغيّر مع أسعار البضاعة',
   tip:'الربح بيتغيّر مع سعر البضاعة — الـEV/EBITDA أدق من الـP/E هنا'
   },
+  'خدمات استهلاكية': {
+  ar:'خدمات', use:['pe','ps','roe'], ban:['de'],
+  note:'الفنادق والسياحة والتعليم والإعلام — بتقاس بالربحية والمبيعات',
+  tip:'ربحية الفنادق بتتذبذب مع الموسم — الـP/E لوحده بيضلّل، فبنقيس بـP/S كمان'
+  },
 };
 const FZ_PACK_DEFAULT = {
   ar:'عام', use:['pe','pb','ps'], ban:['evEbitda'],
@@ -3875,7 +3880,7 @@ function nzAxisScore(s){
     if (have && eff>0){ tot += mean*eff; wGot += eff; }
     axes.push({ id:ax.id, ic:ax.ic, ar:ax.ar, w:ax.w, n:n, have:have, mean:mean, eff:eff, items:items });
   });
-  /* ⛔ tot已是 على مقياس 0-100 (مجموع mean×eff) — ما نقسمش تاني على 100 */
+  /* ⛔ tot على مقياس 0-100 (مجموع mean×eff) — ما نقسمش تاني على 100 */
   return { total: (wGot>0) ? (tot/wGot) : null, wGot:wGot, axes:axes };
 }
 
@@ -4310,7 +4315,7 @@ function nzFiveTable(){
   top.forEach(function(row, i){
     const s = row.s, sc = row.sc, fv = nzFair(s), pl = nzPlan(s, fv), px = fv.px;
     /* ⛔ نسبة المكسب = من نقطة الدخول مش من السعر الحالي.
-       من السعر = رقم مربح زيادة لصف فيه入场 أأمن. */
+       من السعر = رقم مربح زيادة لصف فيه دخول أأمن. */
     const up = (pl.target!=null && pl.entry!=null && pl.entry>0)
              ? (pl.target/pl.entry-1)*100 : null;
     const risk = (pl.stop!=null && pl.entry!=null && pl.entry>0)

@@ -627,12 +627,15 @@ async function renderStrategies(code) {
   x.name + '</button>').join('') + '</div>';
   if (!s) { box.innerHTML = tabs + '<div class="opps-loading">—</div>'; return; }
   const vc = /تجميع/.test(s.decision) ? 'buy' : (/بيع|تجنّب/.test(s.decision) ? 'sell' : (/غير كاف/.test(s.decision) ? 'unknown' : 'hold'));
-  const W = s.weights || {};
-  let wbars = '';
-  for (var k in W) {
-  wbars += '<div class="comp-row"><span class="comp-name">' + (STRAT_AXIS[k] || k) + '</span>' +
-  '<div class="comp-track"><div class="comp-fill" style="width:' + W[k] + '%"></div></div>' +
-  '<span class="comp-val">' + W[k] + '%</span></div>';
+  /* الأعمدة = نتيجة كل محور (s.axes).
+     الأوزان نفسها مخفية عن الـAPI عن قصد (وصفة المحرك) — فبنعرض النتيجة. */
+  const A = s.axes || {};
+  let abars = '';
+  for (var k in A) {
+  const av = Math.max(0, Math.min(100, Number(A[k]) || 0));
+  abars += '<div class="comp-row"><span class="comp-name">' + (STRAT_AXIS[k] || k) + '</span>' +
+  '<div class="comp-track"><div class="comp-fill" style="width:' + av + '%"></div></div>' +
+  '<span class="comp-val">' + Math.round(av) + '</span></div>';
   }
   box.innerHTML = tabs +
   '<div class="strat-info">' +
@@ -645,12 +648,14 @@ async function renderStrategies(code) {
   '<span style="color:var(--muted);font-size:.8rem">ثقة ' + s.confidence + '%</span>' +
   '</div>' +
   '<div style="display:flex;gap:14px;margin-top:10px;font-size:.8rem;color:var(--muted)">' +
-  '<span>مرجّح: ' + s.base + '</span><span>خصم مخاطرة: ' + s.risk_penalty + '</span></div>' +
+  '<span>قبل الخصم: ' + s.base + '</span><span>خصم مخاطرة: ' + Math.abs(s.risk_penalty || 0) + '</span></div>' +
   (s.filter_notes && s.filter_notes.length ?
   '<div style="margin-top:10px">' + s.filter_notes.map(n =>
   '<div style="font-size:.8rem;color:#ff9800;padding:4px 0">⚠️ ' + n + '</div>').join('') + '</div>' : '') +
   '</div>' +
-  '<div class="comp-bars">' + wbars + '</div>';
+  '<div class="comp-bars">' +
+  '<div style="font-size:.75rem;color:var(--muted);margin-bottom:6px">نتيجة كل محور من ١٠٠</div>' +
+  abars + '</div>';
 }
 
 function pickStrategy(key) {
@@ -711,15 +716,28 @@ function renderDashboard(d) {
   '</div>';
 
   // ═══ متوسط المحاور ═══
-  const W = d.weights || {};
+  /* أوزان المحرك مخفية عن الـAPI عن قصد (وصفة المحرك) —،
+     والنسخة المحلية في CFG.engineWeights هي نفس الأرقام.
+     لو الـAPI رجّعها يوم، بنستخدمها هي. */
+  const Wapi = (d.weights && Object.keys(d.weights).length) ? d.weights : null;
+  const W = Wapi || (CFG.engineWeights || {});
+  const Wpct = (function (src) {           // الأوزان كـنسبة مئوية
+  var isFrac = src.technical != null && src.technical <= 1;   // الـAPI كسر · المحلي %
+  return function (key) {
+  var val = src[key];
+  if (key === 'safety') val = src.risk;
+  if (val == null) return null;
+  return Math.round(isFrac ? val * 100 : val);
+  };
+  })(W);
   let axesHtml = '';
   for (var k in (d.axis_average || {})) {
   var v = d.axis_average[k] || 0;
-  var w = W[k] != null ? Math.round(W[k] * 100) : (k === 'safety' ? Math.round((W.risk || 0) * 100) : (k === 'final' ? 100 : 0));
+  var w = Wpct(k);
   axesHtml += '<div class="ad-row">' +
   '<span class="ad-name">' + (DASH_AXIS[k] || k) + '</span>' +
   '<div class="ad-track"><div class="ad-fill" style="width:' + v + '%;background:' + axColor(v) + '"></div></div>' +
-  '<span class="ad-val">' + v + '</span><span class="ad-w">' + w + '%</span></div>';
+  '<span class="ad-val">' + v + '</span><span class="ad-w">' + (w == null ? '—' : w + '%') + '</span></div>';
   }
 
   // ═══ توزيع القرارات + المخاطر ═══
@@ -3628,7 +3646,7 @@ function renderStockPage() {
   ${exRaw.contributions.slice(0, 10).map(c => {
   const n = Number(c.score != null ? c.score : c.contribution) || 0;
   const contrib = Number(c.contribution || 0);
-  const w = Number(c.weight || 0);
+  const w = Number(c.axis_weight || c.weight || (CFG.engineWeights || {})[c.axis] || 0);
   const col = n >= 65 ? 'var(--sec)' : n >= 45 ? 'var(--gold2)' : 'var(--red2)';
   return '<div class="si-c-row">' +
   '<div class="si-c-n">' + (c.name || AXIS_LABELS[c.axis] || c.axis || '—') + '</div>' +
