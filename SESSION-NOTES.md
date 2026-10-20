@@ -174,19 +174,21 @@ de06b17  trigger redeploy
 - ٢٥ قرار موثّق (D-001 لـ D-025) · ٢٢ ملف JS · ٢٤٬٠٥٤ سطر · ٦ ملفات CSS
 - live : `/api/stocks` = ٢٨٥ سهم · ٦٩ حقل · `snapshot_id` = 20261020-103625-a100
 
-### 🔴 نقص وتعارض (محتاج معالجة)
-- **نظام الاستراتيجيات موثّقش خالص** — الباك فيه ٧ استراتيجيات بأوزان مختلفة
-  و`risk_penalty_mult` لكل واحدة (سوينج · قيمة · نمو · دخل · متوازن · محافظ · جريء)
-  و`/api/strategies` و`/api/strategy/<code>/<strategy>` — مفيش ذكر في DOMAINS ولا DECISIONS
-- **تعارض حي مع قاعدة إخفاء الوصفة:** `_HIDDEN_KEYS` فيها `strategies` و`strategy`
-  ⇒ لايف `/api/strategies` بترجّع `{"snapshot_id": ...}` فاضية
-  ⇒ الواجهة `octa-pages.js` بتعمل `STRATS = []` والتبويبات مش بتظهر
-  ⇒ نفس الكود على GitHub · المشكلة في الفلتر مش في الـendpoint
-- **`PROJECT_STATE.md` في المكان الغلط** — AGENTS بيحطه في `octa/` وهو في `octa-prices/`
-  واسمه في الرابط `PROJECT-STATE.md` (شرطة) وهو `PROJECT_STATE.md` (شرطة سفلية)
-  ومحتواه قديم (٢٠ أكتوبر ٧ · ٣٧ endpoint · ٢٥٢ سهم · ~٤٣٥٠ سطر)
+### ✅ متابعة اللي كانت بلوكر (٢٠ أكتوبر · ١٣:٤٥)
+- **`/api/strategies` بقى شغّال على الإنتاج:** رجّع ٧ استراتيجيات كاملة
+  (سوينج · قيمة · نمو · دخل · متوازن · محافظ · جريء)
+  ⇒ التعارض الحي مع `_HIDDEN_KEYS` **اتصلّح** — الفلتر بقى بيفلتر صح
+- **`/api/strategy/<code>/<strategy>` شغّال:** COMI/swing رجّع
+  `all_strategies` · `price` · `snapshot_id`
+- **الواجهة `octa-pages.js:597` — `STRATS = null` كاش**
+  ⇒ مش هيعمل fetch تاني
+
+### 🟡 باقي ناقص — محتاج شغل
+- **نظام الاستراتيجيات موثّقش في `DOMAINS.md` ولا `DECISIONS.md`**
+  ٧ استراتيجيات بأوزان مختلفة و`risk_penalty_mult` لكل واحدة — والمعرفة ناقصة
+- **`PROJECT_STATE.md` في المكان الغلط:** AGENTS بيحطه في `octa/`
+  وهو في `octa-prices/` · واسمه في الرابط غلط (شرطة سفلية مش شرطة)
   و`refresh-context.sh` مكتوب فيه إنه بيحدّثه بس مش بيعمل
-- **الـcommit في كل ملفات المعرفة قديم** — مكتوب `596c665` والـHEAD فعلاً `c5b36cc`
 
 ### 📌 ملاحظات
 - ٦ أسطر فيها حروف صينية ناقصة (ARCHITECTURE ٤ و١٠١ و٢٢٠ · DOMAINS ١٨٧ · KB-PLAN ١١٨ · TEST-LOCAL ٤٦)
