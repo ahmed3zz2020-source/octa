@@ -251,3 +251,57 @@ de06b17  trigger redeploy
 ### ⚠️ أمان
 `users.html` بيعرض الإيميلات **كاملة** — للمدير فقط، متحطهاش على رابط عام.
 `index.html` بيمخفي الإيميلات — آمن للمشاركة.
+
+---
+
+## 🐙 ٢٠ أكتوبر ٢٠٢٦ — تسليم شامل (بعد إصلاح «الصفحة كانت ميتة»)
+
+### 🔴 السبب الجذري اللي اتلDiscover (قديم — من زمان)
+`killLegacyHome()` في `octa-pages.js` كان بيحذف `#homeHidden` **نهائياً** من الـDOM.
+وجواها كان `#intelPage` (التحليل الكامل + الاستراتيجيات) · `#dashPage` (لوحة التحكم) · `#modalOverlay` · `#decideModal`.
+الـrescue كان بيعرف صفحات `page-*` بس ⇒ الـ٤ دول اتمسحوا ⇒ **٤ ميزات ميتة في الموقع**.
+وبالإضافة: `renderStrategies()` كانت بتتنادى **قبل** بناء الـHTML ⇒ `#stratBox` لسه مش موجود ⇒ return فوري.
+وكمان: كلاسات `.comp-*` و`.strat-*` و`.bp-*` **مش في CSS خالص** ⇒ الصفحة بتطلع بلا تنسيق.
+
+### ✅ اللي اتصلح (٢٠ أكتوبر)
+**الباك** (`octa-prices` — اتنشر لايف على Railway):
+- فلتر الوصفة بقى يفرّق **بالعمق**: `strategies`/`strategy` مسموحين في مستوى الرد الأعلى بس
+  ⇒ `GET /api/strategies` بقى يرجّع ٧ استراتيجيات · `GET /api/strategy/<code>/<strategy>` بقى يرجّع النتيجة كاملة
+- ٥ مسارات تسرّب اتقفلت: `current_weights` · `axis_weight` · `old_weights`/`new_weights` · `close_picks` · العتبات في نص الـnotes
+- `POST /api/calibration` بقى محمي بتوكن الأدمن (fail-closed) + `X-OCTA-Admin` اتضاف لـCORS
+- ٣٥ اختبار في `octa-prices/test_recipe_filter.py` (بيقرا الكود الحقيقي بالـAST)
+
+**الواجهة** (اتنشرت على الإنتاج — `check-sync` = صفر اختلاف):
+- ٤ عناصر اتنقذت من الحذف (`intelPage` · `dashPage` · `modalOverlay` · `decideModal`)
+- `renderStrategies` بقت بعد بناء الـHTML
+- CSS جديد: `.comp-*` · `.strat-*` · `.bp-*`
+- زرار «📊 لوحة التحكم» في الشريط (اللوحة مكانش ليها أي زرار)
+- `worker.js`: إعادة محاولة ٣ مرات في الـproxy (كان ٣٥٪ من الطلبات بتفشل ٥٠٣)
+- صفحة «أفضل فرصة»: بقت من محركنا (`/api/intelligence` + `/api/technical`) والشارت من `OCTA_TV.mount()`
+  (الـ`embed-widget-*` القديمة بتتفضل فاضية بسبب CORS/CSP)
+
+**التوثيق** (في نفس الـcommit):
+- `DOMAINS.md`: قسم «نظام الاستراتيجيات» (٧ استراتيجيات · الأوزان · المعادلة · القرار · الفلاتر)
+- `DECISIONS.md`: D-026 (الفلتر بالعمق) · D-027 (الأعمدة من `axes`) · D-028 (حدود إخفاء الوصفة)
+- ٢٥ حرف صينية/لاتيني/تالف اتصلحوا (معرفة + كود) · ٨ أسماء سعودية · ١٤ سهم فيهم `pack` تالف
+- الأرقام صحت (١١٬٥٩٦ سطر · ٨٨ endpoint · ٢٨٥ سهم) · `tools/refresh-context.sh` بقى بيحدّث فعلاً
+
+### 🔴 لسه مفتوح
+- **«قرار اليوم»** بيحتاج ٢٨٥ سهم بكامل الأساسيات — من غير توكن الـOS_DB fallback ٣٠ سهم ⇒ «⏳ بنحسب…»
+- **١٠٨ اسم سعودي فاضي** + كاير مكسورة في `data/data_markets.js` (المصدر: sahm.finance/companies)
+- **`admin/`** مش داخل الـbuild (مش في `package.json` build script) — اللوحة مش منشورة
+- **اختبارات الواجهة** مكسورة من زمان (بتطلب `../js/chart/data.js` اللي مش موجود)
+- **`data_markets.js` ٣٫٤ ميجا** بيتحمّل بـ`<script>` — أكبر خطر أداء
+- **`/api/alerts/test`** مفتوح ( حد يبعت رسالة تليجرام لأي حد) — محمي ب rate limit بس
+
+### 📌 قوانين الشات الجديد (OCTA-7-PRO)
+- أول ١٠ دقايق: `cd /workspace/octa && bash check-sync.sh` (لازم يبقى صفر اختلاف) + `cat AGENTS.md` + `tail -40 SESSION-NOTES.md`
+- ⛔ **ممنوع أي نشر على octashares.com** من غير «ارفع على الدومين» الحرفية من أحمد
+- الترتيب: عدّل → GitHub `main` → `octa-preview` → اختبار → موافقة → `octa` (الإنتاج)
+- `wrangler@4.151.1` بس (٣ بيفشل ٥٠٣) + `NODE_OPTIONS="--dns-result-order=ipv4first"`
+- `wrangler deploy` بيرجع ٥٠٣ لحظي ⇒ loop ٥ محاولات + ١٥ ثانية، وتأكد من «Current Version ID»
+- الباك: `git push` في `octa-prices/main` = نشر لايف على Railway (خطر!)
+- ⛔ `git clone` بيفشل في الساندوكس (cert) ⇒ `GIT_SSL_CAINFO=/etc/ssl/certs/agent-identity/sandbox-gateway-ca.crt`
+  + `git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/ahmed3zz2020-source/octa.git"`
+- ⛔ PyPI محجوب ⇒ مفيش Flask محلياً · `npm` بيوصل نت
+- 🚨 **شاتات تانية بتشتغل على نفس الريبو** ⇒ قبل أي push: `git fetch` + `git merge` (من غير فقد)
