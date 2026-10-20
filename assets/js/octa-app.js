@@ -1035,11 +1035,11 @@ window.openChart = function (code, name, market) {
         '<span class="ocm-change" id="ocm-price-c"></span>' +
       '</span></div>' +
       '<div class="ocm-row2">' +
-      '<span class="ocm-slot ocm-slot-search" id="ocm-pick"></span>' +
-      '<button class="ocm-fs" id="ocm-fs" type="button" aria-label="ملء الشاشة"' +
-      ' title="ملء الشاشة">⛶</button>' +
+      '<button class="ocm-close" data-close aria-label="اقفل">✕</button>' +
       '<span class="ocm-slot ocm-slot-shot" id="ocm-shot"></span>' +
-      '<button class="ocm-close" data-close aria-label="اقفل">✕</button></div>' +
+      '<span class="ocm-slot ocm-slot-search" id="ocm-pick"></span>' +
+      '<a class="ocm-fs" id="ocm-fs" href="https://www.tradingview.com/chart/?symbol=EGX%3ACOMI" target="_blank" rel="noopener noreferrer" aria-label="افتح في TradingView" title="افتح في TradingView (الرسم الكامل)">⛶</a>' +
+      '</div>' +
       '</div>' +
       '<div id="gmv-chart" class="gchart"></div>' +
       '</div>';
@@ -1053,12 +1053,11 @@ window.openChart = function (code, name, market) {
         closeOctaChart();
       }
     });
+    /* ⛶ يفتح TradingView في تاب جديد (الرسم شغّال هناك)
+       بدل ما يوسّع الـiframe (اللي الرسم فيه صعب). */
     var fsBtn = document.getElementById('ocm-fs');
     if (fsBtn) {
-      fsBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        try { window.OCTA_TV.fullscreen(chartHost(m)); } catch (err) {}
-      });
+      fsBtn.addEventListener('click', function (e) { e.stopPropagation(); });
     }
   }
   m.style.display = 'flex';
@@ -1082,6 +1081,13 @@ window.openChart = function (code, name, market) {
   try {
     if (window.OCTA_TV && window.OCTA_TV.isFullscreen(chartHost(m))) window.OCTA_TV.exitFullscreen();
   } catch (e) {}
+
+  /* ⛶ رابط TradingView — يفتح نفس السهم في تاب جديد (الرسم شغّال) */
+  var fsb = document.getElementById('ocm-fs');
+  if (fsb) {
+    fsb.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
+    fsb.setAttribute('data-sym', sym);
+  }
 
   /* 🔎 مستطيل البحث — يتعمل مرة واحدة ويتحدّث في كل فتح */
   var slot = document.getElementById('ocm-pick');
@@ -1108,7 +1114,10 @@ window.openChart = function (code, name, market) {
     var sh = document.getElementById('ocm-shot');
     if (sh && window.OCTA_TV) { sh.innerHTML = ''; sh.appendChild(window.OCTA_TV.makeShotBtn(it.sym)); }
     var fsb = document.getElementById('ocm-fs');
-    if (fsb) fsb.setAttribute('data-sym', it.sym);
+    if (fsb) {
+      fsb.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(it.sym);
+      fsb.setAttribute('data-sym', it.sym);
+    }
     window.OCTA_TV.whenSized(chartHost(m), function () {
       window.OCTA_TV.mount(chartHost(m), { symbol: it.sym, interval: '1D' });
     });
