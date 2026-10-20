@@ -1130,7 +1130,10 @@ window.openChart = function (code, name, market) {
     shotSlot.appendChild(window.OCTA_TV.makeShotBtn(sym));
   }
   var fsb = document.getElementById('ocm-fs');
-  if (fsb) fsb.setAttribute('data-sym', sym);
+  if (fsb) {
+    fsb.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
+    fsb.setAttribute('data-sym', sym);
+  }
 
   /* 💰 19 أكتوبر ٢٠٢٦ (الجولة الثالثة) — legend عربي بسعر لحظي.
      TradingView widgetembed ما بيعرضش السعر اللحظي (refresh كل 15 دقيقة).
