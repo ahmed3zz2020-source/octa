@@ -394,3 +394,37 @@ Preview: `e0c96e67-c11d-46b5-ac57-ced903aff8ae`
 ### 📌 درس
 الأمن طبقات. لما خبّينا المخرجات اكتشفنا إن `/api/rank` — الـfallback — كان مفتوح.
 **الطبقة الحقيقية هي `require_user` مش الإخفاء.**
+
+---
+
+## 🔒 ٢٠ أكتوبر ٢٠٢٦ — الباقي اتعمل
+
+### ✅ ١) الأوزان اتشالت من الملف العام
+`octa-config.js` كان فيه `engineWeights` و `weights` — ٩ أرقام ظاهرة للكل
+دلوقتي: endpoint محمي `/api/engine-weights` + سكربت بيملا `CFG` بعد الدخول
+`WUS()` / `WEGX()` بدل المتغيّرات المجمّدة
+إعادة رسم كارت القرار عند وصول الأوزان
+
+### ✅ ٢) HttpOnly cookie
+`set_auth_cookie_auto` — أي رد فيه توكن → كوكي `octa_token` HttpOnly
+`_bearer` يقرأ الكوكي fallback (البearer لسه الأساسي = توافق كامل)
+`/api/auth/logout` يمسح الكوكي
+
+### ✅ ٣) data_markets.js اتنقّى
+٩ حقول اتشالت (verdict · conf · why · pack · packNote · tvRec · total · partial · missing)
+٢٢٨٩ سجل — كلها JSON صالح
+التوفير: ١١٠ كيلوبايت
+
+### ⏭️ PIN فضل ٤ أرقام
+الباك فيه rate limit (PIN_WINDOW_FAILS=4) + قفل متدرّج (٣٠ث · ٣٠ث · ٦س)
+التغيير لـ٦ هيكسر الـ٥ مستخدمين الحاليين — الحماية القائمة كافية عملياً
+
+### 📊 الحالة
+```
+/api/prices       200 · ٥٤ حقل · صفر مخرجات
+/api/rank         401
+/api/engine-weights 401
+/data_full        401
+octashares.com    200
+```
+Preview: `c151f7bd-e346-489f-95cd-338ced2017d3`
