@@ -1008,6 +1008,28 @@ function chartNameFor(code) {
 window.openChart = function (code, name, market) {
   code = String(code || '').toUpperCase().trim();
   if (!code) return;
+  /* 🐙 19 أكتوبر ٢٠٢٦ — تحقق إن الرمز في قاعدة بياناتنا
+     قبل فتح الشارت. لو مش موجود، اعرض رسالة بدل
+     "هذا الرمز غير موجود" في TradingView. */
+  try {
+    if (typeof OS_DB !== 'undefined' && OS_DB && OS_DB.length) {
+      var found = null;
+      for (var i = 0; i < OS_DB.length; i++) {
+        if (OS_DB[i] && OS_DB[i].code === code) { found = OS_DB[i]; break; }
+      }
+      if (!found) {
+        var msg = 'الرمز «' + code + '» غير موجود في OCTA.\n' +
+          'ممكن يكون رمز جديد في البورصة أو غير مدرج.\n' +
+          'هل تبي تجرب في TradingView؟';
+        if (window.confirm(msg)) {
+          window.open('https://www.tradingview.com/chart/?symbol=EGX%3A' + encodeURIComponent(code), '_blank', 'noopener');
+        }
+        return;
+      }
+      /* لو الـname مش موجود، خده من OS_DB */
+      if (!name) name = found.name || code;
+    }
+  } catch (e) {}
   var label = name || chartNameFor(code) || code;
   var sym = 'EGX:' + code;
 
