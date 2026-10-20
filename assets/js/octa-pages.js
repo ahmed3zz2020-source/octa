@@ -3760,18 +3760,44 @@ function siTab(btn, name) {
 }
 
 function renderSiChart() {
-  /* 🐙 19 أكتوبر 2026 — توحيد: نستخدم openChart الموحد بدل شارت خاص.
-     الـinline شارت في صفحة الـstock info يفتح نفس المودال الموحد. */
+  /* 🐙 19 أكتوبر 2026 — توحيد: نضع نفس الـheader (الاسم+الرمز+السعر+النسبة) inline
+     ثم الشارت مباشرة في نفس الصفحة (مش مودال منفصل).
+     أحمد: «ليه مش بتظهر الشارت نفسه بنفس الطريقة اللى اتفقنا عليه على طول». */
   const box = document.getElementById('si-tv-chart');
   if (!box) return;
   const code = SI_CODE || '—';
   const name = (SI_DATA.intel || {}).name || code;
+  const sym = 'EGX:' + code;
+  const intel = SI_DATA.intel || {};
+  const price = (intel.price || 0).toFixed(2);
+  const chg = (intel.change || 0).toFixed(2);
+  const chgCls = chg > 0 ? 'up' : chg < 0 ? 'down' : 'flat';
+  const chgSign = chg > 0 ? '▲ +' : chg < 0 ? '▼ ' : 'ـ ';
+  const tradingViewUrl = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
   box.innerHTML = `
-  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:360px;gap:14px;text-align:center">
-    <div style="font-size:1.4rem">📈 ${code} — ${name}</div>
-    <div style="color:var(--muted);font-size:.84rem;max-width:380px">لرؤية الشارت بنفس تصميم المودال الموحد (الاسم + السعر اللحظي + ⛶ TradingView)، اضغط الزر:</div>
-    <button class="btn main" onclick="openChart('${code}','${name.replace(/'/g, "\\'")}','EGX')" style="padding:11px 24px;font-size:.92rem">⛶ افتح الشارت الموحد</button>
+  <div class="ocm-head" style="margin-bottom:10px">
+    <div class="ocm-row1">
+      <span class="ocm-title">${name} 📈</span>
+      <span class="ocm-code">${sym}</span>
+      <span class="ocm-price"><span>${price} EGP</span><span class="ocm-change ${chgCls}">${chgSign}${chg}%</span></span>
+    </div>
+    <div class="ocm-row2">
+      <button class="ocm-close" type="button" onclick="if(typeof closeIntel==='function')closeIntel();else if(typeof closeStock==='function')closeStock();else history.back()" aria-label="رجوع">✕</button>
+      <a class="ocm-fs" href="${tradingViewUrl}" target="_blank" rel="noopener noreferrer" aria-label="افتح في TradingView" title="افتح في TradingView (الرسم الكامل)">⛶</a>
+    </div>
+  </div>
+  <div id="siChartHost" style="height:420px"></div>
+  <div class="tvbar" style="margin-top:8px;display:flex;gap:8px;align-items:center">
+    <a class="btn main" href="${tradingViewUrl}" target="_blank" rel="noopener noreferrer" style="flex:1;padding:11px 14px">⛶ افتح في TradingView (الرسم الكامل)</a>
   </div>`;
+  /* تحميل الشارت من نفس المصدر الموحد (tv-shim.js) */
+  setTimeout(function () {
+    var host = document.getElementById('siChartHost');
+    if (!host || !window.OCTA_TV) return;
+    window.OCTA_TV.whenSized(host, function () {
+      window.OCTA_TV.mount(host, { symbol: sym, interval: '1D' });
+    });
+  }, 100);
 }
 
 let siChartRes = 'D';
