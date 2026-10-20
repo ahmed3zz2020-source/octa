@@ -308,6 +308,33 @@ const CALCS = {
 };
 
 /* ══════════════════════════════════════════════════════════════
+  🛡️ تهريب النصوص — XSS guard
+  ──────────────────────────────────────────────────────────────
+  ⛔⛔⛔ ٢٠ أكتوبر ٢٠٢٦ — إصلاح ثغرة XSS في الأخبار.
+  كان `${n.title}` و `${n.link}` بيندرجوا في innerHTML من غير
+  أي تعقيم. أي سكربت جوه عنوان خبر كان يقدر:
+    ١. يقرا التوكن من localStorage
+    ٢. يدخل بحساب أي مستخدم
+  ⛔ الدالة esc() كانت موجودة في octa-app.js بس core.js
+    مبيستخدموهاش خالص (صفر استعمالة).
+  ══════════════════════════════════════════════════════════════ */
+function octaEsc(v){
+  return String(v==null?'':v).replace(/[&<>"']/g, function(c){
+    return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;',
+             '"':'&quot;', "'":'&#39;' })[c];
+  });
+}
+
+/* 🔗 روابط الأخبار — حماية إضافية من javascript: URLs */
+function octaSafeUrl(u){
+  var s = String(u==null?'':u).trim();
+  if (!s) return '#';
+  // اقبل http/https فقط — وامنع javascript: و data:
+  if (!/^https?:\/\//i.test(s)) return '#';
+  return octaEsc(s);
+}
+
+/* ══════════════════════════════════════════════════════════════
   📊 تتبع الاستخدام — نعرف الناس بتعمل إيه فعلاً
   ──────────────────────────────────────────────────────────────
   بيبعت لنا اسم الصفحة أو اسم السهم — مش IP ولا إيميل.
@@ -1968,11 +1995,11 @@ function renderNews() {
   }
 
   document.getElementById('newsList').innerHTML = displayNews.map(n => `
-  <a href="${n.link}" target="_blank" rel="noopener" class="news-ticker" style="text-decoration: none; display: flex; gap: 12px; align-items: center;">
-  <span class="news-time">${n.time ? n.time : formatTimeAgo(n.pubDate)}</span>
-  <span class="news-tag">${n.tag}</span>
-  <span class="news-text" style="flex: 1;">${n.title}</span>
-  <span style="font-size: 0.7rem; color: var(--muted); white-space: nowrap;">${(n.source || '').substring(0, 15)}</span>
+  <a href="${octaSafeUrl(n.link)}" target="_blank" rel="noopener" class="news-ticker" style="text-decoration: none; display: flex; gap: 12px; align-items: center;">
+  <span class="news-time">${octaEsc(n.time ? n.time : formatTimeAgo(n.pubDate))}</span>
+  <span class="news-tag">${octaEsc(n.tag)}</span>
+  <span class="news-text" style="flex: 1;">${octaEsc(n.title)}</span>
+  <span style="font-size: 0.7rem; color: var(--muted); white-space: nowrap;">${octaEsc((n.source || '').substring(0, 15))}</span>
   </a>
   `).join('');
 }
@@ -2297,10 +2324,10 @@ async function loadHomeNews() {
   const data = await res.json();
   if (data.status === 'ok' && data.items && data.items.length > 0) {
   el.innerHTML = data.items.slice(0, 5).map(n => `
-  <a href="${n.link}" target="_blank" rel="noopener" class="news-ticker" style="text-decoration:none; display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--line);">
+  <a href="${octaSafeUrl(n.link)}" target="_blank" rel="noopener" class="news-ticker" style="text-decoration:none; display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--line);">
   <span class="news-time">${new Date(n.pubDate).toLocaleTimeString('ar-EG', {hour:'2-digit',minute:'2-digit'})}</span>
-  <span class="news-tag" style="font-size:0.7rem;">${(n.categories?.[0] || 'YFinance')}</span>
-  <span class="news-text" style="flex:1; font-size:0.85rem;">${n.title}</span>
+  <span class="news-tag" style="font-size:0.7rem;">${octaEsc(n.categories?.[0] || 'YFinance')}</span>
+  <span class="news-text" style="flex:1; font-size:0.85rem;">${octaEsc(n.title)}</span>
   </a>
   `).join('');
   } else {

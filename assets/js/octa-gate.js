@@ -632,9 +632,11 @@
  shake();
  if (strikes == null) { clearMsg(); return; }
  /* 📌 left = المحاولات الفاضلة في نافذة الدقيقة (السيرفر بيحسبها) */
- /* ⭐ ٤ محاولات  زي ما طلب  من غير لخبطة ولا عدّاد. */
+ /* ⛔⛔ إصلاح ٢٠ أكتوبر ٢٠٢٦ — الرقم ٤ كان مكتوب hard-coded.
+  ⛌ PIN_TRIES = 5 بس الرسالة بتقول «من ٤» — المستخدم بيحسب غلط.
+  ⛌ الحل: نجيب الرقم من STRIKE_LIMIT نفسه. */
  if (left <= 0) say('❌ الباسورد غلط — خلصت المحاولات  ابعت كود على الإيميل', false);
- else say('❌ الباسورد غلط — فاضل ' + left + ' من ٤ محاولات', false);
+ else say('❌ الباسورد غلط — فاضل ' + left + ' من ' + STRIKE_LIMIT + ' محاولات', false);
  }
 
  function mm(s) {
@@ -831,6 +833,20 @@
  if (btn) { btn.disabled = false; btn.textContent = 'ابعت الكود'; }
  var d = o.d || {};
  if (o.s === 429) { locked(d.retry_after || d.retry || 60); return; }
+ /* ⛔⛔⛔ إصلاح ٢٠ أكتوبر ٢٠٢٦ — 409 «الإيميل موجود»
+  ⛌ كان بيروح في الرسمة العامة «مقدرناش نبعت الكود» —
+  ⛌ مستخدم عنده حساب بيدوس «حساب جديد» مالوش أي طريقة
+  ⛌ يعرف إن الإيميل مسجّل أصلاً.
+  ⛌ الحل: رسالة واضحة + زرار «ادخل بالباسورد». */
+ if (o.s === 409) {
+  flow.email = mail;
+  say('ℹ️ الإيميل ده مسجّل عندنا من قبل — ادخل بباسووردك بدل ما تعمل حساب تاني.', false);
+  var reg2 = formEl().querySelector('.gt-go');
+  if (reg2) { reg2.textContent = 'ادخل بالباسورد'; reg2.className = 'gt-go gt-go-alt';
+  reg2.onclick = function () { try { flow.email = mail; } catch (e) { } login(); };
+  reg2.classList.add('gt-go-login'); }
+  return;
+ }
  say('❌ ' + ((d.error) || 'مقدرناش نبعت الكود — جرّب تاني'), false);
  })
  .catch(function () {
@@ -1249,7 +1265,7 @@
  /* ⛔⛌ السيرفر هو اللي بيحسم. 429 = قفل ١٥ دقيقة (القاعدة ②).
  والـneed_code بيرجع **401** مش 429 — انتبه. */
  if (o.s === 429) { locked(o.d.retry_after || o.d.retry || 60); return; }
- if (needCode(o.d)) { askCode(); return; }
+ if (needCode(o.d)) { askCode('need'); return; }
  /* ⛌ كل حاجة تانية = الباسورد غلط. ما نقولش حاجة عن الحساب. */
  var n = strikePush();
  if (n >= STRIKE_LIMIT) { locked(30); return; }
@@ -1322,7 +1338,7 @@
  '<button class="gt-back" id="gtBack3" type="button">رجوع للدخول</button>';
 
  var cg = document.getElementById('gtChGo');
- if (cg) cg.onclick = function () { askCode(); };
+ if (cg) cg.onclick = function () { askCode('forgot'); };
  document.getElementById('gtNewAcc').onclick = function () { signup(); };
  document.getElementById('gtBack3').onclick = function () { login(); };
  }
@@ -1337,17 +1353,31 @@
  أي كلمة زي «الإيميل ده مش مسجّل» بتبقى قناة مفتوحة
  نبني بيها قاموس بالمحاولات ونعرف مين عندنا حساب.
  ═══════════════════════════════════════════════════════════ */
- function askCode() {
+/* ⛔⛔⛔ إصلاح ٢٠ أكتوبر ٢٠٢٦
+  ⛌ الشاشة دي كانت بتقول «محاولات كتيرة» لكل حد بيوصلها —
+  ⛌ حتى لو دوس «نسيت الباسورد» وهو ما غلطش أصلاً.
+  ⛌ ده كذب صريح: المستخدم يتلخبط ويفتكر في حد بيخترق حسابه.
+  ⛌ الحل: 'locked' → تحذير · 'forgot' → رسالة عادية · 'need' → محاولات كتيرة */
+ function askCode(cause) {
  stopLock();
+ var why = (cause === 'locked') ? 'locked' : (cause === 'forgot' ? 'forgot' : 'need');
  state.pin = ''; state.len = PIN_LEN; flow.tries = 0;
  mount();
- head('محاولات كتيرة', 1, function () { login(); });
+ head(why === 'locked' ? 'محاولات كتيرة' : 'هنبعتلك كود',
+      1, function () { login(); });
  boxEl().className = 'gt-box code card';
  formEl().innerHTML =
  '<div class="gt-ico">🔑</div>' +
- '<div class="gt-alert">⚠️ محاولات كتيرة</div>' +
- '<h1 class="gt-h">هنبعتلك كود على الإيميل المسجّل</h1>' +
- '<p class="gt-sub2">بعد ٣ محاولات غلط ورا بعض — ودي أأمن من إنك تضل تخمّن</p>' +
+ (why === 'locked'
+   ? '<div class="gt-alert">⚠️ عملت محاولات كتيرة غلط</div>' +
+     '<h1 class="gt-h">استنى بصوت شوية وجرّب تاني</h1>' +
+     '<p class="gt-sub2">عملنا قفل مؤقت عشان أمانك — مش فيه مشكلة في حسابك</p>'
+   : why === 'need'
+     ? '<div class="gt-alert">⛔ محاولات كتيرة</div>' +
+       '<h1 class="gt-h">هنبعتلك كود على الإيميل المسجّل</h1>' +
+       '<p class="gt-sub2">بعد محاولات غلط ورا بعض — ودي أأمن من إنك تفضل تخمّن</p>'
+     : '<h1 class="gt-h">هنبعتلك كود على الإيميل المسجّل</h1>' +
+       '<p class="gt-sub2">ما بعتش باسورد أبداً — كود واحد بس وإحنا نتأكد إنك إنت</p>') +
  '<label class="gt-lb" for="gtChMail">إيميلك المسجّل</label>' +
  '<input id="gtChMail" class="gt-in" type="email" dir="ltr" maxlength="120" ' +
  'autocomplete="email" inputmode="email" placeholder="name@mail.com">' +
@@ -1428,7 +1458,7 @@
  /* 📌 رجوع وإرسال  حسب إحنا في «تسجيل» ولا «استرجاع» */
  var reg = (s.mode === 'signup');
  head(reg ? 'كود التأكيد' : 'كود الدخول', 1, function () {
- if (reg) { signup(); } else { askCode(); }
+ if (reg) { signup(); } else { askCode('forgot'); }
  });
  boxEl().className = 'gt-box code';
  formEl().innerHTML =
@@ -1449,7 +1479,7 @@
  (reg ? 'ارجع — عدّل الإيميل' : 'ارجع — اكتب إيميل تاني') + '</button>';
 
  var back = document.getElementById('gtChAgain');
- if (back) back.onclick = function () { if (reg) { signup(); } else { askCode(); } };
+ if (back) back.onclick = function () { if (reg) { signup(); } else { askCode('forgot'); } };
 
  /* ⛌⛌⛌ الخانات دلوقتي قابلة للكتابة  كيبورد ولصق وقلم */
  wireCodeInput();
@@ -1927,39 +1957,72 @@
  function verify() {
  var t = token();
  if (!t) { mount(); welcome(); open(); return; }
- /* ⛔⛔⛔⛔ ⭐ الأهم  في حالة التحقق  البوابة ما تُرسمش أبداً.
- ⛌ الموقع يبان طبيعي  وكل حاجة شغالة  لحد ما نعرف
- ⛌ إن التوكن صالح  ساعتها بتنطفي ونكمل عادي.
- ⛌ لو التوكن وحش  وقتها وبنرسم ترسم البوابة.
- ⛌ ده أحسن من إن المستخدم يشوف طبقة سودا وهو مستني. */
- try { var g0 = gateEl(); if (g0) g0.remove(); } catch (e) { }
- document.body.style.overflow = '';
+/* ⛔⛔⛔⛔ ⭐ الإصلاح ٢٠ أكتوبر ٢٠٢٦
+ ⛌ الكود القديم كان بيشيل البوابة **قبل** الـfetch:
+ ⛌   try { var g0 = gateEl(); if (g0) g0.remove(); } catch (e) { }
+ ⛌   document.body.style.overflow = '';
+ ⛌ وبعدين بيعمل الـfetch.
+ ⛌ النتيجة: أي توكن مزيف + شبكة ضعيفة = الموقع بيفتح بالكامل.
+ ⛌ كومنت الكود نفسه كان مكتوب فيه «شك = مقفول» — والسلوك كان معاكس.
+ ⛌ ⛔ الحل: البوابة تفضل مقفولة لحد ما نعرف. ما نرسمهاش أبداً. */
 
- /* ⛌ القاعدة: **شك = مقفول**.
- · 200 → الموقع ينفتح
- · أي حاجة تانية → التوكن يتمسح ونرجع للشاشة الأولى
- · خطأ شبكة → نفضل مقفولين ونقوله، ⛔ ما نفتحش أبداً */
- fetch(apiBase() + '/api/auth/me', {
- headers: { 'Authorization': 'Bearer ' + t }
+ function clearHint(){
+ try {
+  var hs = document.querySelectorAll('.gt-netbar');
+  for (var i = 0; i < hs.length; i++) hs[i].remove();
+ } catch (e) { }
+ }
+
+ function hint(msg, bg, fg){
+ clearHint();
+ try {
+  var b = document.createElement('div');
+  b.className = 'gt-netbar';
+  b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:999999;'
+  + 'background:' + bg + ';color:' + fg + ';padding:11px 14px;'
+  + 'font:600 14px/1.5 system-ui;text-align:center';
+  b.textContent = msg;
+  document.body.appendChild(b);
+ } catch (e) { }
+ }
+
+ /* ⛌ القاعدة: **شك = مقفول** — وده بقى حقيقة مش كلام.
+ · 200 → shut() → ينفتح
+ · !ok → logoutLocal() + البوابة
+ · خطأ شبكة → ٣ محاولات، وبعدها البوابة + رسالة
+ · ⛔ ما نفتحش أبداً قبل ما نعرف */
+
+ var tries = 0, MAX_TRIES = 3;
+
+ function verifyOnce(){
+ return fetch(apiBase() + '/api/auth/me', {
+ headers: { 'Authorization': 'Bearer ' + t },
+ cache: 'no-store'
  }).then(function (r) {
- if (r.ok) { shut(); return; }
+ if (r.ok) { clearHint(); shut(); return; }
  /* ⛔ التوكن مش صالح  المسح  وبعدين البوابة تظهر
   لأن مينفعش حد يتفرج من غير دخول. */
+ clearHint();
  logoutLocal();
  mount(); welcome(); open();
  }).catch(function () {
- /* ⛔ خطأ شبكة  مش معناه إن التوكن وحش  فممنوع
-  نمسح جلسة ممكن تكون سليمة  بنقوله بس. */
- try {
- var b = document.createElement('div');
- b.className = 'gt-netbar';
- b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;'
- + 'background:#7a2b16;color:#ffd9c9;padding:9px 14px;'
- + 'font:600 14px/1.5 system-ui;text-align:center';
- b.textContent = '⛔ مش قادرين نتأكد من حسابك  الاتصال بالسيرفر ضعيف. الموقع مش هيتفتح لحد ما نتصل.';
- document.body.appendChild(b);
- } catch (e) { }
+ /* ⛔ خطأ شبكة — بنحاول تاني قبل ما نقفل.
+  ⛌ شبكاتDLGOUOF كتير بتبطئ أول مرة، فبنستنى شوية. */
+ tries++;
+ if (tries < MAX_TRIES) {
+  hint('⏳ بنحاول نتأكد من حسابك… (' + tries + '/' + MAX_TRIES + ')', '#0f2a44', '#cfe3f5');
+  setTimeout(verifyOnce, 900 * tries);
+  return;
+ }
+ /* ⛔ فشلت كل المحاولات → نقفل ونقوله بوضوح. */
+ hint('⛔ مش قادرين نتأكد من حسابك — الاتصال بالسيرفر ضعيف. جرّب تاني بعد شوية.', '#7a2b16', '#ffd9c9');
+ /* ⛔ ما نفتحش. البوابة تفضل مقفولة. */
+ mount(); welcome(); open();
  });
+ }
+
+ hint('⏳ جاري التحقق من حسابك…', '#0f2a44', '#cfe3f5');
+ verifyOnce();
  }
 
 })();
