@@ -1,9 +1,9 @@
 # 🏗️ OCTA — خريطة النظام (ARCHITECTURE.md)
 
 **متى تقراه:** قبل أي تعديل على البنية أو إضافة ملف جديد.
-> عشان تعرف إيه بيستقبل إيه، ومنين بتطلع الداتا، وإيه بياخد قرار.
+>目的是 تعرف إيه بيستقبل إيه، ومنين بتطلع الداتا، وإيه بياخد قرار.
 
-**آخر تحديث:** 2026-10-20 · `02f5abb`
+**آخر تحديث:** 2026-10-20 · `c5b36cc`
 
 ---
 
@@ -32,7 +32,7 @@
            │ fetch (نفس origin)
     ┌──────▼────────────────────────────────────────┐
     │ Railway · Python Flask · Gunicorn             │
-    │ update_prices.py (١١٬٥٩٦ سطر)               │
+    │ update_prices.py (١٠٬٠٠٠+ سطر)               │
     │  · ٨ محaxes + محرك التوصيات                   │
     │  · بوت تيليجرام (cron داخلي)                  │
     │  · ٨٨ endpoint                                │
@@ -98,7 +98,7 @@
 |---|---:|---|
 | `octa-decide.js` | ٤٧٢ | كارت القرار (الملخص النهائي) |
 | `octa-indicators.js` | ٨٤٢ | المؤشرات الفنية · `divergence()` |
-| `octa-gold.js` | ١٬٢١٠ | الذهب + الفريمات الخاصة |
+| `octa-gold.js` | ١٬٢١٠ | الذهب + الفريمات专属 |
 | `octa-watch.js` | ٢٣١ | متابعة الأسهم |
 | `octa-copy.js` | ٣٤٦ | نسخ · مشاركة |
 | `octa-stats.js` | ١٢٤ | إحصائيات السوق |
@@ -137,7 +137,7 @@ OCTA_TV.lockPage(on)          // قفل تمرير الصفحة
 OCTA_TV.fullscreen(host)      // ملء الشاشة
 OCTA_TV.makePicker(opts)      // البحث
 OCTA_TV.makeShotBtn(sym)      // زرار التصوير
-OCTA_TV.symbolList            // ٢٨٥ سهم للبحث
+OCTA_TV.symbolList            // ٢٨٦ سهم للبحث
 ```
 
 ### الـparams المهمة
@@ -188,7 +188,7 @@ OCTA_TV.symbolList            // ٢٨٥ سهم للبحث
 | `css-decide.css` | كارت القرار |
 | `css-screener.css` | جدول الفلتر |
 | `css-chart.css` | المودال · الشارت |
-| `css-gold.css` | ⭐ الأكبر (٩١١ سطر) · المودالات · الشارت · الذهب |
+| `css-gold.css` | ⭐ الأكبر (١٠٠٠+ سطر) · المودالات · الشارت · الذهب |
 
 **ترتيب التحميل مهم** — `tokens` الأول عشان الباقي ياخد المتغيرات.
 
@@ -196,17 +196,17 @@ OCTA_TV.symbolList            // ٢٨٥ سهم للبحث
 
 ## ٦) 🔌 الباك (Railway)
 
-### `update_prices.py` — ١١٬٥٩٦ سطر
+### `update_prices.py` — ١٠٬٠٠٠+ سطر
 
 | القسم | السطر تقريباً | الوظيفة |
 |---|---:|---|
-| محرك التقييم | ٥٬٣٠٤ | المحاور الستة + الأوزان + التوصية |
-| محرك المعنويات | ٥٬٦٧٦ | Sentiment مع cap ٢٥٪ |
-| Fundamental | ٥٬٤٢٤ | P/E · ROE · الصحة المالية |
-| Technical | ٥٬٣٠٤ | RSI · MACD · MA200 · Bollinger |
-| بوت تيليجرام | ٩٬٨٣٨ | `a_decision()` · `send()` · كوكي |
+| محرك التقييم | ٥٬٣٠٠ | المحاور الستة + الأوزان + التوصية |
+| محرك المعنويات | ٥٬٧٠٠ |Sentiment مع cap ٢٥٪ |
+| Fundamental | ٥٬٥٠٠ | P/E · ROE · الصحة المالية |
+| Technical | ٥٬٣٠٠ | RSI · MACD · MA200 · Bollinger |
+| بوت تيليجرام | ٩٬٧٠٠ | `a_decision()` · `send()` · كوكي |
 | الـendpoints | متفرق | ٨٨ مسار |
-| البيانات | ٢٢٬٧٥٨ | `data_full.json` (JSON منسّق) |
+| الشارات | ٥٣٬٠٠ | `data_full.json` |
 
 ### الـendpoints المهمة
 
@@ -217,7 +217,7 @@ OCTA_TV.symbolList            // ٢٨٥ سهم للبحث
 | `GET /api/candles/<code>` | شموع تاريخية |
 | `GET /api/dividends` | توزيعات الأرباح |
 | `GET /api/gold` | الذهب + سعر الدولار |
-| `POST /api/auth/*` | OTP · PIN · البصمة |
+| `POST /api/auth/*` | OTP · PIN ·、生物 |
 | `GET /api/tg-status` | تشخيص البوت |
 
 ---
