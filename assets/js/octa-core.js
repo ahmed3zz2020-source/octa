@@ -2585,32 +2585,107 @@ function changeBestPick(symbol) {
 }
 
 function loadBestPickWidgets(symbol) {
-  const tvSymbol = 'EGX:' + symbol;
-  ['bp-symbol-info', 'bp-tech-analysis', 'bp-advanced-chart'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.innerHTML = '';
+  const code = String(symbol || bestPickSymbol || 'MFPC').toUpperCase();
+  bestPickSymbol = code;
+
+  /* ⛔⛔ ٢٠ أكتوبر ٢٠٢٦ — الصفحة كانت فاضية خالص:
+     الـ3 widgets كانوا embed-widget-* من TradingView، وهُم بيفضلوا
+     فاضيين (CORS + CSP بيرفضوا نداء widgetembed نفسه).
+     ✅ الشارت بقى من المصدر الوحيد: s.tradingview.com/widgetembed (OCTA_TV.mount)
+     ✅ والبيانات بقت من محركنا: /api/intelligence + /api/technical */
+  const chartHost = document.getElementById('bp-advanced-chart');
+  if (chartHost) {
+    if (window.OCTA_TV) {
+      window.OCTA_TV.mount(chartHost, { symbol: 'EGX:' + code, interval: '1D',
+        studies: 'MASimple@tv-basicstudies,RSI@tv-basicstudies,MACD@tv-basicstudies' });
+    } else {
+      chartHost.innerHTML = '<div class="opps-loading">جاري تحميل الرسم البياني…</div>';
+    }
+  }
+
+  const info = document.getElementById('bp-symbol-info');
+  const tech = document.getElementById('bp-tech-analysis');
+  if (info) info.innerHTML = '<div class="opps-loading">جاري تحميل البيانات…</div>';
+  if (tech) tech.innerHTML = '<div class="opps-loading">جاري تحميل البيانات…</div>';
+
+  (async () => {
+    try {
+      const [ri, rt] = await Promise.all([
+        fetch(OCTA_API + '/api/intelligence/' + code).then(r => r.ok ? r.json() : {}).catch(() => ({})),
+        fetch(OCTA_API + '/api/technical/' + code).then(r => r.ok ? r.json() : {}).catch(() => ({})),
+      ]);
+      if (info) info.innerHTML = bpInfoHTML(ri);
+      if (tech) tech.innerHTML = bpTechHTML(rt, ri);
+    } catch (e) {
+      if (info) info.innerHTML = '<div class="opps-loading">تعذر تحميل البيانات</div>';
+      if (tech) tech.innerHTML = '<div class="opps-loading">تعذر تحميل البيانات</div>';
+    }
+  })();
+}
+
+/* 💰 كارت السعر والمعلومات — من محرك OCTA */
+function bpInfoHTML(d) {
+  if (!d || !d.code) return '<div class="opps-loading">لا توجد بيانات لهذا السهم</div>';
+  const ch = Number(d.change || 0);
+  const cls = ch >= 0 ? 'pos' : 'neg';
+  const dec = String(d.decision || '—');
+  const dcls = /إيجابية/.test(dec) ? 'good' : (/سلبية/.test(dec) ? 'bad' : '');
+  const cell = (label, val, c) => '<div class="bp-info-cell"><span>' + label + '</span><b class="' + (c || '') + '">' + val + '</b></div>';
+  return '<div class="bp-info-grid">' +
+    cell('السعر', Number(d.price || 0).toFixed(2)) +
+    cell('التغير', (ch >= 0 ? '+' : '') + ch.toFixed(2) + '%', cls) +
+    cell('النتيجة', (d.final_score != null ? d.final_score : '—')) +
+    cell('القرار', dec, dcls) +
+    cell('الثقة', (d.confidence != null ? d.confidence + '%' : '—')) +
+    cell('القطاع', (d.sector || '—')) +
+    cell('الأمان', (d.risk_level || '—')) +
+    cell('آخر تحديث', String(d.data_ts || '').slice(0, 16).replace('T', ' ')) +
+    '</div>';
+}
+
+/* 🧠 كارت التحليل الفني + التوصية */
+function bpTechHTML(t, intel) {
+  if (!t || !t.code) return '<div class="opps-loading">لا توجد بيانات فنية</div>';
+  const ind = t.indicators || {};
+  const tec = t.technical || {};
+  const axes = (intel && intel.axes) || {};
+  const AX = { technical: 'فني', fundamental: 'أساسي', liquidity: 'سيولة', news: 'أخبار',
+    sentiment: 'معنويات', risk: 'أمان', portfolio: 'محفظة' };
+  const num = (v, d) => (v == null ? '—' : (typeof v === 'number' ? (Math.round(v * 100) / 100) : v));
+  const indRow = (k, label, v) => '<div class="bp-ind"><span>' + label + '</span><b>' + v + '</b></div>';
+  let h = '<div class="bp-tech-head">' +
+    '<span class="bp-signal ' + (tec.signal === 'شراء' ? 'good' : (tec.signal === 'بيع' ? 'bad' : '')) + '">' +
+    (tec.signal || '—') + '</span>' +
+    '<span>نتيجة الفني: <b>' + num(tec.score) + '/100</b></span>' +
+    '<span>ثقة المؤشرات: <b>' + num(tec.confidence) + '%</b></span>' +
+    '</div>';
+  h += '<div class="bp-ind-grid">' +
+    indRow('rsi', 'RSI', num(ind.rsi)) +
+    indRow('macd', 'MACD', num(ind.macd)) +
+    indRow('ema20', 'EMA 20', num(ind.ema20)) +
+    indRow('ema200', 'EMA 200', num(ind.ema200)) +
+    indRow('atr', 'ATR %', num(tec.atr_pct)) +
+    indRow('bb', 'Bollinger', (ind.bb_lower != null && ind.bb_upper != null) ?
+      (Math.round(ind.bb_lower * 100) / 100) + ' – ' + (Math.round(ind.bb_upper * 100) / 100) : '—') +
+    '</div>';
+  const ax = Object.keys(axes).filter(k => k !== 'final' && k !== 'safety')
+    .map(k => '<span class="bp-ax"><i>' + (AX[k] || k) + '</i><b>' + num(axes[k]) + '</b></span>').join('');
+  if (ax) h += '<div class="bp-axes">' + ax + '</div>';
+  const pos = (tec.positives || []).slice(0, 3).join(' · ');
+  const neg = (tec.negatives || []).slice(0, 3).join(' · ');
+  if (pos || neg) {
+    h += '<div class="bp-why">';
+    if (pos) h += '<div class="good">✅ ' + pos + '</div>';
+    if (neg) h += '<div class="bad">⛔ ' + med_escape(neg) + '</div>';
+    h += '</div>';
+  }
+  return h;
+}
+
+function med_escape(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c];
   });
-  document.querySelectorAll('script[data-bp]').forEach(s => s.remove());
-  
-  setTimeout(() => injectWidget('bp-symbol-info', 'embed-widget-mini-symbol-overview.js', {
-  symbol: tvSymbol, width: '100%', height: 280, locale: 'ar', dateRange: '1D',
-  colorTheme: 'dark', isTransparent: true, autosize: true
-  }, '1'), 50);
-  
-  setTimeout(() => injectWidget('bp-tech-analysis', 'embed-widget-technical-analysis.js', {
-  symbol: tvSymbol, width: '100%', height: 480, locale: 'ar', colorTheme: 'dark', isTransparent: true,
-  interval: '1D', showIntervalTabs: true
-  }, '2'), 150);
-  
-  setTimeout(() => injectWidget('bp-advanced-chart', 'embed-widget-advanced-chart.js', {
-  symbol: tvSymbol, width: '100%', height: 600, locale: 'ar', colorTheme: 'dark', isTransparent: true,
-  autosize: true, interval: 'D', timezone: 'Africa/Cairo', theme: 'dark', style: '1',
-  withdateranges: true, hide_side_toolbar: false, allow_symbol_change: true,
-  details: false, hotlist: false, calendar: false,
-  studies: [
-  'MASimple@tv-basicstudies', 'RSI@tv-basicstudies', 'MACD@tv-basicstudies'
-  ]
-  }, '3'), 250);
 }
 
 /* Dispatcher: لما المستخدم يدخل على الـ 3 pages الجديدة
