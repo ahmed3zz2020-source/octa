@@ -944,6 +944,17 @@ async function loadEgxFile(){
   return await r.json();
   } catch(e){ return null; }
   };
+  /* ⛔⛔⛔ ٢١ أكتوبر ٢٠٢٦ — نطلب /api/rank الأول
+  ⛌ ده المحمي اللي فيه الدرجة + التوصية + الاسم العربي.
+  ⛌ قبل كنا بنطلبه في octaLoadDB بس وبنقفل الكاش — فالعشان كان
+  ⛌ بيتقفل بـOS_READY، الواجهة فضلت على الملف العام الفاضي.
+  ⛌ ⛌ الحل: نجيبه هنا جوّه loadEgxFile — مرة واحدة، محمي، مضمون. */
+  let rankRows = [];
+  try {
+  const rr = await pick('/api/rank?limit=400');
+  rankRows = (rr && rr.results) || [];
+  } catch (e) { rankRows = []; }
+
   let f = await pick('/api/data_full');
   let fromFull = _isFullShape(f);
   if (!fromFull) {
@@ -951,10 +962,10 @@ async function loadEgxFile(){
   fromFull = _isFullShape(f);
   }
   if (!f || !f.stocks) return null;
-  const prices = null;
 
+  /* 🎯 live = الدرجات من الـrank المحمي. دي المصدر الأصح. */
   const live = {};
-  if (prices && prices.egx30) for (const s of prices.egx30) if (s.code) live[s.code] = s;
+  for (const s of rankRows) if (s && s.code) live[s.code] = s;
 
   EGX_DB = {};
   for (const code of Object.keys(f.stocks)) {
@@ -973,7 +984,15 @@ async function loadEgxFile(){
   price : Number(lv.price ?? r.p ?? r.price ?? 0),
   change: Number(lv.change ?? r.c ?? r.change ?? 0),
   volume: Number(lv.volume ?? r.v ?? r.volume ?? 0),
-  score : r.total,  decision: r.verdict,
+  /* ⛔⛔⛔ ٢١ أكتوبر ٢٠٢٦ — إصلاح جذر
+  ⛌ كان بيقرا الدرجة من r.total و r.verdict (من data_full).
+  ⛌ بس في _ALWAYS_SHOW_OUTPUT على السيرفر — يعني المفروض يظهر.
+  ⛌ المشكلة: لو data_full رجع 4٠١ (التوكن لسه ما اتسلّمش)،
+  ⛌ fromFull=false و F falsy ⇒ الدرجة = undefined.
+  ⛌ ⛌ الحل: نرجع للـAPI المحمي `/api/rank` اللي دايماً محمي
+  ⛌ وشغّال بعد الدخول، ونضيفه كـfallback قبل أي ملف. */
+  score : (lv.final_score ?? lv.score ?? r.total ?? null),
+  decision: (lv.decision ?? r.verdict ?? null),
   pe: r.pe, pb: r.pb, roe: r.roe, mcap: r.mc, beta: r.beta, yield: r.dy,
   eps: r.eps, revenue: r.rev, netMargin: r.nm, opMargin: r.om,
   rsi: r.rsi, ma50: r.ma50, ma200: r.ma200, roa: r.roa,
@@ -1109,7 +1128,10 @@ async function loadEgxFile(){
   }
   EGX_META = { ts: f._ts, src: f._src, total: Object.keys(EGX_DB).length,
   live: Object.values(EGX_DB).filter(s => s._live).length,
-  isFull: !!fromFull, sectorMed: f._sectorMed || null };
+  isFull: !!fromFull, sectorMed: f._sectorMed || null,
+  /* ⛔ ٢١ أكتوبر: نحفظ rankRows هنا — octaLoadDB بيقراها
+  ⛌ في fallback (لو data_full رجع null). */
+  rankRows: rankRows };
   console.log('📚 سجل EGX:', EGX_META);
   return EGX_DB;
   } catch(e) {
@@ -1122,14 +1144,19 @@ async function octaLoadDB(){
   if (OS_READY) return OS_DB;
 
   // ① المحرك الحي (الأسماء العربية + القرار)  ② السجل الكامل (285 سهم)
+  /* ⛔ ٢١ أكتوبر: loadEgxFile بقى هو نفسه بيطلب /api/rank
+  ⛌ فمفيش داعي نطلبه تاني هنا — الطلب المزدوج كان بيضيّع التوكن. */
   const [rankRes, full] = await Promise.all([
-  fetch(OCTA_API + '/api/rank?limit=400&_=' + Date.now()).then(r => r.ok ? r.json() : {}).catch(() => ({})),
+  Promise.resolve({ results: [] }),
   loadEgxFile()
   ]);
 
-  const apiRows = rankRes.results || [];
+  /* 🎯 الدرجات بقت في EGX_DB نفسها (من loadEgxFile).
+  ⛌ هنا بنبني OS_DB من EGX_DB — فمفيش طلب إضافي.
+  ⛌ ⛌ مهم: fallback السطر الجاي بقى محتاج rankRows لو الـfull رجع null. */
+  const apiRows = (EGX_META && EGX_META.rankRows) || [];
   const live = {};
-  for (const s of apiRows) if (s.code) live[s.code] = s;
+  for (const s of apiRows) if (s && s.code) live[s.code] = s;
 
   // لو السجل مو··ودش ← نرجع للسلوك القديم (الـ API بس)
   if (!full) {
@@ -1166,9 +1193,16 @@ async function octaLoadDB(){
      0 الحقيقي = changeHas true (وده صح، السهم ثابت فعلاً). */
   changeHas: (l.change ?? f.change) != null,
   volumeHas: (l.volume ?? f.volume) != null,
-  /* 🔑 لو عندنا تقييم جديد (data_full) ⇒ هو الأصح، مش الـ API */
-  score: F ? Number(f.score ?? 0) : Number(l.final_score ?? l.score ?? f.score ?? 0),
-  decision: F ? (f.decision || '—') : (l.decision || f.decision || '—'),
+  /* ⛔⛔⛔ ٢١ أكتوبر ٢٠٢٦ — إصلاح جذرري
+  ⛌ كان: score: F ? f.score : l.final_score
+  ⛌ الشرط F (isFull) كان false دايماً لأن _isFullShape كان بيفحص
+  ⛌ حقول مخبيّة (total/verdict) ⇒ فLocation لـ else (API).
+  ⛌ بعد ما صلّحنا _isFullShape، F بقى true ⇒ رجع لـf.score اللي
+  ⛌ مش موجود في data_full (لأنه اتخفي!) ⇒ الدرجة = 0 وطلعت «—».
+  ⛌ ⛌ الحل: مش بنشترط F. الدرجة من الـrank المحمي (l) هي
+  ⛌ الأصح دايماً — لأنها محسوبة لحظياً وفيها التوصية. */
+  score: Number(l.final_score ?? l.score ?? f.score ?? f.total ?? 0),
+  decision: (l.decision || f.decision || f.verdict || '—'),
   /* ⭐ الحقول الجديدة ··من data_full */
   scoreConf: f.conf, whyNote: f.why || '',
   partial: f.partial || [], missingSections: f.missing || [],
