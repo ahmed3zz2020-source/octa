@@ -3760,20 +3760,18 @@ function siTab(btn, name) {
 }
 
 function renderSiChart() {
+  /* 🐙 19 أكتوبر 2026 — توحيد: نستخدم openChart الموحد بدل شارت خاص.
+     الـinline شارت في صفحة الـstock info يفتح نفس المودال الموحد. */
   const box = document.getElementById('si-tv-chart');
   if (!box) return;
+  const code = SI_CODE || '—';
+  const name = (SI_DATA.intel || {}).name || code;
   box.innerHTML = `
-  <div class="si-tf" id="siTf">
-  <button data-res="1" onclick="siTf(this,'1')">5د</button>
-  <button data-res="5" onclick="siTf(this,'5')">30د</button>
-  <button data-res="15" onclick="siTf(this,'15')">ساعة</button>
-  <button data-res="60" onclick="siTf(this,'60')">4 ساعات</button>
-  <button data-res="D" class="on" onclick="siTf(this,'D')">يوم</button>
-  <button data-res="W" onclick="siTf(this,'W')">أسبوع</button>
-  <button data-res="M" onclick="siTf(this,'M')">شهر</button>
-  </div>
-  <div id="siChartHost" style="height:420px"></div>`;
-  siChart('D');
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:360px;gap:14px;text-align:center">
+    <div style="font-size:1.4rem">📈 ${code} — ${name}</div>
+    <div style="color:var(--muted);font-size:.84rem;max-width:380px">لرؤية الشارت بنفس تصميم المودال الموحد (الاسم + السعر اللحظي + ⛶ TradingView)، اضغط الزر:</div>
+    <button class="btn main" onclick="openChart('${code}','${name.replace(/'/g, "\\'")}','EGX')" style="padding:11px 24px;font-size:.92rem">⛶ افتح الشارت الموحد</button>
+  </div>`;
 }
 
 let siChartRes = 'D';
