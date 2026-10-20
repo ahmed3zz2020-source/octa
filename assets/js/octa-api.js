@@ -65,6 +65,9 @@
   ═══════════════════════════════════════════════════════════ */
   const AUTH_PATHS = [
   '/api/egx_full', '/api/data_full', '/api/ranking', '/api/portfolio',
+  /* ⛔⛔ ٢٠ أكتوبر ٢٠٢٦ — /api/rank بقى محمي على السيرفر
+  ⛌ فلازم نبعتهو مع التوكن، وإلا رجع 401 والواجهة فاضية. */
+  '/api/rank',
   '/api/stats', '/api/alerts/watch', '/api/alerts/diag',
   '/api/auth/me', '/api/auth/pin/change'
   ];
