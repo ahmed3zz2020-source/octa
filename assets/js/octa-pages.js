@@ -388,7 +388,7 @@ function renderIntel(d) {
   const rl = d.risk_level || '—';
   let riskCls = rl === 'منخفض' ? 'منخفض' : rl === 'متوسط' ? 'متوسط' : rl === 'مرتفع' ? 'مرتفع' : 'مرتفع جداً';
 
-  if (typeof renderStrategies === 'function') renderStrategies(d.code);
+  if (typeof renderStrategies === 'function') { /* ⛔ بينادي بعد بناء الـHTML — تحت */ }
   document.getElementById('intelBody').innerHTML =
   // ═══ الهيدر ═══
   '<div class="intel-hero">' +
@@ -488,6 +488,11 @@ function renderIntel(d) {
   '</div>' +
   '</div>' +
   '</div>';
+
+  /* ⛔⛔ لازم بعد بناء الـHTML:
+     كان بينادي قبل سطر الـinnerHTML، فكان #stratBox لسه مش موجود
+     وrenderStrategies كان يعمل return على طول → التبويبات مش بتظهر. */
+  if (typeof renderStrategies === 'function') renderStrategies(d.code);
 }
 
 
@@ -4152,6 +4157,17 @@ function icRows(list, valKey) {
   KEEP.forEach(id => {
   const p = document.getElementById('page-' + id);
   if (p && p.parentNode === old) { p.classList.remove('active'); host.appendChild(p); }
+  });
+  /* ⛔⛔⛔ عناصر مش صفحات أدوات — الـid بتاعها مش page-*
+     فكانت بتتمسح مع homeHidden وبتخسر وظيفتها بالكامل:
+     · intelPage   → صفحة «التحليل الكامل» وفيها تبويبات الاستراتيجيات
+     · dashPage    → «لوحة التحكم»
+     · modalOverlay→ مودال السهم
+     · decideModal → مودال كارت القرار
+     الحل: ننقلهم للـhost قبل ما نحذف old. */
+  ['intelPage', 'dashPage', 'modalOverlay', 'decideModal'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el && old.contains(el)) { el.classList.remove('active'); host.appendChild(el); }
   });
   if (active && active.parentNode === host) active.classList.add('active');
   return host;

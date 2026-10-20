@@ -1456,6 +1456,14 @@
   .ad-val { font-size: .84rem; font-weight: 800; color: var(--gold); }
   .ad-w { font-size: .68rem; color: var(--muted); text-align: left; }
 
+  /* 📊 نتيجة كل محور — لوحة الاستراتيجيات (الكلاس ده كان مفقود خالص) */
+  .comp-bars { margin-top: 16px; }
+  .comp-row { display: grid; grid-template-columns: 84px 1fr 40px; gap: 9px; align-items: center; margin-bottom: 8px; }
+  .comp-name { font-size: .82rem; color: var(--txt); font-weight: 600; }
+  .comp-track { height: 9px; background: rgba(255,255,255,.07); border-radius: 5px; overflow: hidden; }
+  .comp-fill { height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--ac), var(--gold)); transition: width .5s; }
+  .comp-val { font-size: .82rem; font-weight: 800; color: var(--gold); text-align: left; }
+
   .dist-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
   .dist-label { font-size: .84rem; width: 76px; color: var(--txt); }
   .dist-track { flex: 1; height: 20px; background: rgba(255,255,255,.06); border-radius: 6px; overflow: hidden; }
