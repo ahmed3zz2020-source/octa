@@ -165,6 +165,40 @@ de06b17  trigger redeploy
 
 ---
 
+## 🗂️ ٢٠ أكتوبر ٢٠٢٦ — جرد المعرفة (OCTA-Files)
+
+### 📊 الجرد
+- `octa/` : ٩٩ ملف · `octa-prices/` : ٣٢ ملف · الإجمالي ١٣١
+- ملفات المعرفة ٥ : AGENTS (٢٣٠ سطر) · ARCHITECTURE (٢٨١) · DECISIONS (٢٥٢) · DOMAINS (٢٢٩) · SESSION-NOTES
+- git : `octa` = `c5b36cc` · `octa-prices` = `d582363` · شجرة نضيفة في الاتنين
+- ٢٥ قرار موثّق (D-001 لـ D-025) · ٢٢ ملف JS · ٢٤٬٠٥٤ سطر · ٦ ملفات CSS
+- live : `/api/stocks` = ٢٨٥ سهم · ٦٩ حقل · `snapshot_id` = 20261020-103625-a100
+
+### 🔴 نقص وتعارض (محتاج معالجة)
+- **نظام الاستراتيجيات موثّقش خالص** — الباك فيه ٧ استراتيجيات بأوزان مختلفة
+  و`risk_penalty_mult` لكل واحدة (سوينج · قيمة · نمو · دخل · متوازن · محافظ · جريء)
+  و`/api/strategies` و`/api/strategy/<code>/<strategy>` — مفيش ذكر في DOMAINS ولا DECISIONS
+- **تعارض حي مع قاعدة إخفاء الوصفة:** `_HIDDEN_KEYS` فيها `strategies` و`strategy`
+  ⇒ لايف `/api/strategies` بترجّع `{"snapshot_id": ...}` فاضية
+  ⇒ الواجهة `octa-pages.js` بتعمل `STRATS = []` والتبويبات مش بتظهر
+  ⇒ نفس الكود على GitHub · المشكلة في الفلتر مش في الـendpoint
+- **`PROJECT_STATE.md` في المكان الغلط** — AGENTS بيحطه في `octa/` وهو في `octa-prices/`
+  واسمه في الرابط `PROJECT-STATE.md` (شرطة) وهو `PROJECT_STATE.md` (شرطة سفلية)
+  ومحتواه قديم (٢٠ أكتوبر ٧ · ٣٧ endpoint · ٢٥٢ سهم · ~٤٣٥٠ سطر)
+  و`refresh-context.sh` مكتوب فيه إنه بيحدّثه بس مش بيعمل
+- **الـcommit في كل ملفات المعرفة قديم** — مكتوب `596c665` والـHEAD فعلاً `c5b36cc`
+
+### 📌 ملاحظات
+- ٦ أسطر فيها حروف صينية ناقصة (ARCHITECTURE ٤ و١٠١ و٢٢٠ · DOMAINS ١٨٧ · KB-PLAN ١١٨ · TEST-LOCAL ٤٦)
+- `docs/KB-PLAN.md` لسه بيقول «خطة، مفيش حاجة اتنفّذت» والحزمة اتنفّذت فعلاً
+- ١٧ نسخة `.bak` متتبعة في git (٩ في `octa` + ٨ في `octa-prices`) — مش موثّقة
+- شجرة AGENTS فيها `assets/data/` والصح `data/` · و`dist/` مش موجود (مفيش build)
+- `css-gold.css` موصوف «١٠٠٠+ سطر» وهو ٩١١
+- لايف `/api/tg-test` و`/api/tg-status` لسه موجودين على الإنتاج (معلّق من يوم ٢٠ أكتوبر)
+- لايف `/` بيرجّع `gemini` و`version: v3-gemini-3.5-flash` — اسم المزوّد مكشوف (واجهة الباك مش الموقع)
+- `mail_last_ok: null` على الباك ⇒ الإيميل مش متأكد إنه شغال
+=======
+
 ## 📊 ٢٠ أكتوبر ٢٠٢٦ — لوحة إدارة OCTA
 
 ### ✅ تم
