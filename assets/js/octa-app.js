@@ -125,8 +125,11 @@ async function loadUS(){
   return{index:idx,stocks:stocks};
 }
 
-/* ══════════ حساب النتيجة ══════════ */
-const W=CFG.weights.usScan;
+/* ══════════ حساب النتيجة ══════════
+   الأوزان بقت فاضية وقت التحميل (مخبيّة عن الزائر ومحجوبة بتوكن).
+   فنقرأها لحظياً من CFG بدل ما نجمّدها في متغيّر ثابت. */
+function WUS(){ return (window.CFG && CFG.weights && CFG.weights.usScan) || {}; }
+function WEGX(){ return (window.CFG && CFG.weights && CFG.weights.egx) || {}; }
 function clamp(x){return Math.max(5,Math.min(95,Math.round(x)))}
 
 function scoreUS(d){
@@ -177,8 +180,8 @@ function scoreUS(d){
   if(d.net_income!=null&&d.net_income<0)r-=6;
   s.risk=clamp(r);
 
-  let a=0,w=0;for(const k in W){a+=s[k]*W[k];w+=W[k]}
-  return Math.round(a/w);
+  const W=WUS();let a=0,w=0;for(const k in W){a+=s[k]*W[k];w+=W[k]}
+  return w?Math.round(a/w):0;
 }
 function verdictOf(x){
   if(x>=65)return['تجميع / شراء','b-buy'];
@@ -395,7 +398,7 @@ async function cardEGX(code,row){
 
   const names={technical:'فني',fundamental:'أساسي',liquidity:'سيولة',news:'أخبار',
   sentiment:'معنويات',risk:'أمان خطر',portfolio:'محفظة'};
-  const W=CFG.weights.egx;
+  const W=WEGX();
   let arms='';
   for(const k in names){
   const v=Math.round(ax[k]||0);
@@ -875,8 +878,8 @@ function scoreUSFull(d){
   if(d['net_income']!=null&&d['net_income']<0)r-=6;
   s.risk=clamp(r);
 
-  let a=0,wt=0;for(const k in W){a+=s[k]*W[k];wt+=W[k]}
-  s.total=Math.round(a/wt);
+  const W=WUS();let a=0,wt=0;for(const k in W){a+=s[k]*W[k];wt+=W[k]}
+  s.total=wt?Math.round(a/wt):0;
   return s;
 }
 

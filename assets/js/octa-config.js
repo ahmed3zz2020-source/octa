@@ -31,25 +31,18 @@ const CFG = {
   overall:  'التوافق العام'
   },
 
-  /* أوزان المحرك الحقيقي — مطابقة لـAXIS_WEIGHTS في الباك */
-  engineWeights: { technical:18, fundamental:22, liquidity:18,
-  news:5, sentiment:4, risk:24, portfolio:9 },
+  /* ⛔⛔⛔ ٢٠ أكتوبر ٢٠٢٦ — الأوزان اتشالت من الملف العام.
+  ⛌ كانت مكتوبة هنا — وأي حد يفتح مصدر الصفحة يقراها.
+  ⛌ `after_request` بيخفيها من ردود JSON بس الملفات الثابتة مش JSON،
+  ⛌ فالإخفاء مكانش بيوصلها.
+  ⛌ الحل: بتتطلب من /api/engine-weights بعد تسجيل الدخول
+  ⛌ (محمي بـrequire_user) وبتتخزن هنا في نفس المكان عشان الكود
+  ⛌ القديم ما يتغيرشش.
+  ⛌ عايز تشوف الأوزان؟ ادخل بـocta — بتظهر في كارت القرار. */
+  engineWeights: {},   /* يتملا بعد الدخول */
 
-  /* ── أوزان التقييم (مجموع 100) ── */
-  weights: {
-  /* أوزان المستخدم — كارت القرار */
-  us:  { technical:15, fundamental:20, valuation:15, liquidity:10,
-  news:10, sentiment:10, risk:10, portfolio:10 },
-  /* أوزان محرك EGX — للمقارنة جنب user's */
-  egx:  { technical:18, fundamental:22, valuation:0,  liquidity:18,
-  news:5,  sentiment:4,  risk:24, portfolio:9 },
-  /* أوزان الأسهم الأمريكية — 6 محاور بس (مفيش أخبار/محفظة من TradingView) */
-  usScan: { technical:15, fundamental:20, valuation:15, liquidity:10,
-  sentiment:10, risk:10 },
-  /* أوزان صفحة التحليل الكامل (intel) */
-  intel:  { technical:20, fundamental:25, liquidity:10, news:7,
-  sentiment:5, risk:20, portfolio:13 }
-  },
+  /* ── أوزان التقييم (مجموع 100) — تُجلب بعد الدخول ── */
+  weights: { us:{}, egx:{}, usScan:{}, intel:{} },
 
   /* ── العتبات (من هنا بتتحدد Decisions والألوان) ── */
   th: {
@@ -96,3 +89,47 @@ const CFG = {
   }
   }
 };
+/* ══════════════════════════════════════════════════════════════
+  ⚖️ تحميل الأوزان من السيرفر (محمي)
+  ──────────────────────────────────────────────────────────────
+  ⛔⛔⛔ ٢٠ أكتوبر ٢٠٢٦
+  ⛌ الأوزان كانت مكتوبة في هذا الملف — كان أي حد يقدر يقراها.
+  ⛌ دلوقتي: /api/engine-weights محمي بـrequire_user،
+  ⛌ وبنملا CFG.weights و CFG.engineWeights بعد الدخول.
+  ⛌ فـ«ارفع على الدومين» مش لازم يتغيّر — الأوزان جاية من السيرفر.
+  ══════════════════════════════════════════════════════════════ */
+(function () {
+  if (typeof window === 'undefined') return;
+  var CFG = window.CFG;
+  if (!CFG) return;
+
+  function apply(d) {
+    if (!d || !d.ok) return;
+    if (d.engine && Object.keys(d.engine).length) CFG.engineWeights = d.engine;
+    if (d.weights) {
+      ['us','egx','usScan','intel'].forEach(function (k) {
+        if (d.weights[k] && Object.keys(d.weights[k]).length) CFG.weights[k] = d.weights[k];
+      });
+    }
+    /* 🎯 إعادة الرسم: الصفحات اللي اتحسبت بأوزان فاضية
+       لازم تتحدّث بعد ما الأوزان توصل. */
+    try { if (typeof window.octaWeightsReady === 'function') window.octaWeightsReady(); }
+    catch (e) { }
+    document.dispatchEvent(new CustomEvent('octa:weights'));
+  }
+
+  /* ⛔ بنجيبها مرتين: مرة عند.authed ومرة احتياطاً.
+  ⛌ لو البوابة أسرع من تحميل السكربت، الـauthed ممكن يفوتنا. */
+  function load() {
+    if (!window.OCTA_API) return;
+    try {
+      fetch(window.OCTA_API + '/api/engine-weights', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(apply).catch(function () { });
+    } catch (e) { }
+  }
+
+  document.addEventListener('octa:authed', function () { setTimeout(load, 60); });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(load, 900); });
+  else setTimeout(load, 500);
+})();

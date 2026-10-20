@@ -348,7 +348,7 @@ function renderIntel(d) {
 
   // المحاور
   let axisHtml = '';
-  const W = CFG.weights.intel;
+  const W = (CFG.weights && CFG.weights.intel) || {};
   for (const k of Object.keys(AXIS_LABELS)) {
   const v = ax[k];
   const val = (v === undefined || v === null) ? 0 : Math.round(v);
@@ -1325,8 +1325,9 @@ async function showSector(sec) {
   🃏 كارت القرار — بيتحسب وقت الفتح (مش ثابت)
   منقول كما هو من verdict-card.html المعتمد
   ══════════════════════════════════════════════════════════════ */
-const W_US = CFG.weights.us;
-const W_EGX = CFG.weights.egx;
+/* الأوزان جاية من /api/engine-weights بعد الدخول — مش مكتوبة في الملف. */
+function W_US(){ return (CFG.weights && CFG.weights.us) || {}; }
+function W_EGX(){ return (CFG.weights && CFG.weights.egx) || {}; }
 const AR_MS = { technical:'فني', fundamental:'أساسي', valuation:'تقييم', liquidity:'سيولة',
   news:'محفزات', sentiment:'معنويات', risk:'مخاطرة', portfolio:'محفظة' };
 let V_REFRESH_MS = 120000, V_TIMER = null, V_CURRENT = 'COMI';
@@ -1512,7 +1513,7 @@ function vRenderCard(d,exRaw,tech){
   const ex=vExplOf(exRaw), ax=d.axes||{}, f=d.fundamental||{}, re=d.risk_engine||{};
   const val=vDeriveValuation(f);
   const us=Object.assign({},ax,{valuation:val});
-  const usScore=vWeighted(us,W_US), egxScore=vWeighted(Object.assign({},ax),W_EGX);
+  const usScore=vWeighted(us,W_US()), egxScore=vWeighted(Object.assign({},ax),W_EGX());
   const v=vVerdictOf(usScore), vEgx=vVerdictOf(egxScore);
   /* ⛔ بدون بيانات ⇒ لون محايد، مش أحمر. الأحمر معناه «سيء» مش «مجهول». */
   const color = (usScore==null) ? '#8b93a7'
@@ -1528,7 +1529,7 @@ function vRenderCard(d,exRaw,tech){
   for(const k in AR_MS){
   const raw=us[k], v2=(raw==null||isNaN(raw))?0:raw;
   arms+='<div class="varms">'+
-  '<span class="varms-n">'+AR_MS[k]+'</span><span class="varms-w">'+W_US[k]+'%</span>'+
+  '<span class="varms-n">'+AR_MS[k]+'</span><span class="varms-w">'+(W_US()[k]||0)+'%</span>'+
   '<span class="varms-t"><span class="varms-f '+vCls(v2)+'" style="width:'+v2.toFixed(1)+'%"></span></span>'+
   '<span class="varms-v '+vCls(v2)+'">'+(raw==null?'—':Math.round(raw))+'</span></div>';
   }
@@ -1553,9 +1554,9 @@ function vRenderCard(d,exRaw,tech){
   const raw=us[k], v2=(raw==null||isNaN(raw))?0:raw;
   const vx=ax[k], vx2=(vx==null||isNaN(vx))?0:vx;
   ab+='<div class="vab-row"><span class="vab-n">'+AR_MS[k]+'</span>'+
-  '<span class="vab-c">'+W_US[k]+'%</span>'+
-  '<span class="vab-c '+(W_US[k]>W_EGX[k]?'win':'')+'">'+Math.round(v2)+'</span>'+
-  '<span class="vab-c '+(W_EGX[k]>W_US[k]?'win':'')+'">'+Math.round(vx2)+'</span></div>';
+  '<span class="vab-c">'+(W_US()[k]||0)+'%</span>'+
+  '<span class="vab-c '+((W_US()[k]||0)>(W_EGX()[k]||0)?'win':'')+'">'+Math.round(v2)+'</span>'+
+  '<span class="vab-c '+((W_EGX()[k]||0)>(W_US()[k]||0)?'win':'')+'">'+Math.round(vx2)+'</span></div>';
   }
   ab+='<div class="vab-row vab-tot"><span class="vab-n">النتيجة</span><span></span>'+
   '<span class="vab-c win">'+usScore.toFixed(1)+'</span><span class="vab-c win">'+egxScore.toFixed(1)+'</span></div>';
@@ -3651,7 +3652,7 @@ function renderStockPage() {
   ${exRaw.contributions.slice(0, 10).map(c => {
   const n = Number(c.score != null ? c.score : c.contribution) || 0;
   const contrib = Number(c.contribution || 0);
-  const w = Number(c.axis_weight || c.weight || (CFG.engineWeights || {})[c.axis] || 0);
+  const w = Number(c.axis_weight || c.weight || ((CFG.engineWeights || {})[c.axis]) || 0);
   const col = n >= 65 ? 'var(--sec)' : n >= 45 ? 'var(--gold2)' : 'var(--red2)';
   return '<div class="si-c-row">' +
   '<div class="si-c-n">' + (c.name || AXIS_LABELS[c.axis] || c.axis || '—') + '</div>' +
@@ -4266,3 +4267,19 @@ function renderBullBear(dash, ticker) {
   </div>
   </div>`;
 }
+/* ══════════════════════════════════════════════════════════════
+  🔄 إعادة الرسم لما الأوزان توصل
+  ──────────────────────────────────────────────────────────────
+  ⛔ الأوزان بقت من /api/engine-weights (محمي).
+  ⛌ ف.card القرار اتحسب أول مرة بأوزان فاضية — لازم نعيد حسابه.
+  ══════════════════════════════════════════════════════════════ */
+document.addEventListener('octa:weights', function () {
+  setTimeout(function () {
+    try {
+      if (V_TIMER) { clearInterval(V_TIMER); V_TIMER = null; }
+      if (typeof vLoadCard === 'function') vLoadCard(true);
+    } catch (e) { }
+  }, 200);
+});
+
+window.octaWeightsReady = function () { /* استدعاء من octa-config.js */ };
