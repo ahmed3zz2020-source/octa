@@ -605,7 +605,7 @@ function switchPage(id) {
   if (ch !== dash) ch.style.display = 'none';
   });
   }
-  if (dash) dash.style.display = 'block';
+  if (dash) dash.style.setProperty('display', 'block', 'important');
   document.getElementById('intelPage')?.style.setProperty('display','none','important');
   document.querySelector('.nav-btn[data-page="dash"]')?.classList.add('active');
   window.scrollTo({top:0,behavior:'smooth'});
@@ -662,7 +662,8 @@ const TOOLS = [
   { id:'pick',  i:'🆚', n:'المقارنة الذكية',
     d:'اكتب لحد 10 أسهم · OCTA يرتّبهم بمعايره' },
   { id:'filter',  i:'🗂️', n:'فلاتر المؤشرات',  d:'8 فلاتر ذكية' },
-  { id:'screener',  i:'🔍', n:'OCTAView',  d:'الفلاتر المباشرة' }
+  { id:'screener',  i:'🔍', n:'OCTAView',  d:'الفلاتر المباشرة' },
+  { id:'dash',      i:'📊', n:'لوحة التحكم', d:'حالة النظام · أفضل ١٠ أسهم · اختبار الضغط' }
 ];
 
 /* كل الأدوات — للـsidebar (الـ15 كلها) */

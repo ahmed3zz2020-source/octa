@@ -1464,6 +1464,22 @@
   .comp-fill { height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--ac), var(--gold)); transition: width .5s; }
   .comp-val { font-size: .82rem; font-weight: 800; color: var(--gold); text-align: left; }
 
+  /* 🎯 كارت الاستراتيجيات — التبويبات والنتيجة (الكلاس ده كان مفقود خالص) */
+  .strat-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .strat-tab { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.10); color: var(--muted);
+    border-radius: 9px; padding: 7px 13px; font-size: .8rem; font-weight: 700; cursor: pointer; transition: .2s; }
+  .strat-tab:hover { border-color: var(--gold); color: var(--gold); }
+  .strat-tab.active { background: rgba(212,175,55,.16); border-color: var(--gold); color: var(--gold); }
+  .strat-info h4 { font-size: 1.08rem; color: var(--gold); font-weight: 800; margin-bottom: 4px; }
+  .strat-info .meta { font-size: .78rem; color: var(--muted); margin-bottom: 6px; }
+  .strat-info .focus { font-size: .84rem; color: var(--txt); margin-bottom: 12px; }
+  .strat-score-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .strat-score-big { font-size: 2rem; font-weight: 900; color: var(--gold); line-height: 1; }
+  .strat-verdict { font-size: .78rem; font-weight: 800; padding: 4px 11px; border-radius: 8px; background: rgba(255,255,255,.06); color: var(--muted); }
+  .strat-verdict.buy { color: var(--sec); background: rgba(22,199,154,.14); }
+  .strat-verdict.sell { color: var(--red2); background: rgba(214,69,69,.14); }
+  .strat-verdict.unknown { color: var(--gold); background: rgba(212,175,55,.14); }
+
   /* 🏆 صفحة «أفضل فرصة» — بطاقات السعر والتحليل الفني */
   .bp-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
   .bp-info-cell { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); border-radius: 10px; padding: 10px 12px; }
