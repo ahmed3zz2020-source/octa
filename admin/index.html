@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>لوحة إدارة OCTA</title>
+<style>
+:root{
+  --bg:#0a1929; --card:#102a43; --card2:#1c3b58; --line:#234a6b;
+  --txt:#e8eef5; --muted:#8b9eb0; --gold:#d4af37;
+  --ok:#2ecc71; --warn:#f39c12; --bad:#e74c3c; --info:#3498db;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--txt);
+  font-family:system-ui,"Segoe UI",Tahoma,Arial,sans-serif;
+  padding:16px; line-height:1.7;
+}
+header{
+  display:flex; justify-content:space-between; align-items:center;
+  flex-wrap:wrap; gap:12px; margin-bottom:22px;
+  padding:16px 20px; background:var(--card);
+  border:1px solid var(--line); border-radius:14px;
+}
+h1{font-size:22px; color:var(--gold)}
+.sub{color:var(--muted); font-size:13px}
+button{
+  background:var(--card2); color:var(--txt); border:1px solid var(--line);
+  padding:10px 18px; border-radius:10px; cursor:pointer;
+  font-family:inherit; font-size:14px; transition:.2s;
+}
+button:hover{background:var(--gold); color:#0a1929; border-color:var(--gold)}
+button:disabled{opacity:.5; cursor:not-allowed}
+
+.kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:22px}
+.kpi{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px}
+.kpi .lbl{color:var(--muted); font-size:13px; margin-bottom:8px}
+.kpi .val{font-size:30px; font-weight:700; color:var(--gold)}
+.kpi .hint{font-size:12px; color:var(--muted); margin-top:4px}
+.kpi.ok .val{color:var(--ok)} .kpi.warn .val{color:var(--warn)} .kpi.bad .val{color:var(--bad)}
+
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:22px}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+.panel{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px}
+.panel h2{font-size:16px; color:var(--gold); margin-bottom:14px; padding-bottom:8px; border-bottom:1px solid var(--line)}
+
+.bar{display:flex; align-items:center; gap:10px; margin-bottom:9px}
+.bar .nm{width:118px; font-size:13px; color:var(--txt); flex-shrink:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.bar .track{flex:1; height:20px; background:var(--card2); border-radius:6px; overflow:hidden}
+.bar .fill{height:100%; background:linear-gradient(90deg,var(--gold),#f0d060); border-radius:6px}
+.bar .n{width:44px; text-align:left; font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums}
+
+table{width:100%; border-collapse:collapse; font-size:13px}
+th,td{padding:10px 12px; text-align:right; border-bottom:1px solid var(--line)}
+th{color:var(--gold); font-weight:600; font-size:12px}
+tbody tr:hover{background:var(--card2)}
+td.num{font-variant-numeric:tabular-nums; text-align:center}
+.pill{display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px}
+.pill.y{background:rgba(46,204,113,.18); color:var(--ok)}
+.pill.n{background:rgba(139,158,176,.15); color:var(--muted)}
+
+.warnbox{
+  background:rgba(243,156,18,.1); border:1px solid rgba(243,156,18,.35);
+  border-radius:12px; padding:14px; margin-bottom:20px;
+}
+.warnbox h3{color:var(--warn); font-size:15px; margin-bottom:8px}
+.warnbox li{font-size:13px; margin-right:20px; margin-bottom:5px; color:var(--txt)}
+
+.acts{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+@media(max-width:820px){.acts{grid-template-columns:1fr}}
+.act{background:var(--card2); border-radius:10px; padding:12px 14px; font-size:13px; border-right:3px solid var(--gold)}
+.act.no{border-right-color:var(--muted); opacity:.72}
+.act b{color:var(--gold); display:block; margin-bottom:5px; font-size:13px}
+.act.no b{color:var(--muted)}
+
+footer{text-align:center; color:var(--muted); font-size:12px; margin-top:28px; padding-top:16px; border-top:1px solid var(--line)}
+.empty{color:var(--muted); text-align:center; padding:26px; font-size:13px}
+code{background:var(--card2); padding:2px 7px; border-radius:5px; font-size:12px; color:var(--gold)}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🐙 لوحة إدارة OCTA</h1>
+    <div class="sub">آخر تحديث: <span id="gen">—</span></div>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button onclick="load()">🔄 تحديث</button>
+    <button id="fetchBtn" onclick="fetchLive()">🌐 سحب من السيرفر</button>
+  </div>
+</header>
+
+<div id="warn" class="warnbox">
+  <h3>⚠️ اقرأ ده قبل ما تاخد قرار</h3>
+  <ul>
+    <li><b>نسبة الرجوع ١٠٠٪ مضلّلة</b> — كل المستخدمين اتسجلوا اليوم، فـ«نشط ٧ يوم» و«نشط ٣٠ يوم» نفس الرقم. الرقم الحقيقي هيبان بعد أسبوعين.</li>
+    <li><b>٩٥٪ من الزيارات من مستخدم واحد</b> — الرقم ده بيمثّل أحمد، مش بيمثّل السوق.</li>
+    <li><b>مدة الجلسة دي مقياس غلط</b> — بتتحسب من أول زيارة لآخر واحدة، فممكن تبقى ٧٩٨٣ دقيقة لو ساب الموقع مفتوح.</li>
+    <li><b>التتبع ناقص</b> — ٧١٣ حدث، ٧١٢ منهم `page_view`. مفيش ولا حدث واحد لفلتر أو أداة أو شارت.</li>
+  </ul>
+</div>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="grid2">
+  <div class="panel">
+    <h2>📈 أكتر الصفحات (٣٠ يوم)</h2>
+    <div id="pages"></div>
+  </div>
+  <div class="panel">
+    <h2>⚡ أكتر الأفعال</h2>
+    <div id="actions"></div>
+  </div>
+</div>
+
+<div class="panel" style="margin-bottom:22px">
+  <h2>👥 المستخدمون</h2>
+  <div id="users"></div>
+</div>
+
+<div class="grid2">
+  <div class="panel">
+    <h2>🔔 الأرقام اللي بتقولنا نعمل إيه</h2>
+    <div class="acts" id="do"></div>
+  </div>
+  <div class="panel">
+    <h2>🚫 اللي مش مهم — نستبعده</h2>
+    <div class="acts" id="skip"></div>
+  </div>
+</div>
+
+<footer>
+  لوحة إدارة OCTA · <code>admin/index.html</code><br>
+  الداتا من <code>/api/admin/monthly</code> — محمية بـ X-OCTA-Admin
+</footer>
+
+<script>
+let D = null;
+
+function load(){
+  fetch('data.json').then(r=>r.json()).then(d=>{ D=d; render(); })
+    .catch(()=>{
+      document.getElementById('kpis').innerHTML =
+        '<div class="empty">مفيش data.json — دوس «سحب من السيرفر» أو حط الملف جنب الصفحة</div>';
+    });
+}
+
+async function fetchLive(){
+  const btn = document.getElementById('fetchBtn');
+  btn.disabled = true; btn.textContent = '… جاري السحب';
+  const tok = prompt('حط توكن الإدارة (X-OCTA-Admin):');
+  if(!tok){ btn.disabled=false; btn.textContent='🌐 سحب من السيرفر'; return; }
+  try{
+    const r = await fetch('https://octa-prices-production-4ccb.up.railway.app/api/admin/monthly',
+      { headers:{ 'X-OCTA-Admin': tok } });
+    const d = await r.json();
+    if(!d.ok) throw new Error(d.error||'محمي');
+    d.users.forEach(u=>{ if(u.email){ const e=u.email.split('@');
+      u.email_masked = e[0].slice(0,2)+'***@'+e[1]; delete u.email; } });
+    D = d; render();
+    fetch('data.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).catch(()=>{});
+  }catch(e){ alert('فشل: '+e.message); }
+  btn.disabled=false; btn.textContent='🌐 سحب من السيرفر';
+}
+
+function kpi(lbl,val,hint,cls){
+  return `<div class="kpi ${cls||''}"><div class="lbl">${lbl}</div>
+    <div class="val">${val}</div><div class="hint">${hint||''}</div></div>`;
+}
+
+function bars(el, arr, color){
+  if(!arr || !arr.length){ document.getElementById(el).innerHTML='<div class="empty">مفيش بيانات</div>'; return; }
+  const mx = Math.max(...arr.map(a=>a[1]));
+  document.getElementById(el).innerHTML = arr.map(a=>
+    `<div class="bar"><div class="nm" title="${a[0]}">${a[0]}</div>
+     <div class="track"><div class="fill" style="width:${(a[1]/mx*100).toFixed(1)}%${color?';background:'+color:''}"></div></div>
+     <div class="n">${a[1]}</div></div>`).join('');
+}
+
+function render(){
+  const a = D.analytics;
+
+  document.getElementById('gen').textContent = D.generated || '—';
+
+  // KPIs
+  const ret = a.active_30d ? Math.round(a.active_7d/a.active_30d*100) : 0;
+  const visits = D.users.reduce((s,u)=>s+(u.hits||0),0);
+  const topShare = a.events_30d && a.top_pages.length
+    ? Math.round(a.top_pages[0][1]/a.events_30d*100) : 0;
+  const behavior = a.events_30d - (a.by_event.find(e=>e[0]==='page_view')||[0,0])[1];
+
+  document.getElementById('kpis').innerHTML =
+    kpi('إجمالي المستخدمين', D.total, D.new_30d+' جدد في ٣٠ يوم') +
+    kpi('نشط ٧ أيام', a.active_7d, 'من '+a.active_30d+' في ٣٠ يوم', 'warn') +
+    kpi('نسبة الرجوع', ret+'٪', 'مضلّلة — كلهم جدد', 'warn') +
+    kpi('إجمالي الزيارات', visits, 'آخر ٣٠ يوم') +
+    kpi('أكتر صفحة', topShare+'٪', a.top_pages[0]?a.top_pages[0][0]:'—') +
+    kpi('أحداث السلوك', behavior, 'غير page_view — ناقص', behavior<10?'bad':'');
+
+  // bars
+  bars('pages', a.top_pages);
+  bars('actions', a.top_actions, 'linear-gradient(90deg,#e74c3c,#f39c12)');
+
+  // users table
+  const us = D.users.slice().sort((x,y)=>(y.hits||0)-(x.hits||0));
+  document.getElementById('users').innerHTML =
+    '<table><thead><tr><th>الاسم</th><th>الإيميل</th><th>زيارات</th>'+
+    '<th>أول ظهور</th><th>آخر ظهور</th><th>«دقيقة»</th><th>PIN</th><th>نشط</th></tr></thead><tbody>'+
+    us.map(u=>`<tr>
+      <td>${u.name}</td>
+      <td style="color:var(--muted);font-size:12px">${u.email_masked||'—'}</td>
+      <td class="num">${u.hits||0}</td>
+      <td class="num" style="color:var(--muted);font-size:12px">${(u.created_iso||'—').slice(0,10)}</td>
+      <td class="num" style="color:var(--muted);font-size:12px">${(u.last_seen||'—').slice(0,10)}</td>
+      <td class="num" style="color:var(--warn)">${u.session_min||0}</td>
+      <td class="num">${u.pin_set?'<span class="pill y">نعم</span>':'<span class="pill n">لا</span>'}</td>
+      <td class="num">${u.active_7d?'<span class="pill y">نعم</span>':'<span class="pill n">لا</span>'}</td>
+    </tr>`).join('') + '</tbody></table>';
+
+  // insights
+  const acts = a.top_actions||[];
+  document.getElementById('do').innerHTML = `
+    <div class="act"><b>🎯 الفلتر هو المنتج</b>
+      ${a.top_pages[0]?a.top_pages[0][0]:'screener'} = ${a.top_pages[0]?a.top_pages[0][1]:0} زيارة
+      (${topShare}٪). أي تحسين في الفلتر = تحسّن مباشر في ربع الاستخدام.</div>
+    <div class="act"><b>📉 ٢٠٪ بيتسرب عند التسجيل</b>
+      مستخدم واحد عمل حساب وماكملش الـPIN، وواحد عمل حساب ومادخلش خالص.</div>
+    <div class="act"><b>❓ ناقص: تتبّع الفلاتر</b>
+      مفيش ولا حدث لـ فلتر أو أداة. من غير ده مش نعرف أي فلتر يستحق تطوير.</div>
+    <div class="act no"><b>⏳ استنى أسبوعين</b>
+      نسبة الرجوع الحقيقية محتاجة بيانات بعد ٧ أيام من التسجيل، مش اليوم.</div>`;
+
+  document.getElementById('skip').innerHTML = `
+    <div class="act no"><b>top_actions الحالي</b>
+      فيه ${acts.length} عنصر بس. مفيش إحصاء — مش رقم قرار.</div>
+    <div class="act no"><b>«دقيقة» الجلسة</b>
+      مقياس غلط: بتحسب من أول زيارة لآخر واحدة، فبتفرق بين «قعد» و«ساب مفتوح».</div>
+    <div class="act no"><b>نسبة الرجوع ١٠٠٪</b>
+      artifact — كل المستخدمين اتسجلوا اليوم فمفيش فرق بين ٧ و٣٠ يوم.</div>
+    <div class="act no"><b>حساب اختبار Volume</b>
+      حساب اختبار بـ٠ زيارات — يتشال قبل أي تقرير رسمي.</div>`;
+}
+
+load();
+</script>
+</body>
+</html>
