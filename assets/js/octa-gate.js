@@ -321,7 +321,11 @@
  ⛔ ممنوع الإيميل أو الكود أو التذكرة يتفكّروا في
  localStorage أو sessionStorage أو cookie أو log أو تحليلات.
  الباك نفسه بيخزّنهم مشفّرين — الواجهة ماتخزّنش خالص. */
- var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0 };
+ /* ⛔⛔⛔ ٢١ أكتوبر ٢٠٢٦ — triedPins: الأرقام اللي المستخدم جرّبها.
+   ⛌ دي بتتبعت مع كود «نسيت الباسورد» عشان السيرفر يمسح
+   ⛌ العدّادات بتاعتها (كان بيفضل «محاولات كتيرة» حتى لو الكود صح). */
+var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
+             triedPins: [] };
 
  /* 📌 التسجيل  لوحده عنده حالة مستقلة  عشان ما نخلطش
  بين «استرجاع باسورد» و«إنشاء حساب». والمهم 
@@ -331,6 +335,12 @@
  function wipeFlow() {
  flow.email = ''; flow.code = ''; flow.unlock = '';
  flow.tries = 0;
+ /* ⛔ ٢١ أكتوبر: منسيب العدّادات القديمة عند بداية جلسة جديدة */
+ if (flow.triedPins && flow.triedPins.length) {
+  try { sessionStorage.setItem('octa_tried_pins', JSON.stringify(flow.triedPins)); }
+  catch (e) { }
+ }
+ flow.triedPins = [];
  stopCd();
  }
 
@@ -637,6 +647,29 @@
  var e = document.getElementById('gtDots');
  if (e) e.classList.remove('bad');
  }, 560);
+ }
+
+ /* 🧹 تنظيف السجل بعد نجاح العملية */
+ function clearTriedPins() {
+  try { sessionStorage.removeItem('octa_tried_pins'); } catch (e) { }
+  if (flow && flow.triedPins) flow.triedPins = [];
+ }
+
+ /* 🧾 تسجيل الأرقام اللي اتجرّبت في الجلسة دي.
+   ⛔⛔⛔ ٢١ أكتوبر ٢٠٢٦ — لازم نعرفها عشان «نسيت الباسورد» يمسحها.
+   ⛌ التخزين في sessionStorage = بيمسح لما قفل التبويب.
+   ⛌ ⛌Namespace: octa_tried_pins */
+ function recordTriedPin(pin) {
+  var t = String(pin || '').trim();
+  if (!/^[0-9]{4}$/.test(t)) return;
+  try {
+   var raw = sessionStorage.getItem('octa_tried_pins') || '[]';
+   var arr = JSON.parse(raw);
+   if (!Array.isArray(arr)) arr = [];
+   if (arr.indexOf(t) === -1) arr.push(t);
+   if (arr.length > 20) arr = arr.slice(-20);
+   sessionStorage.setItem('octa_tried_pins', JSON.stringify(arr));
+  } catch (e) { }
  }
 
  function badPin(left, strikes) {
@@ -1280,6 +1313,11 @@
  if (o.s === 429) { locked(o.d.retry_after || o.d.retry || 60); return; }
  if (needCode(o.d)) { askCode('need'); return; }
  /* ⛌ كل حاجة تانية = الباسورد غلط. ما نقولش حاجة عن الحساب. */
+ /* ⛔⛔⛔ ٢١ أكتوبر ٢٠٢٦ — نسجّل الرقم اللي اتجرّب.
+   ⛌ الهدف: لو عمل «نسيت الباسورد» وكتب الكود الصح،
+   ⛌ السيرفر يقدر يمسح عدّاد p:الرقم ده بالظبط.
+   ⛌ ⛌ من غير ده: القفل بيفضل حتى لو الكود صح. */
+ try { recordTriedPin(state.pin); } catch (e) { }
  var n = strikePush();
  if (n >= STRIKE_LIMIT) { locked(30); return; }
  badPin(winLeft(o.d, state.tries), n);
@@ -1375,6 +1413,12 @@
  stopLock();
  var why = (cause === 'locked') ? 'locked' : (cause === 'forgot' ? 'forgot' : 'need');
  state.pin = ''; state.len = PIN_LEN; flow.tries = 0;
+ /* ⛔ ٢١ أكتوبر: منسيب العدّادات القديمة عند بداية جلسة جديدة */
+ if (flow.triedPins && flow.triedPins.length) {
+  try { sessionStorage.setItem('octa_tried_pins', JSON.stringify(flow.triedPins)); }
+  catch (e) { }
+ }
+ flow.triedPins = [];
  mount();
  head(why === 'locked' ? 'محاولات كتيرة' : 'هنبعتلك كود',
       1, function () { login(); });
@@ -1467,6 +1511,12 @@
  function codeEntry() {
  stopLock();
  state.pin = ''; state.len = CODE_LEN; flow.tries = 0;
+ /* ⛔ ٢١ أكتوبر: منسيب العدّادات القديمة عند بداية جلسة جديدة */
+ if (flow.triedPins && flow.triedPins.length) {
+  try { sessionStorage.setItem('octa_tried_pins', JSON.stringify(flow.triedPins)); }
+  catch (e) { }
+ }
+ flow.triedPins = [];
  mount();
  /* 📌 رجوع وإرسال  حسب إحنا في «تسجيل» ولا «استرجاع» */
  var reg = (s.mode === 'signup');
@@ -1513,7 +1563,16 @@
  function submitCode(v) {
  paintPad(true);
  clearMsg();
- post(reg ? SIGNUP.verify : PATHS.verify, { email: flow.email, code: v })
+ /* ⛔⛔⛔ ٢١ أكتوبر ٢٠٢٦ — نبعت الأرقام المتجرّبة مع الكود.
+   ⛌ السيرفر بيمسح عدّاداتها بس لما يبقى التأكد ناجح.
+   ⛌ ⛌ من غيرها: «نسيت الباسورد» ميبفلحش يفتح أبداً. */
+ var tried = [];
+ try { tried = JSON.parse(sessionStorage.getItem('octa_tried_pins') || '[]'); }
+ catch (e) { tried = []; }
+ if (!Array.isArray(tried)) tried = [];
+ if (tried.length > 20) tried = tried.slice(-20);
+ post(reg ? SIGNUP.verify : PATHS.verify,
+      { email: flow.email, code: v, tried_pins: tried })
  .then(function (o) {
  var d = o.d || {};
  if (o.s === 200) {
@@ -1644,11 +1703,16 @@
  ⛌ فبعد التسجيل  بيوصل لصفحة النجاح  على طول
   والبصمة  المستخدم يفعّلها وقت ما يحب  من
   القائمة  أو من زرار  في شاشة الأرقام. */
+ try { clearTriedPins(); } catch (e) { }
  if (reg) { done(who); } else { shut(); }
  return;
  }
  state.pin = '';
  paintDots();
+ /* ⛔⛔⛔ ٢١ أكتوبر ٢٠٢٦ — نسجّل الرقم الجديد كمان.
+   ⛌ لو هو اللي بيقفل العدّاد، المستخدم يقدر يطلّعه بكود
+   ⛌ من غير ما يستنى ١٥ دقيقة. */
+ try { recordTriedPin(v); } catch (e) { }
  if (o.s === 409 || d.why === 'pin_taken') {
  /* ⛌ 409 → اللوحة فاضية تاني والمستخدم يختار غيره */
  paintPad(false);
