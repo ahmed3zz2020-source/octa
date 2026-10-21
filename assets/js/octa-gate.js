@@ -2063,15 +2063,20 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  } catch (e) { }
  }
 
- /* ⛌ القاعدة: **شك = مقفول** — وده بقى حقيقة مش كلام.
+ /* ⛌ القاعدة: شك = مقفول لمدة ٨ ثواني، بعدها نسأل الواجهة عن
+   الإجابة من cache (يدوي/افتراضي: مفتوح). ده يمنع الـrace condition
+   في أول load (الداتا في طريقها) من إنه يدخل حلقة شك لا تنتهي.
  · 200 → shut() → ينفتح
  · !ok → logoutLocal() + البوابة
- · خطأ شبكة → ٣ محاولات، وبعدها البوابة + رسالة
- · ⛔ ما نفتحش أبداً قبل ما نعرف */
+ · خطأ شبكة → ٣ محاولات (max ٨ ثواني) → البوابة + رسالة
+ · ⛔ بعد ٨ ثواني بدون رد: نسمح بالتصفح زي زائر عادي
+   (الباك لما يرد هيتحقق من require_user في كل endpoint محمي) */
 
  var tries = 0, MAX_TRIES = 3;
+ var STARTED = 0;
 
  function verifyOnce(){
+ STARTED = Date.now();
  return fetch(apiBase() + '/api/auth/me', {
  headers: { 'Authorization': 'Bearer ' + t },
  cache: 'no-store'
@@ -2083,9 +2088,20 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  logoutLocal();
  mount(); welcome(); open();
  }).catch(function () {
- /* ⛔ خطأ شبكة — بنحاول تاني قبل ما نقفل.
-  ⛌ شبكاتDLGOUOF كتير بتبطئ أول مرة، فبنستنى شوية. */
  tries++;
+ var elapsed = (Date.now() - STARTED) / 1000;
+ /* ⛔⛔ ٢١ أكتوبر ٢٠٢٦ — hard limit ٨ ثواني.
+  ⛌ الباك في ساعات الذروة بيرد بعد ١٥ ثانية (timeout curl).
+  ⛌ لو البوابة فضلت مقفولة أكتر من كده، المستخدم ميشوفش حاجة.
+  ⛌ الحل: بعد ٨ ثواني نسمح للزائر يفتح زي ما في حالة عدم وجود توكن
+  ⛌ (كل endpoints محمية محمية بـrequire_user على السيرفر — فمش دخول). */
+ if (elapsed >= 8) {
+  clearHint();
+  try { sessionStorage.setItem('octa_allow_browse', '1'); } catch (e) { }
+  hint('⚠️ السيرفر بطيء — بتفتح بدون تسجيل دخول. الداتا المحمية هتطلب الدخول.', '#7a2b16', '#ffd9c9');
+  shut();
+  return;
+ }
  if (tries < MAX_TRIES) {
   hint('⏳ بنحاول نتأكد من حسابك… (' + tries + '/' + MAX_TRIES + ')', '#0f2a44', '#cfe3f5');
   setTimeout(verifyOnce, 900 * tries);
