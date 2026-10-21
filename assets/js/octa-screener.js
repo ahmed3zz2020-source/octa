@@ -1412,12 +1412,12 @@
   ⛌   (مصر ٣٩٠ ك.ب بدل ٣٫٤ ميجا لكل صفحة).
   ⛌ ⛌ الـfallback للملف الثابت بيفضل شغّال لحد ما الـAPI
   ⛌    يتنشر — وبعدها الملف بيتشال من حزمة النشر نهائياً. */
+  // ⛔⛔⛔ ٢١ أكتوبر ٢٠٢٦ — fallback للملف الثابت محذوف.
+  // ⛌ الـAPI /api/markets محمي ومقسم — كل الحمل بقى في الخادم.
+  // ⛌ ⛌ لو الـAPI رجع 401 (مفيش توكن)، الـscreener لسه يقدر
+  // ⛌ يشتغل لأن البيانات تيجي من LIVE_DATA المحلي في octa-core.
   function loadStaticMK(cb) {
-  const sc = document.createElement('script');
-  sc.src = 'data/data_markets.js';
-  sc.onload = function () { MK = null; mkData(); MK_DONE = true; cb(); };
-  sc.onerror = function () { MK_DONE = true; cb(); };
-  document.head.appendChild(sc);
+  if (typeof cb === 'function') cb();
   }
   function loadMK(cb) {
   const d = mkData();

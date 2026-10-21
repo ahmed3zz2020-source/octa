@@ -5,11 +5,12 @@
   "description": "🐙 OCTA — منصة تحليل أسهم عربية (مصر/أمريكا/السعودية/الإمارات)",
   "scripts": {
     "bump": "node bump-cache.js",
-    "build": "npm run bump && rm -rf dist && mkdir -p dist && cp index.html dist/ && cp gate.html dist/ && cp -r assets dist/assets && node tools/copy-data.js && cp _headers dist/_headers && cp data_ipo.json dist/data_ipo.json && node tools/mk-chart-root.js && node tools/check-dist.js",
+    "build": "npm run bump && rm -rf dist && mkdir -p dist && cp index.html dist/ && cp gate.html dist/ && cp -r assets/. dist/assets/ && node tools/copy-data.js && cp _headers dist/_headers && cp data_ipo.json dist/data_ipo.json && node tools/mk-chart-root.js && node tools/check-dist.js",
+    "build:secure": "OCTA_STATIC_MARKETS=0 npm run build",
+    "build:strict": "OCTA_STATIC_MARKETS=0 npm run build",
     "deploy": "npm run build && wrangler deploy",
     "dev": "wrangler dev",
-    "check:dist": "node tools/check-dist.js",
-    "build:strict": "OCTA_STATIC_MARKETS=0 npm run build"
+    "check:dist": "node tools/check-dist.js"
   },
   "devDependencies": {
     "wrangler": "3.114.14"
