@@ -1405,14 +1405,38 @@
   render();
   };
   let MK_DONE = false;
-  function loadMK(cb) {
-  const d = mkData();
-  if (MK_DONE && d && d[M.id] && d[M.id].length) { cb(); return; }
+  /* ⛔⛔⛔ ٢١ أكتوبر ٢٠٢٦ — داتا السوق بقت من الـAPI المحمي.
+  ⛌ قبل كده: <script src="data/data_markets.js"> — ٣٫٤ ميجا
+  ⛌   كانوا بينزّلوا من غير أي توكن = تسريب تنافسي.
+  ⛌ دلوقتي: /api/markets?market=<السوق> — محمي، ومقسّم
+  ⛌   (مصر ٣٩٠ ك.ب بدل ٣٫٤ ميجا لكل صفحة).
+  ⛌ ⛌ الـfallback للملف الثابت بيفضل شغّال لحد ما الـAPI
+  ⛌    يتنشر — وبعدها الملف بيتشال من حزمة النشر نهائياً. */
+  function loadStaticMK(cb) {
   const sc = document.createElement('script');
   sc.src = 'data/data_markets.js';
   sc.onload = function () { MK = null; mkData(); MK_DONE = true; cb(); };
   sc.onerror = function () { MK_DONE = true; cb(); };
   document.head.appendChild(sc);
+  }
+  function loadMK(cb) {
+  const d = mkData();
+  if (MK_DONE && d && d[M.id] && d[M.id].length) { cb(); return; }
+  const base = (typeof window !== 'undefined' && window.OCTA_API) || '';
+  const url = base + '/api/markets?market=' + encodeURIComponent(M.id);
+  let done = false;
+  function finish() { if (!done) { done = true; cb(); } }
+  try {
+  fetch(url, { cache: 'no-store' })
+  .then(function (r) { return r.ok ? r.json() : null; })
+  .then(function (j) {
+  if (j && j[M.id] && j[M.id].length) {
+  MK = j; MK_DONE = true; finish(); return;
+  }
+  loadStaticMK(finish);
+  })
+  .catch(function () { loadStaticMK(finish); });
+  } catch (e) { loadStaticMK(finish); }
   }
 
   window.scInit = function () {

@@ -17,10 +17,17 @@ const DIST = path.join(__dirname, '..', 'dist');
 const BANNED = ['data_full.json', 'data_egx.json', 'data_risk.json'];
 
 /* ⚠️ مش banning — لكن لازم يتعرف عليه: 3.4MB من أسهم السوق الأمريكي */
+/* ⛔⛔ ٢١ أكتوبر ٢٠٢٦ — داتا السوق بقت جوه الـAPI المحمي.
+   ⛌ الملف الثابت ده كان **تسريب تنافسي** (أي حد بينزّله).
+   ⛌ عايزينه يتحذف نهائياً من الحزمة ⇒ npm run build:strict
+   ⛌ لحد ما الـAPI يتنشر، الملف بيفضل منسوخ (fallback للواجهة). */
 const WARN = [
-  { f: 'data/data_markets.js', why: '2,289 سهم أمريكي — بيتحمّل بـ <script> في المتصفح' },
+  { f: 'data/data_markets.js', why: '2,289 سهم — داتا عامة! تشيل بـ: npm run build:strict' },
   { f: 'data_ipo.json', why: '23 طرح اكتتاب — مكرّر من foudalens/ar/ipo (عام)' },
 ];
+
+/* ⛔ الوضع الصارم — الملف ده لازم يكون مش موجود */
+const STRICT_DROP = ['data/data_markets.js'];
 
 function walk(dir, out) {
   out = out || [];
@@ -49,6 +56,22 @@ for (const b of BANNED) {
 if (bad) {
   console.error('\n⛔⛔⛔ البناء مرفوض — البيانات دي لازم تيجي من /api/data_full المحمي.');
   process.exit(1);
+}
+
+/* ⛔⛔ الوضع الصارم — الملف العام ده لازم يكون مش موجود */
+const strict = process.env.OCTA_STATIC_MARKETS === '0';
+if (strict) {
+  for (const f of STRICT_DROP) {
+    const hit = rel.filter(r => r === f || r.endsWith('/' + f));
+    if (hit.length) {
+      console.error(`⛔⛔ ${f} موجود في dist — في الوضع الصارم لازم يتشال (تسريب مفتوح).`);
+      bad++;
+    }
+  }
+  if (bad) {
+    console.error('\n⛔⛔⛔ البناء مرفوض — التسريب مفتوح.');
+    process.exit(1);
+  }
 }
 
 console.log('🔒 حارس النشر: مفيش ملفات بيانات ممنوعة في dist ✅');

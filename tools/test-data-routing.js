@@ -109,32 +109,47 @@ t('حقول المخاطرة موجودة (vol1y·mdd·sharpe3y·cagr3y)', () =>
 console.log('\n▸ توكن المسارات المحمية');
 
 const api = fs.readFileSync(path.join(ROOT, 'assets/js/octa-api.js'), 'utf8');
-const authBlock = api.slice(api.indexOf('const AUTH_PATHS'), api.indexOf('/* 🩺 شغّل'));
+/* ⛔⛔ ٢١ أكتوبر ٢٠٢٦ — الموديل اتغيّر:
+   التون�� مبعت مع **كل** نداء /api/* (مش ٨ مسارات بس)، لأن
+   الباك بقى يقفل كل مسار بيانات ورا توكن. */
+const authBlock = api.slice(api.indexOf('const OPEN_PATHS'),
+                            api.indexOf('/* 🩺 لو الـWorker وقع'));
 const fake = eval('(function(){ const localStorage={getItem:()=>"TOK-123"};' +
   ' const Headers=function(h){this.h=h||{};this.get=function(k){return this.h[k]||null};' +
   'this.set=function(k,v){this.h[k]=v}};' + authBlock +
-  ' return {_pathOf, _withToken, AUTH_PATHS};})()');
+  ' return {_pathOf, _isOpen, _withToken, OPEN_PATHS, OPEN_PREFIXES};})()');
 
-t('/api/data_full في قائمة المحمية', () => {
-  assert.ok(fake.AUTH_PATHS.indexOf('/api/data_full') !== -1);
+t('/api/data_full في المسارات المفتوحة؟ لأ — لازم محمي', () => {
+  assert.ok(fake.OPEN_PATHS.indexOf('/api/data_full') === -1);
+});
+t('المسارات المفتوحة: health · track · logos', () => {
+  ['/api/health', '/api/track', '/api/logos'].forEach(p => {
+    assert.ok(fake.OPEN_PATHS.indexOf(p) !== -1, p + ' مش مفتوح');
+  });
+});
+t('الـauth كله مفتوح (تسجيل · دخول)', () => {
+  assert.ok(fake.OPEN_PREFIXES.indexOf('/api/auth/') !== -1);
 });
 const U = 'https://octa-prices-production-4ccb.up.railway.app';
 [['egx_full'], ['data_full'], ['ranking'], ['portfolio'], ['stats'],
- ['alerts/watch'], ['alerts/diag'], ['auth/me']].forEach(([p]) => {
+ ['alerts/watch'], ['alerts/diag'], ['auth/me'], ['prices'], ['rank'],
+ ['markets'], ['chat'], ['analyze'], ['candles/COMI']].forEach(([p]) => {
   t(`التوكن بيتلزق على /api/${p}`, () => {
     const o = fake._withToken(U + '/api/' + p + '?_=1');
     assert.ok(o && o.headers && o.headers.get('Authorization') === 'Bearer TOK-123');
+    assert.strictEqual(o.credentials, 'same-origin');
   });
 });
-t('مفيش توكن على المسارات العادية', () => {
-  assert.strictEqual(fake._withToken(U + '/api/prices'), undefined);
-  assert.strictEqual(fake._withToken(U + '/api/rank?limit=400'), undefined);
+t('التوكن مش على رابط مش API', () => {
   assert.strictEqual(fake._withToken('data_ipo.json?_=1'), undefined);
+  assert.strictEqual(fake._withToken('assets/js/octa-core.js'), undefined);
 });
 t('⛔ مفيش سر ولا توكن مكتوب في أي ملف واجهة', () => {
   const bad = [];
   for (const f of fs.readdirSync(path.join(ROOT, 'assets/js'))) {
-    const s = fs.readFileSync(path.join(ROOT, 'assets/js', f), 'utf8');
+    const full = path.join(ROOT, 'assets/js', f);
+    if (!fs.statSync(full).isFile()) continue;   /* ⛔ مجلدات (vendor) */
+    const s = fs.readFileSync(full, 'utf8');
     if (/OCTAD_TOKEN_SECRET|Bearer [A-Za-z0-9._-]{20,}/.test(s)) bad.push(f);
   }
   assert.deepStrictEqual(bad, []);

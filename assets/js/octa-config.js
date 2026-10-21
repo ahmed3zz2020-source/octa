@@ -121,7 +121,7 @@ const CFG = {
   /* ⛔ بنجيبها مرتين: مرة عند.authed ومرة احتياطاً.
   ⛌ لو البوابة أسرع من تحميل السكربت، الـauthed ممكن يفوتنا. */
   function load() {
-    if (!window.OCTA_API) return;
+    if (window.OCTA_API === undefined) return;
     try {
       fetch(window.OCTA_API + '/api/engine-weights', { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json() : null; })

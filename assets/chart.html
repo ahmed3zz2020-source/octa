@@ -252,13 +252,21 @@
         });
       });
 
-      /* قائمة الأسهم — من ملف البيانات المحلي */
+      /* قائمة الأسهم — من الـAPI المحمي (مش ملف عام) */
+      /* ⛔⛔ ٢١ أكتوبر ٢٠٢٦ — كان بيقرا /data/data_markets.js
+         (٣٫٤ ميجا عامة) ⇒ أي حد بينزّل داتا المنصّة.
+         ⛌ دلوقتي: /api/markets?market=egypt — محمي بتوكن. */
       try {
-        fetch('/data/data_markets.js').then(function (r) { return r.text(); }).then(function (t) {
-          var m = t.match(/[A-Z]{2,6}/g) || [];
+        var TK = ''; try { TK = localStorage.getItem('octa_token') || ''; } catch (e) {}
+        var AH = TK ? { 'Authorization': 'Bearer ' + TK } : {};
+        fetch('/api/markets?market=egypt', { headers: AH, credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          var rows = (j && j.egypt) || [];
           var seen = {}, out = '';
-          m.slice(0, 400).forEach(function (c) {
-            if (seen[c] || c.length > 6) return;
+          rows.forEach(function (row) {
+            var c = (row && row.code) || '';
+            if (!c || seen[c] || c.length > 8) return;
             seen[c] = 1;
             out += '<option value="' + c + '">';
           });
@@ -280,9 +288,12 @@
       var symInput = document.getElementById('sym');
       if (!priceEl || !chgEl) return;
       var API = '';  /* same-origin: /api/stocks → worker proxy */
+      /* ⛔⛔ التوكن — المسارات كلها بقت محمية (٢١ أكتوبر ٢٠٢٦) */
+      var TK2 = ''; try { TK2 = localStorage.getItem('octa_token') || ''; } catch (e) {}
+      var AH2 = TK2 ? { 'Authorization': 'Bearer ' + TK2 } : {};
       function fmt(n) { if (n == null || isNaN(n)) return '—'; return Number(n).toFixed(2); }
       function update() {
-        fetch(API + '/api/stocks', { credentials: 'omit' })
+        fetch(API + '/api/stocks', { headers: AH2, credentials: 'same-origin' })
           .then(function (r) { return r.ok ? r.json() : null; })
           .then(function (d) {
             if (!d) return;

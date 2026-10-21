@@ -17,7 +17,7 @@
        ⛌ الحل: نقرا من الـglobal scope مباشرة (OS_DB متاح كـbinding). */
     var DB = (typeof OS_DB !== 'undefined') ? OS_DB : (window.OS_DB || null);
     if (!DB || !DB.length) return;
-    if (!window.OCTA_API) return;
+    if (window.OCTA_API === undefined) return;
     fetch(window.OCTA_API + '/api/quotes?market=egypt', { cache: 'no-store' })
     .then(function(r){ return r.json(); })
     .then(function(j){

@@ -8,5 +8,11 @@
 /index.html
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
 
+# ⛔ ٢١ أكتوبر ٢٠٢٦ — صفحة البوابة: لازم تفضل طازجة دايماً
+# (الـworker بيقدّمها للزائر المجهول — النسخة القديمة تعني كوكي
+#  قديم وعرض غلط).
+/gate.html
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
 /
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
