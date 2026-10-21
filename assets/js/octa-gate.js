@@ -114,6 +114,13 @@
  try { d = JSON.parse(txt); } catch (e) { d = null; }
  return { s: r.status, d: d || {} };
  }, function () { return { s: r.status, d: {} }; });
+ /* ⛔⛔⛔ ٢١ أكتوبر ٢٠٢٦ — catch للشبكة!
+   ⛌ قبل كده: لو الـfetch وقع (timeout · DNS · انقطاع)، الـpromise
+   ⛌ كان بيرفض والـUI بيفضل ثا��ت على «بيحاول» للأبد.
+   ⛌ ⛌ النتيجة: المستخدم بيكتب ٤ أرقام ولا حاجة بتحصل.
+   ⛌ ⛌ الحل: نرجّع حالة pseudo عشان الـcaller يشوف ويفرز اللوحة. */
+ }).catch(function (e) {
+ return { s: 0, d: {}, err: String((e && e.message) || e || 'network') };
  });
  }
 
@@ -1310,6 +1317,13 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  }
  /* ⛔⛌ السيرفر هو اللي بيحسم. 429 = قفل ١٥ دقيقة (القاعدة ②).
  والـneed_code بيرجع **401** مش 429 — انتبه. */
+ /* ⛔ شبكة (s===0) — مش خطأ باسورد. مافيش خصم من العدّاد. */
+ if (o.s === 0) {
+ state.tries = 0; strikeReset();
+ say('⚠️ الشبكة ضعيفة — جاوب تاني', false);
+ paintPad(false);
+ return;
+ }
  if (o.s === 429) { locked(o.d.retry_after || o.d.retry || 60); return; }
  if (needCode(o.d)) { askCode('need'); return; }
  /* ⛌ كل حاجة تانية = الباسورد غلط. ما نقولش حاجة عن الحساب. */
@@ -1317,7 +1331,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
    ⛌ الهدف: لو عمل «نسيت الباسورد» وكتب الكود الصح،
    ⛌ السيرفر يقدر يمسح عدّاد p:الرقم ده بالظبط.
    ⛌ ⛌ من غير ده: القفل بيفضل حتى لو الكود صح. */
- try { recordTriedPin(state.pin); } catch (e) { }
+ try { recordTriedPin(p); } catch (e) { }
  var n = strikePush();
  if (n >= STRIKE_LIMIT) { locked(30); return; }
  badPin(winLeft(o.d, state.tries), n);
@@ -1327,6 +1341,11 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  .catch(function () {
  state.tries = 0; strikeReset(); paintPad(false); down('الدخول');
  });
+
+ /* ⛔⛔ ٢١ أكتوبر ٢٠٢٦ — s:0 = فشل شبكة (مش رد من السيرفر).
+   ⛌ قبل: الـcaller كان بيفتكر ده «باسورد غلط» وبيحسبه محاولة.
+   ⛌ ⛌ دلوقتي: رسالة صريحة + مافيش خصم من العدّاد. */
+ /* (الـbranch فوق بيشوف s===0 الأول) */
  });
 
  document.getElementById('gtForgot').onclick = function () { forgot(); };
