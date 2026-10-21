@@ -23,7 +23,7 @@ const ROOT = path.join(__dirname, '..', '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'worker.js'), 'utf8');
 
 /* ═══════════════════════════════════════════════════════════
-   🛠运行环境 — بنعمل بيئة Worker وهمية
+   🛠بيئة التشغيل — بنعمل بيئة Worker وهمية
    ═══════════════════════════════════════════════════════════ */
 function makeWorker() {
   /* بنصدّر الـdefault عن طريق eval — عشان الـworker موديل ESM
