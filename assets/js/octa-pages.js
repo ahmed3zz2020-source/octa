@@ -2700,9 +2700,12 @@ async function obTick(){
   const r = await obFetch('/api/obdepth/' + SI_CODE);
   d = {
   symbol: SI_CODE,
-  bids: (r.bids || r.depth?.bids || []).map(x => ({ price:+x.price, qty:+x.qty, orders:+x.orders||0 })),
-  asks: (r.asks || r.depth?.asks || []).map(x => ({ price:+x.price, qty:+x.qty, orders:+x.orders||0 })),
-  trades: (r.trades || []).map(t => ({ price:+t.price, qty:+t.qty, side:t.side||'dn', time:(t.time||t.timestamp||'').toString().slice(11,19) })),
+  /* ⛔ ٢١ أكتوبر ٢٠٢٦ — المصدر بيرجّع quantity والباك بيوحّدها،
+     بس هنبقى متسامحين هنا كمان: لو الباك رجع الشكل الخام
+     مفيش رقم بضيع — نقرأ qty ولا quantity ولا volume. */
+  bids: (r.bids || r.depth?.bids || []).map(x => ({ price:+x.price, qty:+(x.qty ?? x.quantity ?? x.volume ?? 0), orders:+x.orders||0 })),
+  asks: (r.asks || r.depth?.asks || []).map(x => ({ price:+x.price, qty:+(x.qty ?? x.quantity ?? x.volume ?? 0), orders:+x.orders||0 })),
+  trades: (r.trades || []).map(t => ({ price:+t.price, qty:+(t.qty ?? t.quantity ?? t.volume ?? 0), side:t.side||'dn', time:(t.time||t.timestamp||'').toString().slice(11,19) })),
   last: r.price || r.last || 0
   };
   /* نحسب التراكمي لو مش موجود */
