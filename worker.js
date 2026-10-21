@@ -158,8 +158,16 @@ export default {
       }
     }
 
-    /* 2) 🚪 البوابة — صفحة التطبيق من غير جلسة = صفحة البوابة */
-    const isGatePage = GATE_PAGES.indexOf(url.pathname) !== -1;
+    /* 2) 🚪 البوابة — صفحة التطبيق من غير جلسة = صفحة البوابة
+       ⛔⛔ مفتاح التحويل: env.OCTA_GATE = 'off' ⇐ البوابة مقفولة.
+       ⛌ دلوقتي (قبل ما الـAPI الجديد يتنشر) البوابة مقفولة في
+       ⛌   المعاينة: لأن الـAPI القديم مش بيرجّع كوكي الجلسة
+       ⛌   (NameError في _json_auth) ⇒ أي حد هيفضل في البوابة
+       ⛌   للأبد. ⇒ المعاينة بتاخد التطبيق زي ما كان، والبوابة
+       ⛌   بتتفتح مع الـAPI الجديد.
+       ⛌ صفحة البوابة نفسها متاحة دايماً على /gate.html. */
+    const GATE_ON = !(env && env.OCTA_GATE === 'off');
+    const isGatePage = GATE_ON && GATE_PAGES.indexOf(url.pathname) !== -1;
     if (isGatePage && !hasSession(request)) {
       try {
         const gateUrl = new URL('/gate.html', url);

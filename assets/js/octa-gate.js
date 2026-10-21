@@ -243,9 +243,13 @@
  /* ⛔⛔ ٢١ أكتوبر ٢٠٢٦ — صفحة البوابة المستقلة (gate.html):
    ⛌ دي مش جوه التطبيق — مفيش محتوى ورا البوابة هنا.
    ⛌ ⇒ بعد ما يسجّل دخول، بنحوّله على التطبيق.
-   ⛌ (الكوكي اتحفظ خلاص ⇒ الـWorker هيقدّم التطبيق عادي.) */
+   ⛌ (صفحة البوابة نفسها بتتأكد إن الكوكي اتحفظ قبل التحويل
+   ⛌  — راجع OCTA_GATE_REDIRECT في gate.html.) */
  if (window.OCTA_GATE_PAGE) {
-  try { location.replace('/'); } catch (e) { location.href = '/'; }
+  try {
+  if (typeof window.OCTA_GATE_REDIRECT === 'function') window.OCTA_GATE_REDIRECT();
+  else location.replace('/');
+  } catch (e) { try { location.replace('/'); } catch (x) { } }
   return;
  }
 

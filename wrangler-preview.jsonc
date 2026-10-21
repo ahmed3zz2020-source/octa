@@ -1,8 +1,12 @@
 {
+  "$schema": "node_modules/wrangler/config-schema.json",
   "account_id": "74e046678adabf0706024b97b205882b",
   "name": "octa-preview",
   "compatibility_date": "2026-10-10",
   "main": "worker.js",
   "assets": { "directory": "./dist" },
-  "observability": { "enabled": false }
+  "observability": { "enabled": false },
+  "vars": {
+    "OCTA_GATE": "off"
+  }
 }

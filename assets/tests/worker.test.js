@@ -125,6 +125,23 @@ test('صفحة الشارت كمان بتتقفل', async () => {
   assert.ok(t.includes('صفحة البوابة'));
 });
 
+test('OCTA_GATE=off ⇐ البوابة مقفولة (المعاينة قبل نشر الـAPI)', async () => {
+  const w = makeWorker();
+  const env = { ASSETS: makeAssets(FILES), OCTA_GATE: 'off' };
+  const r = await w.fetch(req('https://octashares.com/'), env);
+  const t = await r.text();
+  assert.ok(t.includes('التطبيق الكامل'),
+    'البوابة لسه مقفولة رغم OCTA_GATE=off: ' + t.slice(0, 80));
+});
+
+test('صفحة البوابة (/gate.html) متاحة دايماً حتى والبوابة مقفولة', async () => {
+  const w = makeWorker();
+  const env = { ASSETS: makeAssets(FILES), OCTA_GATE: 'off' };
+  const r = await w.fetch(req('https://octashares.com/gate.html'), env);
+  assert.equal(r.status, 200);
+  assert.ok((await r.text()).includes('صفحة البوابة'));
+});
+
 test('الـassets (js/css) بتتنفع من غير جلسة', async () => {
   const w = makeWorker();
   const env = { ASSETS: makeAssets(FILES) };

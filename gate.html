@@ -42,8 +42,32 @@
 
 <script>
   /* ⛔ صفحة البوابة: بعد الدخول بنحوّل على التطبيق
-     (الـWorker سيبعت التطبيق كمان — الكوكي بقى موجود). */
+     (الـWorker سيبعت التطبيق كمان — الكوكي بقى موجود).
+
+     ⛔⛔ مهم — لازم الكوكي يكون موجود **قبل** التحويل:
+     ⛌ الـWorker بيفحص كوكي الجلسة. لو حوّلنا والكوكي لسه
+     ⛌ ما اتحفظش (لأن الـAPI القديم مش بيرجّع Set-Cookie) ⇒
+     ⛌ البوابة هترجع تاني… للأبد.
+     ⛌ الحل: /api/auth/refresh بيرجّع كوكي جديد مع كل رد.
+     ⛌ (الكوكي HttpOnly ⇒ JS مش شايفه — فبنعمل ده قبل التحويل.) */
   window.OCTA_GATE_PAGE = true;
+
+  function octaGateReady(cb) {
+    var t = '';
+    try { t = localStorage.getItem('octa_token') || ''; } catch (e) { }
+    if (!t) { cb(); return; }
+    try {
+      fetch('/api/auth/refresh', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Authorization': 'Bearer ' + t }
+      }).then(function () { cb(); }, function () { cb(); });
+    } catch (e) { cb(); }
+  }
+
+  window.OCTA_GATE_REDIRECT = function () {
+    octaGateReady(function () { location.replace('/'); });
+  };
 </script>
 <script src="assets/js/octa-api.js?v=2026102101"></script>
 <script src="assets/js/octa-auth.js?v=2026102101"></script>
