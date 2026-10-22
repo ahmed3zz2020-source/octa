@@ -120,7 +120,7 @@ function boot(fixture, opt) {
         return { ok: true, json: async () => ({ ok: true, n: fixture.rows.length, rows: fixture.rows }) };
       }
       if (u.indexOf('/api/candles') !== -1) {
-        return { ok: true, json: async () => ({ ok: true, code: 'X', candles: fakeCandles() }) };
+        return { ok: true, json: async () => ({ ok: true, code: 'X', count: fakeCandles().length, candles: fakeCandles() }) };
       }
       return { ok: true, json: async () => ({}) };
     }

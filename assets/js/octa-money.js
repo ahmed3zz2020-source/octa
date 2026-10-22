@@ -360,7 +360,13 @@
   async function loadDetail(r) {
     const box = $('smCards');
     if (!box) return;
-    const j = await jget('/api/candles/' + encodeURIComponent(r.code) + '?n=320');
+    /* ① الباك (المرجع) · ② جسر المعاينة (لما الباك يكون واقع) */
+    let j = await jget('/api/candles/' + encodeURIComponent(r.code) + '?n=320');
+    let via = 'api';
+    if (!j || !j.ok || !j.candles || j.candles.length < 25) {
+      j = await jget('/api/tvcandles?code=' + encodeURIComponent(r.code) + '&n=320');
+      via = 'tv';
+    }
     if (!j || !j.ok || !j.candles || j.candles.length < 25) {
       box.innerHTML = '<div class="sm-loading">⚠️ مقدرتش أجيب شموع السهم — المؤشرات الذكية مش متاحة دلوقتي.</div>';
       return;
@@ -368,7 +374,9 @@
     const SM = window.OCTA_SM;
     const d = SM.fromCandles(j.candles, r.m);
     S.detail = d;
-    box.innerHTML = cardsHtml(r, d);
+    box.innerHTML = cardsHtml(r, d) +
+      '<div class="sm-src">المؤشرات محسوبة من ' + (j.count || (j.candles ? j.candles.length : 0)) + ' شمعة يومية حقيقية' +
+      (via === 'tv' ? ' · من TradingView' : '') + '</div>';
   }
 
   /* كارت واحد: الاسم · القيمة · بيقيس إيه · الحكم

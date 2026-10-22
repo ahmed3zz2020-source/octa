@@ -192,3 +192,6 @@
   .sm-d-chart { height: 300px; }
   .sm-lv3 { flex-direction: column; }
 }
+
+/* مصدر المؤشرات الذكية — سطر صغير تحت الكروت */
+.sm-src { grid-column: 1 / -1; text-align: center; color: var(--dim); font-size: .72rem; padding: var(--s1) 0 0; }

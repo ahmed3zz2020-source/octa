@@ -276,6 +276,59 @@ export default {
       }
     }
 
+    /* 1.6) ⭐ شموع السوق — للمؤشرات الذكية (جيميني · القفل · MCDX)
+       ⛌ نفس بوابة المعاينة (OCTA_TV_PROXY) — الإنتاج مقفول.
+       📌 المصدر: startamarkets (نفس مصدر الباك) — شموع يومية حقيقية. */
+    if (url.pathname === '/api/tvcandles' && env && env.OCTA_TV_PROXY === 'on') {
+      const code = (url.searchParams.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const n = Math.max(60, Math.min(400, Number(url.searchParams.get('n') || 320)));
+      if (!code) {
+        return new Response(JSON.stringify({ ok: false, error: 'bad code' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } });
+      }
+      const ck = new Request('https://octa.internal/tvcandles/' + code + '/' + n, { method: 'GET' });
+      const cache = caches && caches.default;
+      if (cache) {
+        const hit = await cache.match(ck);
+        if (hit) return hit;
+      }
+      try {
+        const up = await fetch('https://startamarkets.com/api/v1/egx/history/' + code, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+            'Accept': 'application/json,text/plain,*/*',
+            'Origin': 'https://startamarkets.com',
+            'Referer': 'https://startamarkets.com/egx'
+          }
+        });
+        if (!up.ok) throw new Error('sa-' + up.status);
+        const raw = await up.json();
+        if (!Array.isArray(raw) || raw.length < 20) throw new Error('no data');
+        const out = [];
+        for (let i = Math.max(0, raw.length - n); i < raw.length; i++) {
+          const c = raw[i];
+          try {
+            out.push({
+              t: c.date, o: +Number(c.open).toFixed(4), h: +Number(c.high).toFixed(4),
+              l: +Number(c.low).toFixed(4), c: +Number(c.close).toFixed(4), v: Math.round(c.volume || 0)
+            });
+          } catch (e) { }
+        }
+        const res = new Response(JSON.stringify({ ok: true, code: code, count: out.length, candles: out }), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=3600',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+        if (cache) { try { await cache.put(ck, res.clone()); } catch (e) { } }
+        return res;
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: 'candles-failed', msg: String(e && e.message || e) }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
     /* 1) proxy للـAPI (نفس origin عشان نتفادى CORP same-site) */
     if (url.pathname.startsWith('/api/')) {
       const target = API + url.pathname + url.search;
