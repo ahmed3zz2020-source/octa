@@ -271,8 +271,13 @@
 
     var badges = [];
     if (weak) badges.push({ id: 'weak', t: 'بيانات ناقصة', ok: 0 });
-    if (!weak && minAxis >= 60) badges.push({ id: 'agree', t: 'توافق ٤ محاور', ok: 1 });
-    if (!weak && minAxis >= 50 && minAxis < 60) badges.push({ id: 'near', t: 'تقارب كويس', ok: 1 });
+    /* ⛔ عتبة التوافق: ٥٠ (مش ٦٠).
+       ⛌ بالقياس على ٢٦٤ سهماً مؤهّل: عتبة ٦٠ ⇒ ٣ أسهم بس (مش
+       ⛌   نافعة كفلتر)، عتبة ٥٥ ⇒ ٨، عتبة ٥٠ ⇒ ١٥ (٥.٧٪).
+       ⛌ يعني: الأربعة محاور **كلها** فوق المحايد — وده المقصود
+       ⛌   من «الأسهم اللي بتتفق على ٤ محاور». */
+    if (!weak && minAxis >= 50) badges.push({ id: 'agree', t: 'توافق ٤ محاور', ok: 1 });
+    if (!weak && minAxis >= 45 && minAxis < 50) badges.push({ id: 'near', t: 'تقارب كويس', ok: 1 });
     if (m.rsi != null && m.rsi < 30) badges.push({ id: 'oversold', t: 'تشبع بيعي', ok: 0 });
     if (m.rsi != null && m.rsi > 80) badges.push({ id: 'overbought', t: 'تشبع شرائي', ok: 0 });
     var flowPart = vo.parts.filter(function (x) { return x.k === 'flow'; })[0];

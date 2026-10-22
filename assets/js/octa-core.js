@@ -513,7 +513,18 @@ const OS_NAV = {
     let n = 0;
     const tick = () => {
     if (this.restored) return;
-    if (++n > 40) { this.restored = true; return; }   // ⛔ سقف واضح
+    if (++n > 40) {
+    /* ⛔⛔⛔ ٢٢ أكتوبر ٢٠٢٦ — باج «شاشة بيضا».
+     ⛌ لو الصفحة المحفوظة مش موجودة في الـDOM (اتمسحت من
+     ⛌   الـKEEP · اتغير اسمها · أخطأنا) ⇒ الـrestore بيعيد ٤٠
+     ⛌   مرة وبيستسلم ⇒ **مفيش صفحة مفتوحة** ⇒ المستخدم بيفتح
+     ⛌   الموقع وشاشة بيضا. (ده اللي حصل مع Smart Money.)
+     ⛌ ✅ الحل: لو الاسترجاع فشل ⇒ افتح الشاشة الافتراضية
+     ⛌   (الرئيسية) بدل ما تسيب المستخدم قدام شاشة بيضا. */
+    this.restored = true;
+    try { this.defaultView(); } catch (e) { }
+    return;
+    }
     if (this.restore()) return;
     setTimeout(tick, 80);
     };
@@ -594,6 +605,17 @@ document.addEventListener('octa:authed', function () {
 });
 
 function switchPage(id) {
+  /* ⛔⛔⛔ ٢٢ أكتوبر ٢٠٢٦ — صفحة مش موجودة = شاشة بيضا.
+  ⛌ لو الـid مالوش عنصر في الـDOM (صفحة اتمسحت · اسم غلط) ⇒
+  ⛌   كل الكود اللي بعده بيشتغل على لا حاجة ⇒ المستخدم بيفتح
+  ⛌   الموقع وشاشة بيضا من غير ما يفهم.
+  ⛌ ✅ الحل: نتأكد إن الصفحة موجودة قبل ما نحفظ ونفتح — ولو
+  ⛌   مش موجودة ⇒ نرجع للصفحة الافتراضية (الرئيسية). */
+  const pg = (id === 'dash') ? document.getElementById('dashPage') : document.getElementById('page-' + id);
+  if (!pg) {
+    try { if (typeof OS_NAV !== 'undefined' && OS_NAV.defaultView) OS_NAV.defaultView(); } catch (e) { }
+    return;
+  }
   /* 🧭 الحفظ **أول سطر في الدالة** — قبل أي سطر DOM.
      كان متحطّ بعد ٤٠ سطر، فلو أي استثناء حصل فوقه
      الحفظ بيضيع والريفريش يرجع بالرئيسية. */

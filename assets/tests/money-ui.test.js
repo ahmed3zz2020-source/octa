@@ -220,3 +220,41 @@ test('الواجهة: لما الباك يكون واقع — الفلتر بي�
   assert.ok(els.smStatus.innerHTML.indexOf('TradingView') !== -1, 'المصدر اتعلّم للمستخدم');
   assert.ok(html.indexOf('NaN') === -1, 'مافيش NaN');
 });
+
+/* ═══════════════════════════════════════════════════════════
+   ⛔⛔ اختبار regression — «شاشة بيضا»
+   ───────────────────────────────────────────────────────────────
+   ▪ المشكلة (٢٢ أكتوبر ٢٠٢٦): صفحة Smart Money كانت مش في قائمة
+     KEEP بـocta-pages.js ⇒ الـapp كان بيمسحها من الـDOM عند الإقلاع.
+     ولو هي آخر صفحة محفوظة (localStorage) ⇒ الـrestore بيفشل
+     ٤٠ مرة ⇒ **مفيش صفحة مفتوحة** ⇒ المستخدم بيفتح الموقع وشاشة
+     بيضا من غير ما يفهم.
+   ▪ كمان: بلوك السكربتات كان متكرر مرتين ⇒ خطأ
+     «Identifier 'X' has already been declared» + ضعف وزن الصفحة.
+   ▪ الاختبار ده بيمنع رجوع أي من اتنين.
+   ═══════════════════════════════════════════════════════════ */
+test('guard: صفحة Smart Money لازم تكون في KEEP (وإلا بتتمسح)', () => {
+  const fs2 = require('node:fs');
+  const p = path.join(__dirname, '..', 'js', 'octa-pages.js');
+  const src = fs2.readFileSync(p, 'utf8');
+  const m = src.match(/const KEEP = \[([^\]]+)\]/);
+  assert.ok(m, 'لازم تلاقي قائمة KEEP');
+  assert.ok(/['"]money['"]/.test(m[1]), "'money' مش في KEEP ⇒ الصفحة بتتمسح من الـDOM");
+});
+
+test('guard: بلوك السكربتات في index.html مفيش فيه تكرار', () => {
+  const fs2 = require('node:fs');
+  const p = path.join(__dirname, '..', '..', 'index.html');
+  const src = fs2.readFileSync(p, 'utf8');
+  const seen = {};
+  let dup = 0;
+  const re = /<script src="(assets\/js\/[^"]+)"/g;
+  let mm;
+  while ((mm = re.exec(src)) !== null) {
+    const f = mm[1].split('?')[0];
+    if (seen[f]) dup++;
+    seen[f] = 1;
+  }
+  assert.equal(dup, 0, 'فيه سكربتات متكررة (' + dup + ') — التكرار بيعمل خطأ "Identifier already declared"');
+  assert.equal(src.indexOf('\n=======\n'), -1, 'فيه سطور "=======" نصية في الصفحة');
+});
