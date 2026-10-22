@@ -541,6 +541,10 @@ function octaPageInit(id) {
 
   // ═══ صفحة البحث — تحميل أول مرة ═══
   if (id === 'stocks' && typeof initStocksPage === 'function') initStocksPage();
+  /* 💰 Smart Money — الفلتر + الكروت + الشارت
+     ⛔ الـinit مرتين (فتح الصفحة + بعد البوابة) زي باقي الصفحات —
+        أول مرة قبل الدخول بترجّع 401 فالداتا بتتحمّل تاني. */
+  if (id === 'money' && typeof moneyInit === 'function') setTimeout(()=>{ try { moneyInit(); } catch(e){ console.warn('money:', e.message); } }, 150);
   if (id === 'compare') setTimeout(()=>{ if (typeof cmpInit==='function') cmpInit(); }, 150);
   /* 🔴⛔⛔ إصلاح 2026-10-15 — الباج اللي Ahmed صوّره.
      كان: `setTimeout(fzInit, 180)` — يعني بنستنى ١٨٠ مللي ثم نرسم.
@@ -670,7 +674,7 @@ function switchPage(id) {
 }
 
 /* ══════════ الأدوات/الفلاتر — من الرابط القديم، بنفس الميزات ══════════ */
-const TOOL_PAGES = ['filter','best','screener','dividends','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms'];
+const TOOL_PAGES = ['filter','best','screener','dividends','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms','money'];
 /* ══════════════════════════════════════════════════════════════
  *  🧰 شريط الأدوات — 8 أدوات بس، والباتاقي في الـsidebar
  *  ──────────────────────────────────────────────────────────
@@ -690,6 +694,7 @@ const TOOLS = [
     d:'اكتب لحد 10 أسهم · OCTA يرتّبهم بمعايره' },
   { id:'filter',  i:'🗂️', n:'فلاتر المؤشرات',  d:'8 فلاتر ذكية' },
   { id:'screener',  i:'🔍', n:'OCTAView',  d:'الفلاتر المباشرة' },
+  { id:'money',   i:'💰', n:'Smart Money', d:'قوة الفلوس · ٤ محاور' },
   { id:'dash',      i:'📊', n:'لوحة التحكم', d:'حالة النظام · أفضل ١٠ أسهم · اختبار الضغط' }
 ];
 
