@@ -74,6 +74,67 @@
     } catch (e) { return null; }
   }
 
+  /* ⏱ مهلة — لو الباك واقع ما ننتظرش طويل */
+  function withTimeout(p, ms) {
+    return new Promise((res) => {
+      let done = false;
+      const t = setTimeout(() => { if (!done) { done = true; res(null); } }, ms);
+      Promise.resolve(p).then((v) => { if (!done) { done = true; clearTimeout(t); res(v); } },
+        () => { if (!done) { done = true; clearTimeout(t); res(null); } });
+    });
+  }
+
+  /* 🗺️ الأسماء العربية — من ملف الأسماء (٢٧١ سهم) */
+  function arName(code, fallback) {
+    try {
+      const m = window.OCTA_EGX_NAMES;
+      if (m && m.names && m.names[code]) return m.names[code];
+    } catch (e) { }
+    return fallback || code;
+  }
+  function arSector(code, fallback) {
+    try {
+      const m = window.OCTA_EGX_NAMES;
+      if (m && m.sectors && m.sectors[code]) return m.sectors[code];
+    } catch (e) { }
+    return fallback || '';
+  }
+
+  /* ⭐ مصدر ٢ — جسر الـWorker (سكانر TradingView من الـedge)
+     ⛌ ده بيشتغل من غير الباك خالص — يعني الفلتر بيفتح وقت الأعطال.
+       和生产 هو مقفول (OCTA_TV_PROXY) — فبيسقط تلقائياً وميبانش. */
+  async function tvBridge() {
+    const j = await jget('/api/tvscan');
+    if (!j || !j.ok || !j.rows || !j.rows.length) return null;
+    const rows = j.rows.map(r => {
+      const code = r.code;
+      return Object.assign({}, r, {
+        name: arName(code, code),
+        sector: arSector(code, ''),
+        _src: 'tv'
+      });
+    });
+    return { rows: rows, src: 'tv' };
+  }
+
+  /* ⭐ مصدر ١ — الباك (المرجع: أسماء عربية + كل الحقول) */
+  async function backendData() {
+    const [mk, tech] = await Promise.all([
+      jget('/api/markets?market=egypt'),
+      jget('/api/market_tech?market=egypt')
+    ]);
+    const mkRows = (mk && mk.egypt) ? mk.egypt : [];
+    if (!mkRows.length) return null;
+    const techMap = (tech && tech.markets && tech.markets.egypt) ? tech.markets.egypt : {};
+    const rows = mkRows.map(r => Object.assign({}, r, {
+      name: arName(r.code, r.name),
+      sector: arSector(r.code, r.sector),
+      _tech: techMap[r.code] || null,
+      _src: 'api'
+    }));
+    return { rows: rows, src: 'api' };
+  }
+
   async function loadData(force) {
     if (S.loading) return;
     if (S.rows.length && !force) { render(); return; }
@@ -82,37 +143,34 @@
     /* ① السجل الأساسي (محمي) — فيه المتوسطات والأداء */
     try { if (typeof octaLoadDB === 'function') await octaLoadDB(); } catch (e) { }
 
-    /* ② السوق الحيّ + الأرقام الفنية */
-    const [mk, tech] = await Promise.all([
-      jget('/api/markets?market=egypt'),
-      jget('/api/market_tech?market=egypt')
-    ]);
+    /* ② الباك الأول (المرجع) · لو واقع ⇒ جسر TradingView */
+    const backend = await withTimeout(backendData(), 6000);
+    const src = backend || await tvBridge();
+    if (!src) {
+      S.err = 'مقدرتش أجيب بيانات السوق. جرّب تحديث الصفحة.';
+      S.loading = false; renderStatus(); return;
+    }
+    S.src = src.src;
 
     const dbMap = {};
     const db = (typeof OS_DB !== 'undefined' && OS_DB) ? OS_DB : [];
     for (let i = 0; i < db.length; i++) if (db[i] && db[i].code) dbMap[db[i].code] = db[i];
 
-    const techMap = (tech && tech.markets && tech.markets.egypt) ? tech.markets.egypt : {};
-    const mkRows = (mk && mk.egypt) ? mk.egypt : [];
-
-    /* ⚠️ لو السوق الحيّ مش موجود، نكمّل بالسجل الأساسي */
-    const codes = {};
-    mkRows.forEach(r => { if (r && r.code) codes[r.code] = 1; });
-    Object.keys(dbMap).forEach(c => { codes[c] = 1; });
-
-    if (!mkRows.length && !db.length) {
-      S.err = 'مقدرتش أجيب بيانات السوق. جرّب تحديث الصفحة.';
-      S.loading = false; renderStatus(); return;
-    }
-
     const SM = window.OCTA_SM;
-    const mkMap = {};
-    mkRows.forEach(r => { if (r && r.code) mkMap[r.code] = r; });
-
     const merged = [];
-    Object.keys(codes).forEach(code => {
-      const m = SM.merge(mkMap[code] || { code: code }, techMap[code] || null, dbMap[code] || null);
-      m.code = code;
+    for (let i = 0; i < src.rows.length; i++) {
+      const r = src.rows[i];
+      const m = SM.merge(r, r._tech || null, dbMap[r.code] || null);
+      m.code = r.code;
+      m.name = r.name || m.name;
+      m.sector = r.sector || m.sector;
+      merged.push(m);
+    }
+    /* أسهم السجل اللي مش في مصدر السوق */
+    Object.keys(dbMap).forEach(code => {
+      if (merged.some(x => x.code === code)) return;
+      const m = SM.merge({ code: code }, null, dbMap[code]);
+      m.code = code; m.name = dbMap[code].name || code;
       merged.push(m);
     });
 
@@ -181,7 +239,9 @@
     const a = $('smAgree'); if (a) a.textContent = agree;
     const u = $('smUpd');
     if (u) u.textContent = S.ts ? S.ts.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '—';
-    st.innerHTML = '<span class="sm-dot ok"></span> البيانات جاهزة';
+    /* ⛌ مصدر البيانات — لازم المستخدم يعرف الأرقام جاية منين */
+    const srcTxt = S.src === 'tv' ? 'بيانات حية من TradingView' : 'بيانات المحرك';
+    st.innerHTML = '<span class="sm-dot ok"></span> البيانات جاهزة · ' + srcTxt;
   }
 
   function bar(v, color) {
@@ -228,7 +288,7 @@
       '<span class="sm-c5">الحالة</span>' +
       '</div>' +
       rows.map(r =>
-        '<div class="sm-row' + (r.weak ? ' weak' : '') + (S.sel === r.code ? ' sel' : '') + '" onclick="moneyOpen(\'' + esc(r.code) + '\')">' +
+        '<div class="sm-row' + (r.weak ? ' weak' : '') + (S.sel === r.code ? ' sel' : '') + '" data-code="' + esc(r.code) + '" role="button" tabindex="0">' +
         '<span class="sm-c1"><b>' + esc(r.code) + '</b><i>' + esc(r.name) + '</i>' +
         (r.sector ? '<em>' + esc(r.sector) + '</em>' : '') + '</span>' +
         '<span class="sm-c2"><b>' + f2(r.price) + '</b><i style="color:' + clr(r.change) + '">' + pct(r.change) + '</i></span>' +
@@ -264,7 +324,7 @@
       '<div class="sm-d-meta">' + esc(r.sector || '') + (r.m.price != null ? ' · ' + f2(r.m.price) + ' ج.م' : '') +
       ' <span style="color:' + clr(r.change) + '">' + pct(r.change) + '</span></div></div>' +
       '<div class="sm-d-score"><b style="color:' + (r.score >= 60 ? 'var(--up)' : (r.score >= 45 ? 'var(--gold)' : 'var(--dn)')) + '">' + Math.round(r.score) + '</b><i>Smart Money</i></div>' +
-      '<button class="sm-d-close" onclick="moneyClose()">✕</button>' +
+      '<button class="sm-d-close" type="button" id="smDClose" title="اقفل">✕</button>' +
       '</div>' +
       '<div class="sm-d-chart" id="smChart"></div>' +
       '<div class="sm-d-badges">' + badgeHtml(r) + '</div>' +
@@ -272,6 +332,9 @@
       '<div class="sm-loading">⏳ بنجيب الشموع عشان المؤشرات الذكية…</div>' +
       '</div>';
     renderList();
+    /* زرار القفل (مش onclick inline — شيفرة CSP) */
+    const cl = $('smDClose');
+    if (cl) cl.addEventListener('click', moneyClose);
     /* الشارت */
     try {
       if (window.OCTA_TV) {
@@ -475,6 +538,30 @@
     });
     const re = $('smReload');
     if (re) re.addEventListener('click', function () { window.moneyReload(); });
+    const dir = $('smDir');
+    if (dir) dir.addEventListener('click', function () {
+      S.dir = -S.dir;
+      dir.textContent = S.dir < 0 ? '\u2B07' : '\u2B06';
+      apply();
+    });
+    /* 🖱 النقر على صف السهم — تفويض (مش onclick inline: سياسة الأمان) */
+    const list = $('smList');
+    if (list) {
+      list.addEventListener('click', function (e) {
+        const row = e.target && e.target.closest ? e.target.closest('.sm-row') : null;
+        if (!row) return;
+        const code = row.getAttribute('data-code');
+        if (code) moneyOpen(code);
+      });
+      list.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const row = e.target && e.target.closest ? e.target.closest('.sm-row') : null;
+        if (!row) return;
+        e.preventDefault();
+        const code = row.getAttribute('data-code');
+        if (code) moneyOpen(code);
+      });
+    }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);

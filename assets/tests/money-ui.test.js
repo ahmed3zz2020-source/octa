@@ -54,7 +54,18 @@ function marketFixture() {
       volD: r.volD, mc: r.mc, av30: r.av30, relvol: r.relvol
     };
   });
-  return { rows: rows, tech: tech };
+  /* ⭐ شكل جسر الـWorker: صف واحد فيه كل الحقول (سوق + فني) */
+  const tvRows = rows.map((r, i) => {
+    const t = tech[r.code] || {};
+    return Object.assign({}, r, {
+      rsi: t.rsi, macd: t.macd, macdSig: t.macdSig,
+      ma50: t.ma50, ma200: t.sma200, ema20: t.ema20, ema50: t.ema50, ema200: t.ema200,
+      atr: t.atr, adx: t.adx, relvol: t.relvol, av30: t.av30,
+      volD: t.volD, perf1w: t.p1w, perf1m: t.p1m, perf3m: t.p3m,
+      perf6m: t.p6m, perf1y: t.p1y, perfYtd: t.pYtd, beta: t.beta
+    });
+  });
+  return { rows: rows, tech: tech, tvRows: tvRows };
 }
 
 /* شموع وهمية (صاعدة) عشان اختبار كروت المؤشرات */
@@ -68,7 +79,8 @@ function fakeCandles() {
 }
 
 /* ═══════════ تشغيل الصفحة في بيئة معزولة ═══════════ */
-function boot(fixture) {
+function boot(fixture, opt) {
+  opt = opt || {};
   const els = {};
   const calls = [];
   const sandbox = {
@@ -78,6 +90,7 @@ function boot(fixture) {
     Number: Number, String: String, isFinite: isFinite, parseInt: parseInt, parseFloat: parseFloat,
     OCTA_SM: SM,
     OS_DB: [],
+    OCTA_EGX_NAMES: { names: { COMI: 'البنك التجاري الدولي - مصر' }, sectors: { COMI: 'بنوك' } },
     document: {
       readyState: 'complete',
       getElementById: (id) => { if (!els[id]) els[id] = makeEl(id); return els[id]; },
@@ -87,11 +100,24 @@ function boot(fixture) {
     fetch: async (url) => {
       calls.push(String(url));
       const u = String(url);
+      /* ⛔ noBackend = الباك واقع (كل /api بيرجع خطأ) */
+      if (opt.noBackend) {
+        if (u.indexOf('/api/tvscan') !== -1) {
+          return { ok: true, json: async () => ({ ok: true, n: fixture.tvRows.length, rows: fixture.tvRows }) };
+        }
+        /* ⛔ indexOf بيرجّع 0 لو لقى في أول النص ⇒ لازم !== -1 */
+        if (u.indexOf('/api/') !== -1) {
+          throw new Error('api-down');
+        }
+      }
       if (u.indexOf('/api/markets') !== -1) {
         return { ok: true, json: async () => ({ ok: true, egypt: fixture.rows }) };
       }
       if (u.indexOf('/api/market_tech') !== -1) {
         return { ok: true, json: async () => ({ ok: true, markets: { egypt: fixture.tech } }) };
+      }
+      if (u.indexOf('/api/tvscan') !== -1) {
+        return { ok: true, json: async () => ({ ok: true, n: fixture.rows.length, rows: fixture.rows }) };
       }
       if (u.indexOf('/api/candles') !== -1) {
         return { ok: true, json: async () => ({ ok: true, code: 'X', candles: fakeCandles() }) };
@@ -131,7 +157,7 @@ test('الواجهة: فتح سهم بيرسم الكروت والشارت', asy
   const { sandbox, els } = boot(fixture);
   sandbox.window.moneyInit();
   await new Promise(r => setTimeout(r, 60));
-  const code = els.smList.innerHTML.match(/moneyOpen\('([A-Z]+)'\)/)[1];
+  const code = els.smList.innerHTML.match(/data-code="([A-Z]+)"/)[1];
   sandbox.window.moneyOpen(code);
   await new Promise(r => setTimeout(r, 60));
 
@@ -171,11 +197,26 @@ test('الواجهة: الفلترة بالكلمة وبالحد الأدنى ب
   assert.ok(all.length > 10, 'في صفوف');
 
   /* البحث: رمز سهم معروف */
-  const first = els.smList.innerHTML.match(/moneyOpen\('([A-Z]+)'\)/)[1];
+  const first = els.smList.innerHTML.match(/data-code="([A-Z]+)"/)[1];
   els.smQ.value = first;
   const ev = { }; els.smQ.addEventListener = (t, fn) => { ev[t] = fn; };
   /* نداء الفلترة عن طريق الـinput handler المسجّل أثناء الربط */
   if (ev.input) ev.input();
   const filtered = els.smList.innerHTML.match(/sm-row/g) || [];
   assert.ok(filtered.length <= all.length, 'الفلترة قلّلت الصفوف');
+});
+
+
+test('الواجهة: لما الباك يكون واقع — الفلتر بيشتغل من جسر TradingView', async () => {
+  const fixture = marketFixture();
+  if (!fixture) { assert.ok(true, 'مفيش بيانات — تخطّي'); return; }
+  const { sandbox, els } = boot(fixture, { noBackend: true });
+  sandbox.window.moneyInit();
+  await new Promise(r => setTimeout(r, 80));
+
+  const html = els.smList.innerHTML;
+  assert.ok(html.indexOf('sm-row') !== -1, 'الجدول اترسم من جسر TradingView');
+  assert.ok(Number(els.smTotal.textContent) > 200, 'عدد الأسهم جاي من الجسر');
+  assert.ok(els.smStatus.innerHTML.indexOf('TradingView') !== -1, 'المصدر اتعلّم للمستخدم');
+  assert.ok(html.indexOf('NaN') === -1, 'مافيش NaN');
 });

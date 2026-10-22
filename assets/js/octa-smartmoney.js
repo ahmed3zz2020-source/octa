@@ -81,7 +81,7 @@
       adx: pick(row.adx, tech.adx),
 
       /* التذبذب */
-      volD: pick(tech.volD, row.volatility, db.volatility),
+      volD: pick(tech.volD, row.volD, row.volatility, db.volatility),
       beta: pick(row.beta, db.beta, tech.beta),
       atr: pick(row.atr, tech.atr),
       mdd: pick(db.mdd, row.mdd),
@@ -89,17 +89,17 @@
       /* الحجم والسيولة */
       relvol: pick(tech.relvol, db.relvol, row.rel_volume, row.relvol),
       av30: pick(tech.av30, db.av30, row.av30),
-      mktCap: pick(row.mkt_cap, db.mcap, tech.mc),
+      mktCap: pick(row.mkt_cap, row.mktCap, db.mcap, tech.mc),
       freeFloat: pick(db.freeFloat, row.float),
       turnover: null,
 
       /* الأداء */
-      perf1w: pick(tech.p1w, row.perf_w, db.perf1w),
-      perf1m: pick(tech.p1m, row.perf_1m, db.perf1m),
-      perf3m: pick(tech.p3m, row.perf_3m, db.perf3m),
-      perf6m: pick(tech.p6m, row.perf_6m, db.perf6mV),
-      perf1y: pick(tech.p1y, row.perf_y, db.perf1yV),
-      perfYtd: pick(tech.pYtd, row.perf_YTD, db.perfYtd),
+      perf1w: pick(tech.p1w, row.perf_w, row.perf1w, db.perf1w),
+      perf1m: pick(tech.p1m, row.perf_1m, row.perf1m, db.perf1m),
+      perf3m: pick(tech.p3m, row.perf_3m, row.perf3m, db.perf3m),
+      perf6m: pick(tech.p6m, row.perf_6m, row.perf6m, db.perf6mV),
+      perf1y: pick(tech.p1y, row.perf_y, row.perf1y, db.perf1yV),
+      perfYtd: pick(tech.pYtd, row.perf_YTD, row.perfYtd, db.perfYtd),
 
       /* تقييم المصدر الفني */
       tvRating: pick(row.tv_rating, db.tvRating)

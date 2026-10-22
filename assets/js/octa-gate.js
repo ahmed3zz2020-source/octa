@@ -2044,10 +2044,50 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  verify();
  return;
  }
+ /* ⛔⛔⛔ ٢٢ أكتوبر ٢٠٢٦ — السيرفر واقع + مافيش توكن
+ ⛌ الكود القديم: البوابة كاملة وال��ستخدم مش قادر يدخل (لأن
+ ⛌   الدخول نفسه محتاج السيرفر). ⇒ تقفل قدام البوابة وخلاص.
+ ⛌ الحل: نفحص الـhealth بسرعة (٣ ثواني) — لو السيرفر واقع
+ ⛌   بنفتح التصفح (الأدوات اللي مش محتاجة السيرفر بتفضل شغالة)
+ ⛌   بدل ما نقفل البوابة على مستخدم مالوش حل.
+ ⛌ ⛔ الداتا المحمية لسه محمية: كل endpoint ورا require_user. */
+ probeApi(function (down) {
+ if (down) {
+ try { sessionStorage.setItem('octa_allow_browse', '1'); } catch (e) { }
+ try {
+ var hs = document.querySelectorAll('.gt-netbar');
+ for (var i = 0; i < hs.length; i++) hs[i].remove();
+ } catch (e) { }
+ var nb = document.createElement('div');
+ nb.className = 'gt-netbar';
+ nb.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:999999;'
+ + 'background:#7a2b16;color:#ffd9c9;padding:11px 14px;'
+ + 'font:600 14px/1.5 system-ui;text-align:center';
+ nb.textContent = '⚠️ السيرفر بينزل — بتفتح بدون تسجيل. الداتا المحمية هتطلب الدخول.';
+ try { document.body.appendChild(nb); } catch (e) { }
+ shut();
+ return;
+ }
  mount();
  welcome();
  open();
  });
+ });
+
+ /* ⛌ فحص سريع: السيرفر شغال ولا واقع؟ (٣ ثواني وخلاص) */
+ function probeApi(cb) {
+ try {
+ var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+ var to = setTimeout(function () { if (ctrl) try { ctrl.abort(); } catch (e) { } }, 3000);
+ fetch(apiBase() + '/api/health', { cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
+ .then(function (r) {
+ clearTimeout(to);
+ /* 5xx = السيرفر واقع · أي 2xx/4xx = شغال (الـhealth مفتوح) */
+ cb(!!(r && r.status >= 500));
+ })
+ .catch(function () { clearTimeout(to); cb(true); });
+ } catch (e) { cb(false); }
+ }
 
  /* التأكد إن التوكن لسه صالح — لو مش كده نرجع للبوابة */
  function verify() {
@@ -2096,17 +2136,42 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
 
  function verifyOnce(){
  STARTED = Date.now();
+ /* ⛔⛔ ٢٢ أكتوبر ٢٠٢٦ — مهلة ٨ ثواني على الطلب نفسه.
+ ⛌ الـWorker بيحاول ٣ مرات والـRailway واقع ⇒ الطلب بيرجع بعد
+ ⛌   دقيقة أو أكتر. قبل كده المستخدم كان واقف قدام «جاري التحقق»
+ ⛌   دقيقة كاملة. دلوقتي بنقطعه بعد ٨ ثواني وندخله تصفح. */
+ var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+ var to = setTimeout(function () { if (ctrl) try { ctrl.abort(); } catch (e) { } }, 8000);
  return fetch(apiBase() + '/api/auth/me', {
  headers: { 'Authorization': 'Bearer ' + t },
- cache: 'no-store'
+ cache: 'no-store',
+ signal: ctrl ? ctrl.signal : undefined
  }).then(function (r) {
+ clearTimeout(to);
  if (r.ok) { clearHint(); shut(); return; }
+ /* ⛔⛔⛔⛔ ٢٢ أكتوبر ٢٠٢٦ — السيرفر واقع (5xx) مش توكن غلط
+ ⛌ الكود القديم: أي !ok ⇒ logoutLocal() + البوابة.
+ ⛌ النتيجة وقت حادثة Railway: الـWorker بيرجّع 502 ⇒ التوكن بيتمسح
+ ⛌   والمستخدم بيتقفل قدام شاشة الدخول و**مش قادر يدخل خالص** —
+ ⛌   مع إن في أدوات شغالة من غير السيرفر (الفلتر بيجيب داتاه من
+ ⛌   TradingView مباشرة).
+ ⛌ الحل: 5xx = السيرفر واقع ⇒ نفتح التصفح مع شريط تنبيه، والتوكن
+ ⛌   يفضل مكانه (لما السيرفر يرجع تفضل مسجّل).
+ ⛌ ⛔ 401/403 = التوكن فعلاً غلط ⇒ المسح + البوابة زي ما هي. */
+ if (r.status >= 500) {
+ clearHint();
+ try { sessionStorage.setItem('octa_allow_browse', '1'); } catch (e) { }
+ hint('⚠️ السيرفر بينزل — بتفتح بدون تسجيل. الداتا المحمية هتطلب الدخول.', '#7a2b16', '#ffd9c9');
+ shut();
+ return;
+ }
  /* ⛔ التوكن مش صالح  المسح  وبعدين البوابة تظهر
   لأن مينفعش حد يتفرج من غير دخول. */
  clearHint();
  logoutLocal();
  mount(); welcome(); open();
  }).catch(function () {
+ clearTimeout(to);
  tries++;
  var elapsed = (Date.now() - STARTED) / 1000;
  /* ⛔⛔ ٢١ أكتوبر ٢٠٢٦ — hard limit ٨ ثواني.

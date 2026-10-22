@@ -35,6 +35,76 @@
 const API = 'https://octa-prices-production-4ccb.up.railway.app';
 const TRIES = 3;
 
+/* ══════════════════════════════════════════════════════════════
+   ⭐ جسر سكانر TradingView — للفلتر (Smart Money)
+   ──────────────────────────────────────────────────────────────
+   ⛔⛔ ليه؟
+      الباك (Railway) ممكن يبقى واقع ساعات ⇒ الفلتر يبقى فاضي
+      والصفحة كلها بتتقفل behind صفحة الصيانة. الجسر ده بيجيب
+      داتا السوق من TradingView مباشرة من الـedge (من غير توكن
+      و من غير CORS — لأن الطلب بيطلع من السيرفر مش من المتصفح).
+
+   ⛌ مقفول على الإنتاج افتراضياً: شغّال بس لو
+      env.OCTA_TV_PROXY === 'on' (اللي متحطّ في المعاينة بس).
+      ⇒ الإنتاج ما يتأثرش خالص.
+
+   📌 الداتا دي من TradingView نفسه — متاحة للكل. مش سر.
+   📌 الكاش على الـedge ٥ دقايق (احترام المصدر + سرعة).
+   ══════════════════════════════════════════════════════════════ */
+const TV_SCAN = 'https://scanner.tradingview.com/egypt/scan';
+
+/* الأعمدة اللي بنجيبها — نفس اللي الباك بيجيبها */
+const TV_COLS = [
+  'close', 'change', 'volume',
+  'Perf.W', 'Perf.1M', 'Perf.3M', 'Perf.6M', 'Perf.Y', 'Perf.YTD',
+  'Volatility.D', 'relative_volume_10d_calc', 'average_volume_30d_calc',
+  'market_cap_basic', 'beta_1_year', 'Recommend.All',
+  'RSI', 'MACD.macd', 'MACD.signal',
+  'EMA20', 'EMA50', 'EMA200', 'SMA50', 'SMA200',
+  'ATR', 'ADX', 'ADX+DI', 'ADX-DI', 'Stoch.K', 'Stoch.D',
+  'price_earnings_ttm', 'price_book_fq', 'return_on_equity',
+  'earnings_per_share_diluted_ttm', 'total_revenue'
+];
+
+/* ⛔ خريطة العمود → اسم الحقل اللي محرك OCTA بيفهمه */
+const TV_MAP = {
+  'close': 'price', 'change': 'change', 'volume': 'volume',
+  'Perf.W': 'perf1w', 'Perf.1M': 'perf1m', 'Perf.3M': 'perf3m',
+  'Perf.6M': 'perf6m', 'Perf.Y': 'perf1y', 'Perf.YTD': 'perfYtd',
+  'Volatility.D': 'volD', 'relative_volume_10d_calc': 'relvol',
+  'average_volume_30d_calc': 'av30', 'market_cap_basic': 'mkt_cap',
+  'beta_1_year': 'beta', 'Recommend.All': 'tvRating',
+  'RSI': 'rsi', 'MACD.macd': 'macd', 'MACD.signal': 'macdSig',
+  'EMA20': 'ema20', 'EMA50': 'ema50', 'EMA200': 'ema200',
+  'SMA50': 'ma50', 'SMA200': 'ma200',
+  'ATR': 'atr', 'ADX': 'adx', 'ADX+DI': 'diPlus', 'ADX-DI': 'diMinus',
+  'Stoch.K': 'stochK', 'Stoch.D': 'stochD',
+  'price_earnings_ttm': 'pe', 'price_book_fq': 'pb',
+  'return_on_equity': 'roe',
+  'earnings_per_share_diluted_ttm': 'eps', 'total_revenue': 'revenue'
+};
+
+function tvRowsFromScan(data, cols) {
+  const use = cols || TV_COLS;
+  const out = [];
+  const rows = (data && data.data) || [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const d = r.d || [];
+    const code = String(r.s || '').split(':').pop();
+    if (!code) continue;
+    const o = { code: code };
+    for (let c = 0; c < use.length; c++) {
+      const f = TV_MAP[use[c]];
+      const v = d[c];
+      if (f && v !== null && v !== undefined && isFinite(v)) o[f] = v;
+    }
+    if (o.price) out.push(o);
+  }
+  return out;
+}
+
+
 /* ⛔ اسم كوكي الجلسة — لازم يبقى نفس اسم الباك (octa_token) */
 const SESSION_COOKIE = 'octa_token';
 
@@ -50,7 +120,15 @@ async function fetchApi(target, init) {
   let lastErr = null;
   for (let i = 0; i < TRIES; i++) {
     try {
-      const r = await fetch(target, init);
+      /* ⛔⛔ ٢٢ أكتوبر ٢٠٢٦ — مهلة ٨ ثواني لكل محاولة.
+      ⛌ الباك (Railway) واقع ⇒ الطلب كان بيقعد دقيقة لحد ما
+      ⛌   يرد 502 ⇒ المستخدم واقف قدام شاشة تحميل.
+      ⛌ دلوقتي بنقطعه بسرعة ونرجّع 502 — الواجهة بتعرف تتعامل. */
+      const o = Object.assign({}, init || {});
+      if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
+        o.signal = AbortSignal.timeout(8000);
+      }
+      const r = await fetch(target, o);
       if (r.status >= 500 && i < TRIES - 1) {
         lastErr = new Error('upstream ' + r.status);
         await sleep(180 * (i + 1));
@@ -119,8 +197,84 @@ function hasSession(request) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    /* 1.5) ⭐ جسر سكانر TradingView — الفلتر يشتغل من غير الباك
+       ⛌ مقفول على الإنتاج: شغّال بس لو OCTA_TV_PROXY === 'on'
+          (اللي في إعدادات المعاينة بس).
+       📌 stale-while-revalidate: أول طلب بعد انتهاء الكاش بيرجّع
+          النسخة القديمة فوراً ويحدّث في الخلفية — عشان المستخدم
+          ما يستناش ٢٠ ثانية كل مرة. */
+    if (url.pathname === '/api/tvscan' && env && env.OCTA_TV_PROXY === 'on') {
+      const c = url.searchParams.get('c') || 'egx';
+      const limit = Math.max(1, Math.min(400, Number(url.searchParams.get('limit') || 400)));
+      const cols = url.searchParams.get('cols') === 'min'
+        ? ['close', 'change', 'volume', 'RSI', 'MACD.macd', 'MACD.signal', 'SMA50', 'SMA200']
+        : TV_COLS;
+      const key = 'https://octa.internal/tvscan/' + c + '/' + limit + '/' + cols.length;
+      const cacheKey = new Request(key, { method: 'GET' });
+      const cache = caches && caches.default;
+
+      const doFetch = async () => {
+        const body = {
+          symbols: { query: { types: [] }, tickers: [] },
+          filter: [
+            { left: 'exchange', operation: 'in_range', right: ['EGX'] },
+            { left: 'type', operation: 'equal', right: 'stock' }
+          ],
+          options: { lang: 'en' },
+          columns: cols,
+          range: [0, limit],
+          sort: { sortBy: 'market_cap_basic', sortOrder: 'desc' }
+        };
+        const up = await fetch(TV_SCAN, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        if (!up.ok) throw new Error('tv-' + up.status);
+        const j = await up.json();
+        const rows = tvRowsFromScan(j, cols);
+        const res = new Response(JSON.stringify({ ok: true, n: rows.length, ts: Date.now(), rows: rows }), {
+          headers: {
+            'Content-Type': 'application/json',
+            /* ⛔ TTL طويل (يوم) — التحديث بيتم في الخلفية مش عند الطلب */
+            'Cache-Control': 'public, max-age=86400',
+            'Access-Control-Allow-Origin': '*',
+            'x-octa-ts': String(Date.now())
+          }
+        });
+        if (cache) { try { await cache.put(cacheKey, res.clone()); } catch (e) { } }
+        return res;
+      };
+
+      if (cache) {
+        const hit = await cache.match(cacheKey);
+        if (hit) {
+          const ts = Number(hit.headers.get('x-octa-ts') || 0);
+          const age = Date.now() - ts;
+          const h = new Headers(hit.headers);
+          h.set('x-octa-cache', age < 300000 ? 'fresh' : 'stale');
+          h.set('x-octa-age', String(age));
+          if (age < 300000) return new Response(hit.body, { headers: h });   /* لسه طازة */
+          if (ctx && ctx.waitUntil) {               /* قديمة → نحدّث في الخلفية */
+            try { ctx.waitUntil(doFetch().catch(() => { })); } catch (e) { }
+          }
+          return new Response(hit.body, { headers: h });                    /* نرجّع القديمة فوراً */
+        }
+      }
+      try {
+        return await doFetch();
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: 'tv-failed', msg: String(e && e.message || e) }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
 
     /* 1) proxy للـAPI (نفس origin عشان نتفادى CORP same-site) */
     if (url.pathname.startsWith('/api/')) {
