@@ -214,3 +214,50 @@
 .sm-chip-i.ok b { color: var(--up); }
 .sm-chip-i.no { border-color: rgba(239,68,68,.3); }
 .sm-chip-i.no b { color: var(--dn); }
+
+/* ═══ خريطة المستويات — المؤشرات على مقياس السعر ═══ */
+.sm-map-wrap { margin: var(--s2) 0 var(--s3); }
+.sm-map-h { font-size: var(--fs-sm); color: var(--muted); margin-bottom: 5px; }
+.sm-map-h b { color: var(--gold); }
+.sm-map {
+  position: relative; height: 190px;
+  background: var(--pri); border: 1px solid var(--line); border-radius: var(--r2);
+  overflow: hidden;
+}
+.sm-map::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%;
+  border-top: 1px dashed var(--line2);
+}
+.sm-map-price {
+  position: absolute; left: 0; right: 0; top: 50%; height: 0;
+  border-top: 2px solid var(--gold); z-index: 3;
+}
+.sm-map-price span {
+  position: absolute; right: 4px; top: -9px;
+  background: var(--gold); color: #10233a; font-size: .68rem; font-weight: 800;
+  padding: 1px 6px; border-radius: var(--r1);
+}
+.sm-map-l {
+  position: absolute; left: 0; right: 0; height: 0; z-index: 2;
+  border-top: 1px solid var(--line2);
+}
+.sm-map-l span {
+  position: absolute; left: 5px; top: -8px; font-size: .66rem;
+  color: var(--muted); background: var(--pri); padding: 0 4px; border-radius: 3px;
+}
+.sm-map-l b {
+  position: absolute; right: 5px; top: -8px; font-size: .68rem;
+  background: var(--pri); padding: 0 4px; border-radius: 3px; color: var(--txt);
+}
+.sm-map-l.ema span { color: var(--gold2); }
+.sm-map-l.vwap span { color: var(--up2); }
+.sm-map-l.sr span { color: var(--muted); }
+.sm-map-l.ob { border-top-color: var(--warn); }
+.sm-map-l.ob span { color: var(--warn); }
+.sm-map-zone {
+  position: absolute; left: 0; right: 0; z-index: 1;
+  background: var(--warnSoft); border-top: 1px dashed var(--warn);
+  border-bottom: 1px dashed var(--warn);
+}
+.sm-map-zone.bull { background: var(--upSoft); border-color: var(--up); }
+.sm-map-f { font-size: .68rem; color: var(--dim); margin-top: 4px; text-align: center; }

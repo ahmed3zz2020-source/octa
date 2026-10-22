@@ -72,8 +72,14 @@ function marketFixture() {
 function fakeCandles() {
   const out = [];
   for (let i = 0; i < 60; i++) {
-    const c = 100 + i * 1.2;
-    out.push({ t: '2026-01-' + (i + 1), o: c - 0.8, h: c + 0.3, l: c - 1.6, c: c, v: 100000 + i * 2000 });
+    /* تصحيح كل ٨ شموع (عشان يبقى فيه Order Block ونموذج رانيا) */
+    const pull = (i % 8 === 7);
+    const imp = (i % 8 === 0 && i > 0);
+    const c = 100 + i * 1.2 - (pull ? 1.5 : 0);
+    out.push({ t: '2026-01-' + (i + 1),
+      o: pull ? c + 1.2 : (imp ? c - 3.0 : c - 0.8),
+      h: c + (imp ? 0.4 : 0.3), l: pull ? c - 0.4 : (imp ? c - 3.2 : c - 1.6),
+      c: c, v: 100000 + i * 2000 });
   }
   return out;
 }
@@ -195,6 +201,18 @@ test('الواجهة: فتح سهم بيرسم الكروت والشارت', asy
   assert.ok(strip.indexOf('MCDX') !== -1, 'MCDX في الشريط');
   assert.ok(strip.indexOf('BOS') !== -1, 'البنية في الشريط');
   assert.ok(strip.indexOf('NaN') === -1, 'مافيش NaN في الشريط');
+  assert.ok(strip.indexOf('نموذج رانيا') !== -1, 'نموذج رانيا في الشريط');
+  assert.ok(strip.indexOf('Order Block') !== -1, 'Order Block في الشريط');
+  assert.ok(strip.indexOf('EMA 8/13/21') !== -1, 'المتوسطات في الشريط');
+  assert.ok(strip.indexOf('VWAP') !== -1, 'الـVWAP في الشريط');
+
+  /* ⭐ خريطة المستويات — المؤشرات على مقياس السعر */
+  const map = els.smMapWrap;
+  assert.ok(map, 'خريطة المستويات موجودة');
+  assert.ok(map.innerHTML.indexOf('sm-map-l') !== -1, 'في خطوط المستويات');
+  assert.ok(map.innerHTML.indexOf('EMA 8') !== -1, 'EMA 8 مرسوم');
+  assert.ok(map.innerHTML.indexOf('VWAP') !== -1, 'VWAP مرسوم');
+  assert.ok(map.innerHTML.indexOf('NaN') === -1, 'مافيش NaN في الخريطة');
   /* ⭐ الشارت لازم يكون فوق الجدول (مش تحت الـ120 صف) */
   const fs3 = require('node:fs');
   const html = fs3.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'utf8');

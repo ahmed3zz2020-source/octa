@@ -37,6 +37,7 @@
   };
 
   const $ = (id) => document.getElementById(id);
+  const clamp = (v, a, b) => (v < a ? a : (v > b ? b : v));
   const esc = (s) => String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -354,6 +355,8 @@
       '<div class="sm-d-badges">' + badgeHtml(r) + '</div>' +
       /* ⭐ شريط المؤشرات — كل اللي اتفقنا عليه في سطر واحد */
       '<div class="sm-strip" id="smStrip"></div>' +
+      /* ⭐ خريطة المستويات — المؤشرات على مقياس السعر */
+      '<div class="sm-map-wrap" id="smMapWrap" style="display:none"></div>' +
       '<div class="sm-cards" id="smCards">' +
       '<div class="sm-loading">⏳ بنجيب الشموع عشان المؤشرات الذكية…</div>' +
       '</div>';
@@ -382,6 +385,7 @@
     /* ⚡ شريط المؤشرات — RSI/MACD فوراً (من داتا السوق)
        والباقي بعد ما الشموع تيجي */
     renderStrip(r, null);
+    renderMap(r, null);
     /* الشموع → المؤشرات الثلاثة */
     loadDetail(r);
   }
@@ -414,6 +418,67 @@
       '<div class="sm-src">المؤشرات محسوبة من ' + (j.count || (j.candles ? j.candles.length : 0)) + ' شمعة يومية حقيقية' +
       (via === 'tv' ? ' · من TradingView' : '') + '</div>';
     renderStrip(r, d);
+    renderMap(r, d);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   🗺️ خريطة المستويات — المؤشرات على مقياس السعر
+   ──────────────────────────────────────────────────────────────
+   📌 كل مستوى (متوسطات · VWAP · زون Order Block · دعم/مقاومة)
+   بيتحسب موضعه من السعر الحالي ويترسم عند نسبته.
+   ⛌ CSS بس (مفيش canvas) — والشارت نفسه TradingView.
+   ══════════════════════════════════════════════════════════════ */
+  function renderMap(r, d) {
+    const wrap = $('smMapWrap');
+    if (!wrap) return;
+    const price = num(r.price);
+    if (!price) { wrap.style.display = 'none'; return; }
+    const L = [];
+    if (d && d.fib) {
+      L.push({ v: d.fib.e8, n: 'EMA 8', c: 'ema' });
+      L.push({ v: d.fib.e13, n: 'EMA 13', c: 'ema' });
+      L.push({ v: d.fib.e21, n: 'EMA 21', c: 'ema' });
+      L.push({ v: d.fib.e34, n: 'EMA 34', c: 'ema' });
+      L.push({ v: d.fib.e55, n: 'EMA 55', c: 'ema' });
+      if (d.fib.vwap) L.push({ v: d.fib.vwap, n: 'VWAP', c: 'vwap' });
+    }
+    if (d && d.orderBlock) {
+      L.push({ v: (d.orderBlock.lo + d.orderBlock.hi) / 2, n: 'Order Block', c: 'ob', zone: [d.orderBlock.lo, d.orderBlock.hi] });
+    }
+    if (d && d.structure) {
+      if (d.structure.support) L.push({ v: d.structure.support, n: 'دعم', c: 'sr' });
+      if (d.structure.resistance) L.push({ v: d.structure.resistance, n: 'مقاومة', c: 'sr' });
+    }
+    if (!L.length) { wrap.style.display = 'none'; return; }
+
+    /* المدى: أكبر بُعد حول السعر (محدود ١٪..٨٪) */
+    let far = 0;
+    L.forEach(l => { far = Math.max(far, Math.abs(l.v - price) / price * 100); });
+    far = clamp(far * 1.15, 1.2, 8);
+
+    const pos = (v) => clamp(50 - ((v - price) / price * 100) / far * 50, 2, 98);
+
+    let html = '<div class="sm-map-h">🗺️ خريطة المستويات — السعر <b>' + f2(price) + '</b></div>';
+    html += '<div class="sm-map">';
+    /* خط السعر */
+    html += '<div class="sm-map-price" style="top:50%"><span>' + f2(price) + '</span></div>';
+    /* زون الـOrder Block */
+    const ob = L.filter(x => x.zone)[0];
+    if (ob) {
+      const t1 = pos(ob.zone[1]), t2 = pos(ob.zone[0]);
+      html += '<div class="sm-map-zone' + (d.orderBlock.state === 'bull' ? ' bull' : ' bear') +
+        '" style="top:' + Math.min(t1, t2) + '%;height:' + Math.max(1.5, Math.abs(t2 - t1)) + '%"></div>';
+    }
+    L.forEach(l => {
+      const p = pos(l.v);
+      const above = l.v >= price;
+      html += '<div class="sm-map-l ' + l.c + (above ? ' up' : ' dn') + '" style="top:' + p + '%">' +
+        '<span>' + esc(l.n) + '</span><b>' + f2(l.v) + '</b></div>';
+    });
+    html += '</div>';
+    html += '<div class="sm-map-f">فوق السعر = مقاومة · تحت السعر = دعم · الإطار الملوّن = زون الـOrder Block</div>';
+    wrap.innerHTML = html;
+    wrap.style.display = 'block';
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -475,7 +540,7 @@
     if (d && d.orderBlock) {
       const ob = d.orderBlock;
       out.push(chip('Order Block', ob.state === 'bull' ? 'شراء' : 'بيع',
-        ob.inside ? true : (ob.broken ? false : null), ob.label));
+        (!ob.broken && ob.state === 'bull'), ob.label));
     }
     /* ⓘ المتوسطات الأسّية (فيبوناتشي) */
     if (d && d.fib) {
@@ -590,7 +655,8 @@
     /* ── Order Block ── */
     if (d && d.orderBlock) {
       const ob = d.orderBlock;
-      const ok = ob.inside ? true : (ob.broken ? false : null);
+      /* ✅ الزون صالح وقابل للاعتماد (لما يكون زون طلب) · ❌ اتكسر أو مقاومة */
+      const ok = (!ob.broken && ob.state === 'bull');
       out.push(card('Order Block — زون مؤسسي', '🧱', ob.state === 'bull' ? 'دعم' : 'مقاومة',
         'آخر شمعة معاكسة قبل اندفاع قوي — المكان اللي المؤسسات بتجمع فيه الأوامر',
         ok, ob.label,
