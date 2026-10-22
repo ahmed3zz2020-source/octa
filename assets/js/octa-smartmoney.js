@@ -489,6 +489,141 @@
     };
   }
 
+
+  /* ══════════════════════════════════════════════════════════════
+   🧱 Order Block — زون الشراء/البيع المؤسسي
+   ──────────────────────────────────────────────────────────────
+   📌 التعريف: آخر شمعة **معاكسة** قبل اندفاع قوي.
+   ⛌ ده المكان اللي المؤسسات كانت بتجمع فيها الأوامر.
+   📌 نسخنا OCTA: بنحسب ATR(14) وبنعتبر «اندفاع» أي شمعة جسمها
+      أكبر من ١.٢×ATR. وبعدها نشوف هل السعر لسه داخل الزون.
+   ══════════════════════════════════════════════════════════════ */
+  function orderBlock(c) {
+    if (!c || c.length < 30) return null;
+    var a = atr(c, 14);
+    if (!a) return null;
+    var start = Math.max(3, c.length - 45);
+    /* ⛌ ابدأ من آخر شمعة (مش ماقبلها) — الاندفاع ممكن يكون في الشمعة
+       الجارية (لأنها اللي كسرت). */
+    for (var i = c.length - 1; i >= start; i--) {
+      var body = Math.abs(c[i].c - c[i].o);
+      if (body < a * 1.2) continue;
+      var up = c[i].c > c[i].o;
+      /* آخر شمعة معاكسة قبل الاندفاع */
+      var j = i - 1, ob = null;
+      while (j >= 1) {
+        var dir = c[j].c > c[j].o;
+        if (dir !== up) { ob = { i: j, h: c[j].h, l: c[j].l, c: c[j].c }; break; }
+        j--;
+      }
+      if (!ob) continue;
+      var price = c[c.length - 1].c;
+      var inside = up ? (price >= ob.l && price <= ob.h) : (price <= ob.h && price >= ob.l);
+      var broken = up ? (price < ob.l) : (price > ob.h);
+      return {
+        state: up ? 'bull' : 'bear',
+        age: c.length - 1 - ob.i,
+        hi: ob.h, lo: ob.l,
+        inside: inside, broken: broken,
+        dist: price >= ob.h ? (price - ob.h) / price * 100 : (price <= ob.l ? (ob.l - price) / price * 100 : 0),
+        label: up
+          ? (inside ? 'زون شراء مؤسسي — السعر داخله' : (broken ? 'زون شراء اتكسر — الخطر' : 'زون شراء فوق السعر'))
+          : (inside ? 'زون بيع مؤسسي — السعر داخله' : (broken ? 'زون بيع اتكسر — الخطر' : 'زون بيع تحت السعر'))
+      };
+    }
+    return null;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   🕯️ نموذج رانيا — ٣ شموع
+   ──────────────────────────────────────────────────────────────
+   📌 النموذج الشهير في مصر:
+   ⛌ الشمعة ١: شمعة قوية في اتجاه النموذج
+   ⛌ الشمعة ٢: تصحيح صغير (-pullback) فوق/تحت الشمعة الأولى
+   ⛌ الشمعة ٣: شمعة كسرت قمّة/قاع الشمعة الأولى ⇒ تأكيد
+   📌 تأكيدات إضافية: حجم الشمعة ٣ > حجم الشمعة ١ · والسعر فوق EMA 50
+   ══════════════════════════════════════════════════════════════ */
+  function ranaPattern(c) {
+    if (!c || c.length < 30) return null;
+    var bodies = [], vs = [];
+    for (var i = 0; i < c.length; i++) {
+      bodies.push(Math.abs(c[i].c - c[i].o));
+      vs.push(c[i].v || 0);
+    }
+    var avBody = sma(bodies, 20) || 1;
+    var avVol = sma(vs, 20) || 1;
+    var ema50 = ema(c.map(function (x) { return x.c; }), 50);
+    var price = c[c.length - 1].c;
+
+    for (var k = c.length - 3; k >= Math.max(2, c.length - 7); k--) {
+      var c1 = c[k], c2 = c[k + 1], c3 = c[k + 2];
+
+      /* ── صاعد ── */
+      if (c1.c > c1.o && (c1.c - c1.o) >= avBody * 1.1 &&
+          c2.c < c1.c && Math.abs(c2.c - c2.o) <= Math.abs(c1.c - c1.o) * 0.7 &&
+          c2.l >= c1.l &&
+          c3.c > c1.h && c3.c > c3.o) {
+        var bullVol = (c3.v || 0) > (c1.v || 0) * 0.9;
+        var bullTrend = ema50 != null ? price > ema50 : true;
+        return {
+          state: 'bull', age: c.length - 1 - (k + 2),
+          volOk: bullVol, trendOk: bullTrend,
+          strength: Math.min(100, Math.round((c1.c - c1.o) / avBody * 30 + (c3.c - c1.h) / avBody * 30 + (bullVol ? 20 : 0) + (bullTrend ? 20 : 0))),
+          label: 'نموذج رانيا الصاعد — ٣ شموع: قوية · تصحيح · كسر القمة'
+        };
+      }
+      /* ── هابط ── */
+      if (c1.c < c1.o && (c1.o - c1.c) >= avBody * 1.1 &&
+          c2.c > c1.c && Math.abs(c2.c - c2.o) <= Math.abs(c1.c - c1.o) * 0.7 &&
+          c2.h <= c1.h &&
+          c3.c < c1.l && c3.c < c3.o) {
+        var bearVol = (c3.v || 0) > (c1.v || 0) * 0.9;
+        var bearTrend = ema50 != null ? price < ema50 : true;
+        return {
+          state: 'bear', age: c.length - 1 - (k + 2),
+          volOk: bearVol, trendOk: bearTrend,
+          strength: Math.min(100, Math.round((c1.o - c1.c) / avBody * 30 + (c1.l - c3.c) / avBody * 30 + (bearVol ? 20 : 0) + (bearTrend ? 20 : 0))),
+          label: 'نموذج رانيا الهابط — ٣ شموع: قوية · تصحيح · كسر القاع'
+        };
+      }
+    }
+    return { state: 'none', label: 'مفيش نموذج ٣ شموع مكتمل دلوقتي' };
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   📐 المتوسطات الأسّية (فيبوناتشي) + VWAP
+   ──────────────────────────────────────────────────────────────
+   📌 ٨ · ١٣ · ٢١ · ٣٤ · ٥٥ (فيبوناتشي) — الترتيب بيقول اتجاه
+      مبني على «الترتيب الصاعد = ترند قوي» (الريبد).
+   📌 VWAP — السعر العادل المرجّح بالحجم.
+   ══════════════════════════════════════════════════════════════ */
+  function fibEmas(c) {
+    if (!c || c.length < 60) return null;
+    var closes = c.map(function (x) { return x.c; });
+    var e8 = ema(closes, 8), e13 = ema(closes, 13), e21 = ema(closes, 21),
+      e34 = ema(closes, 34), e55 = ema(closes, 55);
+    if (e8 == null || e13 == null || e21 == null || e34 == null || e55 == null) return null;
+    var align = (e8 > e13 && e13 > e21 && e21 > e34 && e34 > e55) ? 'up'
+      : ((e8 < e13 && e13 < e21 && e21 < e34 && e34 < e55) ? 'down' : 'mixed');
+    /* VWAP على ٢٠ يوم */
+    var pv = 0, vv = 0;
+    var from = Math.max(0, c.length - 20);
+    for (var i = from; i < c.length; i++) {
+      var tp = (c[i].h + c[i].l + c[i].c) / 3;
+      pv += tp * (c[i].v || 0); vv += (c[i].v || 0);
+    }
+    var vwap = vv > 0 ? pv / vv : null;
+    var price = c[c.length - 1].c;
+    return {
+      e8: round1(e8), e13: round1(e13), e21: round1(e21), e34: round1(e34), e55: round1(e55),
+      align: align,
+      spread: round1(Math.abs(e8 - e55) / price * 100),
+      vwap: vwap != null ? round1(vwap) : null,
+      vwapSide: vwap == null ? null : (price > vwap ? 'above' : 'below'),
+      label: align === 'up' ? 'ترتيب صاعد — ترند قوي' : (align === 'down' ? 'ترتيب هابط — ترند ضعيف' : 'متوسطات متشابكة — سوق عرض')
+    };
+  }
+
   /* كل التحليلات اللي محتاجة شموع */
   function fromCandles(candles, m) {
     var c = (candles || []).filter(function (x) { return x && x.c != null && x.h != null && x.l != null; });
@@ -501,6 +636,9 @@
       lock: lock(c),
       mcdx: mcdx(c, m),
       structure: structure(c),
+      orderBlock: orderBlock(c),
+      rana: ranaPattern(c),
+      fib: fibEmas(c),
       atr: a != null ? round1(a) : null,
       atrPct: (a != null && price) ? round1(a / price * 100) : null,
       levels: null
@@ -529,6 +667,7 @@
     compute: compute,
     rank: rank,
     fromCandles: fromCandles,
-    gemini: gemini, lock: lock, mcdx: mcdx, structure: structure, atr: atr
+    gemini: gemini, lock: lock, mcdx: mcdx, structure: structure, atr: atr,
+    orderBlock: orderBlock, ranaPattern: ranaPattern, fibEmas: fibEmas
   };
 });

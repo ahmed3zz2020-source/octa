@@ -143,12 +143,28 @@
     /* ① السجل الأساسي (محمي) — فيه المتوسطات والأداء */
     try { if (typeof octaLoadDB === 'function') await octaLoadDB(); } catch (e) { }
 
-    /* ② الباك الأول (المرجع) · لو واقع ⇒ جسر TradingView */
+    /* ② الباك الأول (المرجع) · لو واقع ⇒ جسر TradingView
+       ⛌⛌ ٢٢ أكتوبر ٢٠٢٦ — أول نداء بعد أي نشر **بارد** عند
+       TradingView (١٠-٤٠ ثانية) ⇒ كان المستخدم واقف على
+       «بنجيب بيانات السوق» نص دقيقة. الحل:
+       ① مهلة ٤٥ ثانية على الجسر (أطول من البرد)
+       ② رسالة واضحة بتقول إيه اللي بيحصل
+       ③ إعادة محاولة تلقائية لو فشل
+       ④ و«تحديث» بيشتغل فوراً في أي وقت */
     const backend = await withTimeout(backendData(), 6000);
-    const src = backend || await tvBridge();
+    let src = backend;
     if (!src) {
-      S.err = 'مقدرتش أجيب بيانات السوق. جرّب تحديث الصفحة.';
-      S.loading = false; renderStatus(); return;
+      setStatus('⏳ أول تحميل — TradingView بيحسب الأرقام (ممكن ياخد ٤٠ ثانية)…');
+      src = await withTimeout(tvBridge(), 45000);
+    }
+    if (!src) {
+      /* إعادة محاولة واحدة قبل ما نقول «مقدرتش» */
+      await new Promise(r => setTimeout(r, 4000));
+      src = await withTimeout(tvBridge(), 45000);
+    }
+    if (!src) {
+      S.err = 'مقدرتش أجيب بيانات السوق دلوقتي. دوس «تحديث» وحاول تاني.';
+      S.loading = false; renderStatus(); renderList(); return;
     }
     S.src = src.src;
 
@@ -227,6 +243,12 @@
   /* ══════════════════════════════════════════════════════════════
    🎨 الرسم
    ══════════════════════════════════════════════════════════════ */
+  /* سطر حالة مخصص (قبل ما البيانات تيجي) */
+  function setStatus(txt) {
+    const st = $('smStatus');
+    if (st) st.innerHTML = '<span class="sm-dot"></span> ' + esc(txt);
+  }
+
   function renderStatus() {
     const st = $('smStatus');
     if (!st) return;
@@ -271,7 +293,9 @@
       return;
     }
     if (!S.rows.length) {
-      box.innerHTML = '<div class="sm-empty">⏳ بنحمّل بيانات البورصة…</div>';
+      box.innerHTML = '<div class="sm-empty">⏳ بنجيب بيانات السوق…'
+        + '<br><small>أول مرة ممكن تاخد ٤٠ ثانية — بعد كده بتبقى فورية</small>'
+        + '<br><small>لو وقفت — دوس «تحديث»</small></div>';
       return;
     }
     if (!S.view.length) {
@@ -441,6 +465,28 @@
       out.push(chip('MCDX', f1(x.value), x.state === 'inst' ? true : (x.state === 'retail' ? false : null),
         'مين ماسك السوق — مؤسسات ولا أفراد'));
     }
+    /* ⓘ نموذج رانيا (٣ شموع) */
+    if (d && d.rana) {
+      const rp = d.rana;
+      out.push(chip('نموذج رانيا', rp.state === 'bull' ? 'صاعد' : (rp.state === 'bear' ? 'هابط' : 'مفيش'),
+        rp.state === 'bull' ? true : (rp.state === 'bear' ? false : null), rp.label));
+    }
+    /* ⓘ Order Block */
+    if (d && d.orderBlock) {
+      const ob = d.orderBlock;
+      out.push(chip('Order Block', ob.state === 'bull' ? 'شراء' : 'بيع',
+        ob.inside ? true : (ob.broken ? false : null), ob.label));
+    }
+    /* ⓘ المتوسطات الأسّية (فيبوناتشي) */
+    if (d && d.fib) {
+      out.push(chip('EMA 8/13/21', d.fib.align === 'up' ? 'صاعد' : (d.fib.align === 'down' ? 'هابط' : 'عرض'),
+        d.fib.align === 'up' ? true : (d.fib.align === 'down' ? false : null), d.fib.label));
+    }
+    /* ⓘ VWAP */
+    if (d && d.fib && d.fib.vwap != null) {
+      out.push(chip('VWAP', f1(d.fib.vwap), d.fib.vwapSide === 'above' ? true : false,
+        'السعر العادل المرجّح بالحجم — فوقه ولا تحته'));
+    }
     /* ⓘ البنية */
     if (d && d.structure) {
       const st = d.structure;
@@ -524,6 +570,46 @@
         'كسر السقف أو الأرض = البنية الجديدة. كسر عكس الاتجاه = تغيّر الطابع',
         ok, s.label,
         '<div class="sm-lv"><span>مقاومة <b>' + f2(s.resistance) + '</b></span><span>دعم <b>' + f2(s.support) + '</b></span></div>'));
+    }
+
+    /* ── نموذج رانيا (٣ شموع) ── */
+    if (d && d.rana) {
+      const rp = d.rana;
+      const ok = rp.state === 'bull' ? true : (rp.state === 'bear' ? false : null);
+      const why = rp.state === 'bull'
+        ? 'نموذج صاعد مكتمل — قاع في الشراء'
+        : (rp.state === 'bear' ? 'نموذج هابط مكتمل — قاع في البيع' : 'مفيش نموذج ٣ شموع مكتمل');
+      out.push(card('نموذج رانيا — ٣ شموع', '🕯️', rp.state === 'bull' ? 'صاعد' : (rp.state === 'bear' ? 'هابط' : 'مفيش'),
+        'شمعة قوية · شمعة تصحيح · شمعة كسرت القمة/القاع. أشهر نموذج في مصر', ok, why,
+        rp.state !== 'none' ? '<div class="sm-lv"><span>القوة <b>' + rp.strength + '/100</b></span>' +
+          '<span>الحجم مؤكد <b>' + (rp.volOk ? '✅' : '❌') + '</b></span>' +
+          '<span>مع الاتجاه <b>' + (rp.trendOk ? '✅' : '❌') + '</b></span>' +
+          '<span>عمره <b>' + rp.age + ' يوم</b></span></div>' : ''));
+    }
+
+    /* ── Order Block ── */
+    if (d && d.orderBlock) {
+      const ob = d.orderBlock;
+      const ok = ob.inside ? true : (ob.broken ? false : null);
+      out.push(card('Order Block — زون مؤسسي', '🧱', ob.state === 'bull' ? 'دعم' : 'مقاومة',
+        'آخر شمعة معاكسة قبل اندفاع قوي — المكان اللي المؤسسات بتجمع فيه الأوامر',
+        ok, ob.label,
+        '<div class="sm-lv"><span>الزون <b>' + f2(ob.lo) + ' — ' + f2(ob.hi) + '</b></span>' +
+        '<span>عمره <b>' + ob.age + ' يوم</b></span></div>'));
+    }
+
+    /* ── المتوسطات الأسّية + VWAP ── */
+    if (d && d.fib) {
+      const fb = d.fib;
+      out.push(card('المتوسطات الأسّية (فيبوناتشي)', '📐', fb.align === 'up' ? 'ترتيب صاعد' : (fb.align === 'down' ? 'ترتيب هابط' : 'متشابكة'),
+        'المتوسطات ٨·١٣·٢١·٣٤·٥٥ — ترتيبها بيقول الاتجاه، والبُعد بيقول قوته',
+        fb.align === 'up' ? true : (fb.align === 'down' ? false : null), fb.label,
+        '<div class="sm-lv3">' +
+        '<div class="sm-lv3-i"><span>EMA 8</span><b>' + f2(fb.e8) + '</b></div>' +
+        '<div class="sm-lv3-i"><span>EMA 21</span><b>' + f2(fb.e21) + '</b></div>' +
+        '<div class="sm-lv3-i"><span>EMA 55</span><b>' + f2(fb.e55) + '</b></div>' +
+        '<div class="sm-lv3-i"><span>VWAP</span><b>' + f2(fb.vwap) + '</b><i>' + (fb.vwapSide === 'above' ? 'فوق السعر' : 'تحت السعر') + '</i></div>' +
+        '</div>'));
     }
 
     /* ── مستويات الـATR ── */
