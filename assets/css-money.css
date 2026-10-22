@@ -195,3 +195,22 @@
 
 /* مصدر المؤشرات الذكية — سطر صغير تحت الكروت */
 .sm-src { grid-column: 1 / -1; text-align: center; color: var(--dim); font-size: .72rem; padding: var(--s1) 0 0; }
+
+/* ═══ شريط المؤشرات — كل المؤشرات في سطر واحد (زي TradingView) ═══ */
+.sm-strip {
+  display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto;
+  padding: 8px 0 10px; margin-bottom: 4px;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.sm-strip::-webkit-scrollbar { display: none; }
+.sm-chip-i {
+  flex: 0 0 auto; display: flex; flex-direction: column; gap: 1px;
+  background: var(--pri3); border: 1px solid var(--line);
+  border-radius: var(--r1); padding: 5px 9px; min-width: 62px;
+}
+.sm-chip-i i { font-style: normal; color: var(--muted); font-size: .65rem; white-space: nowrap; }
+.sm-chip-i b { font-size: .82rem; color: var(--txt); white-space: nowrap; }
+.sm-chip-i.ok { border-color: rgba(34,197,94,.32); }
+.sm-chip-i.ok b { color: var(--up); }
+.sm-chip-i.no { border-color: rgba(239,68,68,.3); }
+.sm-chip-i.no b { color: var(--dn); }

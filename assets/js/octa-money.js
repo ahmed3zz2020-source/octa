@@ -328,10 +328,17 @@
       '</div>' +
       '<div class="sm-d-chart" id="smChart"></div>' +
       '<div class="sm-d-badges">' + badgeHtml(r) + '</div>' +
+      /* ⭐ شريط المؤشرات — كل اللي اتفقنا عليه في سطر واحد */
+      '<div class="sm-strip" id="smStrip"></div>' +
       '<div class="sm-cards" id="smCards">' +
       '<div class="sm-loading">⏳ بنجيب الشموع عشان المؤشرات الذكية…</div>' +
       '</div>';
     renderList();
+    /* ⬆️ نوديه على الشارت — اللوحة فوق الجدول دلوقتي */
+    try {
+      if (box.scrollIntoView) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      else if (window.scrollTo) window.scrollTo(0, 0);
+    } catch (e) { }
     /* زرار القفل (مش onclick inline — شيفرة CSP) */
     const cl = $('smDClose');
     if (cl) cl.addEventListener('click', moneyClose);
@@ -340,12 +347,17 @@
       if (window.OCTA_TV) {
         window.OCTA_TV.mount($('smChart'), {
           symbol: 'EGX:' + r.code, interval: '1D',
-          studies: 'RSI@tv-basicstudies,MACD@tv-basicstudies',
+          /* ⛔ فاصل المؤشرات في TradingView = backslash واحد
+             (نفس DEFAULT_STUDIES بتاع tv-shim). */
+          studies: 'MASimple@tv-basicstudies\\RSI@tv-basicstudies\\MACD@tv-basicstudies',
           compactMobile: false,
           minHeight: 360
         });
       }
     } catch (e) { /* الشارت مش لازم للصفحة تشتغل */ }
+    /* ⚡ شريط المؤشرات — RSI/MACD فوراً (من داتا السوق)
+       والباقي بعد ما الشموع تيجي */
+    renderStrip(r, null);
     /* الشموع → المؤشرات الثلاثة */
     loadDetail(r);
   }
@@ -377,6 +389,65 @@
     box.innerHTML = cardsHtml(r, d) +
       '<div class="sm-src">المؤشرات محسوبة من ' + (j.count || (j.candles ? j.candles.length : 0)) + ' شمعة يومية حقيقية' +
       (via === 'tv' ? ' · من TradingView' : '') + '</div>';
+    renderStrip(r, d);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   ⭐ شريط المؤشرات — كل المؤشرات في سطر واحد (زي الـtradingView)
+   ──────────────────────────────────────────────────────────────
+   RSI · MACD · ATR (متاحين في شارت TradingView)
+   جيميني · القفل · MCDX · BOS (بنحسبهم إحنا — مش في شارت TV)
+   ══════════════════════════════════════════════════════════════ */
+  function chip(label, value, ok, title) {
+    return '<span class="sm-chip-i' + (ok === null ? '' : (ok ? ' ok' : ' no')) + '" title="' + esc(title || label) + '">' +
+      '<i>' + esc(label) + '</i><b>' + esc(value) + '</b></span>';
+  }
+
+  function renderStrip(r, d) {
+    const el = $('smStrip');
+    if (!el) return;
+    const m = r.m || {};
+    const out = [];
+
+    /* ⓘ RSI */
+    if (m.rsi != null) {
+      const v = Math.round(m.rsi);
+      out.push(chip('RSI', String(v), v > 80 ? false : (v < 30 ? null : true), 'مؤشر القوة النسبية —TradingView'));
+    }
+    /* ⓘ MACD */
+    if (m.macd != null && m.macdSig != null) {
+      const bull = m.macd > m.macdSig;
+      out.push(chip('MACD', (bull ? '▲ ' : '▼ ') + f1(m.macd), bull, 'الزخم — TradingView'));
+    }
+    /* ⓘ ATR */
+    if (d && d.atrPct != null) {
+      out.push(chip('ATR', f1(d.atrPct) + '%', d.atrPct <= 4.5, 'مدى التذبذب الحقيقي — منه الدخول والهدف'));
+    }
+    /* ⓘ جيميني */
+    if (d && d.gemini) {
+      const g = d.gemini;
+      const ok = (g.state === 'bull' || g.state === 'oversold');
+      out.push(chip('جيميني', f1(g.value), ok, 'Banker Fund Oscillator'));
+    }
+    /* ⓘ القفل */
+    if (d && d.lock) {
+      const l = d.lock;
+      out.push(chip('القفل', l.state === 'in' ? 'دخول' : (l.state === 'out' ? 'خروج' : 'محايد'),
+        l.state === 'in' ? true : (l.state === 'out' ? false : null), 'تدفق الحجم — مؤسسية داخل ولا خارج'));
+    }
+    /* ⓘ MCDX */
+    if (d && d.mcdx) {
+      const x = d.mcdx;
+      out.push(chip('MCDX', f1(x.value), x.state === 'inst' ? true : (x.state === 'retail' ? false : null),
+        'مين ماسك السوق — مؤسسات ولا أفراد'));
+    }
+    /* ⓘ البنية */
+    if (d && d.structure) {
+      const st = d.structure;
+      out.push(chip('BOS', st.bos === 'up' ? 'صاعد' : (st.bos === 'down' ? 'هابط' : (st.choc ? 'تغيّر طابع' : 'عرض')),
+        st.state === 'bull' ? true : (st.state === 'bear' ? false : null), st.label));
+    }
+    el.innerHTML = out.join('');
   }
 
   /* كارت واحد: الاسم · القيمة · بيقيس إيه · الحكم

@@ -185,6 +185,23 @@ test('الواجهة: فتح سهم بيرسم الكروت والشارت', asy
   });
   assert.ok(cards.indexOf('NaN') === -1, 'مافيش NaN في الكروت');
   assert.ok(cards.indexOf('undefined') === -1, 'مافيش undefined في الكروت');
+
+  /* ⭐ شريط المؤشرات — كل المؤشرات في سطر واحد */
+  const strip = els.smStrip.innerHTML;
+  assert.ok(strip.indexOf('RSI') !== -1, 'الـRSI في الشريط');
+  assert.ok(strip.indexOf('MACD') !== -1, 'الـMACD في الشريط');
+  assert.ok(strip.indexOf('جيميني') !== -1, 'جيميني في الشريط');
+  assert.ok(strip.indexOf('القفل') !== -1, 'القفل في الشريط');
+  assert.ok(strip.indexOf('MCDX') !== -1, 'MCDX في الشريط');
+  assert.ok(strip.indexOf('BOS') !== -1, 'البنية في الشريط');
+  assert.ok(strip.indexOf('NaN') === -1, 'مافيش NaN في الشريط');
+  /* ⭐ الشارت لازم يكون فوق الجدول (مش تحت الـ120 صف) */
+  const fs3 = require('node:fs');
+  const html = fs3.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'utf8');
+  const iDet = html.indexOf('id="smDetail"');
+  const iList = html.indexOf('id="smList"');
+  assert.ok(iDet > -1 && iList > -1, 'لازم Page السهم والجدول يكونوا موجودين');
+  assert.ok(iDet < iList, 'لوحة السهم (الشارت) لازم تكون قبل الجدول');
 });
 
 test('الواجهة: الفلترة بالكلمة وبالحد الأدنى بيشتغلوا', async () => {
