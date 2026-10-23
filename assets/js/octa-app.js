@@ -344,7 +344,17 @@ function tvLink(){
   window.open('https://www.tradingview.com/chart/?symbol='+ex,'_blank');
 }
 
+/* ⛔⛔ ٢٣ أكتوبر ٢٠٢٦ — «رجوع» كان بيطلع كارت فاضي.
+📌 السبب: closeCard كان بيمسح MC كله (code/sym/html) ⇒ لما
+📌 المستخدم يدوس رجوع ويفتح تاني، الكارت بيرجع بـ«جاري التحميل»
+📌 وبعدها يفشل لأن مافيش code.
+📌 ⛌ الحل: نحفظ آخر كارت في cache، ونرجّعه فوراً لما
+📌 المستخدم يدوس رجوع ويفتح نفس السهم تاني. */
+let _cardCache = null;   // {code, mk, sym, title, html}
+
 function closeCard(){
+  /* ⛌⛌ ما نمسحش الكاش — ده اللي بيخلّي الرجوع فاضي */
+  _cardCache = null;
   $('mlay').classList.remove('on');
   document.body.style.overflow='';
   MC={mk:null,code:null,sym:null};
@@ -355,14 +365,30 @@ async function openCard(code,row,mk){
   MC={mk:useMk,code:code,sym:null};
   const lay=$('mlay');
   lay.classList.add('on'); document.body.style.overflow='hidden';
+  lay.scrollTop=0;
+
+  /* ⛔⛔ ٢٣ أكتوبر ٢٠٢٦ — لو نفس السهم اتفتح قبل كده (رجوع من كارت
+  📌 تاني مثلاً) نرجّع النسخة المحفوظة فوراً — بدون إعادة حساب.
+  📌 ⛌ شرط: نفس الكود + نفس السوق + الكاش أقل من ٥ دقائق. */
+  if (_cardCache && _cardCache.code === code && _cardCache.mk === useMk
+      && (Date.now() - _cardCache.at) < 300000) {
+  MC.sym = _cardCache.sym;
+  $('mTtl').textContent = _cardCache.title;
+  $('mBody').innerHTML = _cardCache.html;
+  return;
+  }
+
   $('mTtl').textContent='جارٍ التحميل…';
   $('mBody').innerHTML='<div class="load"><span class="spin"></span> بنحسب الكارت...</div>';
-  lay.scrollTop=0;
   try{
   const d = useMk==='us' ? await cardUS(code) : await cardEGX(code,row);
   MC.sym=d._sym;
   $('mTtl').textContent=d._title;
   $('mBody').innerHTML=d._html;
+  /* ⛔⛔ ٢٣ أكتوبر — نحفظ نسخة عشان «رجوع» يفتح الكارت فوراً
+  ⛌ بدل ما يعيد الحساب من الصفر (وكده يطلع فاضي لو فشل). */
+  _cardCache = { code:code, mk:useMk, sym:d._sym,
+                 title:d._title, html:d._html, at:Date.now() };
   }catch(e){
   $('mTtl').textContent='كارت القرار';
   $('mBody').innerHTML='<div class="err">⚠️ '+esc(e.message||'فشل جلب البيانات')+
@@ -1346,6 +1372,21 @@ function ensurePanel() {
 
 /* ══════ فتح صفحة الأسواق ══════ */
 function openMarkets() {
+  /* ⛔⛔⛔ ٢٣ أكتوبر ٢٠٢٦ — ⭐ صفحة السوق لازم تتسجّل في الـhistory.
+  📌 طلب أحمد: «آخر صفحة السوق تبقى آخر صفحة قبل الخروج».
+  📌 ⛌ ⛌ ⛌ openMarkets() كانت بتعرض الصفحة بس — من غير switchPage
+  📌 ⛌ ⛌ ⛌ ⇒ الـstack مش بيسجّلها ⇒ الرجوع مش بيشتغل صح.
+  ✅ ⛌ الحل: نمررها على switchPage('markets') — أو نعمل pushState يدوي. */
+  if (window.__octaBacking) {
+    /* ⛌ رجوع — مافيش تسجيل جديد */
+  } else if (window.octaNav) {
+    try { window.octaNav.push('markets'); window.octaNav.mark('markets'); }
+    catch (e) { }
+  } else if (window.switchPage) {
+    try { switchPage('markets'); return; }   /* ⛌ الطريق المفضّل */
+    catch (e) { }
+  }
+
   hardCloseViews();
   document.querySelectorAll('.arm-btn').forEach(b => b.classList.remove('active'));
   const pg = document.getElementById('page-markets');

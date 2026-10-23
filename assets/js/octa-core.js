@@ -909,7 +909,17 @@ function buildCredit(){
   *  لازم محامي مصري يراجعه قبل ما أي مستخدم حقيقي
   *  يتعامل مع الموقع. مش اعتماد نهائي.
   * ══════════════════════════════════════════════════════ */
-  '<div class="oc-disc">' +
+  /* ⛔⛔ ٢٣ أكتوبر ٢٠٢٦ — أخفينا النص الطويل.
+  📌 كان بياخد نص الشاشة وبيخوّف الزائر قبل ما يدخل.
+  📌 ⛌ دلوقتي: سطر واحد «إخلاء المسؤولية» بخط منقّط (زي أي لينك)
+  📌 ⛌ ⛌ والضغط عليه يفتح الكارت. مخفي في كل الصفحات.
+  📌 ⛌ ⛌ ونفس الكارت موجود في الـmodal بتاع التحليل كمان ( octa-copyright ).
+  📌 (من Production — اتنقذ قبل ما يضيع) */
+  '<button class="oc-disc-toggle" type="button" id="ocDiscToggle"' +
+  ' aria-expanded="false" aria-controls="ocDiscBody">' +
+  '⚖️ <u>إخلاء المسؤولية</u>' +
+  '</button>' +
+  '<div class="oc-disc" id="ocDiscBody" hidden>' +
   '<div class="oc-disc-h">⚖️ إخلاء المسؤولية</div>' +
   '<ol class="oc-disc-l">' +
   '<li>الموقع ده أداة تحليل وتعلّم — <b>مش</b> توصية شراء أو بيع لأي سهم.</li>' +
@@ -923,6 +933,33 @@ function buildCredit(){
   '</div>';
   document.body.appendChild(d);
 }
+
+/* ⛔ toggle إخلاء المسؤولية — ٢٣ أكتوبر ٢٠٢٦
+📌 الضغط على «إخلاء المسؤولية» يفتح/يقفل الكارت.
+📌 ⛌ متربط بالـdelegate على document عشان يشتغل من أي مكان
+📌 (الصفحة الرئيسية · المودال · التحليل) من غير تكرار. */
+document.addEventListener('click', function (e) {
+  var t = e.target;
+  if (!t) return;
+  if (t.id === 'ocDiscToggle' || (t.closest && t.closest('#ocDiscToggle'))) {
+  e.preventDefault();
+  var btn = document.getElementById('ocDiscToggle');
+  var box = document.getElementById('ocDiscBody');
+  if (!btn || !box) return;
+  var open = box.hasAttribute('hidden');
+  if (open) { box.removeAttribute('hidden'); btn.setAttribute('aria-expanded', 'true'); }
+  else { box.setAttribute('hidden', ''); btn.setAttribute('aria-expanded', 'false'); }
+  return;
+  }
+  /* ⛌ الضغط بره الكارت بيقفله */
+  var box2 = document.getElementById('ocDiscBody');
+  if (box2 && !box2.hasAttribute('hidden') && t.id !== 'ocDiscToggle'
+  && !box2.contains(t)) {
+  box2.setAttribute('hidden', '');
+  var b2 = document.getElementById('ocDiscToggle');
+  if (b2) b2.setAttribute('aria-expanded', 'false');
+  }
+});
 
 /* ══════════ بحث OCTA — تحليل كامل ══════════ */
 let OS_DB = [], OS_LIST = [], OS_SEL = -1, OS_SECT = 'all', OS_READY = false, OS_SEQ = 0, OS_ORIGIN = null, OS_META = null;
@@ -1565,6 +1602,21 @@ function renderAiResult(code, d) {
   const change = (live && live.price > 0) ? live.change : d.change;
 
   renderEngineBars(scores, Number(ax.overall || 0), { d, price, change });
+}
+
+/* ⛔⛔ ٢٣ أكتوبر ٢٠٢٦ — قرار OCTA من الدرجة (fallback محلي).
+📌 القواعد ثابتة ومش متغيرة (زي المحرك الأصلي):
+· ٧٠+ → شراء
+· ٥٠–٧٠ → تجميع
+· أقل من ٥٠ → حذر
+📌 ⛔ المشتقة من الدرجة دي، مش من ذكاء اصطناعي.
+📌 ⛌ لو الباك رجّع قراره، بنستخدم قراره هو. */
+function _octaDecisionFromScore(score) {
+  const s = Math.max(0, Math.min(100, Number(score) || 0));
+  if (s >= 70) return 'شراء';
+  if (s >= 50) return 'إشارة إيجابية';
+  if (s >= 35) return 'إشارة محايدة';
+  return 'إشارة سلبية';
 }
 
 function renderEngine() {
@@ -2980,6 +3032,18 @@ function renderEngineBars(scores, finalScore, extra) {
   }
 
   const d = extra.d;
+  /* ⛔⛔ ٢٣ أكتوبر ٢٠٢٦ — القرار كان undefined في كل سهم.
+  ⛌ السبب: الباك مش بيرجّع decision/axes/... في كل رد anymore،
+  ⛌ فالـtemplate كان بيطبع undefined و NaN.
+  ⛌ ⛌ الحل: لو الحقول ناقصة، نحسب القرار من finalScore (المحلي).
+  ⛌ ⛌ نفس قواعد المحرك: ٧٠+ شراء · ٥٠-٧٠ تجميع · أقل حذر.
+  ⛌ ⛌ (من Production — اتنقذ قبل ما يضيع) */
+  if (!d.decision) d.decision = _octaDecisionFromScore(finalScore);
+  if (!d.confidence) d.confidence = Math.min(95, Math.round(finalScore));
+  if (!d.risk_level) d.risk_level = finalScore >= 70 ? 'منخفضة' : finalScore >= 50 ? 'متوسطة' : 'عالية';
+  if (!d.model) d.model = 'octa';
+  if (!d.sector) d.sector = '';
+  if (d.reasons && !Array.isArray(d.reasons)) d.reasons = [];
   const DEC_MAP = {
   'شراء': { icon: '✅', cls: '#16c79a' },
   'إشارة إيجابية': { icon: '🟡', cls: '#f4d03f' },

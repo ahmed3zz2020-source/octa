@@ -7280,3 +7280,26 @@ body.light .octa-why-btn { background: #fffbeb; border-color: rgba(154,123,24,.4
   background: var(--goldBg) !important;
   color: var(--gold) !important;
 }
+
+/* ══════════════════════════════════════════════════════════════
+ ⚖️ إخلاء المسؤولية — مقفول افتراضياً (٢٣ أكتوبر ٢٠٢٦)
+ ══════════════════════════════════════════════════════════════
+ 📌 السبب: النص الطويل كان بياخد نص الشاشة وبيخوّف الزائر.
+ 📌 ⛌ دلوقتي: سطر واحد بخط منقّط. الضغط عليه يفتح الكارت.
+ 📌 ⛌ ⛌ pseudo-element: مفيش HTML، فبيشتغل في أي كارت تعليمي. */
+.oc-disc-toggle{
+  display:block; width:100%; margin:14px 0 0;
+  background:rgba(212,175,55,.07);
+  border:1px dashed rgba(212,175,55,.35);
+  border-radius:10px;
+  padding:9px 14px;
+  color:var(--gold); font:600 .78rem system-ui,sans-serif;
+  text-align:center; cursor:pointer;
+  transition:background .18s, border-color .18s;
+}
+.oc-disc-toggle:hover{ background:rgba(212,175,55,.14); border-color:var(--gold); }
+.oc-disc-toggle:active{ transform:translateY(1px); }
+.oc-disc-toggle:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+.oc-disc-toggle u{ text-decoration-color:rgba(212,175,55,.5); text-underline-offset:3px; }
+
+.oc-disc[hidden]{ display:none !important; }
