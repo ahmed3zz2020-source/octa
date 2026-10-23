@@ -1103,6 +1103,9 @@
     if (plan.status === PLAN.INVALID) {
       warns.push({ k: 'plan_invalid', t: 'ar', msg: 'الخطة غير صالحة في الاتجاه الحالي' });
       flags.planInvalid = true;
+      /* ⛔⛔ «الخطة غير صالحة» مش بنزود بيه نقاط المخاطرة:
+         هو حكم على **الإعداد** مش على المخاطرة. (باج: كل سهم
+         في هبوط كان بيتصنّف «مخاطرة عالية» لمجرد إن الاتجاه هابط.) */
     }
     if (plan.conflict) {
       warns.push({ k: 'stop_conflict', t: 'ar', msg: 'وقف الخسارة بالـATR وبالهيكل مختلفين — محتاج مراجعة' });
@@ -1150,7 +1153,7 @@
     if (flags.highAtr) score += 2;
     if (flags.lowLiquidity) score += 2;
     if (flags.liquidityUnknown) score += 1;
-    if (flags.noPlan || flags.planInvalid) score += 2;
+    if (flags.noPlan) score += 2;   /* مفيش خطة ⇒ المخاطرة مش متقاسة */
     if (flags.stopConflict) score += 1;
     if (flags.lowRR) score += 2;
     if (flags.noTarget) score += 1;
@@ -1471,8 +1474,15 @@
       plan.rr != null && plan.rr >= profile.minRR,
       plan.rr == null ? 'مفيش هدف ⇒ نسبة العائد غير محسوبة' : 'نسبة العائد ' + plan.rr + ' أقل من ' + profile.minRR, 'confirm');
     if (profile.requirePlan) {
-      check('خطة دخول صالحة', plan.status === PLAN.ZONE || plan.status === PLAN.CONFIRMED,
-        'الخطة: ' + (plan.status || 'غير متاحة'), 'confirm');
+      /* ⛔⛔ المطلوب: خطة **موجودة ومش ملغاة** — مش إن شرط الدخول اشتغل.
+         (باج: «في انتظار تأكيد» كان بيخلي التصنيف A مستحيل —
+          لأن السعر لازم يكون داخل منطقة الدخول *دلوقتي*، وده
+          شرط توقيت مش شرط تحليلي.)
+         ⛔ بس «الخطة ملغاة» (اتجاه هابط) أو «مفيش خطة» ⇒ بتفشل. */
+      var planOk = plan.status && plan.status !== PLAN.NONE && plan.status !== PLAN.INVALID;
+      check('خطة دخول صالحة', planOk,
+        plan.status === PLAN.INVALID ? 'الخطة ملغاة (الاتجاه الحالي لا يسمح)'
+          : (plan.status === PLAN.NONE ? 'مفيش خطة دخول قابلة للبناء' : 'الخطة: ' + plan.status), 'confirm');
     }
     var riskOrder = { 'LOWER RELATIVE RISK': 0, 'MODERATE RISK': 1, 'HIGH RISK': 2, 'VERY HIGH RISK': 3, 'RISK NOT ASSESSABLE': 4 };
     var maxRisk = riskOrder[profile.maxRisk] == null ? 2 : riskOrder[profile.maxRisk];
@@ -1546,6 +1556,18 @@
       volume: volume.score, risk: volatility.score
     };
     var score = compositeScore(scores, profile, { total: COMPONENTS.length });
+
+    /* ⛔⛔ بيانات قديمة ⇒ مفيش درجة إطلاقاً.
+       (باج: سهام شمعته من ٣ أشهر كانت بتتصدّر الترتيب بدرجة ٨٤.٥
+       — والمؤشرات بتتكلم عن زمن فات.) */
+    if (dq.stale) {
+      score = {
+        total: null, used: score.used, missing: score.missing,
+        weights: score.weights, adjusted: score.adjusted,
+        completeness: score.completeness, insufficient: true,
+        reason: 'stale_data'
+      };
+    }
 
     var cls = classify({
       dq: dq, trend: trend, momentum: momentum, volume: volume,

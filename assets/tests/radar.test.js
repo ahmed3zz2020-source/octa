@@ -951,3 +951,57 @@ test('⛔ مفيش «undefined» أو «NaN» في النصوص المولّدة
     assert.ok(t.indexOf('NaN') < 0, '⛔ NaN في: ' + t);
   });
 });
+
+/* ═══════════════════════════════════════════════════════════
+   🛡️ 17) قواعد ثابتة — محمية من الباج
+   ═══════════════════════════════════════════════════════════ */
+
+test('⛔ بيانات قديمة ⇒ مفيش درجة (السهم ما يتصدّرش الترتيب)', () => {
+  const c = mkCandles({ n: 120, trend: 1 });
+  c.forEach((x, i) => { x.t = dayIso(120 - i + 30); });   /* ٣٠ يوم قديم */
+  const a = R.analyze(c, { code: 'T', price: 100, marketCap: 5e9 });
+  assert.equal(a.dq.stale, true, 'قديم');
+  assert.equal(a.score.total, null, '⛔ مفيش درجة');
+  assert.equal(a.score.reason, 'stale_data', 'السبب مكتوب');
+  assert.equal(a.classification.code, 'E', '⛔ تصنيف E');
+});
+
+test('⛔ الخطة الملغاة مش بتدي نقاط مخاطرة (حكم على الإعداد مش على المخاطرة)', () => {
+  const withInvalid = R.riskEngine({
+    dq: { stale: false, sessions: 200 },
+    plan: { status: R.PLAN.INVALID, rr: 2.0 },
+    volat: { atrPct: 1 }, volume: { liq: R.LIQ.DEEP },
+    momentum: {}, trend: {}, sizing: {}, profile: {}
+  });
+  const noPlan = R.riskEngine({
+    dq: { stale: false, sessions: 200 },
+    plan: { status: R.PLAN.NONE, rr: 2.0 },
+    volat: { atrPct: 1 }, volume: { liq: R.LIQ.DEEP },
+    momentum: {}, trend: {}, sizing: {}, profile: {}
+  });
+  assert.equal(withInvalid.riskScore, 0, '⛔ الخطة الملغاة = صفر نقاط مخاطرة');
+  assert.ok(noPlan.riskScore > 0, '⛔ مفيش خطة = المخاطرة مش متقاسة');
+  assert.ok(withInvalid.warnings.some(w => w.k === 'plan_invalid'), 'التحذير موجود');
+});
+
+test('⛔ «في انتظار تأكيد» مش بيفشل التصنيف (شرط توقيت مش شرط تحليلي)', () => {
+  const r = mkResult();
+  r.plan = { status: R.PLAN.WAIT, rr: 2.2 };
+  const c = R.classify(r, R.PROFILES.balanced);
+  assert.ok(c.code === 'A' || c.code === 'B', '⛔ مش D — ' + c.code);
+  assert.ok(!c.failed.some(f => f.indexOf('خطة') >= 0), '⛔ الخطة لم تُحسب فاشلة');
+});
+
+test('⛔ الخطة الملغاة (اتجاه هابط) بتفشل التصنيف', () => {
+  const r = mkResult();
+  r.plan = { status: R.PLAN.INVALID, rr: 2.2 };
+  const c = R.classify(r, R.PROFILES.balanced);
+  assert.ok(c.failed.some(f => f.indexOf('خطة') >= 0), '⛔ الخطة فاشلة');
+  assert.notEqual(c.code, 'A', '⛔ مش A');
+});
+
+test('⛔ التصنيف A ممكن يتحقق (مش مستحيل رياضياً)', () => {
+  const c = R.classify(mkResult(), R.PROFILES.balanced);
+  assert.equal(c.code, 'A', '⛔ لازم فيه مسار لشروط كاملة');
+  assert.equal(c.failed.length, 0, 'مفيش شروط فاشلة');
+});
