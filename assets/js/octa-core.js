@@ -483,6 +483,16 @@ const OS_NAV = {
      بيرجّع true لو اتنفّذ، false لو لسه مقدرش (DOM لسه بيتبني). */
   restore() {
   if (this.restored) return true;
+  /* 🔗 رابط مباشر: #money يفتح أداة Smart Money فوراً.
+     ⛌ الرابط **يغلب** على آخر صفحة محفوظة (ده المقصود من اللينك).
+     ⛌ لو الـDOM لسه جاهزش ⇒ نرجّع false عشان الـstart يعيد المحاولة. */
+  const hash = (location.hash || '').replace(/^#/, '').trim();
+  if (hash && typeof TOOL_PAGES !== 'undefined' && TOOL_PAGES.indexOf(hash) >= 0) {
+    if (!this.valid(hash)) return false;   // ⏳ لسه مش جاهزة
+    this.restored = true;
+    switchPage(hash);
+    return true;
+  }
   const id = this.get();
   if (!id || id === OS_NAV_HOME) {
   /* 🏠 أول زيارة (أو الحالة اتمسحت) → الشاشة الرئيسية */
@@ -688,6 +698,14 @@ function switchPage(id) {
   /* 🧭 كل المسجّلين (السايدبار · الشاشة · السكيرENER) — بعد ما
      الصفحة اتفعّلت فعلاً عشان يشوفوا الـactive. */
   OS_NAV.fire(id);
+
+  /* 🔗 الرابط المباشر — الـhash يعكس الصفحة المفتوحة.
+     ⛔ replaceState (مش location.hash) عشان ماتفتحش صفحات كتير في
+     ⛔   الـhistory (رجوع بيزود). ⛔ ومسح الـhash لما نرجع الرئيسية. */
+  try {
+    if (isTool) history.replaceState(null, '', '#' + id);
+    else if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  } catch (e) { }
 
   /* ═══ قرار اليوم — نافذة منبثقة مش صفحة ═══ */
   if (id === 'decide') { if (typeof openDecide==='function') openDecide(); return; }

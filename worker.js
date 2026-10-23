@@ -331,6 +331,15 @@ export default {
 
     /* 1) proxy للـAPI (نفس origin عشان نتفادى CORP same-site) */
     if (url.pathname.startsWith('/api/')) {
+      /* ⛔⛔ الجسور بتاعت المعاينة (tvscan/tvcandles) **ما بتروحلش**
+         ⛌   للـAPI الميت — لو حصل خطأ جواها (أو نشر جديد لسه
+         ⛌   بيتملّد) كانت بيروحوا للباك (Railway) ⇒ 405/503 HTML
+         ⛌   والصفحة بتكسر. ⛌ هنا بنرجّع JSON نضيف. */
+      if ((url.pathname === '/api/tvscan' || url.pathname === '/api/tvcandles') &&
+        !(env && env.OCTA_TV_PROXY === 'on')) {
+        return new Response(JSON.stringify({ ok: false, error: 'bridge-off', msg: 'الجسر مش شغال' }),
+          { status: 503, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
       const target = API + url.pathname + url.search;
       const init = {
         method: request.method,
