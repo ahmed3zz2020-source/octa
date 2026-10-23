@@ -346,3 +346,47 @@ test('EMA فيبوناتشي: الترتيب + VWAP', () => {
   assert.ok(f.e8 > f.e13 && f.e13 > f.e21 && f.e21 > f.e34 && f.e34 > f.e55, 'ترتيب المتوسطات');
   assert.ok(f.vwap > 0, 'VWAP رقم');
 });
+
+
+/* ═══════════════════════════════════════════════════════════
+   🎯 دقة المستويات — الأسهم الرخيصة (باج ARAB ٠.٢٤٨)
+   ═══════════════════════════════════════════════════════════ */
+test('المستويات: سهم تحت ١ جنيه — التقueling ميضيّعش الخانات', () => {
+  /* candle price ~0.248 زي ARAB —Direction هابط عشان نختبر الهدف تحت */
+  const c = [];
+  for (let i = 0; i < 80; i++) {
+    const p = 0.30 - i * 0.0007;
+    c.push({ t: 'd' + i, o: p + 0.002, h: p + 0.004, l: p - 0.004, c: p, v: 100000 + i });
+  }
+  const r = SM.fromCandles(c, {});
+  assert.ok(r && r.levels, 'المستويات اتحسبت');
+  const L = r.levels;
+  /* ⛔ الباج: round1 كان بيحوّل ٠.٢٤٨ → ٠.٢ والهدف → ٠.٢ */
+  assert.ok(String(L.entry).indexOf('0.2') === 0 && L.entry > 0.2 && L.entry < 0.3,
+    'الدخول لازم يفضل precise (مش ٠.٢) — got: ' + L.entry);
+  assert.ok(L.entry.toString().split('.').length === 2 && L.entry.toString().split('.')[1].length >= 3,
+    'الدخول لازم ٣ خانات على الأقل — got: ' + L.entry);
+  assert.ok(L.stop !== L.entry && L.target !== L.entry, 'الlevels مختلفة عن الدخول');
+  /* ⛌ في الإعداد الهابط: الوقف فوق والهدف تحت */
+  if (L.dir === 'down') {
+    assert.ok(L.stop > L.entry, 'في البيع: الوقف فوق الدخول');
+    assert.ok(L.target < L.entry, 'في البيع: الهدف تحت الدخول');
+  } else {
+    assert.ok(L.stop < L.entry, 'في الشراء: الوقف تحت الدخول');
+    assert.ok(L.target > L.entry, 'في الشراء: الهدف فوق الدخول');
+  }
+  assert.ok(L.dirLabel && L.dirLabel.length > 5, 'فيه وصف للاتجاه');
+});
+
+test('المستويات:Directions يتفق مع اتجاه البنية', () => {
+  const up = [];
+  for (let i = 0; i < 80; i++) {
+    const p = 10 + i * 0.05;
+    up.push({ t: 'd' + i, o: p - 0.1, h: p + 0.2, l: p - 0.2, c: p, v: 100000 + i });
+  }
+  const r = SM.fromCandles(up, {});
+  assert.ok(r.levels, 'اتحسب');
+  assert.equal(r.levels.dir, 'up', 'اتجاه صاعد');
+  assert.ok(r.levels.target > r.levels.entry, 'الهدف فوق في الصاعد');
+  assert.ok(r.levels.stop < r.levels.entry, 'الوقف تحت في الصاعد');
+});

@@ -36,6 +36,30 @@
   }
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
   function round1(v) { return Math.round(v * 10) / 10; }
+
+  /* ══════════════════════════════════════════════════════════════
+   🎯 تقريب حسب حجم السعر
+   ──────────────────────────────────────────────────────────────
+   ⛔⛔ باج ٢٣ أكتوبر ٢٠٢٦ — سهم زي ARAB بسعر ٠.٢٤٨:
+   ⛌   round1 (خانة واحدة) كان بيحوّل ٠.٢٦٩ → ٠.٣ و ٠.٢٢ → ٠.٢
+   ⛌   ⇒ «الهدف» بيطلع **تحت** سعر الدخول ⇒ المستخدم فاكر إن في خطأ.
+   ⛌ ✅ الحل: عدد الخانات بيتحسب من حجم السعر نفسه.
+   ══════════════════════════════════════════════════════════════ */
+  function pxDec(price) {
+    var a = Math.abs(Number(price) || 0);
+    if (a >= 100) return 1;
+    if (a >= 10) return 2;
+    if (a >= 1) return 3;
+    if (a >= 0.1) return 4;
+    if (a >= 0.01) return 5;
+    return 6;
+  }
+  function pxRound(v, price) {
+    if (v == null || !isFinite(v)) return null;
+    var d = pxDec(price);
+    var p = Math.pow(10, d);
+    return Math.round(v * p) / p;
+  }
   function round0(v) { return Math.round(v); }
 
   /* أول قيمة موجودة من القايمة (لأن أسماء الحقول بتختلف من مصدر لمصدر) */
@@ -641,18 +665,22 @@
       orderBlock: orderBlock(c),
       rana: ranaPattern(c),
       fib: fibEmas(c),
-      atr: a != null ? round1(a) : null,
+      atr: a != null ? pxRound(a, price) : null,
       atrPct: (a != null && price) ? round1(a / price * 100) : null,
       levels: null
     };
     if (a != null && price) {
       var up = !(out.structure && out.structure.state === 'bear');
+      /* ⛌ التقريب حسب حجم السعر (مش خانة واحدة) — شوف pxDec فوق. */
       out.levels = {
-        entry: round1(price),
-        stop: round1(up ? price - 1.5 * a : price + 1.5 * a),
-        target: round1(up ? price + 2 * a : price - 2 * a),
+        entry: pxRound(price, price),
+        stop: pxRound(up ? price - 1.5 * a : price + 1.5 * a, price),
+        target: pxRound(up ? price + 2 * a : price - 2 * a, price),
         stopPct: round1((up ? -1 : 1) * 1.5 * a / price * 100),
-        targetPct: round1((up ? 1 : -1) * 2 * a / price * 100)
+        targetPct: round1((up ? 1 : -1) * 2 * a / price * 100),
+        /* ⭐ الاتجاه — عشان الواجهة تقول للUSER مين فوق ومين تحت */
+        dir: up ? 'up' : 'down',
+        dirLabel: up ? 'إعداد شراء — الوقف تحت والهدف فوق' : 'إعداد بيع — الوقف فوق والهدف تحت'
       };
     }
     return out;

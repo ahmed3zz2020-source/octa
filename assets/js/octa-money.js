@@ -156,6 +156,14 @@
   const num = (v) => (typeof v === 'number' && isFinite(v)) ? v : null;
   const f1 = (v) => num(v) != null ? Number(v).toFixed(1) : '—';
   const f2 = (v) => num(v) != null ? Number(v).toFixed(2) : '—';
+  /* 🎯 سعر بدون ما نضيّع خانات — للأرقام الصغيرة (٠.٢٤٨) الـtoFixed(2)
+     كان بيحوّلها لـ«٠.٢٥» والهدف لـ«٠.٢» ⇒ مستحيل يفهمها المستخدم. */
+  const fp = (v) => {
+    if (num(v) == null) return '—';
+    const n = Number(v);
+    const d = n >= 100 ? 1 : n >= 10 ? 2 : n >= 1 ? 3 : n >= 0.1 ? 4 : n >= 0.01 ? 5 : 6;
+    return n.toFixed(d).replace(/\.?0+$/, '') || '0';
+  };
   const pct = (v) => num(v) != null ? (v >= 0 ? '+' : '') + Number(v).toFixed(2) + '%' : '—';
   const clr = (v) => num(v) == null ? 'var(--muted)' : (v > 0 ? 'var(--up)' : (v < 0 ? 'var(--dn)' : 'var(--muted)'));
 
@@ -793,15 +801,19 @@
     /* ── مستويات الـATR ── */
     if (d.levels) {
       const L = d.levels;
+      const down = L.dir === 'down';
       out.push('<div class="sm-card sm-card-wide">' +
         '<div class="sm-card-h"><span class="sm-card-i">🎯</span><span class="sm-card-t">الدخول ووقف الخسارة والهدف</span>' +
-        '<span class="sm-card-v">ATR ' + f2(d.atr) + ' (' + f1(d.atrPct) + '% من السعر)</span></div>' +
+        '<span class="sm-card-v">ATR ' + fp(d.atr) + ' (' + f1(d.atrPct) + '% من السعر)</span></div>' +
         '<div class="sm-lv3">' +
-        '<div class="sm-lv3-i"><span>دخول</span><b>' + f2(L.entry) + '</b></div>' +
-        '<div class="sm-lv3-i stop"><span>وقف الخسارة</span><b>' + f2(L.stop) + '</b><i>' + f1(L.stopPct) + '%</i></div>' +
-        '<div class="sm-lv3-i tgt"><span>هدف أول</span><b>' + f2(L.target) + '</b><i>' + f1(L.targetPct) + '%</i></div>' +
+        '<div class="sm-lv3-i"><span>دخول</span><b>' + fp(L.entry) + '</b></div>' +
+        '<div class="sm-lv3-i stop"><span>وقف الخسارة' + (down ? ' (فوق)' : ' (تحت)') + '</span>' +
+          '<b>' + fp(L.stop) + '</b><i>' + f1(Math.abs(L.stopPct)) + '%</i></div>' +
+        '<div class="sm-lv3-i tgt"><span>هدف أول' + (down ? ' (تحت)' : ' (فوق)') + '</span>' +
+          '<b>' + fp(L.target) + '</b><i>' + f1(Math.abs(L.targetPct)) + '%</i></div>' +
         '</div>' +
-        '<div class="sm-card-m">📎 المسافة محسوبة من مدى التذبذب الحقيقي (ATR) — مش رقم مخترع.</div>' +
+        '<div class="sm-card-m">📎 المسافة محسوبة من مدى التذبذب الحقيقي (ATR) — مش رقم مخترع.' +
+        (L.dirLabel ? ' · <b>' + L.dirLabel + '</b>' : '') + '</div>' +
         '</div>');
     }
 

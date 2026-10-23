@@ -213,6 +213,13 @@ test('الواجهة: فتح سهم بيرسم الكروت والشارت', asy
   assert.ok(map.innerHTML.indexOf('EMA 8') !== -1, 'EMA 8 مرسوم');
   assert.ok(map.innerHTML.indexOf('VWAP') !== -1, 'VWAP مرسوم');
   assert.ok(map.innerHTML.indexOf('NaN') === -1, 'مافيش NaN في الخريطة');
+
+  /* 🎯 كارت الدخول/الوقف/الهدف — لازم يوضح الاتجاه (فوق/تحت) */
+  const lv = els.smCards.innerHTML;
+  assert.ok(lv.indexOf('وقف الخسارة') !== -1, 'كارت المستويات موجود');
+  assert.ok(lv.indexOf('هدف أول') !== -1, 'الهدف موجود');
+  assert.ok(lv.indexOf('(فوق)') !== -1 || lv.indexOf('(تحت)') !== -1,
+    'الكارت بيوضح إن الوقف/الهدف فوق ولا تحت');
   /* ⭐ الشارت لازم يكون فوق الجدول (مش تحت الـ120 صف) */
   const fs3 = require('node:fs');
   const html = fs3.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'utf8');
