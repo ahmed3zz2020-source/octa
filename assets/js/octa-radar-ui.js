@@ -583,13 +583,13 @@
         /* المتوسطات المتحركة */
         const closes = candles.map(c => c.c);
         function emaLine(len, color) {
-          const s = R.emaSeries(closes, len);
-          if (!s) return;
+          /* ⛔⛔ الإزاحة بتاعت EMA لازم تكون مظبوطة — لو غلطت
+             candles[off+i] بيرجع undefined والشارت بيقع بالكامل.
+             ⇒ العقد معرّف ومختبر في المحرك (R.emaAligned). */
+          const data = R.emaAligned(closes, candles.map(c => c.t), len);
+          if (!data || !data.length) return;
           const line = chart.addSeries(lib.LineSeries, { color: color, lineWidth: 1 });
-          const off = s.length - (candles.length - s.length);
-          const data = [];
-          for (let i = 0; i < s.length; i++) data.push({ time: candles[off + i].t, value: s[i] });
-          line.setData(data);
+          line.setData(data.map(d => ({ time: d.t, value: d.value })));
         }
         emaLine(20, '#d4af37'); emaLine(50, '#3b82f6'); emaLine(200, '#a855f7');
         /* الحجم */

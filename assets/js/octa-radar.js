@@ -173,6 +173,25 @@
     return s ? s[s.length - 1] : null;
   }
 
+  /* 📈 EMA مُزاحة مع الزمن — بترجّع نقاط {t, value} مربوطة بالشموع.
+     ⛔⛔ العقد: emaSeries بتبدأ من أول EMA = الشمعة رقم (len-1)
+        (بذرة = SMA أول len شمعة ⇒ أول EMA بينتهي عند len-1).
+        ⛌ أي حد يحسب الإزاحة غلط (زي 2*len - count) بيطلع
+           undefined وبيقع الشارت بالكامل. ⇒ العقد ده متكتوب هنا
+           ومغطّى باختبار. */
+  function emaAligned(closes, times, len) {
+    var s = emaSeries(closes, len);
+    if (!s || !times) return null;
+    var off = len - 1;
+    var out = [];
+    for (var i = 0; i < s.length; i++) {
+      var idx = off + i;
+      if (idx < 0 || idx >= times.length) return null;   /* ⛔ fail-closed */
+      out.push({ t: times[idx], value: s[i] });
+    }
+    return out;
+  }
+
   /* 📉 RSI — Wilder (14) */
   function rsiSeries(closesArr, len) {
     if (!closesArr || closesArr.length < len + 1) return null;
@@ -1599,7 +1618,7 @@
     /* جود�� البيانات */
     DQ: DQ, cleanCandles: cleanCandles, dataQuality: dataQuality, hasRealMovement: hasRealMovement,
     /* مؤشرات */
-    sma: sma, ema: ema, emaSeries: emaSeries, rsi: rsi, rsiSeries: rsiSeries,
+    sma: sma, ema: ema, emaSeries: emaSeries, emaAligned: emaAligned, rsi: rsi, rsiSeries: rsiSeries,
     macd: macd, atr: atr, atrSeries: atrSeries, atrPct: atrPct, adx: adx,
     rvol: rvol, volumeStats: volumeStats, avgRange: avgRange,
     /* بنية */

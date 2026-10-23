@@ -1005,3 +1005,29 @@ test('⛔ التصنيف A ممكن يتحقق (مش مستحيل رياضياً
   assert.equal(c.code, 'A', '⛔ لازم فيه مسار لشروط كاملة');
   assert.equal(c.failed.length, 0, 'مفيش شروط فاشلة');
 });
+
+/* ═══════════════════════════════════════════════════════════
+   📈 18) محاذاة EMA مع الزمن (باج: الشارت كان بيقع بالكامل)
+   ═══════════════════════════════════════════════════════════ */
+
+test('📈 emaAligned بترجّع نقاط مربوطة بالشموع (الإزاحة = len-1)', () => {
+  const closes = []; const times = [];
+  for (let i = 1; i <= 25; i++) { closes.push(i); times.push('d' + i); }
+  const a = R.emaAligned(closes, times, 20);
+  assert.equal(a.length, closes.length - 20 + 1, 'عدد النقاط');
+  assert.equal(a[0].t, 'd20', '⛔ أول نقطة = الشمعة رقم (len-1)');
+  assert.equal(a[a.length - 1].t, 'd25', '⛔ آخر نقطة = آخر شمعة');
+  assert.equal(a[a.length - 1].value, R.ema(closes, 20), '⛔ آخر قيمة = EMA الحالي');
+  /* ⛔ ما فيش أي undefined — ده اللي كان بيقع بيه الشارت */
+  a.forEach(p => { assert.ok(p && p.t != null && Number.isFinite(p.value), '⛔ نقطة سليمة'); });
+});
+
+test('📈 emaAligned بترجّع null لو البيانات قصيرة (fail-closed)', () => {
+  assert.equal(R.emaAligned([1, 2], ['a', 'b'], 20), null);
+  assert.equal(R.emaAligned(null, null, 20), null);
+});
+
+test('📈 emaAligned بترجّع null لو_times_ أقصر من البيانات', () => {
+  const closes = []; for (let i = 1; i <= 50; i++) closes.push(i);
+  assert.equal(R.emaAligned(closes, ['x', 'y'], 20), null, '⛔ fail-closed');
+});

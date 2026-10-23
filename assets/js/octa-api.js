@@ -86,7 +86,10 @@
   '/api/health', '/api/track', '/api/logos', '/api/tvlogo'
   ];
   const OPEN_PREFIXES = [
-  '/api/auth/', '/api/logos/', '/api/tvlogo/', '/api/admin/', '/api/tg-'
+  '/api/auth/', '/api/logos/', '/api/tvlogo/', '/api/admin/', '/api/tg-',
+  /* 🛰️ الرادار الذكي — مفتوح زي /api/candles بالظبط
+     (نفس بيانات الشموع + كون المرجع في ملف ثابت). */
+  '/api/radar/'
   ];
 
   /* ⛔ الـfetch بتيجي برابط كامل (https://…) أو نسبي (/api/…)
