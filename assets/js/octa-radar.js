@@ -675,9 +675,13 @@
 
     if (r == null) { state = VOL.NONE; score = null; }
     else {
-      if (r >= 3) state = VOL.UNUSUAL;
-      else if (r >= 1.5) state = VOL.HIGH;
-      else if (r >= 0.8) state = VOL.NORMAL;
+      /* 📊 عتبات معايَرة على التوزيع الحقيقي للبورصة المصرية
+         (عيّنة ١١٦ سهم · ٢٣ أكتوبر ٢٠٢٦):
+         وسيط RVOL = ٠.٧٠ · ربع ١ = ٠.٤٦ · ربع ٣ = ١.٠١
+         ⇒ «ضعيف» تحت ٠.٦ (٣٠٪ من السوق) · «مرتفع» ١.٣+ */
+      if (r >= 2.5) state = VOL.UNUSUAL;
+      else if (r >= 1.3) state = VOL.HIGH;
+      else if (r >= 0.6) state = VOL.NORMAL;
       else state = VOL.LOW;
 
       /* 📊 الدرجة = هل الحجم **أكّد** الحركة ولا ناقضها؟
@@ -1075,7 +1079,9 @@
 
     /* ── الفحوصات ─────────────────────────────────────────── */
     var atrPct = vola.atrPct;
-    if (atrPct != null && atrPct > 4.5) {
+    /* 📊 العتبة معايَرة على السوق: وسيط ATR% في البورصة المصرية ≈ ٥.٤٤٪
+       (عيّنة ١١٢ سهم) ⇒ ٨٪ هو الحدّ_HIGH فعلاً، مش ٤.٥٪. */
+    if (atrPct != null && atrPct > 8) {
       warns.push({ k: 'atr_high', t: 'ar', msg: 'السهم شديد التذبذب (ATR = ' + round2(atrPct) + '% من السعر)' });
       flags.highAtr = true;
     }
@@ -1166,6 +1172,402 @@
   }
 
   /* ══════════════════════════════════════════════════════════════
+   🕵️ 12) الدليل الذكي (SMART MONEY EVIDENCE)
+   ──────────────────────────────────────────────────────────────
+   ⛔⛔⛔ ده **طبقة أدلة** — مش كاشف مؤسسات.
+      مفيش عندنا بيانات ملكية مؤسسية ولا تدفق أوامر.
+      ⛔ بنقول «نشاط» مش «شراء مؤسسات».
+      ⛔ كل مكوّن ليه مصدر + مستوى ثقة — والدرجة محسوبة بثقة مرجّحة.
+
+   📌 درجتها **مش** جزء من الدرجة المركّبة (عشان ما نضاعفش الحجم).
+      هي طبقة **تأكيد** مستقلة.
+   ══════════════════════════════════════════════════════════════ */
+  var SM = {
+    STRONG: 'STRONG SUPPORTING EVIDENCE', MODERATE: 'MODERATE SUPPORTING EVIDENCE',
+    MIXED: 'MIXED EVIDENCE', WEAK: 'WEAK EVIDENCE', NONE: 'INSUFFICIENT DATA'
+  };
+  var CONF = { HIGH: 'HIGH', MEDIUM: 'MEDIUM', LOW: 'LOW', NONE: 'NONE' };
+
+  /* 📡 توصية المحللين (TradingView) من -1 (بيع) لـ +1 (شراء) */
+  function recToScore(rec) {
+    var r = num(rec);
+    if (r == null) return null;
+    return clamp((r + 1) * 50, 0, 100);
+  }
+
+  function smartMoneyEngine(c, opts) {
+    opts = opts || {};
+    var comps = [];
+    var notes = [];
+
+    /* ① توسيع الحجم — من الشموع */
+    /* ⛔ الاسم لازم يبقى rv مش rvol — عشان rvol() هي الدالة نفسها
+       (لو سمّيناه rvol المتغيّر بيغطّي الدالة وبيطلع TypeError). */
+    var rv = c && c.length >= 21 ? rvol(c, 20) : null;
+    if (rv != null) {
+      var s1 = clamp(50 + (rv - 1) * 30, 0, 100);
+      comps.push({ k: 'volume_expansion', label: 'توسّع الحجم',
+        src: 'الشموع اليومية · حجم ٢٠ جلسة سابقة',
+        conf: 0.6, score: round1(s1),
+        detail: 'حجم اليوم ' + round2(rv) + '× متوسط ٢٠ جلسة' });
+    }
+
+    /* ② تأكيد السعر بالحجم — السعر صاعد والحجم كبر */
+    var move5 = null;
+    if (c && c.length >= 6) {
+      var p0 = c[c.length - 6].c, p1 = c[c.length - 1].c;
+      if (p0 > 0) move5 = (p1 - p0) / p0 * 100;
+    }
+    if (move5 != null && rv != null) {
+      var s2 = (move5 > 0 && rv >= 1.1) ? clamp(60 + Math.min(move5, 10) * 2 + (rv - 1) * 10, 0, 100)
+        : (move5 < 0 && rv >= 1.5) ? clamp(30 - Math.min(-move5, 10), 0, 100)
+        : clamp(45 + move5, 0, 100);
+      comps.push({ k: 'price_volume_confirm', label: 'تأكيد السعر بالحجم',
+        src: 'الشموع اليومية · ٥ جلسات',
+        conf: 0.6, score: round1(s2),
+        detail: (move5 >= 0 ? 'السعر +' : 'السهم −') + round1(Math.abs(move5)) + '% مع حجم ' + round2(rv) + '×' });
+    }
+
+    /* ③ توصية المحللين — مصدر مستقل (مش الحجم) */
+    var recS = recToScore(opts.rec);
+    if (recS != null) {
+      var s3 = recS;
+      var divBonus = 0;
+      /* ⛔⛔ الانفصال: المحللين إيجابيين والسعر واقف ⇒ تموضع قبل الحركة */
+      if (recS >= 60 && move5 != null && move5 <= 0.2) { s3 = clamp(s3 + 12, 0, 100); divBonus = 12; }
+      comps.push({ k: 'analyst_alignment', label: 'اتفاق المحللين',
+        src: 'توصية المحللين · TradingView',
+        conf: 0.4, score: round1(s3),
+        detail: (opts.rec >= 0.15 ? 'توصية إيجابية' : (opts.rec <= -0.15 ? 'توصية سلبية' : 'توصية محايدة')) +
+          (divBonus ? ' · مع انفصال عن السعر (تموضع قبل الحركة)' : '') });
+    }
+
+    /* ④ شذوذ الدوران — حجم التداول ÷ حجم السهمOutstanding مقابل متوسطه */
+    var mc = num(opts.marketCap), px = num(opts.price) || (c && c.length ? c[c.length - 1].c : null);
+    if (mc && mc > 0 && px && px > 0 && c && c.length >= 21) {
+      var shares = mc / px;
+      var v = volumes(c);
+      var avgV = sma(v.slice(0, v.length - 1), 20);
+      if (avgV && avgV > 0) {
+        var toAvg = (avgV / shares) * 100;
+        var toNow = (v[v.length - 1] / shares) * 100;
+        var ratio = toAvg > 0 ? toNow / toAvg : null;
+        if (ratio != null) {
+          var s4 = clamp(50 + (ratio - 1) * 35, 0, 100);
+          comps.push({ k: 'turnover_anomaly', label: 'شذوذ الدوران',
+            src: 'الحجم + القيمة السوقية · TradingView',
+            conf: 0.5, score: round1(s4),
+            detail: 'دوران اليوم ' + round2(toNow) + '% مقابل متوسط ' + round2(toAvg) + '%' });
+        }
+      }
+    }
+
+    /* ⑤ بيانات المؤسسات — غير متاحة ⛔ */
+    var institutional = null;
+    notes.push('INSTITUTIONAL DATA UNAVAILABLE');
+
+    /* ── الدرجة بثقة مرجّحة ───────────────────────────────── */
+    var wsum = 0, acc = 0;
+    for (var i = 0; i < comps.length; i++) {
+      wsum += comps[i].conf;
+      acc += comps[i].score * comps[i].conf;
+    }
+    var score = wsum > 0 ? round1(clamp(acc / wsum, 0, 100)) : null;
+    var confLevel = CONF.NONE;
+    if (wsum >= 1.2) confLevel = CONF.HIGH;
+    else if (wsum >= 0.6) confLevel = CONF.MEDIUM;
+    else if (wsum > 0) confLevel = CONF.LOW;
+
+    var state;
+    if (score == null) state = SM.NONE;
+    else if (score >= 70) state = SM.STRONG;
+    else if (score >= 55) state = SM.MODERATE;
+    else if (score >= 40) state = SM.MIXED;
+    else state = SM.WEAK;
+
+    return {
+      state: state, score: score, confidence: confLevel,
+      components: comps, institutional: institutional,
+      institutionalAvailable: false,
+      notes: notes,
+      /* ⛔ تنبيه ثابت: الحجم العالي مش إثبات شراء مؤسسات */
+      disclaimer: 'حجم عالي ≠ شراء مؤسسات. الأدلة المتاحة من السعر والحجم وتوصية المحللين فقط.'
+    };
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   🎚️ 13) بروفايلات الاستراتيجية
+   ──────────────────────────────────────────────────────────────
+   📌 كل قاعدة موثّقة. ⛔ مفيش بروفايل «الأفضل» — دي أدوات مختلفة.
+   📌 الأوزان **بتتخزّن هنا** مش متفرقة في الكود.
+   ══════════════════════════════════════════════════════════════ */
+  var STRATEGY_VERSION = '1.0.0';
+
+  var PROFILES = {
+    conservative: {
+      key: 'conservative', name: 'محافظ', nameEn: 'Conservative',
+      desc: 'تأكيد أقوى للاتجاه · سيولة أعلى · مخاطرة أقل',
+      descEn: 'Stronger trend confirmation, higher liquidity, lower risk',
+      trendAllowed: ['UPTREND'],
+      minTrendScore: 62, minMomentumScore: 58, minVolumeScore: 48,
+      maxAtrPct: 6.0, minRvol: 1.1, minLiquidity: 'LIQUID', minRR: 2.0,
+      requireVolumeConfirm: 1.3, requirePlan: true, maxRisk: 'MODERATE RISK',
+      minComposite: 66,
+      weights: { trend: 40, momentum: 25, volume: 20, risk: 15 }
+    },
+    balanced: {
+      key: 'balanced', name: 'متوازن', nameEn: 'Balanced',
+      desc: 'توازن بين التأكيد والمخاطرة',
+      descEn: 'Balanced confirmation and risk criteria',
+      trendAllowed: ['UPTREND', 'TREND TRANSITION'],
+      minTrendScore: 48, minMomentumScore: 45, minVolumeScore: 40,
+      maxAtrPct: 8.0, minRvol: 1.0, minLiquidity: 'MODERATE', minRR: 1.5,
+      requireVolumeConfirm: 1.2, requirePlan: true, maxRisk: 'MODERATE RISK',
+      minComposite: 58,
+      weights: { trend: 35, momentum: 25, volume: 20, risk: 20 }
+    },
+    trend: {
+      key: 'trend', name: 'اتجاه', nameEn: 'Trend Following',
+      desc: 'الاتجاه هو المحور · الزخم والحجم يأكّدوا · الوقف على ATR',
+      descEn: 'Directional trend is central; momentum and volume confirm',
+      trendAllowed: ['UPTREND', 'TREND TRANSITION'],
+      minTrendScore: 55, minMomentumScore: 50, minVolumeScore: 38,
+      maxAtrPct: 10.0, minRvol: 0.9, minLiquidity: 'MODERATE', minRR: 1.5,
+      requireVolumeConfirm: 1.1, requirePlan: true, maxRisk: 'HIGH RISK',
+      minComposite: 60,
+      weights: { trend: 45, momentum: 20, volume: 15, risk: 20 }
+    }
+  };
+
+  function getProfile(key) {
+    return PROFILES[key] || PROFILES.balanced;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   🧮 14) الدرجة المركّبة + إعادة توزيع الأوزان
+   ──────────────────────────────────────────────────────────────
+   ⛔ المؤشر الناقص **مش** صفر — بيتشال، والوزن بيتوزّع على الباقي.
+   ⛔ لو الباقي مش كفاية ⇒ مفيش درجة مركّبة (مش درجة ناقصة).
+   ══════════════════════════════════════════════════════════════ */
+  var COMPONENTS = ['trend', 'momentum', 'volume', 'risk'];
+
+  function compositeScore(scores, profile, available) {
+    profile = profile || PROFILES.balanced;
+    var w = profile.weights || {};
+    var used = {}, missing = [], wsum = 0, acc = 0, adjW = {};
+    for (var i = 0; i < COMPONENTS.length; i++) {
+      var k = COMPONENTS[i];
+      var v = scores ? scores[k] : null;
+      var base = w[k] || 0;
+      if (v == null || !isFinite(v)) {
+        missing.push(k);
+        continue;
+      }
+      used[k] = v;
+      wsum += base;
+    }
+    /* ⛔ مفيش حد أدنى من المؤشرات ⇒ مفيش درجة */
+    var minNeeded = 3;
+    if (wsum <= 0 || Object.keys(used).length < minNeeded) {
+      return {
+        total: null, used: used, missing: missing, weights: {}, adjusted: {},
+        completeness: available && available.total ? Math.round(Object.keys(used).length / available.total * 100) : 0,
+        insufficient: true, reason: Object.keys(used).length < minNeeded ? 'insufficient_indicators' : 'no_weights'
+      };
+    }
+    /* 📊 إعادة التوزيع متناسبة */
+    for (var j = 0; j < COMPONENTS.length; j++) {
+      var kk = COMPONENTS[j];
+      if (used[kk] == null) continue;
+      var nw = (w[kk] || 0) / wsum * 100;   /* وزن موزّع بالـ% */
+      adjW[kk] = Math.round(nw * 10) / 10;
+      /* ⛔⛔ لازم نقسم على ١٠٠ — nw percentage مش كسر.
+         (باج: الدرجة كانت ٨٤٥٠ بدل ٨٤.٥) */
+      acc += used[kk] * nw / 100;
+    }
+    var total = Math.round(acc * 10) / 10;
+    return {
+      total: total, used: used, missing: missing,
+      weights: w, adjusted: adjW,
+      completeness: available && available.total ? Math.round(Object.keys(used).length / available.total * 100) : 0,
+      insufficient: false, reason: null
+    };
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   🏷️ 15) التصنيف النهائي
+   ──────────────────────────────────────────────────────────────
+   ⛔ مش بنجبر أي سهم يدخل صفقة.
+   A مرشح قوي · B محتاج تأكيد · C مخاطرة عالية
+   D مفيش_SETUP حالياً · E بيانات ناقصة
+   ══════════════════════════════════════════════════════════════ */
+  var CLASS = {
+    A: 'STRONG ANALYTICAL CANDIDATE',
+    B: 'CANDIDATE — NEEDS CONFIRMATION',
+    C: 'HIGH RISK',
+    D: 'NO CURRENT SETUP',
+    E: 'INSUFFICIENT DATA'
+  };
+
+  function classify(r, profile) {
+    profile = profile || PROFILES.balanced;
+    var reasons = [], missing = [];
+
+    /* ── E: بيانات ناقصة ─────────────────────────────────── */
+    var dq = r.dq || {};
+    if (!dq.usable || (dq.sessions != null && dq.sessions < DQ.MIN_TREND)) {
+      return { code: 'E', state: CLASS.E, reasons: [], failed: [], missing: missing };
+    }
+    if (r.score && r.score.insufficient) {
+      return { code: 'E', state: CLASS.E, reasons: [], failed: [],
+        missing: ['عدد المؤشرات المتاحة أقل من الحد الأدنى (' + r.score.reason + ')'] };
+    }
+
+    var tr = r.trend || {}, mom = r.momentum || {}, vol = r.volume || {}, vola = r.volatility || {};
+    var plan = r.plan || {}, risk = r.risk || {}, sm = r.smart || {};
+
+    /* ── الشروط المطلوبة ──────────────────────────────────── */
+    var ok = [];
+    var fail = [];
+
+    /* 📌 كل شرط متصنّف:
+       core    = أساس التحليل (اتجاه/زخم/حجم/درجة) — ٥ شروط
+       confirm = شروط التأكيد (تذبذب/حجم نسبي/سيولة/عائد/خطة) — ٥ شروط
+       risk    = شرط المخاطرة — ١
+       ⛔ التصنيف بيتبني على المجموعات دي مش على عدد الفاشل. */
+    var groups = { core: [], confirm: [], risk: [] };
+    function check(name, cond, whyFail, group) {
+      if (cond) { ok.push(name); groups[group].push(true); }
+      else {
+        fail.push(name); missing.push(whyFail || name); groups[group].push(false);
+      }
+    }
+    function corePass() { return groups.core.filter(Boolean).length; }
+    function confirmPass() { return groups.confirm.filter(Boolean).length; }
+
+    check('الاتجاه ' + (profile.trendAllowed.join(' أو ')),
+      profile.trendAllowed.indexOf(tr.state) >= 0,
+      'الاتجاه الحالي «' + (tr.state || 'غير متاح') + '» مش ضمن شروط البروفايل', 'core');
+    check('درجة الاتجاه ≥ ' + profile.minTrendScore,
+      tr.score != null && tr.score >= profile.minTrendScore,
+      'درجة الاتجاه ' + (tr.score == null ? 'غير متاحة' : tr.score) + ' أقل من ' + profile.minTrendScore, 'core');
+    check('درجة الزخم ≥ ' + profile.minMomentumScore,
+      mom.score != null && mom.score >= profile.minMomentumScore,
+      'درجة الزخم ' + (mom.score == null ? 'غير متاحة' : mom.score) + ' أقل من ' + profile.minMomentumScore, 'core');
+    check('درجة الحجم ≥ ' + profile.minVolumeScore,
+      vol.score != null && vol.score >= profile.minVolumeScore,
+      'درجة الحجم ' + (vol.score == null ? 'غير متاحة' : vol.score) + ' أقل من ' + profile.minVolumeScore, 'core');
+    check('التذبذب ≤ ' + profile.maxAtrPct + '%',
+      vola.atrPct != null && vola.atrPct <= profile.maxAtrPct,
+      'التذبذب ' + (vola.atrPct == null ? 'غير متاح' : vola.atrPct + '%') + ' أعلى من المسموح', 'confirm');
+    check('الحجم النسبي ≥ ' + profile.minRvol,
+      vol.rvol != null && vol.rvol >= profile.minRvol,
+      'الحجم النسبي ' + (vol.rvol == null ? 'غير متاح' : vol.rvol) + ' أقل من ' + profile.minRvol, 'confirm');
+    var liqRank = { 'DEEP': 5, 'LIQUID': 4, 'MODERATE': 3, 'THIN': 2, 'ILLIQUID': 1 };
+    check('السيولة ≥ ' + profile.minLiquidity,
+      vol.liq && vol.liq !== 'NONE' && (liqRank[vol.liq] || 0) >= (liqRank[profile.minLiquidity] || 0),
+      'السيولة ' + (vol.liq || 'غير متاحة') + ' أقل من ' + profile.minLiquidity, 'confirm');
+    check('نسبة العائد ≥ ' + profile.minRR,
+      plan.rr != null && plan.rr >= profile.minRR,
+      plan.rr == null ? 'مفيش هدف ⇒ نسبة العائد غير محسوبة' : 'نسبة العائد ' + plan.rr + ' أقل من ' + profile.minRR, 'confirm');
+    if (profile.requirePlan) {
+      check('خطة دخول صالحة', plan.status === PLAN.ZONE || plan.status === PLAN.CONFIRMED,
+        'الخطة: ' + (plan.status || 'غير متاحة'), 'confirm');
+    }
+    var riskOrder = { 'LOWER RELATIVE RISK': 0, 'MODERATE RISK': 1, 'HIGH RISK': 2, 'VERY HIGH RISK': 3, 'RISK NOT ASSESSABLE': 4 };
+    var maxRisk = riskOrder[profile.maxRisk] == null ? 2 : riskOrder[profile.maxRisk];
+    check('المخاطرة ≤ ' + profile.maxRisk,
+      risk.state && riskOrder[risk.state] != null && riskOrder[risk.state] <= maxRisk,
+      'المخاطرة: ' + (risk.state || 'غير متاحة'), 'risk');
+    check('الدرجة المركّبة ≥ ' + profile.minComposite,
+      r.score && r.score.total != null && r.score.total >= profile.minComposite,
+      'الدرجة المركّبة ' + (r.score && r.score.total != null ? r.score.total : 'غير متاحة') + ' أقل من ' + profile.minComposite, 'core');
+
+    /* ── A: كل الشروط مستوفاة ────────────────────────────── */
+    if (fail.length === 0) {
+      return { code: 'A', state: CLASS.A, reasons: ok, failed: [], missing: [] };
+    }
+    /* ── C: «يبدو كويس بس خطور» ────────────────────────────
+       ⛔ لازم الأساس التحليلي كله يمر (اتجاه+زخم+حجم+درجة)
+          وإلا السهم مش «مرشح بجهد مخاطرة» — ده «مفيش_setup». */
+    var risky = risk.state === RISK.VERY_HIGH || risk.state === RISK.HIGH;
+    if (corePass() === groups.core.length && risky) {
+      return { code: 'C', state: CLASS.C, reasons: ok, failed: fail, missing: missing };
+    }
+    /* ── B: أساس جيد + ناقص تأكيد ───────────────────────── */
+    if (corePass() >= groups.core.length - 1 && confirmPass() >= 3) {
+      return { code: 'B', state: CLASS.B, reasons: ok, failed: fail, missing: missing };
+    }
+    /* ── D: مفيش_SETUP حالياً ─────────────────────────────── */
+    return { code: 'D', state: CLASS.D, reasons: ok, failed: fail, missing: missing };
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   🛰️ 16) المنسّق (ORCHESTRATOR) — المسار الكامل
+   ──────────────────────────────────────────────────────────────
+   📌 الترتيب المنطقي (ثابت):
+      جودة البيانات → الاتجاه → الزخم → الحجم → التذبذب
+      → الدليل الذكي → الخطة → المخاطرة → الدرجة → التصنيف
+
+   ⛔ لو أي مرحلة رجّعت «ناقص» ⇒ بتنتقل زي ما هي.
+      مافيش أي مرحلة بتخترع رقم.
+   ══════════════════════════════════════════════════════════════ */
+  function analyze(candles, meta) {
+    meta = meta || {};
+    var profile = getProfile(meta.profile);
+    var dq = dataQuality(candles);
+    var c = cleanCandles(candles).candles;
+
+    var trend = trendEngine(c, dq, {});
+    var momentum = momentumEngine(c, dq, {});
+    var volume = volumeEngine(c, dq, { marketCap: meta.marketCap, price: meta.price });
+    var volatility = volatilityEngine(c, dq, {});
+    var smart = smartMoneyEngine(c, {
+      rec: meta.rec, marketCap: meta.marketCap, price: meta.price
+    });
+
+    var planCfg = defaultPlanCfg(meta.planCfg || {});
+    planCfg.requireVolumeConfirm = profile.requireVolumeConfirm;
+    var plan = planEngine(c, trend, volume, volatility, planCfg);
+
+    var money = meta.money || {};
+    var sizing = sizingEngine(plan, money);
+
+    var risk = riskEngine({
+      dq: dq, plan: plan, volat: volatility, volume: volume,
+      momentum: momentum, trend: trend, sizing: sizing,
+      profile: profile, suspended: !!meta.suspended,
+      missingCount: [trend.score, momentum.score, volume.score, volatility.score]
+        .filter(function (x) { return x == null; }).length
+    });
+
+    var scores = {
+      trend: trend.score, momentum: momentum.score,
+      volume: volume.score, risk: volatility.score
+    };
+    var score = compositeScore(scores, profile, { total: COMPONENTS.length });
+
+    var cls = classify({
+      dq: dq, trend: trend, momentum: momentum, volume: volume,
+      volatility: volatility, plan: plan, risk: risk, score: score, smart: smart
+    }, profile);
+
+    return {
+      code: meta.code || '',
+      name: meta.name || '',
+      sector: meta.sector || '',
+      price: meta.price != null ? meta.price : (c.length ? c[c.length - 1].c : null),
+      change: meta.change != null ? meta.change : null,
+      rec: meta.rec != null ? meta.rec : null,
+      dq: dq, trend: trend, momentum: momentum, volume: volume,
+      volatility: volatility, smart: smart, plan: plan, sizing: sizing,
+      risk: risk, score: score, classification: cls,
+      profile: profile, strategyVersion: STRATEGY_VERSION,
+      dataTimestamp: dq.lastDate
+    };
+  }
+
+  /* ══════════════════════════════════════════════════════════════
    🔬 8) جودة البيانات —德냐 غير متاح
    ══════════════════════════════════════════════════════════════ */
 
@@ -1187,6 +1589,13 @@
     volumeEngine: volumeEngine, volatilityEngine: volatilityEngine,
     /* الخطة والمخاطرة */
     defaultPlanCfg: defaultPlanCfg, planEngine: planEngine,
-    sizingEngine: sizingEngine, riskEngine: riskEngine
+    sizingEngine: sizingEngine, riskEngine: riskEngine,
+    /* الدليل الذكي + البروفايلات + الدرجة + التصنيف */
+    SM: SM, CONF: CONF, recToScore: recToScore, smartMoneyEngine: smartMoneyEngine,
+    PROFILES: PROFILES, getProfile: getProfile, STRATEGY_VERSION: STRATEGY_VERSION,
+    COMPONENTS: COMPONENTS, compositeScore: compositeScore,
+    CLASS: CLASS, classify: classify,
+    /* المنسّق */
+    analyze: analyze
   };
 });

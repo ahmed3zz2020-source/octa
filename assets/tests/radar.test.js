@@ -405,8 +405,9 @@ test('حجم ضعيف ⇒ LOW', () => {
   const c = mkCandles({ n: 60, vol: 1000, volGrow: 0 });
   const v = R.volumeEngine(c, R.dataQuality(c), {});
   assert.equal(v.state, R.VOL.NORMAL, 'حجم ثابت = طبيعي');
-  const c2 = mkCandles({ n: 60, vol: 3000, volGrow: -40 });
+  const c2 = mkCandles({ n: 60, vol: 5000, volGrow: -80 });
   const v2 = R.volumeEngine(c2, R.dataQuality(c2), {});
+  assert.ok(v2.rvol < 0.6, 'الحجم النسبي تحت ٠.٦ — ' + v2.rvol);
   assert.equal(v2.state, R.VOL.LOW, 'حجم متناقص = ضعيف — ' + v2.state);
 });
 
@@ -622,7 +623,7 @@ test('المخاطرة: سيولة ضعيفة + تذبذب عالي ⇒ HIGH ع�
   const r = R.riskEngine({
     dq: { stale: false, sessions: 200 },
     plan: { status: R.PLAN.ZONE, rr: 2.0, conflict: false },
-    volat: { atrPct: 6.0 },
+    volat: { atrPct: 9.0 },
     volume: { liq: R.LIQ.ILLIQUID },
     momentum: { dirState: R.MOM.POS },
     trend: { state: R.TREND.UP },
@@ -665,4 +666,195 @@ test('⛔ مفيش أي سهم بيتقصد «آمن»', () => {
   });
   assert.notEqual(r.state, 'SAFE', '⛔ مفيش تصنيف SAFE');
   assert.ok(r.state.indexOf('RISK') >= 0 || r.state.indexOf('RELATIVE RISK') >= 0, r.state);
+});
+
+/* ═══════════════════════════════════════════════════════════
+   🕵️ 12) الدليل الذكي
+   ═══════════════════════════════════════════════════════════ */
+
+test('الدليل الذكي: مكوّنات ليها مصدر + ثقة + درجة', () => {
+  const c = mkReal({ n: 150, trend: 1, noise: 0.04, seed: 3 });
+  const sm = R.smartMoneyEngine(c, { rec: 0.4, marketCap: 5e9, price: 100 });
+  assert.ok(sm.components.length >= 2, 'في مكوّنات — ' + sm.components.length);
+  sm.components.forEach(cp => {
+    assert.ok(cp.src && cp.src.length > 3, 'المكوّن ' + cp.k + ' ليه مصدر');
+    assert.ok(typeof cp.conf === 'number' && cp.conf > 0 && cp.conf <= 1, 'ثقة ' + cp.k);
+    assert.ok(cp.score >= 0 && cp.score <= 100, 'درجة ' + cp.k + ' = ' + cp.score);
+  });
+  assert.ok(sm.score >= 0 && sm.score <= 100, '⛔ الدرجة داخل ٠..١٠٠ — ' + sm.score);
+});
+
+test('⛔ بيانات المؤسسات غير متاحة ⇒ معلنة دايماً (مش مصنوعة)', () => {
+  const c = mkReal({ n: 150, trend: 1 });
+  const sm = R.smartMoneyEngine(c, { rec: 0.2, marketCap: 5e9, price: 100 });
+  assert.equal(sm.institutionalAvailable, false, 'غير متاح');
+  assert.equal(sm.institutional, null, '⛔ مفيش بيانات مؤسسات مصنوعة');
+  assert.ok(sm.notes.indexOf('INSTITUTIONAL DATA UNAVAILABLE') >= 0, 'التنبيه موجود');
+  assert.ok(sm.disclaimer.indexOf('مؤسسات') >= 0, '⛔ التنبيه بيقول إن الحجم مش شراء مؤسسات');
+});
+
+test('⛔ توصية المحللين: من -١..+١ ⇒ ٠..١٠٠', () => {
+  closeTo(R.recToScore(1), 100, 'شراء strongest');
+  closeTo(R.recToScore(-1), 0, 'sell strongest');
+  closeTo(R.recToScore(0), 50, 'neutral');
+  assert.equal(R.recToScore(null), null, '⛔ مفيش توصية ⇒ null');
+});
+
+test('⛔ مفيش شموع ⇒ دليل ذكي غير متاح', () => {
+  const sm = R.smartMoneyEngine([], {});
+  assert.equal(sm.score, null, '⛔ الدرجة null');
+  assert.equal(sm.state, R.SM.NONE, 'غير متاح');
+});
+
+/* ═══════════════════════════════════════════════════════════
+   🧮 13) الدرجة المركّبة
+   ═══════════════════════════════════════════════════════════ */
+
+test('⛔ الدرجة المركّبة داخل ٠..١٠٠ (باج ٨٤٥٠)', () => {
+  const c = R.compositeScore(
+    { trend: 84, momentum: 60, volume: 50, risk: 70 },
+    R.PROFILES.balanced, { total: 4 });
+  assert.ok(c.total >= 0 && c.total <= 100, '⛔ الدرجة = ' + c.total);
+  /* (84×35 + 60×25 + 50×20 + 70×20) / 100 = 68.4 */
+  closeTo(c.total, 68.4, 'الدرجة المركّبة');
+});
+
+test('⛔ مؤشر ناقص ⇒ بيتشال والوزن بيتوزّع (مش صفر)', () => {
+  const c = R.compositeScore(
+    { trend: 80, momentum: null, volume: 60, risk: 70 },
+    R.PROFILES.balanced, { total: 4 });
+  assert.equal(c.missing.length, 1, 'المؤشر الناقص مسجّل');
+  assert.ok(c.missing.indexOf('momentum') >= 0, 'اسمه صحيح');
+  assert.ok(c.adjusted.momentum === undefined, '⛔ مفيش وزن للمؤشر الناقص');
+  /* الأوزان بتتجمع ١٠٠ بعد التوزيع */
+  const sum = Object.keys(c.adjusted).reduce((a, k) => a + c.adjusted[k], 0);
+  /* ⛔ الأوزان معروضة بخانة ⇒ المجموع ممكن يختلف ٠.١ */
+  assert.ok(Math.abs(sum - 100) <= 0.2, 'مجموع الأوزان ≈ ١٠٠ — ' + sum);
+  assert.ok(c.total >= 0 && c.total <= 100, 'الدرجة لسه داخل المدى');
+});
+
+test('⛔ أقل من ٣ مؤشرات ⇒ مفيش درجة مركّبة', () => {
+  const c = R.compositeScore({ trend: 80, momentum: null }, R.PROFILES.balanced, { total: 4 });
+  assert.equal(c.total, null, '⛔ مفيش درجة');
+  assert.equal(c.insufficient, true, 'غير كافية');
+});
+
+test('البروفايلات: ٣ بروفايلات + أوزان مخزّنة + قواعد موثّقة', () => {
+  const keys = Object.keys(R.PROFILES);
+  assert.equal(keys.length, 3, '٣ بروفايلات');
+  ['conservative', 'balanced', 'trend'].forEach(k => {
+    const p = R.PROFILES[k];
+    assert.ok(p.name && p.nameEn, k + ' ليه اسم عربي وإنجليزي');
+    assert.ok(p.desc && p.descEn, k + ' ليه وصف');
+    const wsum = p.weights.trend + p.weights.momentum + p.weights.volume + p.weights.risk;
+    closeTo(wsum, 100, k + ' مجموع الأوزان = ١٠٠');
+    assert.ok(p.minComposite > 0 && p.minRR > 0 && p.maxAtrPct > 0, k + ' ليه حدود');
+  });
+  assert.equal(R.getProfile('balanced').key, 'balanced', 'البروفايل الافتراضي');
+  assert.equal(R.getProfile('مش موجود').key, 'balanced', '⛔ بروفايل مجهول ⇒ الافتراضي');
+});
+
+/* ═══════════════════════════════════════════════════════════
+   🏷️ 14) التصنيف النهائي
+   ═══════════════════════════════════════════════════════════ */
+
+function mkResult(over) {
+  over = over || {};
+  var base = {
+    dq: { usable: true, sessions: 200, stale: false },
+    score: { total: 70, missing: [], insufficient: false },
+    trend: { state: R.TREND.UP, score: 70 },
+    momentum: { score: 60, dirState: R.MOM.POS },
+    volume: { score: 55, rvol: 1.3, liq: R.LIQ.LIQUID },
+    volatility: { atrPct: 2.0 },
+    plan: { status: R.PLAN.ZONE, rr: 2.2 },
+    risk: { state: R.RISK.LOWER }
+  };
+  for (var k in over) base[k] = over[k];
+  return base;
+}
+
+test('كل الشروط ⇒ STRONG ANALYTICAL CANDIDATE', () => {
+  const c = R.classify(mkResult(), R.PROFILES.balanced);
+  assert.equal(c.code, 'A', 'تصنيف A — ' + c.state);
+});
+
+test('⛔ بيانات ناقصة ⇒ INSUFFICIENT DATA (مش صفر)', () => {
+  const c = R.classify(mkResult({ dq: { usable: false, sessions: 10, stale: false } }), R.PROFILES.balanced);
+  assert.equal(c.code, 'E', 'تصنيف E');
+  assert.equal(c.state, R.CLASS.E);
+});
+
+test('مؤشرات ناقصة ⇒ INSUFFICIENT DATA', () => {
+  const c = R.classify(mkResult({
+    score: { total: null, missing: ['momentum'], insufficient: true, reason: 'insufficient_indicators' }
+  }), R.PROFILES.balanced);
+  assert.equal(c.code, 'E', 'تصنيف E');
+});
+
+test('أساس جيد + مخاطرة عالية ⇒ HIGH RISK', () => {
+  const c = R.classify(mkResult({
+    risk: { state: R.RISK.VERY_HIGH },
+    plan: { status: R.PLAN.ZONE, rr: 2.2 }
+  }), R.PROFILES.balanced);
+  assert.equal(c.code, 'C', 'تصنيف C — ' + c.state);
+});
+
+test('⛔ سهمTrends هابط ⇒ NO CURRENT SETUP (مش HIGH RISK)', () => {
+  const c = R.classify(mkResult({
+    trend: { state: R.TREND.DOWN, score: 25 },
+    momentum: { score: 30, dirState: R.MOM.STRONG_NEG },
+    volume: { score: 40, rvol: 0.5, liq: R.LIQ.LIQUID },
+    score: { total: 45, missing: [], insufficient: false },
+    plan: { status: R.PLAN.INVALID, rr: null }
+  }), R.PROFILES.balanced);
+  assert.ok(c.code === 'D' || c.code === 'C', 'مش A/B — ' + c.code);
+  assert.notEqual(c.code, 'A', '⛔ مفيش مرشح ضعيف');
+});
+
+test('أساس جيد + ناقص تأكيد ⇒ CANDIDATE — NEEDS CONFIRMATION', () => {
+  var r = mkResult();
+  r.volume = { score: 55, rvol: 0.8, liq: R.LIQ.LIQUID };
+  r.plan = { status: R.PLAN.WAIT, rr: 2.2 };
+  const c = R.classify(r, R.PROFILES.balanced);
+  assert.equal(c.code, 'B', 'تصنيف B — ' + c.state);
+  assert.ok(c.missing.length > 0, 'فيه سبب مكتوب');
+});
+
+test('⛔ التصنيف بيقول السبب (مش صندوق أسود)', () => {
+  var r = mkResult();
+  r.volume = { score: 20, rvol: 0.3, liq: R.LIQ.ILLIQUID };
+  const c = R.classify(r, R.PROFILES.balanced);
+  assert.ok(c.missing.length >= 2, 'أكتر من سبب');
+  c.missing.forEach(m => assert.ok(typeof m === 'string' && m.length > 3, 'سبب مفهوم: ' + m));
+});
+
+/* ═══════════════════════════════════════════════════════════
+   🛰️ 15) المنسّق — المسار الكامل
+   ═══════════════════════════════════════════════════════════ */
+
+test('⛔ analyze بيشتغل من الصفر للنهاية (كل المراحل)', () => {
+  const c = mkReal({ n: 250, trend: 1, noise: 0.03, seed: 5 });
+  const a = R.analyze(c, {
+    code: 'TEST', name: 'سهم تجريبي', sector: 'بنوك',
+    price: c[c.length - 1].c, marketCap: 5e9, rec: 0.3
+  });
+  ['dq', 'trend', 'momentum', 'volume', 'volatility', 'smart', 'plan', 'sizing', 'risk', 'score', 'classification']
+    .forEach(k => assert.ok(a[k] != null, 'المرحلة ' + k + ' موجودة'));
+  assert.ok(a.score.total >= 0 && a.score.total <= 100, '⛔ الدرجة ' + a.score.total);
+  assert.ok(['A', 'B', 'C', 'D', 'E'].indexOf(a.classification.code) >= 0, 'تصنيف صالح');
+  assert.equal(a.strategyVersion, R.STRATEGY_VERSION, 'إصدار الاستراتيجية مسجّل');
+  assert.ok(a.profile && a.profile.key, 'البروفايل مسجّل');
+});
+
+test('⛔ analyze على شموع قليلة ⇒ E من غير crash', () => {
+  const a = R.analyze(mkCandles({ n: 5 }), { code: 'X' });
+  assert.equal(a.classification.code, 'E', 'تصنيف E');
+  assert.equal(a.score.total, null, '⛔ مفيش درجة');
+});
+
+test('⛔ analyze على فاضي ⇒ E من غير crash', () => {
+  const a = R.analyze([], {});
+  assert.equal(a.classification.code, 'E');
+  assert.equal(a.dq.sessions, 0);
 });
