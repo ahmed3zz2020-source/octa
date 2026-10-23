@@ -4138,7 +4138,7 @@ function icRows(list, valKey) {
   ════════════════════════════════════════════════════════════ */
 (function killLegacyHome() {
   /* ═══ صفحات الأدوات/الفلاتر — لازم نجيبها من الموت مع المحتوى القديم ═══ */
-  const KEEP = ['filter','best','screener','dividends','compare','calc','academy','bestpick','news','search','engine','arms','markets','stocks','intel','dash','octasearch','verdict','pick','money'];
+  const KEEP = ['filter','best','screener','dividends','compare','calc','academy','bestpick','news','search','engine','arms','markets','stocks','intel','dash','octasearch','verdict','pick','money','radar'];
   function rescueToolPages(old) {
   let host = document.getElementById('toolPagesHost');
   if (!host) {
