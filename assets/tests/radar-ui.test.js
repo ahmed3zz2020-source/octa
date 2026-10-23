@@ -371,3 +371,72 @@ test('⛔ فشل المؤشرات الجماعية ما بيوقّفش المس�
     assert.ok(S.scan.log.some(l => l.indexOf('الشموع') >= 0), '⛔ السجل بيقول إن الشموع جابت');
   });
 });
+
+/* ═══════════════════════════════════════════════════════════
+   🛟 9) الاحتياطي — لو الكون فشل، market_tech + ملف المرجع
+   ───────────────────────────────────────────────────────────
+   📌 ده بالظبط اللي كان مفروض ينقذ المستخدم لما الـكون
+   وقع عنده — وفيه باج كان بيمنعه يشتغل خالص (الشكل القديم).
+   ═══════════════════════════════════════════════════════════ */
+test('🛟 لو الكون فشل، الاحتياطي (market_tech) بيشتغل والمسح بيكمّل', () => {
+  const sb = loadUI();
+  const S = sb.win.OCTA_RADAR_UI.state;
+  sb.win.OCTA_RADAR_REF = { TEST: { n: 'سهم اختباري', s: 'بنوك' } };
+  const candles = mkCandles(250, 0.004, 21);
+  sb.win.fetch = (url) => {
+    const u = String(url);
+    let j = null;
+    if (u.indexOf('/api/radar/universe') >= 0) {
+      return Promise.resolve({ ok: false, status: 500, statusText: 'Server Error', json: () => Promise.resolve({}) });
+    }
+    if (u.indexOf('/api/market_tech') >= 0) {
+      j = { markets: { egypt: { TEST: { p: 100, mc: 5e9 } } }, updated: '2026-10-23T10:00:00' };
+    } else if (u.indexOf('/api/quotes') >= 0) {
+      j = { markets: { egypt: { TEST: { close: 100, change: 1 } } } };
+    } else if (u.indexOf('/api/radar/history') >= 0) {
+      j = { ok: true, codes: { TEST: candles }, failed: [] };
+    }
+    if (!j) return Promise.resolve({ ok: false, status: 404, statusText: 'Not Found', json: () => Promise.resolve({}) });
+    return Promise.resolve({ ok: true, status: 200, statusText: 'OK', json: () => Promise.resolve(j) });
+  };
+  return sb.win.OCTA_RADAR_UI.scan().then(() => {
+    assert.equal(S.universe.length, 1, '⛔ الكون الاحتياطي اتبنى');
+    assert.equal(S.universe[0].code, 'TEST', '⛔ الكود صح');
+    assert.equal(S.universe[0].name, 'سهم اختباري', '⛔ الاسم من ملف المرجع');
+    assert.equal(S.results.length, 1, '⛔ النتيجة اتحللت');
+    assert.equal(S.results[0].code, 'TEST', '⛔ مفيش نتيجة بـcode=undefined');
+    assert.ok(S.scan.log.some(l => l.indexOf('الكون فشل') >= 0), '⛔ السجل بيقول إن الكون فشل');
+  });
+});
+
+test('🛟 النتيجة ما فيهاش entry بـcode=undefined (Display تدريجي)', () => {
+  const sb = loadUI();
+  const S = sb.win.OCTA_RADAR_UI.state;
+  const candles = mkCandles(250, 0.004, 33);
+  const stocks = [
+    { code: 'AAA', name: 'أ', sector: 'بنوك' },
+    { code: 'BBB', name: 'ب', sector: 'عقارات' },
+    { code: 'CCC', name: 'ج', sector: 'نPyx' }
+  ];
+  sb.win.fetch = (url) => {
+    const u = String(url);
+    let j = null;
+    if (u.indexOf('/api/radar/universe') >= 0) j = { ok: true, stocks: stocks, ts: 't' };
+    else if (u.indexOf('/api/market_tech') >= 0) j = { markets: { egypt: {} }, updated: 't' };
+    else if (u.indexOf('/api/quotes') >= 0) j = { markets: { egypt: {} } };
+    else if (u.indexOf('/api/radar/history') >= 0) {
+      const codes = {};
+      stocks.forEach(s => { codes[s.code] = candles; });
+      j = { ok: true, codes: codes, failed: [] };
+    }
+    if (!j) return Promise.resolve({ ok: false, status: 404, statusText: 'x', json: () => Promise.resolve({}) });
+    return Promise.resolve({ ok: true, status: 200, statusText: 'OK', json: () => Promise.resolve(j) });
+  };
+  return sb.win.OCTA_RADAR_UI.scan().then(() => {
+    assert.equal(S.results.length, 3, '⛔ ٣ نتائج');
+    S.results.forEach(r => {
+      assert.ok(r.code, '⛔ مفيش نتيجة برمز فاضي');
+      assert.ok(stocks.some(s => s.code === r.code), '⛔ رمز غريب: ' + r.code);
+    });
+  });
+});

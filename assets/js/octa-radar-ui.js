@@ -138,8 +138,13 @@
       S.scan.dataTs = u.ts;
       return true;
     }
-    /* ⛔ احتياطي: market_tech مفتوح + ملف المرجع المحلي */
-    const mt = await jget('/api/market_tech?market=egypt', 30000);
+    /* ⛔ احتياطي: market_tech مفتوح + ملف المرجع المحلي
+       ⛔⛔ كان لسه بيستخدم الشكل القديم بتاع jget (قبل ._ok/.j)
+          ⇒ mt.markets undefined ⇒ الاحتياطي **ما كانش بيشتغل خالص**
+          ⇒ لو الكون فشل، مفيش بيانات خالص (صفحة أصفار). */
+    const rmt = await jget('/api/market_tech?market=egypt', 30000);
+    const mt = rmt && rmt.j;
+    if (rmt && rmt._err) note('✗ الاحتياطي فشل: ' + rmt._err);
     if (!mt || !mt.markets || !mt.markets.egypt) return false;
     const ref = window.OCTA_RADAR_REF || {};
     const nonEq = new Set(['EGS30AJ1C016-EGP', 'EGS65101C015', 'EGS65621C012', 'EGS65861C014', 'EGS72L31C011']);
@@ -190,11 +195,47 @@
       note('✗ دفعة ردّ ناقص: ' + JSON.stringify(d).slice(0, 80));
       return { got: {}, failed: codes.slice() };
     }
-    const got = d.codes || {};
+    /* 🔄 الأعمدة → صفوف (شكل الباك الجديد: أخف ~٣٥٪ على الشبكة) */
+    const got = {};
+    for (const code in d.codes) {
+      const v = d.codes[code];
+      if (v && v.t && v.t.length) {
+        const rows = [];
+        for (let i = 0; i < v.t.length; i++) {
+          rows.push({ t: v.t[i], o: v.o[i], h: v.h[i], l: v.l[i], c: v.c[i], v: v.v[i] });
+        }
+        got[code] = rows;
+      } else if (Array.isArray(v)) {
+        got[code] = v;   /* الشكل القديم (سطر) — احتياط */
+      }
+    }
     if (Object.keys(got).length) {
       note('  دفعة ' + Object.keys(got).length + '/' + codes.length + ' (' + r._ms + 'ms)');
     }
     return { got: got, failed: d.failed || [] };
+  }
+
+  /* 🧮 تحليل مجموعة أكواد (بيتشال مستدعى لكل دفعة — عرض تدريجي) */
+  function analyzeCodes(list, meta) {
+    list.forEach(u => {
+      if (S.byCode[u.code]) return;              /* ⛔ متكررش */
+      const c = S.candles[u.code];
+      const tech = S.tech[u.code] || {};
+      const q = S.quotes[u.code] || {};
+      let a;
+      try {
+        a = R.analyze(c || [], {
+          code: u.code, name: u.name, sector: u.sector,
+          price: q.close != null ? q.close : tech.p,
+          change: q.change, marketCap: tech.mc,
+          rec: q['Recommend.All'], profile: meta.profile, money: meta.money
+        });
+      } catch (e) {
+        a = R.analyze([], { code: u.code, name: u.name, sector: u.sector, profile: meta.profile, money: meta.money });
+      }
+      S.results.push(a);
+      S.byCode[u.code] = a;
+    });
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -226,19 +267,31 @@
       /* 📜 التاريخ — دفعات بـ ٢ بالتوازي (الباك semaphore = ٤ اتصالات)
          ⛌ كانت متتابعة ⇒ ٨ دورات × (٢-٦٠ ثانية) = المستخدم مستني دقايق.
          ⛌ والتوازي بيخلّي أول نتيجة تظهر بسرعة. */
-      const codes = S.universe.map(u => u.code);
+      /* ⛔⛔ لازم ناخد **الكائنات** (code+name+sector) مش الأكواد بس:
+         العرض التدريجي بيحلل كل دفعة فور وصولها — ولو بعنا الكود
+         نص، التحليل بيبني نتيجة فاضية (code=undefined). */
+      const list = S.universe.slice();
+      const codes = list.map(u => u.code);
       const tHist = Date.now();
+      const meta = { profile: S.profile, money: S.money };
       const PAR = 2;
       let idx = 0;
       async function worker() {
         while (idx < codes.length) {
           const i = idx; idx += CHUNK;
           const part = codes.slice(i, i + CHUNK);
+          const objs = list.slice(i, i + CHUNK);
           const r = await loadHistory(part);
           for (const k in r.got) S.candles[k] = r.got[k];
           S.scan.done += part.length - (r.failed || []).length;
           S.scan.failed += (r.failed || []).length;
+          /* 📈 تحليل + عرض **طول ما الدفعة جت** — المستخدم يشوف
+             أرقام بعد ثانية واحدة مش بعد ما كل حاجة تخلص.
+             (⛌ كان بيستنى آخر دفعة ⇒ الشاشة زي اللي شافه أحمد.) */
+          analyzeCodes(objs, meta);
           renderProgress(true);
+          renderStats();
+          renderList();
         }
       }
       await Promise.all([worker(), worker()]);
@@ -246,27 +299,10 @@
       note('✓ الشموع: ' + S.scan.done + ' جاب · ' + S.scan.failed + ' تعذّر (' + ((Date.now() - tHist) / 1000).toFixed(1) + 'ث)');
       S.scan.steps.history = 'ok';
 
-      /* التحليل */
-      setStatus('busy', '⏳ بنحلل…');
-      const meta = { profile: S.profile, money: S.money };
-      S.universe.forEach(u => {
-        const c = S.candles[u.code];
-        const tech = S.tech[u.code] || {};
-        const q = S.quotes[u.code] || {};
-        let a;
-        try {
-          a = R.analyze(c || [], {
-            code: u.code, name: u.name, sector: u.sector,
-            price: q.close != null ? q.close : tech.p,
-            change: q.change, marketCap: tech.mc,
-            rec: q['Recommend.All'], profile: meta.profile, money: meta.money
-          });
-        } catch (e) {
-          a = R.analyze([], { code: u.code, name: u.name, sector: u.sector, profile: meta.profile });
-        }
-        S.results.push(a);
-        S.byCode[u.code] = a;
-      });
+      /* التحليل — خلص incrementally جوه الـworker (شوف فوق) */
+      /* ⛔ احتياطي: لو حصل خطأ في التحليل الجزئي، نكمّل الباقي */
+      const rest = S.universe.filter(u => !S.byCode[u.code]);
+      if (rest.length) analyzeCodes(rest, meta);
       S.scan.steps.analyze = 'ok';
       S.scan.lastRun = new Date().toISOString();
 
