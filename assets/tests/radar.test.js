@@ -858,3 +858,96 @@ test('⛔ analyze على فاضي ⇒ E من غير crash', () => {
   assert.equal(a.classification.code, 'E');
   assert.equal(a.dq.sessions, 0);
 });
+
+/* ═══════════════════════════════════════════════════════════
+   🗣️ 16) طبقة الشرح
+   ═══════════════════════════════════════════════════════════ */
+
+const X = require('../js/octa-radar-explain.js');
+
+test('المصطلحات: كل واحد ليه ٤ أجزاء (يقيس · ليه يهم · إزاي بنستخدمه · ما لا يعنيه)', () => {
+  const keys = Object.keys(X.TERMS);
+  assert.ok(keys.length >= 12, 'عدد المصطلحات — ' + keys.length);
+  keys.forEach(k => {
+    ['ar', 'en'].forEach(lang => {
+      const t = X.TERMS[k][lang];
+      assert.ok(t.what && t.why && t.how && t.not, k + '.' + lang + ' ليه ٤ أجزاء');
+      assert.ok(t.not.length > 10, k + '.' + lang + ' part "not" مكتوبة');
+    });
+  });
+});
+
+test('⛔ كل مصطلح فيه «ما لا يعنيه» — مفيش وعود', () => {
+  Object.keys(X.TERMS).forEach(k => {
+    const not = X.TERMS[k].ar.not;
+    assert.ok(not.length > 10, k + ' ليه تحذير');
+  });
+  /* ⛔ الأداة الذكية لازم تنفي إنها كاشف مؤسسات */
+  assert.ok(X.TERMS.smartMoney.ar.not.indexOf('مؤسسات') >= 0, '⛔ تنبيه المؤسسات');
+  assert.ok(X.TERMS.smartMoneyUnavailable.ar.how.indexOf('غير متاحة') >= 0, '⛔ غير متاحة');
+  /* ⛔ الدرجة المركّبة مش احتمال ربح */
+  assert.ok(X.TERMS.compositeScore.ar.not.indexOf('احتمال ربح') >= 0, '⛔ مش احتمال ربح');
+  /* ⛔ ATR مش بيحدد اتجاه */
+  assert.ok(X.TERMS.atr.ar.not.indexOf('اتجاه') >= 0, '⛔ ATR مش اتجاه');
+});
+
+test('البطاقة النهائية: عنوان + سبب + حالة + أسطر', () => {
+  const c = mkReal({ n: 250, trend: 1, noise: 0.03, seed: 5 });
+  const a = R.analyze(c, { code: 'T', name: 'سهم', sector: 'بنوك', price: c[c.length - 1].c, marketCap: 5e9, rec: 0.3 });
+  const card = X.card(a, 'ar');
+  assert.ok(card.title && card.title.length > 3, 'عنوان');
+  assert.ok(card.reason && card.reason.length > 3, 'سبب مكتوب');
+  assert.ok(card.status, 'حالة');
+  assert.equal(card.lines.length, 7, '٧ أسطر (٤ مؤشرات + دليل + مخاطرة + خطة)');
+  const en = X.card(a, 'en');
+  assert.ok(en.title && en.title.length > 3, 'English title');
+  assert.ok(en.reason && en.reason.length > 3, 'English reason');
+});
+
+test('شرح الدرجة: صفوف + أوزان + مؤشر ناقص', () => {
+  const c = mkReal({ n: 250, trend: 1, noise: 0.03, seed: 5 });
+  const a = R.analyze(c, { code: 'T', price: c[c.length - 1].c, marketCap: 5e9, rec: 0.3 });
+  const se = X.scoreExplain(a, 'ar');
+  assert.ok(se.total >= 0 && se.total <= 100, 'الدرجة');
+  assert.ok(se.rows.length >= 3, 'صفوف');
+  se.rows.forEach(r => {
+    assert.ok(r.label, 'label');
+    assert.ok(r.weight != null, 'وزن');
+  });
+  assert.equal(se.label, 'درجة تحليلية', '⛔ الاسم مش «احتمال نجاح»');
+});
+
+test('خطوات «كيف الرادار بيحلل» — ٨ خطوات بحالة', () => {
+  const c = mkReal({ n: 250, trend: 1, noise: 0.03, seed: 5 });
+  const a = R.analyze(c, { code: 'T', price: c[c.length - 1].c, marketCap: 5e9, rec: 0.3 });
+  const st = X.steps(a, 'ar');
+  assert.equal(st.length, 8, '٨ خطوات');
+  st.forEach(s => {
+    assert.ok(s.title && s.title.length > 3, 'عنوان الخطوة');
+    assert.ok(['ok', 'warn', 'na'].indexOf(s.status) >= 0, 'حالة الخطوة — ' + s.status);
+  });
+});
+
+test('⛔ مفيش حروف صينية/يابانية في أي ملف من ملفات الرادار', () => {
+  /* ⛔ حارس: كنا بنكتب «潜» بالغلط في عناوين — ده بيمرّ في الـreview
+     غير بصري. الفحص ده بيمنع أي حرف غير عربي/لاتيني يدخل. */
+  const files = ['../js/octa-radar.js', '../js/octa-radar-explain.js', '../js/octa-radar-ref.js'];
+  const bad = /[一-鿿가-힯]/;
+  files.forEach(f => {
+    const txt = fs.readFileSync(path.join(__dirname, f), 'utf8');
+    const m = txt.match(bad);
+    assert.equal(m, null, f + ' فيه حرف غريب: ' + (m ? m[0] : ''));
+  });
+});
+
+test('⛔ مفيش «undefined» أو «NaN» في النصوص المولّدة', () => {
+  const c = mkReal({ n: 250, trend: 1, noise: 0.03, seed: 5 });
+  const a = R.analyze(c, { code: 'T', price: c[c.length - 1].c, marketCap: 5e9, rec: 0.3 });
+  const texts = [X.trendText(a, 'ar'), X.momentumText(a, 'ar'), X.volumeText(a, 'ar'),
+    X.volatilityText(a, 'ar'), X.smartText(a, 'ar'), X.planText(a, 'ar'), X.card(a, 'ar').reason];
+  texts.forEach(t => {
+    assert.equal(typeof t, 'string', 'نص');
+    assert.ok(t.indexOf('undefined') < 0, '⛔ undefined في: ' + t);
+    assert.ok(t.indexOf('NaN') < 0, '⛔ NaN في: ' + t);
+  });
+});

@@ -89,7 +89,7 @@
     return { candles: out, bad: bad, zeroVol: zeroVol, gaps: gaps };
   }
 
-  /* ⛔ شموع بدون حركة (كل价格 متطابق) = بيانات وهمية */
+  /* ⛔ شموع بدون حركة (كل الأسعار متطابقة) = بيانات وهمية */
   function hasRealMovement(candles) {
     if (!candles || candles.length < 5) return false;
     var mn = candles[0].c, mx = candles[0].c;
@@ -565,7 +565,7 @@
 
     var rsiScore = null;
     if (rsiV != null) {
-      /* ⛔ ٥٠ =中性. ٧٠ =قوة، ٣٠ =ضعف. التشبع بيلف الدايرة بحد أقصى ٢٥ */
+      /* ⛔ ٥٠ = محايد · ٧٠ = قوة · ٣٠ = ضعف. التشبع بيلف الدايرة بحد أقصى ٢٥ */
       rsiScore = clamp(rsiV, 0, 100);
       parts.push({ k: 'rsi', label: 'RSI (14)', detail: 'RSI = ' + round1(rsiV), ok: rsiV >= 50, v: round1(rsiV) });
     }
@@ -1568,7 +1568,7 @@
   }
 
   /* ══════════════════════════════════════════════════════════════
-   🔬 8) جودة البيانات —德냐 غير متاح
+   🔬 8) جودة البيانات — ناقصة أم متاحة
    ══════════════════════════════════════════════════════════════ */
 
   return {
