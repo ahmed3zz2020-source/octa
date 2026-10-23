@@ -255,7 +255,7 @@
     var p = [];
     /* ⛔⛔ سهم ما اتداولش (حجم = ٠) ⇒ «تدفق مع الشراء» (لأن التغير ٠)
        ⛌   + درجة سيولة ضعيفة = تفسير غلط. ⇒ المحور مستبعد بالكامل. */
-    if (m.volume === 0) return pack([], 'الحجم');
+    if (m.volume === 0 || m.volume == null) return pack([], 'الحجم');
     var r = m.relvol;
     if (r != null) {
       p.push({ k: 'relvol', w: 0.35, v: band(r, 0.5, 0.9, 2.5, 4) / 100,
@@ -353,8 +353,12 @@
     var coverage = Math.min(1, wsum);
 
     var spread = vals.length > 1 ? (Math.max.apply(null, vals) - Math.min.apply(null, vals)) : 0;
-    var agreement = clamp(1 - spread / 100, 0, 1);
-    var bonus = 10 * agreement;
+    /* ⚠️⚠️ مكافأة التوافق: كانت **١٠ كاملة** حتى لو فيه محور واحد بس
+       (لأن الـspread=0 ⇒ توافق=١) ⇒ سهم بمحور واحد بياخد مكافأة
+       توافق كاملة. ✅ دلوقتي:Scale بعدد المحاور المتاحة
+       (محور واحد ⇒ ٠ · محورين ⇒ نص · ٣ ⇒ ٧٥٪ · ٤ ⇒ ١٠٠٪). */
+    var agreement = vals.length > 1 ? clamp(1 - spread / 100, 0, 1) : 0;
+    var bonus = 10 * agreement * Math.min(1, vals.length / 4);
 
     /* ⛔ الدرجة = (الأساس + المكافأة) × التغطية ⇒ محور ناقص = ثقة أقل */
     var score = clamp((base + bonus) * coverage, 0, 100);
@@ -833,7 +837,9 @@
     if (c.length < 25) return null;
     /* ⛔ البيانات القديمة ⇒ مفيش مؤشرات (الواجهة بتعرض سبب واضح) */
     var age = candleAgeDays(c);
-    if (age != null && age > MAX_CANDLE_AGE_DAYS) return null;
+    /* ⛔ من غير تاريخ ⇒ مش قادرين نتأكد ⇒ مفيش مؤشرات (القد بتعدّي) */
+    if (age == null) return null;
+    if (age > MAX_CANDLE_AGE_DAYS) return null;
     var a = atr(c, 14);
     var price = c[c.length - 1].c;
     var out = {
@@ -845,14 +851,18 @@
       orderBlock: orderBlock(c),
       rana: ranaPattern(c),
       fib: fibEmas(c),
-      atr: a != null ? pxRound(a, price) : null,
+      /* ⚠️⚠️ دقة الـATR حسب **حجمه هو** (مش حسب السعر):
+         ⛌   pxRound(a, price) كان بيقرّب ATR=٢.٦٤ ل«٢.٦» في السهم اللي
+         ⛌   سعره ١٢٥ (pxDec=1 خانة) ⇒ رقم الكارت مختلف عن اللي
+         ⛌   احتُسبت منه المستويات. ✅ دلوقتي: ٢.٦٤. */
+      atr: a != null ? pxRound(a, a) : null,
       atrPct: (a != null && price) ? round1(a / price * 100) : null,
       /* 📉 أقصى تراجع خلال نافذة الشموع — مكمل لمحور التذبذب.
          ⛌ مسح TradingView مفيوش عمود «أقصى تراجع» ⇒ بيتحسب من الشموع. */
       mdd: maxDrawdown(c),
       levels: null
     };
-    if (a != null && price) {
+    if (a != null && price && price > 0) {
       /* ⛔⛔ قرار أحمد (٢٣ أكتوبر ٢٠٢٦): المستويات **دايمًا** لصفقة شراء:
          ⛌   الوقف **تحت** الدخول والهدف **فوق** الدخول.
          ⛌   قبل كده كان في وضع «بيع» بيحط الهدف تحت السعر ⇒ المستخدم
@@ -863,8 +873,11 @@
       /* 📌 الدخول يُقرَّب الأول وبعدين نشتقّ الباقي منه ⇒ النِسب
          المعروضة بتطابق الأرقام المعروضة بالظبط. */
       var ep = pxRound(price, price);
-      var sp = pxRound(ep - 1.5 * a, price);
-      var tp = pxRound(ep + 2 * a, price);
+      /* 📌 نفس الـATR المعروض (المقرّب) ⇒ الوقف/الهدف متسقين مع الرقم
+         اللي في رأس الكارت. */
+      var ar = pxRound(a, a);
+      var sp = pxRound(ep - 1.5 * ar, price);
+      var tp = pxRound(ep + 2 * ar, price);
       /* ⚠️ لو الـATR أصغر من دقة العرض ⇒ الوقف = الدخول (صفر مخاطرة
          ⛌   على الشاشة). ⇒ نفرض فصل لا يقل عن وحدة واحدة. */
       var unit = Math.pow(10, -pxDec(price));

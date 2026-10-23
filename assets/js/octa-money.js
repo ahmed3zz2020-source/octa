@@ -549,11 +549,26 @@
       if (window.OCTA_TV) {
         window.OCTA_TV.mount($('smChart'), {
           symbol: 'EGX:' + r.code, interval: '1D',
-          /* ⛔ فاصل المؤشرات في TradingView = backslash واحد
-             (نفس DEFAULT_STUDIES بتاع tv-shim). */
-          studies: 'MASimple@tv-basicstudies\\RSI@tv-basicstudies\\MACD@tv-basicstudies',
+          /* ⭐⭐ المؤشرات اللي **احنا شغالين بيه** في الأداة — كلهم
+             ظاهرين جوّه شارت TradingView (اتأكدت بـChromium حقيقي):
+             📈 EMA (متوسط متحرك)  · 📊 VWAP (السعر العادل بالحجم)
+             🌊 ATR (مدى التذبذب الحقيقي — نفس رقم كارتنا)
+             ⚡ RSI (نفس رقم كارتنا)  · 📉 MACD (نفس رقم كارتنا)
+             ℹ️ ⚠️ ملاحظة: TradingView بيتجاهل الأطوال المخصصة في الـembed
+             البسيط ⇒ EMA بيبقى 9 (قريب من EMA 8 بتاعنا) والباقي
+             بإعداداته الافتراضية (RSI 14 · MACD 12/26/9 · ATR 14 = بتاعنا).
+             📌 المؤشرات الحصرية بتاعتنا (جيميني · القفل · MCDX · Order Block
+             · نموذج رانيا) نسخ OCTA من شموع حقيقية — TradingView مش
+             بيعرفها من غير Pine script ⇒ قيمها في الكروت والشريط. */
+          studies: [
+            { id: 'STD;EMA' },
+            { id: 'STD;VWAP' },
+            { id: 'ATR@tv-basicstudies' },
+            { id: 'STD;RSI' },
+            { id: 'STD;MACD' }
+          ],
           compactMobile: false,
-          minHeight: 360
+          minHeight: 560
         });
       }
     } catch (e) { /* الشارت مش لازم للصفحة تشتغل */ }
@@ -613,9 +628,14 @@
       return;
     }
     S.detail = d;
+    /* ⚠️⚠️ المصدر: الشموع من **startamarkets** (مش TradingView).
+       ⛌   النص القديم كان بيقول «من TradingView» ⇒ جملة غلط.
+       ⛌ ✅ دلوقتي: «شموع يومية حقيقية من startamarkets» + تاريخ آخر شمعة. */
+    const lastT = (j.candles && j.candles.length) ? String(j.candles[j.candles.length - 1].t || '') : '';
     box.innerHTML = cardsHtml(r, d) +
-      '<div class="sm-src">المؤشرات محسوبة من ' + (j.count || (j.candles ? j.candles.length : 0)) + ' شمعة يومية حقيقية' +
-      (via === 'tv' ? ' · من TradingView' : '') + '</div>';
+      '<div class="sm-src">المؤشرات محسوبة من ' + (j.count || (j.candles ? j.candles.length : 0)) +
+      ' شمعة يومية حقيقية من startamarkets' +
+      (lastT ? ' · آخر إغلاق ' + esc(lastT) : '') + '</div>';
     renderStrip(r, d);
     renderMap(r, d);
   }
@@ -748,7 +768,7 @@
     }
     /* ⓘ VWAP */
     if (d && d.fib && d.fib.vwap != null) {
-      out.push(chip('VWAP', f1(d.fib.vwap), d.fib.vwapSide === 'above' ? true : false,
+      out.push(chip('VWAP', fp(d.fib.vwap), d.fib.vwapSide === 'above' ? true : false,
         'السعر العادل المرجّح بالحجم — فوقه ولا تحته'));
     }
     /* ⓘ البنية */
@@ -828,12 +848,15 @@
     if (d.mcdx) {
       const x = d.mcdx;
       const ok = x.state === 'inst';
-      const why = x.state === 'inst' ? 'المؤسسات مسيطرة على السوق'
+      /* ⚠️⚠️ التصحيح: بعد قياس ارتباط MCDX (＋٠.٦٩ مع العائد ٢٠ يوم)
+         ⛌   ⇒ هو **مؤشر زخم ٢٠ يوم** بالأساس، مش «مؤسسات ضد أفراد».
+         ⛌   التسمية القديمة كانت بتوحي بحاجة مش موجودة ⇒ نصحّحها. */
+      const why = x.state === 'inst' ? 'تدفق الشراء هو الغالب على التدفق البيعي'
         : (x.state === 'retail' ? 'الأفراد مسيطرين — مش هما اللي بيتحكموا' : 'مفيش هيمنة واضحة — مش مؤشر ذكي');
       const cross = x.cross === 'gc' ? ' · التقاطع الذهبي = إشارة دخول'
         : (x.cross === 'dc' ? ' · التقاطع المميت = المؤسسات بتسحب' : '');
-      out.push(card('MCDX — مين ماسك السوق', '⚖️', f1(x.value) + ' / 100',
-        'فرق السيطرة بين المؤسسات والأفراد. فوق ٥٠ المؤسسات · تحت ٥٠ الأفراد' + cross,
+      out.push(card('MCDX — زخم التدفق', '⚖️', f1(x.value) + ' / 100',
+        'قوة تدفق الفلوس مقارنةً بحجم التداول على ٢٠ يوم. فوق ٥٠ الشراء هو الغالب · تحت ٥٠ البيع هو الغالب' + cross,
         ok, why, mcdxBar(x)));
     }
 
@@ -892,10 +915,10 @@
         'المتوسطات ٨·١٣·٢١·٣٤·٥٥ — ترتيبها بيقول الاتجاه، والبُعد بيقول قوته',
         fb.align === 'up' ? true : (fb.align === 'down' ? false : null), fb.label,
         '<div class="sm-lv3">' +
-        '<div class="sm-lv3-i"><span>EMA 8</span><b>' + f2(fb.e8) + '</b></div>' +
-        '<div class="sm-lv3-i"><span>EMA 21</span><b>' + f2(fb.e21) + '</b></div>' +
-        '<div class="sm-lv3-i"><span>EMA 55</span><b>' + f2(fb.e55) + '</b></div>' +
-        '<div class="sm-lv3-i"><span>VWAP</span><b>' + f2(fb.vwap) + '</b><i>' + (fb.vwapSide === 'above' ? 'فوق السعر' : 'تحت السعر') + '</i></div>' +
+        '<div class="sm-lv3-i"><span>EMA 8</span><b>' + fp(fb.e8) + '</b></div>' +
+        '<div class="sm-lv3-i"><span>EMA 21</span><b>' + fp(fb.e21) + '</b></div>' +
+        '<div class="sm-lv3-i"><span>EMA 55</span><b>' + fp(fb.e55) + '</b></div>' +
+        '<div class="sm-lv3-i"><span>VWAP</span><b>' + fp(fb.vwap) + '</b><i>' + (fb.vwapSide === 'above' ? 'فوق السعر' : 'تحت السعر') + '</i></div>' +
         '</div>'));
     }
 

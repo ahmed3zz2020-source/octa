@@ -23,6 +23,13 @@ const vm = require('node:vm');
 const ROOT = path.join(__dirname, '..', '..');
 const SM = require('../js/octa-smartmoney.js');
 
+/* 📅 تاريخ شمعة حديث (منافض للحارس: البيانات الأقدم من ١٠ أيام مرفوضة) */
+function dayIso(offset) {
+  const d = new Date(Date.now() - (offset || 0) * 86400000);
+  return d.toISOString().slice(0, 10);
+}
+
+
 /* ═══════════ DOM مصغّر ═══════════ */
 function makeEl(id) {
   const el = {
@@ -86,7 +93,7 @@ function fakeCandles() {
     const pull = (i % 8 === 7);
     const imp = (i % 8 === 0 && i > 0);
     const c = 100 + i * 1.2 - (pull ? 1.5 : 0);
-    out.push({ t: '2026-01-' + (i + 1),
+    out.push({ t: dayIso(59 - i),
       o: pull ? c + 1.2 : (imp ? c - 3.0 : c - 0.8),
       h: c + (imp ? 0.4 : 0.3), l: pull ? c - 0.4 : (imp ? c - 3.2 : c - 1.6),
       c: c, v: 100000 + i * 2000 });
@@ -180,8 +187,16 @@ test('الواجهة: فتح سهم بيرسم الكروت والشارت', asy
   assert.ok(els.smDetail.innerHTML.indexOf('sm-d-code') !== -1, 'رأس السهم اترسم');
   assert.ok(els.smChart.__mounted, 'الشارت اتركّب');
   assert.equal(els.smChart.__mounted.symbol, 'EGX:' + code, 'رمز الشارت صح');
-  assert.ok(String(els.smChart.__mounted.studies).indexOf('RSI') !== -1, 'مؤشر RSI على الشارت');
-  assert.ok(String(els.smChart.__mounted.studies).indexOf('MACD') !== -1, 'مؤشر MACD على الشارت');
+  /* ⭐ المؤشرات جوّه شارت TradingView — لازم تكون **مصفوفة JSON**
+     (النص بيتجاهله TradingView ⇒ مفيش RSI/MACD على الشارت). */
+  const st = els.smChart.__mounted.studies;
+  assert.ok(Array.isArray(st), 'المؤشرات لازم مصفوفة — got: ' + typeof st);
+  const ids = st.map(x => x.id);
+  ['STD;RSI', 'STD;MACD', 'STD;EMA', 'STD;VWAP', 'ATR@tv-basicstudies'].forEach((id) => {
+    assert.ok(ids.indexOf(id) !== -1, 'المؤشر ' + id + ' موجود في الشارت');
+  });
+  assert.ok(ids.indexOf('STD;RSI') !== -1, 'مؤشر RSI على الشارت');
+  assert.ok(ids.indexOf('STD;MACD') !== -1, 'مؤشر MACD على الشارت');
 
   const cards = els.smCards.innerHTML;
   assert.ok(cards.indexOf('الاتجاه') !== -1, 'كارت الاتجاه');

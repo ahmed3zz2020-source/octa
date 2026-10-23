@@ -24,7 +24,18 @@
   var ENDPOINT = 'https://s.tradingview.com/widgetembed/';
   /* ⛔ فاصل المؤشرات في TradingView هو backslash واحد.
      كنا بنكتبه %5C وURLSearchParams بيبعّدله تاني ⇒ %255C غلط. */
-  var DEFAULT_STUDIES = 'MASimple@tv-basicstudies\\RSI@tv-basicstudies\\MACD@tv-basicstudies';
+  /* ⛔⛔⛔ باج ٢٣ أكتوبر ٢٠٢٦ (اتأكد بـPlaywright + Chromium حقيقي):
+     ⛌   الـ`studies` كـ**نص** (مفصول بـbackslash) بيتجاهله TradingView
+     ⛌   تمامًا ⇒ الشارت كان بيعرض السعر والحجم بس، ومفيش RSI/MACD/MA.
+     ⛌   ده بالظبط سبب «مش لاقي المؤشرات في TradingView».
+     ⛌ ✅ الصيغة الصح = **مصفوفة JSON**:
+     ⛌   studies=[{"id":"STD;EMA"},{"id":"STD;RSI"},{"id":"STD;MACD"},…]
+     ⛌ ✅ ملاحظة: الـ`inputs` (زي length) بيتجاهلها الـembed البسيط ⇒
+     ⛌   المؤشرات بتيجي بإعداداتها الافتراضية (RSI 14 · MACD 12/26/9 · ATR 14).
+     ⛌ ✅ و-study-ID غلط بيتجاهل برضو (من غير error) ⇒ آمن. */
+  var DEFAULT_STUDIES = [
+    { id: 'STD;EMA' }, { id: 'STD;RSI' }, { id: 'STD;MACD' }
+  ];
 
   /* ── الوضع الفاتح/الداكن ── */
   function isLight() {
@@ -84,7 +95,14 @@
        مش موجودة في الـembed، فعشان كمان بنزوّر زرار تصوير فوق. */
     q.set('save_image', o.saveImage === false ? '0' : '1');
     if (o.studies !== false && !compact) {
-      q.set('studies', typeof o.studies === 'string' ? o.studies : DEFAULT_STUDIES);
+      var st = o.studies === undefined ? DEFAULT_STUDIES : o.studies;
+      /* 📌 مصفوفة ⇒ JSON · نص ⇒ كما هو (للتوافق) */
+      q.set('studies', Array.isArray(st) ? JSON.stringify(st) : String(st));
+    }
+    /* 📌 studies_overrides (اختياري) —TradingView بيتجاهله في الـembed
+       البسيط، بس بنبّعته لو حد مرّره (احتياطي). */
+    if (o.studiesOverrides) {
+      try { q.set('studies_overrides', JSON.stringify(o.studiesOverrides)); } catch (e) { }
     }
     return ENDPOINT + '?' + q.toString();
   }

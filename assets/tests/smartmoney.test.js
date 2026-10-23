@@ -21,6 +21,13 @@ const fs = require('node:fs');
 
 const SM = require('../js/octa-smartmoney.js');
 
+/* 📅 تاريخ شمعة حديث (منافض للحارس: البيانات الأقدم من ١٠ أيام مرفوضة) */
+function dayIso(offset) {
+  const d = new Date(Date.now() - (offset || 0) * 86400000);
+  return d.toISOString().slice(0, 10);
+}
+
+
 const EPS = 1e-9;
 function closeTo(actual, expected, msg) {
   assert.equal(typeof actual, 'number', (msg || '') + ' — لازم رقم');
@@ -68,7 +75,7 @@ function upCandles(n) {
   const out = [];
   for (let i = 0; i < n; i++) {
     const c = 100 + i * 1.2;
-    out.push({ t: '2026-01-' + (i + 1), o: +(c - 0.8).toFixed(2), h: +(c + 0.3).toFixed(2),
+    out.push({ t: dayIso(59 - i), o: +(c - 0.8).toFixed(2), h: +(c + 0.3).toFixed(2),
       l: +(c - 1.6).toFixed(2), c: +c.toFixed(2), v: 100000 + i * 2000 });
   }
   return out;
@@ -79,7 +86,7 @@ function downCandles(n) {
   const out = [];
   for (let i = 0; i < n; i++) {
     const c = 200 - i * 1.4;
-    out.push({ t: '2026-01-' + (i + 1), o: +(c + 0.8).toFixed(2), h: +(c + 1.6).toFixed(2),
+    out.push({ t: dayIso(59 - i), o: +(c + 0.8).toFixed(2), h: +(c + 1.6).toFixed(2),
       l: +(c - 0.3).toFixed(2), c: +c.toFixed(2), v: 120000 + i * 2000 });
   }
   return out;
@@ -306,10 +313,10 @@ test('بيانات السوق الحقيقية: كل الأسهم بتتحسب �
 test('نموذج رانيا: ٣ شموع صاعدة مكتملة بتتعرف', () => {
   /* شمعة قوية صاعدة · شمعة تصحيح صغيرة · شمعة كسرت القمة */
   const c = [];
-  for (let i = 0; i < 40; i++) c.push({ t: 'd' + i, o: 100, h: 101, l: 99, c: 100, v: 1000 });
-  c.push({ t: 'x1', o: 100, h: 106, l: 99.8, c: 105, v: 5000 });   /* قوية */
-  c.push({ t: 'x2', o: 105, h: 105.5, l: 103, c: 103.4, v: 2000 }); /* تصحيح */
-  c.push({ t: 'x3', o: 103.4, h: 108, l: 103.2, c: 107.5, v: 6000 }); /* كسرت القمة */
+  for (let i = 0; i < 40; i++) c.push({ t: dayIso(59 - i), o: 100, h: 101, l: 99, c: 100, v: 1000 });
+  c.push({ t: dayIso(3), o: 100, h: 106, l: 99.8, c: 105, v: 5000 });   /* قوية */
+  c.push({ t: dayIso(2), o: 105, h: 105.5, l: 103, c: 103.4, v: 2000 }); /* تصحيح */
+  c.push({ t: dayIso(1), o: 103.4, h: 108, l: 103.2, c: 107.5, v: 6000 }); /* كسرت القمة */
   const r = SM.ranaPattern(c);
   assert.ok(r, 'النموذج اتحسب');
   assert.equal(r.state, 'bull', 'النموذج لازم يكون صاعد');
@@ -318,14 +325,14 @@ test('نموذج رانيا: ٣ شموع صاعدة مكتملة بتتعرف', 
 
 test('نموذج رانيا: مفيش نم��ذج ⇒ مفيش ادعاء كاذب', () => {
   const c = [];
-  for (let i = 0; i < 40; i++) c.push({ t: 'd' + i, o: 100, h: 101, l: 99, c: 100, v: 1000 });
+  for (let i = 0; i < 40; i++) c.push({ t: dayIso(59 - i), o: 100, h: 101, l: 99, c: 100, v: 1000 });
   const r = SM.ranaPattern(c);
   assert.equal(r.state, 'none', 'مفيش نموذج');
 });
 
 test('Order Block: زون شراء/بيع بيتحسب ومش مخترع', () => {
   const c = [];
-  for (let i = 0; i < 40; i++) c.push({ t: 'd' + i, o: 100, h: 101, l: 99, c: 100, v: 1000 });
+  for (let i = 0; i < 40; i++) c.push({ t: dayIso(59 - i), o: 100, h: 101, l: 99, c: 100, v: 1000 });
   c.push({ t: 'ob', o: 100, h: 101, l: 95, c: 95.5, v: 1200 });   /* هابطة */
   c.push({ t: 'imp', o: 95.5, h: 108, l: 95.4, c: 107, v: 9000 }); /* اندفاع صاعد */
   const ob = SM.orderBlock(c);
@@ -338,7 +345,7 @@ test('EMA فيبوناتشي: الترتيب + VWAP', () => {
   const c = [];
   for (let i = 0; i < 80; i++) {
     const p = 100 + i;                       /* اتجاه صاعد ثابت */
-    c.push({ t: 'd' + i, o: p - 0.5, h: p + 1, l: p - 1, c: p, v: 1000 + i });
+    c.push({ t: dayIso(59 - i), o: p - 0.5, h: p + 1, l: p - 1, c: p, v: 1000 + i });
   }
   const f = SM.fibEmas(c);
   assert.ok(f, 'اتحسب');
@@ -356,7 +363,7 @@ test('المستويات: سهم تحت ١ جنيه — التقueling ميضي�
   const c = [];
   for (let i = 0; i < 80; i++) {
     const p = 0.30 - i * 0.0007;
-    c.push({ t: 'd' + i, o: p + 0.002, h: p + 0.004, l: p - 0.004, c: p, v: 100000 + i });
+    c.push({ t: dayIso(59 - i), o: p + 0.002, h: p + 0.004, l: p - 0.004, c: p, v: 100000 + i });
   }
   const r = SM.fromCandles(c, {});
   assert.ok(r && r.levels, 'المستويات اتحسبت');
@@ -382,7 +389,7 @@ test('المستويات:Directions يتفق مع اتجاه البنية', () =
   const up = [];
   for (let i = 0; i < 80; i++) {
     const p = 10 + i * 0.05;
-    up.push({ t: 'd' + i, o: p - 0.1, h: p + 0.2, l: p - 0.2, c: p, v: 100000 + i });
+    up.push({ t: dayIso(59 - i), o: p - 0.1, h: p + 0.2, l: p - 0.2, c: p, v: 100000 + i });
   }
   const r = SM.fromCandles(up, {});
   assert.ok(r.levels, 'اتحسب');
@@ -400,7 +407,7 @@ test('المستويات: الوقف تحت والهدف فوق دايمًا (ح
   const down = [];
   for (let i = 0; i < 80; i++) {
     const p = 20 - i * 0.15;
-    down.push({ t: 'd' + i, o: p + 0.2, h: p + 0.35, l: p - 0.2, c: p, v: 100000 + i });
+    down.push({ t: dayIso(59 - i), o: p + 0.2, h: p + 0.35, l: p - 0.2, c: p, v: 100000 + i });
   }
   const r = SM.fromCandles(down, {});
   assert.ok(r.levels, 'اتحسب');
@@ -423,7 +430,7 @@ test('ATR: Wilder مطابق للTradingView (مش EMA)', () => {
   const c = [];
   for (let i = 0; i < 40; i++) {
     const p = 100 + i;
-    c.push({ t: 'd' + i, o: p - 0.5, h: p + 1.0, l: p - 1.0, c: p, v: 1000 });
+    c.push({ t: dayIso(59 - i), o: p - 0.5, h: p + 1.0, l: p - 1.0, c: p, v: 1000 });
   }
   const a = SM.atr(c, 14);
   assert.ok(Math.abs(a - 2.0) < 1e-9, 'ATR لازم يساوي ٢ (Wilder) — got: ' + a);
@@ -433,7 +440,7 @@ test('ATR: EMA كان أعلى — الـlevels بتتغيّر accordingly', () 
   const c = [];
   for (let i = 0; i < 60; i++) {
     const p = 100 + i * 1.2;
-    c.push({ t: 'd' + i, o: p - 0.8, h: p + 0.3, l: p - 1.6, c: p, v: 1000 });
+    c.push({ t: dayIso(59 - i), o: p - 0.8, h: p + 0.3, l: p - 1.6, c: p, v: 1000 });
   }
   const a = SM.atr(c, 14);
   const r = SM.fromCandles(c, {});
@@ -456,8 +463,8 @@ test('NaN في المدخلات ما بيpoisonش الدرجة', () => {
 test('MDD بيتحسب من الشموع (مفيش عمود له في المسح)', () => {
   const c = [];
   /* صعود ١٠٠ ثم هبوط ٢٠٪ ثم تعافٍ */
-  for (let i = 0; i < 20; i++) c.push({ t: 'a' + i, o: 100 + i, h: 101 + i, l: 99 + i, c: 100 + i, v: 1000 });
-  for (let i = 0; i < 10; i++) c.push({ t: 'b' + i, o: 120 - i * 2, h: 121 - i * 2, l: 118 - i * 2, c: 119 - i * 2, v: 1000 });
+  for (let i = 0; i < 20; i++) c.push({ t: dayIso(29 - i), o: 100 + i, h: 101 + i, l: 99 + i, c: 100 + i, v: 1000 });
+  for (let i = 0; i < 10; i++) c.push({ t: dayIso(19 - i), o: 120 - i * 2, h: 121 - i * 2, l: 118 - i * 2, c: 119 - i * 2, v: 1000 });
   const r = SM.fromCandles(c, {});
   assert.ok(r.mdd != null, 'MDD اتحسب');
   assert.ok(r.mdd > 15 && r.mdd < 25, 'MDD قريب من ٢٠٪ — got: ' + r.mdd);
@@ -469,7 +476,7 @@ test('الشموع غير المرتبة بتترتب قبل الحساب', () =
     const out = [];
     for (let i = 0; i < 60; i++) {
       const p = 100 + i * 1.2;
-      out.push({ t: '2026-01-' + String((i % 28) + 1).padStart(2, '0') + (i > 27 ? 'B' : 'A'),
+      out.push({ t: dayIso(59 - i),
         o: p - 0.8, h: p + 0.3, l: p - 1.6, c: p, v: 1000 });
     }
     return out;
