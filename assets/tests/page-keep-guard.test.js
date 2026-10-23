@@ -84,3 +84,14 @@ test('🛡️ صفحة الرادار مش جوّه #homeHidden من غير resc
       '⛔ page-radar جوّه #homeHidden ومش في KEEP ⇒ هتتمسح');
   }
 });
+
+test('🛡️ كل صفحة page-* في الـHTML لازم تكون في KEEP (ما تمسحش مع homeHidden)', () => {
+  const html = read('index.html');
+  const keep = keepList();
+  const ids = [...html.matchAll(/id="page-([a-z0-9_-]+)"/g)].map(m => m[1]);
+  /* ⛔ 'home' استثناء مقصود: الصفحة القديمة بتتمسح عمداً
+     (v8 fix — الشاشة الرئيسية دلوقتي جزء من OS_NAV.restore()). */
+  const missing = ids.filter(id => id !== 'home' && !keep.includes(id));
+  assert.deepEqual(missing, [],
+    '⛔ صفحات في الـHTML ومش في KEEP ⇒ هتتمسح مع #homeHidden:\n  ' + missing.join('\n  '));
+});
