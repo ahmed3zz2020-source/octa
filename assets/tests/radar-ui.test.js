@@ -58,11 +58,21 @@ function mkSandbox() {
     OCTA_RADAR_EXPLAIN: X,
     OCTA_RADAR_REF: {},
     OCTA_API: '',
+    location: { protocol: 'https:', host: 'octashares.com', href: 'https://octashares.com/#radar', hash: '#radar' },
     addEventListener() { },
     setTimeout: (f) => { try { f(); } catch (e) { } },
     clearTimeout() { },
     fetch: () => Promise.resolve({ ok: false, json: () => Promise.resolve({}) }),
     AbortController: function () { this.abort = () => { }; },
+    localStorage: (function () {
+      const st = {};
+      return {
+        getItem: (k) => (k in st ? st[k] : null),
+        setItem: (k, v) => { st[k] = String(v); },
+        removeItem: (k) => { delete st[k]; },
+        _dump: () => st
+      };
+    })(),
     console: console
   };
   win.window = win;
@@ -270,4 +280,94 @@ test('⛔ رموز التصميم موجودة فعلاً في octa-tokens.css',
   const uniq = [...new Set(used)];
   const missing = uniq.filter(v => tok.indexOf('--' + v + ':') < 0);
   assert.equal(missing.length, 0, '⛔ رموز ناقصة: ' + missing.join(', '));
+});
+
+/* ═══════════════════════════════════════════════════════════
+   🩺 8) التشخيص + الكاش + fail-soft (٢٣ أكتوبر ٢٠٢٦)
+   ───────────────────────────────────────────────────────────
+   📌 المشكلة: لو الطلب فشل، الصفحة كانت واقفة «بنجيب بيانات
+   السوق» للأبد من غير أي سبب ظاهر. دلوقتي:
+   · كل نداء بيسجّل السبب والوقت
+   · مودال تشخيص بيعرض السجل للمستخدم
+   · الكاش المحلي بيخلّي إعادة الفتح فورية
+   ═══════════════════════════════════════════════════════════ */
+
+test('🩺 مودال التشخيص بيعرض السجل وسبب الفشل', () => {
+  const sb = loadUI();
+  const S = sb.win.OCTA_RADAR_UI.state;
+  S.scan.log.push('✗ الكون فشل: HTTP 502 (1200ms)');
+  S.scan.err = 'مفيش بيانات للسوق';
+  sb.win.OCTA_RADAR_UI.showDiag();
+  const box = sb.els.rdDiag;
+  assert.ok(box.innerHTML.length > 100, 'المودال اتملأ');
+  assert.ok(box.innerHTML.indexOf('تشخيص') >= 0, 'العنوان');
+  assert.ok(box.innerHTML.indexOf('HTTP 502') >= 0, '⛔ سبب الفشل ظاهر للمستخدم');
+  assert.ok(box.innerHTML.indexOf('نسخ السجل') >= 0, 'زرار نسخ — المستخدم مش هيفتح الـconsole');
+});
+
+test('💾 مسح كامل بـmock ⇒ كاش محلي بيتحفظ', () => {
+  const sb = loadUI();
+  const S = sb.win.OCTA_RADAR_UI.state;
+  const candles = mkCandles(250, 0.004, 9);
+  const hist = { TEST: candles };
+  sb.win.fetch = (url) => {
+    const u = String(url);
+    let j = {};
+    if (u.indexOf('/api/radar/universe') >= 0) {
+      j = { ok: true, stocks: [{ code: 'TEST', name: 'سهم تجريبي', sector: 'بنوك' }], ts: '2026-10-23T10:00:00', snapshot_id: 's1' };
+    } else if (u.indexOf('/api/market_tech') >= 0) {
+      j = { markets: { egypt: { TEST: { p: 100, mc: 5e9 } } }, updated: '2026-10-23T10:00:00' };
+    } else if (u.indexOf('/api/quotes') >= 0) {
+      j = { markets: { egypt: { TEST: { close: 100, change: 1.2 } } } };
+    } else if (u.indexOf('/api/radar/history') >= 0) {
+      j = { ok: true, codes: hist, failed: [] };
+    }
+    return Promise.resolve({ ok: true, status: 200, statusText: 'OK', json: () => Promise.resolve(j) });
+  };
+  return sb.win.OCTA_RADAR_UI.scan().then(() => {
+    assert.equal(S.results.length, 1, '⛔ النتيجة اتحللت');
+    assert.equal(S.scan.done, 1, '⛔ عدّاد الجاب');
+    assert.equal(S.scan.err, null, '⛔ مفيش خطأ: ' + S.scan.err);
+    const raw = sb.win.localStorage.getItem('octa_radar_cache_' + S.profile);
+    assert.ok(raw, '⛔ مفيش كاش اتحفظ');
+    const c = JSON.parse(raw);
+    assert.equal(c.results.length, 1, 'النتيجة اتحفظت');
+    assert.equal(c.results[0].c, 'TEST', 'الكود اتحفظ');
+    assert.ok(c.ts, 'الوقت اتحفظ');
+  });
+});
+
+test('⛔ الكاش المنتهي (أقدم من يوم) بيتجاهل', () => {
+  const sb = loadUI();
+  const S = sb.win.OCTA_RADAR_UI.state;
+  const old = JSON.stringify({ ts: Date.now() - 2 * 24 * 3600 * 1000, results: [{ c: 'OLD' }] });
+  sb.win.localStorage.setItem('octa_radar_cache_' + S.profile, old);
+  const ok = sb.win.OCTA_RADAR_UI.loadCache();
+  assert.equal(ok, false, '⛔ كاش منتهي لازم يتجاهل');
+  assert.equal(S.results.length, 0, 'مفيش نتائج قديمة');
+});
+
+test('⛔ فشل المؤشرات الجماعية ما بيوقّفش المسح (fail-soft)', () => {
+  const sb = loadUI();
+  const S = sb.win.OCTA_RADAR_UI.state;
+  const candles = mkCandles(250, 0.004, 11);
+  sb.win.fetch = (url) => {
+    const u = String(url);
+    let j = null;
+    if (u.indexOf('/api/radar/universe') >= 0) {
+      j = { ok: true, stocks: [{ code: 'TEST', name: 'سهم', sector: 'بنوك' }], ts: '2026-10-23T10:00:00' };
+    } else if (u.indexOf('/api/radar/history') >= 0) {
+      j = { ok: true, codes: { TEST: candles }, failed: [] };
+    }
+    /* ⛔ market_tech و quotes بيرجعوا 500 */
+    if (!j) return Promise.resolve({ ok: false, status: 500, statusText: 'Server Error', json: () => Promise.resolve({}) });
+    return Promise.resolve({ ok: true, status: 200, statusText: 'OK', json: () => Promise.resolve(j) });
+  };
+  return sb.win.OCTA_RADAR_UI.scan().then(() => {
+    assert.equal(S.results.length, 1, '⛔ المسح خلص رغم فشل المؤشرات');
+    assert.equal(S.scan.err, null, '⛔ مفيش خطأ: ' + S.scan.err);
+    assert.ok(S.scan.log.some(l => l.indexOf('المؤشرات') >= 0), '⛔ السجل بيقول إن المؤشرات تعذّرت');
+    assert.ok(S.scan.log.some(l => l.indexOf('الأسعار') >= 0), '⛔ السجل بيقول إن الأسعار تعذّرت');
+    assert.ok(S.scan.log.some(l => l.indexOf('الشموع') >= 0), '⛔ السجل بيقول إن الشموع جابت');
+  });
 });

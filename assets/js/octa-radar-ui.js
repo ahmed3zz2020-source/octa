@@ -34,7 +34,7 @@
     minLiq: 'all', minRR: 0, maxAtr: 0, minRvol: 0,
     showAll: false,
     money: { capital: 100000, riskPct: 1, maxAllocPct: 20 },
-    scan: { running: false, total: 0, done: 0, failed: 0, steps: {}, err: null, lastRun: null },
+    scan: { running: false, total: 0, done: 0, failed: 0, steps: {}, err: null, lastRun: null, log: [], dataTs: null, snapshot: null },
     selected: null,
     started: false
   };
@@ -71,15 +71,54 @@
     if (v == null || !isFinite(v)) return '—';
     return (v > 0 ? '+' : '') + Number(v).toFixed(1) + '%';
   }
+  /* 📡 نداء شبكة — ⛔⛔ بيسجّل سبب أي فشل ويرجّعه (مش null).
+     السبب: لو الطلب فشل بصمت، المستخدم بيبصّ على أصفار من غير ما يعرف
+     فين المشكلة — والصفحة كانت واقفة «بنجيب بيانات السوق» للأبد. */
   async function jget(path, ms) {
+    const lim = ms || 45000;
+    const t0 = Date.now();
+    const base = window.OCTA_API || '';
+    let r = await jgetOnce(base + path, lim);
+    /* 🛟 شبكة أمان: لو فشل المسار الأساسي، جرّب السيرفر المباشر.
+       ⛌ السبب: لو الـinterceptor عمل failover، الـOCTA_API بقى هو
+       السيرفر المباشر — فإعادة المحاولة بنفس العنوان مش هتفرق.
+       ولومستخدم على شبكة بطيئة، الطلب المباشر بيشتغل أسرع. */
+    if (!r._ok && window.OCTA_DIRECT && window.OCTA_DIRECT !== base) {
+      const r2 = await jgetOnce(window.OCTA_DIRECT + path, lim);
+      if (r2._ok) { r2._via = 'مباشر'; return r2; }
+      r2._via = 'الأساسي + المباشر فشلوا';
+      r2._err = r._err + ' | ' + r2._err;
+      return r2;
+    }
+    r._via = base ? 'مباشر' : 'نفس الموقع';
+    return r;
+  }
+
+  async function jgetOnce(url, lim) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), lim);
+    const t0 = Date.now();
     try {
-      const ctl = new AbortController();
-      const t = setTimeout(() => ctl.abort(), ms || 45000);
-      const r = await fetch((window.OCTA_API || '') + path, { cache: 'no-store', signal: ctl.signal });
+      const r = await fetch(url, { cache: 'no-store', signal: ctl.signal });
       clearTimeout(t);
-      if (!r.ok) return null;
-      return await r.json();
-    } catch (e) { return null; }
+      const dt = Date.now() - t0;
+      if (!r.ok) return { _err: 'HTTP ' + r.status + ' ' + (r.statusText || ''), _ms: dt };
+      const j = await r.json();
+      return { _ok: true, _ms: dt, j: j };
+    } catch (e) {
+      clearTimeout(t);
+      const why = (e && e.name === 'AbortError') ? 'انتهت المهلة (' + lim + 'ms)'
+                : (e && e.message) ? e.message : 'فشل شبكة';
+      return { _err: why, _ms: Date.now() - t0 };
+    }
+  }
+
+  /* 📝 سجل تشخيص — يظهر للمستخدم (زرار «تشخيص») */
+  function note(msg) {
+    try {
+      S.scan.log.push(msg);
+      if (S.scan.log.length > 60) S.scan.log.shift();
+    } catch (e) { }
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -88,7 +127,10 @@
 
   /* 🌍 الكون — من /api/radar/universe (حيّ + عربي) */
   async function loadUniverse() {
-    let u = await jget('/api/radar/universe', 30000);
+    let r = await jget('/api/radar/universe', 30000);
+    let u = r && r.j;
+    if (r && r._err) note('✗ الكون فشل: ' + r._err + ' (' + r._ms + 'ms)');
+    else note('✓ الكون: ' + (u && u.stocks ? u.stocks.length : 0) + ' سهماً (' + r._ms + 'ms · ' + (r._via || '') + ')');
     if (u && u.ok && u.stocks && u.stocks.length) {
       S.universe = u.stocks;
       S.scan.marketPhase = u.market_phase;
@@ -115,22 +157,44 @@
   }
 
   /* 📊 المؤشرات الجماعية + الأسعار */
+  /* ⛔⛔ fail-soft: المؤشرات الجماعية **مش أساسية** — المحرك بيحسب
+     كل حاجة من الشموع. فلو فشل الطلب ده، المسح لازم يكمل. */
   async function loadBulk() {
-    const mt = await jget('/api/market_tech?market=egypt', 30000);
-    if (mt && mt.markets && mt.markets.egypt) {
-      S.tech = mt.markets.egypt;
-      S.scan.dataTs = S.scan.dataTs || mt.updated;
+    const r1 = await jget('/api/market_tech?market=egypt', 20000);
+    if (r1 && r1.j && r1.j.markets && r1.j.markets.egypt) {
+      S.tech = r1.j.markets.egypt;
+      S.scan.dataTs = S.scan.dataTs || r1.j.updated;
+      note('✓ المؤشرات: ' + Object.keys(S.tech).length + ' سهماً (' + r1._ms + 'ms)');
+    } else {
+      note('⚠ المؤشراتBulk تعذّرت: ' + ((r1 && r1._err) || 'رد فاضي') + ' — هنكمل من الشموع');
     }
-    const q = await jget('/api/quotes', 30000);
-    if (q && q.markets && q.markets.egypt) S.quotes = q.markets.egypt;
+    const r2 = await jget('/api/quotes', 20000);
+    if (r2 && r2.j && r2.j.markets && r2.j.markets.egypt) {
+      S.quotes = r2.j.markets.egypt;
+      note('✓ الأسعار: ' + Object.keys(S.quotes).length + ' سهماً (' + r2._ms + 'ms)');
+    } else {
+      note('⚠ الأسعار تعذّرت: ' + ((r2 && r2._err) || 'رد فاضي') + ' — هنكمل');
+    }
   }
 
   /* 📜 تاريخ مجموعة أكواد — دفعة واحدة من السيرفر */
   async function loadHistory(codes) {
     const list = codes.join(',');
-    const d = await jget('/api/radar/history?list=' + encodeURIComponent(list) + '&n=320', 120000);
-    if (!d || !d.ok || !d.codes) return { got: {}, failed: codes.slice() };
-    return { got: d.codes || {}, failed: d.failed || [] };
+    const r = await jget('/api/radar/history?list=' + encodeURIComponent(list) + '&n=320', 120000);
+    if (!r || !r._ok) {
+      note('✗ دفعة (' + codes.length + ' كود) فشلت: ' + ((r && r._err) || 'رد فاضي') + ' (' + ((r && r._ms) || 0) + 'ms)');
+      return { got: {}, failed: codes.slice() };
+    }
+    const d = r.j;
+    if (!d || !d.ok || !d.codes) {
+      note('✗ دفعة ردّ ناقص: ' + JSON.stringify(d).slice(0, 80));
+      return { got: {}, failed: codes.slice() };
+    }
+    const got = d.codes || {};
+    if (Object.keys(got).length) {
+      note('  دفعة ' + Object.keys(got).length + '/' + codes.length + ' (' + r._ms + 'ms)');
+    }
+    return { got: got, failed: d.failed || [] };
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -159,17 +223,27 @@
       S.scan.steps.bulk = 'ok';
       renderProgress(true);
 
-      /* التاريخ — دفعات متتابعة (مش متوازية: عشان ما نضغطش على المصدر) */
+      /* 📜 التاريخ — دفعات بـ ٢ بالتوازي (الباك semaphore = ٤ اتصالات)
+         ⛌ كانت متتابعة ⇒ ٨ دورات × (٢-٦٠ ثانية) = المستخدم مستني دقايق.
+         ⛌ والتوازي بيخلّي أول نتيجة تظهر بسرعة. */
       const codes = S.universe.map(u => u.code);
-      for (let i = 0; i < codes.length; i += CHUNK) {
-        const part = codes.slice(i, i + CHUNK);
-        setStatus('busy', '⏳ بنجيب الشموع… ' + Math.min(i + CHUNK, codes.length) + ' من ' + codes.length);
-        const r = await loadHistory(part);
-        for (const k in r.got) S.candles[k] = r.got[k];
-        S.scan.done += part.length - (r.failed || []).length;
-        S.scan.failed += (r.failed || []).length;
-        renderProgress(true);
+      const tHist = Date.now();
+      const PAR = 2;
+      let idx = 0;
+      async function worker() {
+        while (idx < codes.length) {
+          const i = idx; idx += CHUNK;
+          const part = codes.slice(i, i + CHUNK);
+          const r = await loadHistory(part);
+          for (const k in r.got) S.candles[k] = r.got[k];
+          S.scan.done += part.length - (r.failed || []).length;
+          S.scan.failed += (r.failed || []).length;
+          renderProgress(true);
+        }
       }
+      await Promise.all([worker(), worker()]);
+      setStatus('busy', '⏳ بنجيب الشموع… ' + Math.min(S.scan.done + S.scan.failed, codes.length) + ' من ' + codes.length);
+      note('✓ الشموع: ' + S.scan.done + ' جاب · ' + S.scan.failed + ' تعذّر (' + ((Date.now() - tHist) / 1000).toFixed(1) + 'ث)');
       S.scan.steps.history = 'ok';
 
       /* التحليل */
@@ -198,15 +272,91 @@
 
       setStatus('live', '✅ تم المسح — ' + S.scan.done + ' سهم محلّل' +
         (S.scan.failed ? ' · ' + S.scan.failed + ' تعذّر' : ''));
+      /* 💾 كاش محلي — إعادة فتح الصفحة تطلع فوراً (مهم على الموبايل) */
+      try {
+        localStorage.setItem('octa_radar_cache_' + meta.profile, JSON.stringify({
+          ts: Date.now(), dataTs: S.scan.dataTs, snapshot: S.scan.snapshot,
+          done: S.scan.done, failed: S.scan.failed,
+          results: S.results.map(r => ({
+            c: r.code, n: r.name, s: r.sector, sc: r.score, cl: r.classification,
+            tr: r.trend, mo: r.momentum, vo: r.volume, va: r.volatility,
+            pl: r.plan, rk: r.risk, sm: r.smart, dq: r.dq
+          }))
+        }));
+        note('💾 اتحفظ كاش محلي');
+      } catch (e) { }
       renderAll();
     } catch (e) {
       S.scan.err = String(e && e.message || e);
-      setStatus('err', '⛔ ' + S.scan.err);
+      note('⛔ ' + S.scan.err);
+      setStatus('err', '⛔ ' + S.scan.err + ' — دوس «تشخيص» وشوف التفاصيل');
+      showDiag();
     } finally {
       S.scan.running = false;
       renderProgress(false);
       renderStats();
     }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   🩺 التشخيص — المستخدم على موبايل مش هيفتح الـconsole
+   ⇒ لازم الصفحة نفسها تقوله فين المشكلة.
+   ══════════════════════════════════════════════════════════════ */
+  function showDiag() {
+    const box = $('rdDiag');
+    if (!box) return;
+    const L = (S.scan.log || []).slice(-40);
+    const info = [
+      'الحالة: ' + (S.scan.err ? 'خطأ — ' + S.scan.err : (S.scan.running ? 'شغّال…' : 'مكتمل')),
+      'الكون: ' + S.universe.length + ' · جاب: ' + S.scan.done + ' · تعذّر: ' + S.scan.failed,
+      'آخر تحديث البيانات: ' + (S.scan.dataTs || '—'),
+      'عناوين الطلب: ' + (window.OCTA_API || '(نفس الموقع)'),
+      'الملف: ' + (location.protocol + '//' + location.host)
+    ];
+    box.innerHTML = '<div class="rd-diag-box">' +
+      '<div class="rd-diag-h">🩺 تشخيص</div>' +
+      '<div class="rd-diag-info">' + info.map(esc).join('<br>') + '</div>' +
+      '<pre class="rd-diag-log">' + esc(L.join('\n') || '(مفيش سجل)') + '</pre>' +
+      '<button type="button" class="rd-chip" id="rdDiagClose">إغلاق</button>' +
+      '<button type="button" class="rd-chip" id="rdDiagCopy">نسخ السجل</button>' +
+      '</div>';
+    const bg = $('rdDiagBg');
+    if (bg) bg.style.display = 'flex';
+    const c = $('rdDiagClose');
+    if (c) c.onclick = () => { if (bg) bg.style.display = 'none'; };
+    const cp = $('rdDiagCopy');
+    if (cp) cp.onclick = function () {
+      const txt = info.join('\n') + '\n---\n' + L.join('\n');
+      try { navigator.clipboard.writeText(txt); cp.textContent = '✅ اتنسخ'; }
+      catch (e) { cp.textContent = '❌ مقدرتش'; }
+    };
+  }
+
+  /* 💾 كاش محلي — إعادة الفتح تطلع فوراً (مهم على الموبايل) */
+  function loadCache() {
+    try {
+      const raw = localStorage.getItem('octa_radar_cache_' + S.profile);
+      if (!raw) return false;
+      const c = JSON.parse(raw);
+      if (!c || !c.results || !c.results.length) return false;
+      /* ⛔ الكاش بيصالح يوم واحد — بعدها الداتا بتكون قديمة */
+      if (Date.now() - (c.ts || 0) > 24 * 3600 * 1000) return false;
+      S.results = c.results.map(x => ({
+        code: x.c, name: x.n, sector: x.s, score: x.sc, classification: x.cl,
+        trend: x.tr, momentum: x.mo, volume: x.vo, volatility: x.va,
+        plan: x.pl, risk: x.rk, smart: x.sm, dq: x.dq
+      }));
+      S.byCode = {};
+      S.results.forEach(r => { S.byCode[r.code] = r; });
+      S.scan.done = c.done || 0; S.scan.failed = c.failed || 0;
+      S.scan.dataTs = c.dataTs || null; S.scan.snapshot = c.snapshot || null;
+      S.scan.lastRun = new Date(c.ts).toISOString();
+      setStatus('live', '✅ كاش محلي — ' + S.results.length + ' سهماً · آخر مسح ' +
+        new Date(c.ts).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit' }));
+      note('💾 كاش محلي: ' + S.results.length + ' سهماً');
+      renderAll();
+      return true;
+    } catch (e) { return false; }
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -734,6 +884,10 @@
     S.started = true;
     bindControls();
     fillSectors();
+    mountDiagBtn();
+    /* 💾 كاش محلي الأول — لو فيه نتيجة من امبارح نطلع بيها فوراً
+       بدل ما المستخدم يستنى دقايق كل مرة يفتح الصفحة. */
+    if (loadCache()) return;
     setStatus('busy', '⏳ بنجهّز بيانات السوق…');
     (async () => {
       const okU = await loadUniverse();
@@ -753,9 +907,19 @@
     })();
   };
 
+  /* 🩺 زرار تشخيص — يظهر للمستخدم في الترويسة */
+  function mountDiagBtn() {
+    const b = $('rdDiagBtn');
+    if (b && !b.dataset.bound) {
+      b.dataset.bound = '1';
+      b.onclick = showDiag;
+    }
+  }
+
   /* ⛔ إتاحة الدالة للاختبارات */
   window.OCTA_RADAR_UI = {
     state: S, scan: scan, renderList: renderList, renderStats: renderStats,
-    detailHTML: detailHTML, filtered: filtered, resetFilters: resetFilters
+    detailHTML: detailHTML, filtered: filtered, resetFilters: resetFilters,
+    showDiag: showDiag, loadCache: loadCache, note: note
   };
 })();

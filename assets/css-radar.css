@@ -296,3 +296,66 @@
   .rd-dot.busy { animation: none; }
   .rd-bar i { transition: none; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   🩺 التشخيص — المستخدم على موبايل مش هيفتح الـconsole
+   ⇒ لازم يشوف التفاصيل جوه الصفحة نفسها.
+   ══════════════════════════════════════════════════════════════ */
+.rd-diag-btn {
+  margin-top: 8px;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px;
+  font: 600 .74rem system-ui, sans-serif;
+  color: var(--muted);
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+  cursor: pointer;
+  transition: color .18s, border-color .18s;
+}
+.rd-diag-btn:hover { color: var(--gold); border-color: var(--gold); }
+.rd-diag-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.rd-diag-bg {
+  position: fixed; inset: 0; z-index: 12000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--bg) 84%, transparent);
+  backdrop-filter: blur(3px);
+}
+.rd-diag-box {
+  position: relative;
+  width: min(680px, 100%);
+  max-height: 86vh; overflow: auto;
+  padding: 18px;
+  background: var(--pri2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  text-align: start;
+}
+.rd-diag-box .x {
+  position: absolute; top: 10px; inset-inline-end: 10px;
+  width: 30px; height: 30px;
+  background: transparent; border: 1px solid var(--line);
+  border-radius: 8px; color: var(--muted); cursor: pointer;
+}
+.rd-diag-h { font: 800 .95rem system-ui, sans-serif; color: var(--gold); margin-bottom: 10px; }
+.rd-diag-info {
+  font: .76rem/1.9 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--txt);
+  padding: 10px; margin-bottom: 10px;
+  background: var(--goldBg);
+  border-radius: 9px;
+  word-break: break-all;
+}
+.rd-diag-log {
+  font: .72rem/1.8 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--sec2);
+  padding: 10px; margin: 0 0 12px;
+  max-height: 40vh; overflow: auto;
+  background: var(--bg);
+  border-radius: 9px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.rd-diag-box .rd-chip { margin-inline-end: 8px; }

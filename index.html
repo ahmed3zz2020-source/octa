@@ -1303,6 +1303,12 @@ window.addEventListener('error', function (e) {
        PAGE: RADAR — الرادار الذكي للأسهم
        🛰️ OCTA Smart Money Radar
        ══════════════════════════════════════════════════════════════ -->
+  <div class="rd-diag-bg" id="rdDiagBg" style="display:none">
+    <div class="rd-diag-box" id="rdDiag">
+      <button type="button" class="x" id="rdDiagClose" aria-label="إغلاق">✕</button>
+    </div>
+  </div>
+
   <div class="page" id="page-radar">
   <div class="rd-wrap">
 
@@ -1311,6 +1317,7 @@ window.addEventListener('error', function (e) {
       <div class="rd-title">🛰️ الرادار الذكي للأسهم</div>
       <div class="rd-sub">افحص السوق بالكامل، واعرف الأسهم التي تتوافق مع استراتيجيتك، وافهم سبب ظهور كل سهم.</div>
       <div class="rd-status" id="rdStatus"><span class="rd-dot"></span> بنجهّز بيانات السوق…</div>
+      <button type="button" class="rd-diag-btn" id="rdDiagBtn" title="تفاصيل المسح — لو الأرقام مش ظاهرة">🩺 تشخيص</button>
     </div>
     <div class="rd-stats">
       <div class="rd-stat"><span>الأسهم</span><b id="rdTotal">—</b></div>
