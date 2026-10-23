@@ -293,3 +293,34 @@ test('guard: بلوك السكربتات في index.html مفيش فيه تكر�
   assert.equal(dup, 0, 'فيه سكربتات متكررة (' + dup + ') — التكرار بيعمل خطأ "Identifier already declared"');
   assert.equal(src.indexOf('\n=======\n'), -1, 'فيه سطور "=======" نصية في الصفحة');
 });
+
+
+/* ═══════════════════════════════════════════════════════════
+   ⑤ كارت الاستراتيجية — آخر الصفحة
+   ═══════════════════════════════════════════════════════════ */
+test('كارت الاستراتيجية: موجود في آخر الصفحة وفيه الشرح كامل', async () => {
+  const fixture = marketFixture();
+  if (!fixture) { assert.ok(true, 'مفيش بيانات — تخطّي'); return; }
+  const { sandbox, els } = boot(fixture);
+  sandbox.window.moneyInit();
+  await new Promise(r => setTimeout(r, 60));
+  const g = els.smGuide;
+  assert.ok(g, 'حاوية الكارت موجودة');
+  const h = g.innerHTML;
+  assert.ok(h.indexOf('sm-guide-grid') !== -1, 'شبكة المحاور');
+  assert.ok(h.indexOf('الوزن ٣٠٪') !== -1, 'وزن الاتجاه ٣٠٪');
+  assert.ok(h.indexOf('الوزن ٢٥٪') !== -1, 'أوزان ٢٥٪');
+  assert.ok(h.indexOf('الوزن ٢٠٪') !== -1, 'وزن التذبذب ٢٠٪');
+  assert.ok(h.indexOf('مكافأة توافق') !== -1, 'مكافأة التوافق');
+  assert.ok(h.indexOf('الشارات ومعناها') !== -1, 'قسم الشارات');
+  assert.ok(h.indexOf('نصائح') !== -1, 'قسم النصائح');
+  assert.ok(h.indexOf('مش نصيحة استثمار') !== -1, 'تنبيه إنه مش نصيحة استثمار');
+  assert.ok(h.indexOf('Order Block') !== -1, 'Order Block معرّف');
+  assert.ok(h.indexOf('VWAP') !== -1, 'VWAP معرّف');
+  /* ⛔ ممنوع: أسماء أدوات ذكاء اصطناعي في واجهة المنتج */
+  ['ذكاء اصطناعي', 'ChatGPT', 'Claude', 'OpenAI', 'Gemini AI', 'الذكاء الاصطناعي']
+    .forEach((w) => assert.ok(h.indexOf(w) === -1, 'ممنوع: ' + w));
+  /* ⛔ وممنوع أرقام مخترعة (ادعاءات دقة) */
+  assert.ok(h.indexOf('دقة') === -1, 'مافيش ادعاء دقة');
+  assert.ok(h.indexOf('مضمون') === -1, 'مافيش ضمان ربح');
+});

@@ -782,7 +782,15 @@ function buildToolbar(){
   </button>`
   ).join('');
 
-
+  /* 🧭 الصفحة المفتوحة (خصوصاً لو جايدة من رابط مباشر) — نعلّم الزر بتاعها.
+     ⛌ الأزرار بتتبني بعد switchPage أحياناً ⇒ فبدون السطر ده
+     ⛌   الرابط المباشر بيفتح الصفحة بس الزرار مش مميّز. */
+  try {
+    const cur = (typeof OS_NAV !== 'undefined' && OS_NAV.get) ? (OS_NAV.get() || '') : '';
+    if (cur) {
+      el.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === cur));
+    }
+  } catch (e) { }
 }
 
 /* ══════ لوحة الترتيب ══════ */
