@@ -8,3 +8,4 @@ shots/
 # ── أدوات الرادار: لقطات تطوير محلية (مش بتترفع) ──
 tools/_candles/
 tools/_live_*.json
+.npmrc
