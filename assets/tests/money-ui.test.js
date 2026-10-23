@@ -316,6 +316,10 @@ test('كارت الاستراتيجية: موجود في آخر الصفحة و�
   assert.ok(h.indexOf('نصائح') !== -1, 'قسم النصائح');
   assert.ok(h.indexOf('مش نصيحة استثمار') !== -1, 'تنبيه إنه مش نصيحة استثمار');
   assert.ok(h.indexOf('Order Block') !== -1, 'Order Block معرّف');
+  /* المصطلح الإنجليزي بجانب كل محور */
+  ['Trend', 'Momentum', 'Volume', 'Volatility'].forEach((en) => {
+    assert.ok(h.indexOf('sm-guide-en">' + en + '</em>') !== -1, 'المصطلح ' + en + ' جنب المحور');
+  });
   assert.ok(h.indexOf('VWAP') !== -1, 'VWAP معرّف');
   /* ⛔ ممنوع: أسماء أدوات ذكاء اصطناعي في واجهة المنتج */
   ['ذكاء اصطناعي', 'ChatGPT', 'Claude', 'OpenAI', 'Gemini AI', 'الذكاء الاصطناعي']

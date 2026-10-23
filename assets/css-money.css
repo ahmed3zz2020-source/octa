@@ -363,3 +363,13 @@
   .sm-guide { padding: var(--s4) var(--s3) var(--s3); margin-top: var(--s5); }
   .sm-guide-grid { grid-template-columns: 1fr; }
 }
+
+/* المصطلح الإنجليزي بجانب اسم المحور */
+.sm-guide-en {
+  font-style: normal; font-size: .72rem; font-weight: 700;
+  color: var(--dim); letter-spacing: .3px;
+  border: 1px solid var(--line2); border-radius: 999px;
+  padding: 0 7px; margin-inline-start: 6px;
+  vertical-align: middle;
+}
+.sm-guide-t .sm-guide-en + .sm-guide-w { margin-inline-start: auto; }
