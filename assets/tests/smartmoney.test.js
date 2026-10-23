@@ -409,3 +409,203 @@ test('المستويات: الوقف تحت والهدف فوق دايمًا (ح
   assert.equal(r.levels.dir, 'up', 'الاتجاه دايمًا شراء');
   assert.ok(r.levels.bearNote && r.levels.bearNote.length > 5, 'فيه تنبيه إن البنية هابطة');
 });
+
+
+/* ═══════════════════════════════════════════════════════════
+   📐 ATR = Wilder (RMA) — يطابق TradingView بالظبط
+   ───────────────────────────────────────────────────────────
+   ⛔ الباج: كان ema(tr) ⇒ القيمة أعلى بـ٦-٩٪ (COMI ٢.٨ بدل ٢.٦٤)
+   ⛌   ⇒ وقف الخسارة والهدف بيحسبوا من ATR مختلف عن اللي المستخدم
+   ⛌   شايفه في TradingView.
+   ═══════════════════════════════════════════════════════════ */
+test('ATR: Wilder مطابق للTradingView (مش EMA)', () => {
+  /* سلسلة ثابتة — القيمة المرجعية محسوبة مستقلاً: 2.0 */
+  const c = [];
+  for (let i = 0; i < 40; i++) {
+    const p = 100 + i;
+    c.push({ t: 'd' + i, o: p - 0.5, h: p + 1.0, l: p - 1.0, c: p, v: 1000 });
+  }
+  const a = SM.atr(c, 14);
+  assert.ok(Math.abs(a - 2.0) < 1e-9, 'ATR لازم يساوي ٢ (Wilder) — got: ' + a);
+});
+
+test('ATR: EMA كان أعلى — الـlevels بتتغيّر accordingly', () => {
+  const c = [];
+  for (let i = 0; i < 60; i++) {
+    const p = 100 + i * 1.2;
+    c.push({ t: 'd' + i, o: p - 0.8, h: p + 0.3, l: p - 1.6, c: p, v: 1000 });
+  }
+  const a = SM.atr(c, 14);
+  const r = SM.fromCandles(c, {});
+  /* وقف = دخول − ١.٥×ATR ⇒ لازم يتحسب من نفس الـATR */
+  const expStop = r.levels.entry - 1.5 * a;
+  /* ⚠️ التسامح ٠.٠٦ بسبب التقريب حسب حجم السعر (سعر ١٧٠ ⇒ خانة واحدة) */
+  assert.ok(Math.abs(r.levels.stop - expStop) < 0.06, 'الوقف محسوب من نفس الـATR — got ' + r.levels.stop + ' vs ' + expStop.toFixed(3));
+});
+
+
+/* ═══════════════════════════════════════════════════════════
+   🛡️ حماية +MDD من الشموع
+   ═══════════════════════════════════════════════════════════ */
+test('NaN في المدخلات ما بيpoisonش الدرجة', () => {
+  const r = SM.compute({ code: 'X', price: NaN, rsi: NaN, change: NaN });
+  assert.ok(isFinite(r.score), 'الدرجة لازم تبقى رقم — got: ' + r.score);
+  assert.ok(isFinite(r.axes.trend.score), 'محور الاتجاه رقم');
+});
+
+test('MDD بيتحسب من الشموع (مفيش عمود له في المسح)', () => {
+  const c = [];
+  /* صعود ١٠٠ ثم هبوط ٢٠٪ ثم تعافٍ */
+  for (let i = 0; i < 20; i++) c.push({ t: 'a' + i, o: 100 + i, h: 101 + i, l: 99 + i, c: 100 + i, v: 1000 });
+  for (let i = 0; i < 10; i++) c.push({ t: 'b' + i, o: 120 - i * 2, h: 121 - i * 2, l: 118 - i * 2, c: 119 - i * 2, v: 1000 });
+  const r = SM.fromCandles(c, {});
+  assert.ok(r.mdd != null, 'MDD اتحسب');
+  assert.ok(r.mdd > 15 && r.mdd < 25, 'MDD قريب من ٢٠٪ — got: ' + r.mdd);
+});
+
+
+test('الشموع غير المرتبة بتترتب قبل الحساب', () => {
+  const mk = (n) => {
+    const out = [];
+    for (let i = 0; i < 60; i++) {
+      const p = 100 + i * 1.2;
+      out.push({ t: '2026-01-' + String((i % 28) + 1).padStart(2, '0') + (i > 27 ? 'B' : 'A'),
+        o: p - 0.8, h: p + 0.3, l: p - 1.6, c: p, v: 1000 });
+    }
+    return out;
+  };
+  const ordered = mk(60);
+  const shuffled = ordered.slice().reverse();
+  const a = SM.fromCandles(ordered, {});
+  const b = SM.fromCandles(shuffled, {});
+  assert.ok(a && b, 'اتحسبوا');
+  assert.ok(Math.abs(a.atr - b.atr) < 1e-9, 'نفس الـATR بعد الترتيب — ' + a.atr + ' vs ' + b.atr);
+});
+
+
+/* ═══════════════════════════════════════════════════════════
+   🛡️ اختبارات حارس — نتائج تدقيق ٢٣ أكتوبر ٢٠٢٦
+   ═══════════════════════════════════════════════════════════ */
+const FULL = {
+  code: 'X', price: 100, change: 1, volume: 1000, av30: 1000, rsi: 60,
+  macd: 1, macdSig: 0.5, ma50: 110, ma200: 100, perf1w: 1, perf1m: 2, perf3m: 3,
+  volD: 2.5, beta: 1, relvol: 1.2, turnover: 0.01, mktCap: 1e9
+};
+
+test('المحور الفاضي ما بياخدش نص وزنه (مش ٥٠)', () => {
+  /* ٣ محاور كاملة + محور الزخم فاضي ⇒ الدرجة ما تقفزش لـ ٩٥ */
+  const r = SM.compute(Object.assign({}, FULL, { rsi: null, macd: null, macdSig: null, perf1w: null }));
+  assert.ok(r.axes.momentum.has === false, 'محور الزخم ناقص');
+  assert.ok(r.coverage < 100, 'التغطية أقل من ١٠٠٪ — got ' + r.coverage);
+  assert.ok(r.score < 90, 'الدرجة ما فيش تضخيم — got ' + r.score);
+});
+
+test('سهم بلا بيانات ⇒ درجة صفر مش ٦٠', () => {
+  const r = SM.compute({ code: 'E' });
+  assert.equal(r.score, 0, 'الدرجة صفر');
+  assert.equal(r.weak, true, 'معلّم ضعيف');
+  assert.equal(r.coverage, 0, 'تغطية صفر');
+});
+
+test('شارة «توافق ٤ محاور» محتاجة ٤ محاور فعلاً', () => {
+  const r = SM.compute(Object.assign({}, FULL, { rsi: null, macd: null, macdSig: null, perf1w: null }));
+  assert.ok(!r.badges.some(b => b.id === 'agree'), 'ما فيش شارة توافق على ٣ محاور');
+  const r2 = SM.compute(FULL);
+  assert.ok(r2.badges.some(b => b.id === 'agree'), 'مع ٤ محاور كاملة في شارة');
+});
+
+test('سهم ما اتداولش (حجم = ٠) ⇒ محور الحجم مستبعد', () => {
+  const r = SM.compute(Object.assign({}, FULL, { volume: 0, change: 0 }));
+  assert.equal(r.axes.volume.has, false, 'محور الحجم مستبعد');
+  assert.ok(r.coverage < 100, 'التغطية قلّت');
+});
+
+test('سندات EGP مش أسهم — مستبعدة من الترتيب', () => {
+  const out = SM.rank([{ code: 'EGS3E071C013-EGP', price: 99.8 }, Object.assign({}, FULL)]);
+  assert.equal(out.length, 1, 'السند اتشال');
+  assert.equal(out[0].code, 'X', 'فقط السهم');
+});
+
+test('RSI تحت ٣٠ ⇒ زخم ضعيف (صفر) + شارة تشبع بيعي', () => {
+  const r20 = SM.compute(Object.assign({}, FULL, { rsi: 20 }));
+  const r60 = SM.compute(Object.assign({}, FULL, { rsi: 60 }));
+  assert.ok(r20.score < r60.score, 'RSI ٢٠ أضعف من ٦٠ — ' + r20.score + ' vs ' + r60.score);
+  assert.ok(r20.badges.some(b => b.id === 'oversold'), 'شارة التشبع البيعي');
+  const part = r20.axes.momentum.parts.find(p => p.k === 'rsi');
+  assert.equal(part.v, 0, 'جزء الـRSI = صفر (زخم ضعيف)');
+});
+
+test('MACD من غير سعر ⇒ محايد ٥٠ (مش ٧٥)', () => {
+  const r = SM.compute(Object.assign({}, FULL, { price: null }));
+  const part = r.axes.momentum.parts.find(p => p.k === 'macd');
+  assert.ok(part, 'الجزء موجود');
+  assert.ok(Math.abs(part.v - 0.5) < 1e-9, 'القيمة محايدة — got ' + part.v);
+});
+
+test('شموع قديمة (أكتر من ١٠ أيام) ⇒ مفيش مؤشرات', () => {
+  const old = [];
+  for (let i = 0; i < 60; i++) {
+    old.push({ t: '2017-01-' + String((i % 28) + 1).padStart(2, '0'),
+      o: 10, h: 11, l: 9, c: 10, v: 100 });
+  }
+  assert.equal(SM.fromCandles(old, {}), null, 'مفيش مؤشرات على بيانات قديمة');
+  const fresh = [];
+  for (let i = 0; i < 60; i++) {
+    const d = new Date(Date.now() - i * 86400000);
+    fresh.push({ t: d.toISOString().slice(0, 10), o: 10, h: 11, l: 9, c: 10, v: 100 });
+  }
+  const r = SM.fromCandles(fresh, {});
+  assert.ok(r && r.atr != null, 'الشموع الحديثة بتشتغل');
+});
+
+test('المتوسطات بتتقرب حسب حجم السعر (مش خانة واحدة)', () => {
+  const c = [];
+  for (let i = 0; i < 80; i++) {
+    const p = 0.30 - i * 0.0007;
+    const d = new Date(Date.now() - (79 - i) * 86400000);
+    c.push({ t: d.toISOString().slice(0, 10),
+      o: p + 0.002, h: p + 0.004, l: p - 0.004, c: p, v: 100000 + i });
+  }
+  const r = SM.fromCandles(c, {});
+  assert.ok(r.fib, 'المتوسطات اتحسبت');
+  const vals = [r.fib.e8, r.fib.e13, r.fib.e21, r.fib.e34, r.fib.e55];
+  const uniq = new Set(vals.map(v => String(v)));
+  assert.ok(uniq.size >= 3, 'المتوسطات مختلفة (مش كلها نفس الرقم) — ' + vals.join(','));
+  assert.ok(r.fib.vwap > 0.2 && r.fib.vwap < 0.3, 'VWAP دقيق — got ' + r.fib.vwap);
+});
+
+test('جيميني ما يتشبّعش عند ٠/١٠٠', () => {
+  const c = [];
+  for (let i = 0; i < 80; i++) {
+    const p = 100 + (i % 2 ? 1 : -1) * 0.2;
+    const d = new Date(Date.now() - (79 - i) * 86400000);
+    c.push({ t: d.toISOString().slice(0, 10),
+      o: p, h: p + 0.5, l: p - 0.5, c: p, v: 1000 });
+  }
+  const r = SM.fromCandles(c, {});
+  assert.ok(r.gemini, 'الجيميني اتحسب');
+  assert.ok(r.gemini.value > 0 && r.gemini.value < 100, 'مش متشبّع — got ' + r.gemini.value);
+});
+
+test('MCDX بيتغيّر مع البيانات (مش ثابت قرب ٥٠)', () => {
+  const mk = (trend) => {
+    const c = [];
+    for (let i = 0; i < 80; i++) {
+      const p = 100 + trend * i * 0.5;
+      /* الإغلاق قرب القمة في الصاعد وقرب الأرض في الهابط
+         ⇒ تدفق الفلوس مختلف فعلاً (mm ≠ 0) */
+      const o = trend > 0 ? p - 0.6 : p + 0.6;
+      const h = trend > 0 ? p + 0.4 : p + 0.8;
+      const l = trend > 0 ? p - 0.8 : p - 0.4;
+      const d = new Date(Date.now() - (79 - i) * 86400000);
+      c.push({ t: d.toISOString().slice(0, 10),
+        o: o, h: h, l: l, c: p, v: 1000 + (trend > 0 ? i * 20 : 0) });
+    }
+    return c;
+  };
+  const up = SM.fromCandles(mk(1), {});
+  const down = SM.fromCandles(mk(-1), {});
+  assert.ok(up && down, 'اتحسبوا');
+  assert.ok(Math.abs(up.mcdx.value - down.mcdx.value) > 5,
+    'MCDX مختلف بين اتجاهين — ' + up.mcdx.value + ' vs ' + down.mcdx.value);
+});

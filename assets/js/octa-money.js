@@ -87,13 +87,17 @@
     '    <div class="sm-guide-t">🌊 محور التذبذب <em class="sm-guide-en">Volatility</em><span class="sm-guide-w">الوزن ٢٠٪</span></div>',
     '    <p><strong>التقلب اليومي</strong> (٦٠٪): أقل من ٠.٨٪ ضعيف،',
     '       و<em>١.٥٪ – ٤.٥٪ هو النطاق المريح = درجة كاملة</em>، وفوق ٨٪ خطر.</p>',
-    '    <p>وحساسية السهم لحركة السوق (٢٥٪)، وأكبر تراجع خلال السنة (١٥٪).</p>',
+    '    <p>وحساسية السهم لحركة السوق (٢٥٪). وأكبر تراجع خلال النافذة بيتحسب',
+    '       من الشموع ويظهر في <strong>كارت السهم</strong>.</p>',
     '    <p><em>مستقر ولا عنيف؟</em></p>',
     '  </div>',
     '</div>',
 
     '<div class="sm-guide-score">',
     '  <div class="sm-guide-score-t">🧮 الدرجة من ٠ إلى ١٠٠ بتتحسب إزاي؟</div>',
+    '  <p style="margin:0 0 6px;font-size:.78rem;color:var(--muted);line-height:1.75">',
+    '  ولو سهم ناقصه جزء من المحور ⇒ الدرجة بتتحسب على الموجود بس،',
+    '  والـ<strong>تغطية</strong> بتقل ⇒ رقم أقل = ثقة أقل.</p>',
     '  <div class="sm-guide-score-f">',
     '    كل قياس بيتحوّل الأول لدرجة من <b>٠</b> إلى <b>١٠٠</b>:',
     '    تحت الحد الأدنى = ضعيف (٠–٤٠) · في النطاق المريح = <b>١٠٠</b> ·',
@@ -161,6 +165,7 @@
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   const num = (v) => (typeof v === 'number' && isFinite(v)) ? v : null;
   const f1 = (v) => num(v) != null ? Number(v).toFixed(1) : '—';
+  const clamp01 = (v) => Math.max(0, Math.min(1, Number(v) || 0));
   const f2 = (v) => num(v) != null ? Number(v).toFixed(2) : '—';
   /* 🎯 سعر بدون ما نضيّع خانات — للأرقام الصغيرة (٠.٢٤٨) الـtoFixed(2)
      كان بيحوّلها لـ«٠.٢٥» والهدف لـ«٠.٢» ⇒ مستحيل يفهمها المستخدم. */
@@ -303,6 +308,9 @@
     const merged = [];
     for (let i = 0; i < src.rows.length; i++) {
       const r = src.rows[i];
+      /* ⛔ استبعاد السندات الحكومية (EGP) — مش أسهم.
+         ⛌   ٣ سندات كانت داخلة في الفلتر (منها واحد سعره ٠.١٣). */
+      if (/-EGP$/i.test(String(r.code || ''))) continue;
       const m = SM.merge(r, r._tech || null, dbMap[r.code] || null);
       m.code = r.code;
       m.name = r.name || m.name;
@@ -418,7 +426,12 @@
     const u = $('smUpd');
     if (u) u.textContent = S.ts ? S.ts.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '—';
     /* ⛌ مصدر البيانات — لازم المستخدم يعرف الأرقام جاية منين */
-    const srcTxt = S.src === 'tv' ? 'بيانات حية من TradingView' : 'بيانات المحرك';
+    /* ⚠️⚠️ مش «بيانات حية»! فيد TradingView للمؤشرات متأخر ١٥ دقيقة
+       (delayed_streaming_900) والسعر = إغلاق الجلسة السابقة.
+       ⛌   الكلمة دي كانت بتوحي إن السعر لحظي ⇒ تصحيح. */
+    const srcTxt = S.src === 'tv'
+      ? 'بيانات TradingView — متأخرة ١٥ دقيقة (إقفال الجلسة السابقة)'
+      : 'بيانات المحرك';
     st.innerHTML = '<span class="sm-dot ok"></span> البيانات جاهزة · ' + srcTxt;
   }
 
@@ -455,6 +468,8 @@
       return;
     }
     if (!S.view.length) {
+      /* ⛔ العدّاد لازم يصفّر مع الجدول (كان فاضل بيقول ٢٦٤) */
+      const cz = $('smCount'); if (cz) cz.textContent = '0';
       box.innerHTML = '<div class="sm-empty">🚫 مفيش أسهم مطابقة للفلتر. جرّب حد أدنى أقل أو شيل الفلاتر.</div>';
       return;
     }
@@ -568,11 +583,35 @@
       via = 'tv';
     }
     if (!j || !j.ok || !j.candles || j.candles.length < 25) {
-      box.innerHTML = '<div class="sm-loading">⚠️ مقدرتش أجيب شموع السهم — المؤشرات الذكية مش متاحة دلوقتي.</div>';
+      /* ⛔⛔ سبب واضح — مش كارت فاضي. (٢٦ من ١٢٠ سهم رجّعوا
+         ⛌   candles-failed ⇒ المستخدم كان بيشوف فراغ بلا تفسير) */
+      const why = (j && j.error === 'candles-failed')
+        ? 'مفيش تاريخ شموع متاح لهذا السهم من المصدر — جرّب سهم تاني.'
+        : 'مقدرتش أجيب شموع السهم — المؤشرات الذكية مش متاحة دلوقتي.';
+      box.innerHTML = '<div class="sm-loading">⚠️ ' + why + '</div>';
       return;
     }
     const SM = window.OCTA_SM;
+    /* ⛔ البيانات القديمة (مثال TOUR: آخر شمعة ٢٠١٧) ⇒ مفيش مؤشرات.
+         بنقول للمستخدم السبب بدل ما نعرض أرقام من ٩ سنين. */
+    const age = (typeof SM.candleAgeDays === 'function') ? SM.candleAgeDays(j.candles) : null;
+    const maxAge = (typeof SM.MAX_CANDLE_AGE_DAYS === 'function') ? SM.MAX_CANDLE_AGE_DAYS : 10;
+    if (age != null && age > maxAge) {
+      const last = j.candles[j.candles.length - 1];
+      box.innerHTML = '<div class="sm-loading">⚠️ بيانات السهم دي قديمة — آخر تحديث ' +
+        esc(String(last && last.t || 'غير معروف')) + ' (' + age + ' يوم). ' +
+        'المؤشرات مش محسوبة عشان ما تبقاش مضلّلة.</div>';
+      renderStrip(r, null);
+      renderMap(r, null);
+      return;
+    }
     const d = SM.fromCandles(j.candles, r.m);
+    if (!d) {
+      box.innerHTML = '<div class="sm-loading">⚠️ الشموع المتاحة مش كفاية لحساب المؤشرات (محتاجة ٢٥ شمعة على الأقل).</div>';
+      renderStrip(r, null);
+      renderMap(r, null);
+      return;
+    }
     S.detail = d;
     box.innerHTML = cardsHtml(r, d) +
       '<div class="sm-src">المؤشرات محسوبة من ' + (j.count || (j.candles ? j.candles.length : 0)) + ' شمعة يومية حقيقية' +
@@ -740,11 +779,22 @@
     /* ── المحاور الأربعة (من بيانات السوق) ── */
     ['trend', 'momentum', 'volatility', 'volume'].forEach(k => {
       const a = r.axes[k];
+      if (!a.has || a.score == null) {
+        /* ⚠️ محور بلا بيانات ⇒ نقوله بصراحة بدل ما نعرض رقم */
+        out.push(card(AX[k].n, AX[k].i, 'مفيش بيانات',
+          AX_MEASURE[k], false, 'مفيش قراءات كافية لهذا المحور — مش بيتحسب',
+          '<div class="sm-lv3-i"><span>التغطية</span><b>٠٪</b></div>'));
+        return;
+      }
       const v = Math.round(a.score);
       const ok = v >= 55;
       const why = (ok ? 'قوي — ' : 'ضعيف — ') + partsText(a);
+      /* 📊 التغطية: كام مؤشر من المحور اتاح فعلاً (شفافية) */
+      const cov = Math.round((a.coverage == null ? 1 : a.coverage) * 100);
+      const extra = '<div class="sm-lv3-i"><span>التغطية</span><b>' + cov + '%</b>' +
+        '<i>' + a.parts.length + ' مؤشر</i></div>';
       out.push(card(AX[k].n, AX[k].i, v + ' / 100', AX_MEASURE[k], ok, why,
-        bar(a.score, ok ? 'var(--up)' : 'var(--dn)')));
+        bar(a.score, ok ? 'var(--up)' : 'var(--dn)') + extra));
     });
 
     if (!d) return out.join('');
@@ -810,6 +860,17 @@
           '<span>الحجم مؤكد <b>' + (rp.volOk ? '✅' : '❌') + '</b></span>' +
           '<span>مع الاتجاه <b>' + (rp.trendOk ? '✅' : '❌') + '</b></span>' +
           '<span>عمره <b>' + rp.age + ' يوم</b></span></div>' : ''));
+    }
+
+    /* ── أقصى التراجع (من الشموع) — مكمل محور التذبذب ── */
+    if (d.mdd != null) {
+      const mdd = d.mdd;
+      const ok = mdd <= 35;
+      out.push(card('أكبر تراجع — آخر ٣٢٠ يوم', '📉', f1(mdd) + '%',
+        'أقصى نزول من القمة للإرضي خلال النافذة — كل ما قلّ، السهم كان مستقر',
+        ok, mdd <= 35 ? 'تراجع محدود — السهم محافظ على قيمته'
+          : (mdd <= 55 ? 'تراجع متوسط — طبيعي في السوق المصري' : 'تراجع كبير — مخاطرة عالية'),
+        bar(clamp01((70 - mdd) / 30), ok ? 'var(--up)' : 'var(--dn)')));
     }
 
     /* ── Order Block ── */

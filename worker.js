@@ -212,7 +212,9 @@ export default {
       const cols = url.searchParams.get('cols') === 'min'
         ? ['close', 'change', 'volume', 'RSI', 'MACD.macd', 'MACD.signal', 'SMA50', 'SMA200']
         : TV_COLS;
-      const key = 'https://octa.internal/tvscan/' + c + '/' + limit + '/' + cols.length;
+      /* 📌 v2 في المفتاح — عشان الكاش القديم (بصيغة تانية) ما يتخدمش
+         بعد أي تعديل على شكل البيانات. */
+      const key = 'https://octa.internal/v2/tvscan/' + c + '/' + limit + '/' + cols.length;
       const cacheKey = new Request(key, { method: 'GET' });
       const cache = caches && caches.default;
 
@@ -244,7 +246,9 @@ export default {
           headers: {
             'Content-Type': 'application/json',
             /* ⛔ TTL طويل (يوم) — التحديث بيتم في الخلفية مش عند الطلب */
-            'Cache-Control': 'public, max-age=86400',
+            /* ⚠️ TTL كان يوم كامل ⇒ لو فشل التحديث في الخلفية، المستخدم
+               ياخد بيانات من يوم كامل وهي معروضة «حيّة». ⇒ ١٠ دقايق. */
+            'Cache-Control': 'public, max-age=600',
             'Access-Control-Allow-Origin': '*',
             'x-octa-ts': String(Date.now())
           }
@@ -286,7 +290,7 @@ export default {
         return new Response(JSON.stringify({ ok: false, error: 'bad code' }),
           { status: 400, headers: { 'Content-Type': 'application/json' } });
       }
-      const ck = new Request('https://octa.internal/tvcandles/' + code + '/' + n, { method: 'GET' });
+      const ck = new Request('https://octa.internal/v2/tvcandles/' + code + '/' + n, { method: 'GET' });
       const cache = caches && caches.default;
       if (cache) {
         const hit = await cache.match(ck);
@@ -303,21 +307,37 @@ export default {
         });
         if (!up.ok) throw new Error('sa-' + up.status);
         const raw = await up.json();
-        if (!Array.isArray(raw) || raw.length < 20) throw new Error('no data');
+        /* ⛔ الحد الأدنى ٢٥ (مش ٢٠) — نفس حدّ المحرك. بالحد القديم
+           ⛌   IRAX (٢٠ شمعة) كان يعدّي من الـworker ويرجّع null بعدين
+           ⛌   ⇒ كارت فاضي من غير سبب. */
+        if (!Array.isArray(raw) || raw.length < 25) throw new Error('no data');
         const out = [];
         for (let i = Math.max(0, raw.length - n); i < raw.length; i++) {
           const c = raw[i];
           try {
+            /* ⚠️ الإغلاق **المعدّل** (adj_close) لما يتوفّر — التوزيعات
+               والتجزئة بتخلي الإغلاق الخام غلط. (لو مفيش adj_close ⇒ خام) */
+            const close = (c.adj_close != null && isFinite(Number(c.adj_close)))
+              ? Number(c.adj_close) : Number(c.close);
             out.push({
               t: c.date, o: +Number(c.open).toFixed(4), h: +Number(c.high).toFixed(4),
-              l: +Number(c.low).toFixed(4), c: +Number(c.close).toFixed(4), v: Math.round(c.volume || 0)
+              l: +Number(c.low).toFixed(4), c: +close.toFixed(4), v: Math.round(c.volume || 0)
             });
           } catch (e) { }
         }
-        const res = new Response(JSON.stringify({ ok: true, code: code, count: out.length, candles: out }), {
+        /* ⛔⛔ حارس البيانات القديمة (حرجة): مثال TOUR آخر شمعة ٢٠١٧-٠٤-٠٢
+           ⇒ الكارت بيحسب مستويات على بيانات ٩ سنين والسعر الظاهر ١٠.٠٠.
+           ⇒ هنا بنرتّب ونعلّم العمر، والواجهة بتعرض سبب واضح. */
+        const lastDate = out.length ? String(out[out.length - 1].t) : '';
+        const lastMs = lastDate ? Date.parse(lastDate) : NaN;
+        const ageDays = isFinite(lastMs) ? Math.floor((Date.now() - lastMs) / 86400000) : null;
+        const res = new Response(JSON.stringify({
+          ok: true, code: code, count: out.length, candles: out,
+          ageDays: ageDays, stale: !!(ageDays != null && ageDays > 10)
+        }), {
           headers: {
             'Content-Type': 'application/json',
-            'Cache-Control': 'public, max-age=3600',
+            'Cache-Control': 'public, max-age=600',
             'Access-Control-Allow-Origin': '*'
           }
         });
