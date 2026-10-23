@@ -273,6 +273,7 @@ window.addEventListener('error', function (e) {
 <link rel="stylesheet" href="assets/css-gold.css?v=202610231003">
 <!-- 💰 Smart Money (22 أكتوبر 2026) — صفحة الفلتر والكروت -->
 <link rel="stylesheet" href="assets/css-money.css?v=202610231003">
+<link rel="stylesheet" href="assets/css-radar.css?v=202610231200">
   <!-- 🔒 سياسة الأمان — بتتقرأ وتتركّب من octa-csp.js (report-only) -->
   <meta name="octa-csp-report" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com https://s.tradingview.com https://www.tradingview.com; frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com; form-action 'self'; img-src 'self' data: blob: https://*.tradingview.com https://*.tradingview-widget.com; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' https://s3.tradingview.com; connect-src 'self' https://octa-prices-production-4ccb.up.railway.app https://scanner.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://www.tradingview-widget.com https://*.tradingview.com https://news.google.com https://api.rss2json.com https://foudalens.com https://api.cors.lol; frame-src https://s3.tradingview.com https://www.tradingview.com https://*.tradingview-widget.com https://*.tradingview.com; media-src 'self' blob:; worker-src 'self' blob:">
 </head>
@@ -1298,6 +1299,167 @@ window.addEventListener('error', function (e) {
   </div>
   </div>
 
+  <!-- ══════════════════════════════════════════════════════════════
+       PAGE: RADAR — الرادار الذكي للأسهم
+       🛰️ OCTA Smart Money Radar
+       ══════════════════════════════════════════════════════════════ -->
+  <div class="page" id="page-radar">
+  <div class="rd-wrap">
+
+  <div class="rd-top">
+    <div style="flex:1;min-width:230px">
+      <div class="rd-title">🛰️ الرادار الذكي للأسهم</div>
+      <div class="rd-sub">افحص السوق بالكامل، واعرف الأسهم التي تتوافق مع استراتيجيتك، وافهم سبب ظهور كل سهم.</div>
+      <div class="rd-status" id="rdStatus"><span class="rd-dot"></span> بنجهّز بيانات السوق…</div>
+    </div>
+    <div class="rd-stats">
+      <div class="rd-stat"><span>الأسهم</span><b id="rdTotal">—</b></div>
+      <div class="rd-stat"><span>محلّل</span><b id="rdAnalyzed">—</b></div>
+      <div class="rd-stat a"><span>مرشح قوي</span><b id="rdA">0</b></div>
+      <div class="rd-stat b"><span>يحتاج تأكيد</span><b id="rdB">0</b></div>
+      <div class="rd-stat c"><span>مخاطرة عالية</span><b id="rdC">0</b></div>
+      <div class="rd-stat e"><span>ناقص بيانات</span><b id="rdE">0</b></div>
+      <div class="rd-stat"><span>آخر تحديث</span><b id="rdUpd">—</b></div>
+    </div>
+  </div>
+
+  <div class="rd-tools">
+    <select id="rdProfile" class="rd-sel" aria-label="بروفايل الاستراتيجية">
+      <option value="balanced">البروفايل: متوازن</option>
+      <option value="conservative">البروفايل: محافظ</option>
+      <option value="trend">البروفايل: اتجاه</option>
+    </select>
+    <input id="rdQ" class="rd-in" type="search" placeholder="دوّر بالاسم أو الرمز…" autocomplete="off">
+    <select id="rdSect" class="rd-sel" aria-label="القطاع"><option value="all">كل القطاعات</option></select>
+    <select id="rdCls" class="rd-sel" aria-label="التصنيف">
+      <option value="all">كل التصنيفات</option>
+      <option value="A">مرشح تحليلي قوي</option>
+      <option value="B">مرشح — محتاج تأكيد</option>
+      <option value="C">مرشح بمخاطرة عالية</option>
+      <option value="D">مفيش إعداد حالياً</option>
+      <option value="E">بيانات غير كافية</option>
+    </select>
+    <select id="rdSort" class="rd-sel" aria-label="الترتيب">
+      <option value="score">الترتيب: الدرجة التحليلية</option>
+      <option value="trend">الترتيب: درجة الاتجاه</option>
+      <option value="momentum">الترتيب: درجة الزخم</option>
+      <option value="volume">الترتيب: درجة الحجم</option>
+      <option value="volatility">الترتيب: درجة التذبذب</option>
+      <option value="rvol">الترتيب: الحجم النسبي</option>
+      <option value="rr">الترتيب: العائد/المخاطرة</option>
+      <option value="liquidity">الترتيب: السيولة</option>
+      <option value="risk">الترتيب: المخاطرة</option>
+      <option value="change">الترتيب: التغير</option>
+      <option value="price">الترتيب: السعر</option>
+    </select>
+    <button id="rdDir" class="rd-chip" type="button" title="عكس الترتيب" aria-label="عكس الترتيب">⬇</button>
+    <select id="rdLiq" class="rd-sel" aria-label="أقل سيولة">
+      <option value="all">السيولة: أي</option>
+      <option value="MODERATE">سيولة متوسطة فأكثر</option>
+      <option value="LIQUID">سيولة عالية فأكثر</option>
+      <option value="DEEP">سيولة عالية جداً</option>
+    </select>
+    <select id="rdRR" class="rd-sel" aria-label="أقل نسبة عائد">
+      <option value="0">العائد/المخاطرة: أي</option>
+      <option value="1.5">عائد ≥ ١.٥</option>
+      <option value="2">عائد ≥ ٢</option>
+      <option value="3">عائد ≥ ٣</option>
+    </select>
+    <select id="rdAtr" class="rd-sel" aria-label="أقصى تذبذب">
+      <option value="0">التذبذب: أي</option>
+      <option value="4">تذبذب ≤ ٤٪</option>
+      <option value="6">تذبذب ≤ ٦٪</option>
+      <option value="8">تذبذب ≤ ٨٪</option>
+    </select>
+    <select id="rdRvol" class="rd-sel" aria-label="أقل حجم نسبي">
+      <option value="0">الحجم النسبي: أي</option>
+      <option value="0.6">حجم نسبي ≥ ٠.٦</option>
+      <option value="1">حجم نسبي ≥ ١</option>
+      <option value="1.5">حجم نسبي ≥ ١.٥</option>
+    </select>
+    <button id="rdShowAll" class="rd-chip" type="button">أظهر ناقص البيانات</button>
+    <button id="rdReset" class="rd-chip" type="button">↺ تصفير الفلاتر</button>
+    <button id="rdScan" class="rd-chip primary" type="button">⟳ افحص السوق</button>
+  </div>
+
+  <div class="rd-progress" id="rdProgress" style="display:none"></div>
+
+  <div class="rd-detail" id="rdDetail" style="display:none">
+    <button id="rdClose" class="rd-chip" type="button" style="margin-bottom:10px">✕ إغلاق التحليل</button>
+  </div>
+
+  <div class="rd-list" id="rdList">
+    <div class="rd-empty"><h3>⏳ بنحمّل بيانات البورصة…</h3>
+      <p>المسح بيحتاج تاريخ كل سهم — بياخد لحد دقيقة واحدة أول مرة.</p></div>
+  </div>
+
+  <div class="rd-guide">
+    <details>
+      <summary>🔄 كيف الرادار بيحلل السهم؟</summary>
+      <div class="body">
+        <p>المسح بيمشي بالترتيب ده — وكل خطوة حالتها بتظهر في تحليل السهم:</p>
+        <ol>
+          <li>بنجمع بيانات الأسهم المتاحة (كم جلسة لكل سهم).</li>
+          <li>بنفحص الاتجاه (المتوسطات المتحركة + بنية القمم والأرض + ADX).</li>
+          <li>بنحلل الزخم (RSI + MACD + ميل الزخم).</li>
+          <li>بنراجع حجم التداول والسيولة (الحجم النسبي + نسبة الدوران).</li>
+          <li>نقيس التذبذب (ATR ونسبته مقارنةً بتاريخ السهم نفسه).</li>
+          <li>بنراجع أدلة نشاط التداول (حجم · توصية المحللين · شذوذ الدوران).</li>
+          <li>بنحسب مستويات الدخول والوقف والهدف ونسبة العائد للمخاطرة.</li>
+          <li>بنحدد التصنيف النهائي حسب البروفايل المختار.</li>
+        </ol>
+        <p>⛔ <b>بيانات نشاط المؤسسات غير متاحة</b> عندنا — مافيش مصدر عام بيوصف ملكية المؤسسات أو تدفق الأوامر.
+           عشان كده الأدلة بتتسمّى «أدلة متاحة» ومش «شراء مؤسسات»، ومفيش أي درجة بتُحتسب لغير المتاح.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>⚖️ إزاي بيتحسب التصنيف النهائي؟</summary>
+      <div class="body">
+        <p>كل شرط بيتفحص **على حدة** — والنتيجة بتقولك بالظبط إيه اللي اتحقق وإيه اللي ناقص:</p>
+        <ul>
+          <li><b>A — مرشح تحليلي قوي:</b> كل شروط البروفايل اتحقق.</li>
+          <li><b>B — محتاج تأكيد:</b> الأساس التحليلي كويس بس ناقص شروط تأكيد.</li>
+          <li><b>C — مخاطرة عالية:</b> الأساس التحليلي كامل بس المخاطرة مش مقبولة.</li>
+          <li><b>D — مفيش إعداد:</b> الشروط الأساسية مش متحقق.</li>
+          <li><b>E — بيانات ناقصة:</b> مش قادر نحلّل السهم بثقة.</li>
+        </ul>
+        <p>البروفايلات: <b>محافظ</b> (تأكيد أقوى · سيولة أعلى · مخاطرة أقل) ·
+           <b>متوازن</b> (توازن) · <b>اتجاه</b> (الاتجاه محور · ATR يحدد الوقف).
+           ⛔ مفيش بروفايل «الأفضل» — دي أدوات مختلفة.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>📚 معجم المصطلحات</summary>
+      <div class="body">
+        <p>اضغط على علامة (؟) جنب أي مصطلح في التحليل لتشوف: ما الذي يقيسه · ليه يهمّك ·
+           إزاي OCTA بيستخدمه · و<b>ما الذي لا يعنيه</b>.</p>
+        <p>المصطلحات: الاتجاه · الزخم · RSI · MACD · ADX · الحجم النسبي · ATR · التذبذب ·
+           السيولة · الدليل الذكي · وقف الخسارة · الهدف · العائد/المخاطرة · حجم المركز ·
+           الدرجة التحليلية · التصنيف · حداثة البيانات.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>🔒 تنويه مهم</summary>
+      <div class="body">
+        <div class="disc">
+          <b>هذا النظام أداة تحليلية وتعليمية</b> تساعدك على فهم حركة الأسهم ومؤشرات التداول وإدارة المخاطر.<br><br>
+          النتائج <b>لا تمثل توصية بالشراء أو البيع</b>، ولا تضمن تحقيق أرباح.<br>
+          الأسعار والمؤشرات قد تتغير، وقد تكون البيانات متأخرة أو غير مكتملة.<br>
+          <b>⛔ حجم التداول العالي لا يُثبت شراء مؤسسات</b> — بيانات المؤسسات غير متاحة لدينا.<br>
+          <b>⛔ الدرجة التحليلية ليست احتمال نجاح</b> ولاعدل ربح.<br>
+          تكاليف المعاملة غير مشمولة في حسابات حجم المركز.<br>
+          المستخدم مسؤول عن قراراته الاستثمارية.
+        </div>
+      </div>
+    </details>
+  </div>
+
+  </div>
+  </div>
+
   <!-- ============ PAGE: SEARCH ============ -->
   <div class="page" id="page-search">
   <h1 class="page-title">🔎 بحث الأسهم</h1>
@@ -1532,6 +1694,10 @@ window.addEventListener('error', function (e) {
 <!-- 💰 Smart Money (22 أكتوبر 2026) — المحرك النقي + صفحة الفلتر.
      لازم بعد tv-shim.js عشان الشارت (OCTA_TV.mount) يكون موجود. -->
 <script src="assets/js/octa-egx-names.js?v=202610231003"></script>
+<script src="assets/js/octa-radar.js?v=202610231200"></script>
+<script src="assets/js/octa-radar-explain.js?v=202610231200"></script>
+<script src="assets/js/octa-radar-ref.js?v=202610231200"></script>
+<script src="assets/js/octa-radar-ui.js?v=202610231200"></script>
 <script src="assets/js/octa-smartmoney.js?v=202610231003"></script>
 <script src="assets/js/octa-money.js?v=202610231003"></script>
 
