@@ -442,6 +442,65 @@
   }
 
   /* 🔎 الفلترة */
+  /* ══════════════════════════════════════════════════════════════
+   📊 أعمدة الجدول — مصدر واحد (العنوان · الترتيب · الفلترة)
+   ──────────────────────────────────────────────────────────────
+   📌 ٢٣ أكتوبر ٢٠٢٦: كل عمود في الجدول قابل للترتيب (بضغطة)
+   + قابل للفلترة (سطر الترويسة الثاني).
+   ⛔ كل عمود لازم يكون له sortBy (رقم أو نص) عشان الترتيب يشتغل.
+   ══════════════════════════════════════════════════════════════ */
+  const COLS = [
+    { k: 'name', t: 'السهم', f: 'text', get: r => (r.name || '') + ' ' + (r.code || '') },
+    { k: 'price', t: 'السعر', f: 'num', get: r => r.price },
+    { k: 'change', t: 'التغير', f: 'num', get: r => r.change },
+    /* ⛔ الأعمدة اللي بتعرض حالة: الترتيب بيكون بالـscore (رقم) مش بالحالة
+       (نص) — الترتيب بالحالة مش مفيد. */
+    { k: 'trend', t: 'الاتجاه', f: 'sel', vals: () => uniqStates('trend'), get: r => r.trend.state, sb: r => r.trend.score },
+    { k: 'momentum', t: 'الزخم', f: 'sel', vals: () => uniqStates('momentum'), get: r => r.momentum.state, sb: r => r.momentum.score },
+    { k: 'volume', t: 'الحجم', f: 'sel', vals: () => uniqStates('volume'), get: r => r.volume.state, sb: r => r.volume.score },
+    { k: 'volatility', t: 'التذبذب', f: 'sel', vals: () => uniqStates('volatility'), get: r => r.volatility.state, sb: r => r.volatility.score },
+    { k: 'liq', t: 'السيولة', f: 'sel', vals: () => uniqStates('liq'), get: r => r.volume.liq },
+    { k: 'rr', t: 'R:R', f: 'num', get: r => r.plan.rr },
+    { k: 'atr', t: 'التذبذب%', f: 'num', get: r => r.volatility.atrPct },
+    { k: 'rvol', t: 'الحجم النسبي', f: 'num', get: r => r.volume.rvol },
+    { k: 'risk', t: 'المخاطرة', f: 'sel', vals: () => uniqStates('risk'), get: r => r.risk.state, sb: r => r.risk.riskScore },
+    { k: 'score', t: 'الدرجة', f: 'num', get: r => r.score.total },
+    { k: 'cls', t: 'الحالة', f: 'sel', vals: () => ['A', 'B', 'C', 'D', 'E'], get: r => r.classification.code }
+  ];
+
+  /* كل القيم المتاحة في عمود (للفلاتر المنسدلة) */
+  function uniqStates(which) {
+    const set = {};
+    S.results.forEach(r => {
+      let v = null;
+      if (which === 'trend') v = r.trend.state;
+      else if (which === 'momentum') v = r.momentum.state;
+      else if (which === 'volume') v = r.volume.state;
+      else if (which === 'volatility') v = r.volatility.state;
+      else if (which === 'liq') v = r.volume.liq;
+      else if (which === 'risk') v = r.risk.state;
+      if (v) set[v] = 1;
+    });
+    return Object.keys(set).sort();
+  }
+
+  /* ⛔ فلتر رقم: يقبل 5 أو >5 أو <5 أو >=5 أو <=5 أو =5 */
+  function numFilterOk(val, expr) {
+    if (expr == null) return true;
+    const e = String(expr).trim();
+    if (!e) return true;
+    const m = e.match(/^(>=|<=|>|<|=)?\s*(-?\d+(?:\.\d+)?)$/);
+    if (!m) return true;
+    const op = m[1] || '>=';
+    const n = parseFloat(m[2]);
+    if (val == null || !isFinite(val)) return false;
+    if (op === '>=') return val >= n;
+    if (op === '>') return val > n;
+    if (op === '<=') return val <= n;
+    if (op === '<') return val < n;
+    return Math.abs(val - n) < 1e-9;
+  }
+
   function filtered() {
     const liqRank = { DEEP: 5, LIQUID: 4, MODERATE: 3, THIN: 2, ILLIQUID: 1 };
     let out = S.results.slice();
@@ -461,25 +520,49 @@
     if (S.minRvol > 0) out = out.filter(r => r.volume.rvol != null && r.volume.rvol >= S.minRvol);
     if (!S.showAll) out = out.filter(r => r.classification.code !== 'E');
 
+    /* 🧮 فلاتر الأعمدة (من صف الترويسة) */
+    const cf = S.col || {};
+    COLS.forEach(c => {
+      const ex = cf[c.k];
+      if (ex == null || ex === '' || ex === 'all') return;
+      if (c.f === 'text') {
+        const q = String(ex).toLowerCase();
+        out = out.filter(r => String(c.get(r) || '').toLowerCase().indexOf(q) >= 0);
+      } else if (c.f === 'num') {
+        out = out.filter(r => numFilterOk(c.get(r), ex));
+      } else if (c.f === 'sel') {
+        if (c.k === 'cls') out = out.filter(r => r.classification.code === ex);
+        else out = out.filter(r => String(c.get(r) || '') === ex);
+      }
+    });
+
+    /* 🔀 الترتيب — بالعمود المختار */
     const key = S.sort;
+    const col = COLS.find(c => c.k === key);
+    const LIQ_ORDER = { DEEP: 5, LIQUID: 4, MODERATE: 3, THIN: 2, ILLIQUID: 1 };
     out.sort((a, b) => {
       let x, y;
-      if (key === 'score') { x = a.score.total; y = b.score.total; }
-      else if (key === 'trend') { x = a.trend.score; y = b.trend.score; }
-      else if (key === 'momentum') { x = a.momentum.score; y = b.momentum.score; }
-      else if (key === 'volume') { x = a.volume.score; y = b.volume.score; }
-      else if (key === 'volatility') { x = a.volatility.score; y = b.volatility.score; }
-      else if (key === 'rvol') { x = a.volume.rvol; y = b.volume.rvol; }
-      else if (key === 'rr') { x = a.plan.rr; y = b.plan.rr; }
-      else if (key === 'liquidity') { x = liqRank[a.volume.liq] || 0; y = liqRank[b.volume.liq] || 0; }
-      else if (key === 'risk') { x = a.risk.riskScore; y = b.risk.riskScore; }
-      else if (key === 'change') { x = a.change; y = b.change; }
-      else { x = a.price; y = b.price; }
+      if (col) {
+        if (key === 'liq') { x = LIQ_ORDER[a.volume.liq] || 0; y = LIQ_ORDER[b.volume.liq] || 0; }
+        else if (col.sb) { x = col.sb(a); y = col.sb(b); }
+        else { x = col.get(a); y = col.get(b); }
+      } else { x = a.price; y = b.price; }
       if (x == null) x = -Infinity;
       if (y == null) y = -Infinity;
+      if (typeof x === 'string' || typeof y === 'string') {
+        return String(x).localeCompare(String(y), 'ar') * S.dir;
+      }
       return (x - y) * S.dir;
     });
     return out;
+  }
+
+  /* 🔄 زامن منسدلة الترتيب في كارت الفلاتر مع ترتيب الجدول */
+  function syncSortUI() {
+    const sel = $('rdSort');
+    if (sel && sel.value !== S.sort) sel.value = S.sort;
+    const dir = $('rdDir');
+    if (dir) dir.textContent = S.dir > 0 ? '⬆' : '⬇';
   }
 
   function clsBadge(code) {
@@ -518,45 +601,111 @@
       if (b) b.onclick = resetFilters;
       return;
     }
-    /* الجدول (ديسكوب) */
-    let html = '<div class="rd-row head"><span>السهم</span><span>السعر</span><span>الاتجاه</span>' +
-      '<span>الزخم</span><span>الحجم</span><span>التذبذب</span><span>الدرجة</span><span>الحالة</span></div>';
-    rows.forEach(r => {
-      html += '<div class="rd-row" data-code="' + esc(r.code) + '" tabindex="0" role="button" ' +
-        'aria-label="' + esc(r.name + ' — ' + X.tr('ar', r.classification.state)) + '">' +
-        '<div class="rd-nm"><b>' + esc(r.name) + '</b><span class="rd-code">' + esc(r.code) +
-        (r.sector ? ' · ' + esc(r.sector) : '') + '</span></div>' +
-        '<div class="rd-cell"><b>' + fmtPrice(r.price) + '</b>' +
-        (r.change != null ? ' <span class="' + (r.change >= 0 ? 'rd-up' : 'rd-dn') + '">' + fmtPct(r.change) + '</span>' : '') + '</div>' +
-        '<div class="rd-cell">' + stateCell(r.trend.state) + '</div>' +
-        '<div class="rd-cell">' + stateCell(r.momentum.state) + '</div>' +
-        '<div class="rd-cell">' + stateCell(r.volume.state) + '</div>' +
-        '<div class="rd-cell">' + stateCell(r.volatility.state) + '</div>' +
-        '<div class="rd-cell"><b>' + (r.score.total == null ? '—' : r.score.total) + '</b></div>' +
-        '<div>' + clsBadge(r.classification.code) + '</div>' +
-        '</div>';
+    /* ══════════════════════════════════════════════════════════════
+     📊 الجدول — صف عناوين (ترتيب) + صف فلاتر (لكل عمود)
+     ══════════════════════════════════════════════════════════════ */
+    const cf = S.col || {};
+    const isOn = (k) => S.sort === k;
+    const arrow = (k) => isOn(k) ? (S.dir > 0 ? '<span class="ar">▲</span>' : '<span class="ar">▼</span>') : '';
+
+    let head = '<tr>';
+    COLS.forEach(c => {
+      head += '<th' + (c.k === 'name' ? ' class="sticky-c"' : '') + '>' +
+        '<button type="button" class="rd-th-sort' + (isOn(c.k) ? ' on' : '') + '" ' +
+        'data-sort="' + esc(c.k) + '" aria-label="ترتيب حسب ' + esc(c.t) + '">' +
+        esc(c.t) + arrow(c.k) + '</button></th>';
     });
-    /* الكروت (موبايل) */
-    let cards = '';
-    rows.forEach(r => {
-      cards += '<div class="rd-card" data-code="' + esc(r.code) + '" tabindex="0" role="button" ' +
-        'aria-label="' + esc(r.name) + '">' +
-        '<div class="top"><div class="rd-nm"><b>' + esc(r.name) + '</b>' +
-        '<span class="rd-code">' + esc(r.code) + (r.sector ? ' · ' + esc(r.sector) : '') + '</span></div>' +
-        '<div style="text-align:left">' + clsBadge(r.classification.code) +
-        '<div style="margin-top:5px;font-size:15px;font-weight:800;color:var(--gold)">' +
-        (r.score.total == null ? '—' : r.score.total) + '</div></div></div>' +
-        '<div class="grid">' +
-        '<div>السعر<b>' + fmtPrice(r.price) + '</b></div>' +
-        '<div>الاتجاه<b>' + X.tr('ar', r.trend.state) + '</b></div>' +
-        '<div>الزخم<b>' + X.tr('ar', r.momentum.state) + '</b></div>' +
-        '<div>الحجم<b>' + X.tr('ar', r.volume.state) + '</b></div>' +
-        '<div>التذبذب<b>' + X.tr('ar', r.volatility.state) + '</b></div>' +
-        '<div>المخاطرة<b>' + X.tr('ar', r.risk.state) + '</b></div>' +
-        '</div></div>';
+    head += '</tr>';
+
+    let frow = '<tr>';
+    COLS.forEach(c => {
+      const val = cf[c.k] == null ? '' : cf[c.k];
+      let ctrl;
+      if (c.f === 'text') {
+        ctrl = '<input type="search" data-cf="' + esc(c.k) + '" value="' + esc(val) + '" placeholder="' + esc(c.t) + '" aria-label="فلتر ' + esc(c.t) + '">';
+      } else if (c.f === 'num') {
+        ctrl = '<input type="text" inputmode="decimal" data-cf="' + esc(c.k) + '" value="' + esc(val) + '" placeholder="' + esc(c.t) + '" aria-label="فلتر ' + esc(c.t) + '">';
+      } else {
+        const opts = ['<option value="all">الكل</option>'];
+        const vals = c.k === 'cls' ? ['A', 'B', 'C', 'D', 'E'] : (c.vals ? c.vals() : []);
+        vals.forEach(v => {
+          const lb = c.k === 'cls' ? (({ A: 'قوي', B: 'تأكيد', C: 'مخاطرة', D: 'مفيش', E: 'ناقص' })[v] || v) : X.tr('ar', v);
+          opts.push('<option value="' + esc(v) + '"' + (val === v ? ' selected' : '') + '>' + esc(lb) + '</option>');
+        });
+        ctrl = '<select data-cf="' + esc(c.k) + '" aria-label="فلتر ' + esc(c.t) + '">' + opts.join('') + '</select>';
+      }
+      frow += '<th' + (c.k === 'name' ? ' class="sticky-c"' : '') + ' class="rd-th-f-wrap"><td class="rd-th-f">' + ctrl + '</td></th>';
     });
-    box.innerHTML = html + '<div class="rd-cards">' + cards + '</div>';
-    box.querySelectorAll('[data-code]').forEach(n => {
+    frow += '</tr>';
+
+    let body = '';
+    rows.forEach(r => {
+      const tds = COLS.map(c => {
+        if (c.k === 'name') {
+          return '<td class="sticky-c"><div class="rd-nm"><b>' + esc(r.name) + '</b>' +
+            '<span class="rd-code">' + esc(r.code) + (r.sector ? ' · ' + esc(r.sector) : '') + '</span></div></td>';
+        }
+        if (c.k === 'price') {
+          return '<td class="num"><b>' + fmtPrice(r.price) + '</b>' +
+            (r.change != null ? ' <span class="' + (r.change >= 0 ? 'rd-up' : 'rd-dn') + '">' + fmtPct(r.change) + '</span>' : '') + '</td>';
+        }
+        if (c.k === 'change') {
+          return '<td class="num">' + (r.change == null ? '<span class="rd-na">—</span>' :
+            '<b class="' + (r.change >= 0 ? 'rd-up' : 'rd-dn') + '">' + fmtPct(r.change) + '</b>') + '</td>';
+        }
+        if (c.k === 'score') {
+          return '<td class="num"><b>' + (r.score.total == null ? '—' : r.score.total) + '</b></td>';
+        }
+        if (c.k === 'rr') {
+          return '<td class="num">' + (r.plan.rr == null ? '<span class="rd-na">—</span>' : '<b>' + r.plan.rr + '</b>') + '</td>';
+        }
+        if (c.k === 'atr') {
+          return '<td class="num">' + (r.volatility.atrPct == null ? '<span class="rd-na">—</span>' : r.volatility.atrPct + '%') + '</td>';
+        }
+        if (c.k === 'rvol') {
+          return '<td class="num">' + (r.volume.rvol == null ? '<span class="rd-na">—</span>' : r.volume.rvol) + '</td>';
+        }
+        if (c.k === 'cls') {
+          return '<td>' + clsBadge(r.classification.code) + '</td>';
+        }
+        return '<td>' + stateCell(c.get(r)) + '</td>';
+      }).join('');
+      body += '<tr data-code="' + esc(r.code) + '" tabindex="0" role="button" ' +
+        'aria-label="' + esc(r.name + ' — ' + X.tr('ar', r.classification.state)) + '">' + tds + '</tr>';
+    });
+
+    box.innerHTML = '<div class="rd-tablewrap"><table class="rd-table">' +
+      '<thead>' + head + frow + '</thead><tbody>' + body + '</tbody></table></div>';
+
+    /* 🔀 زرار الترتيب */
+    box.querySelectorAll('[data-sort]').forEach(b => {
+      b.addEventListener('click', () => {
+        const k = b.getAttribute('data-sort');
+        if (S.sort === k) S.dir = -S.dir;
+        else { S.sort = k; S.dir = (k === 'name' || k === 'cls') ? 1 : -1; }
+        syncSortUI();
+        renderList();
+      });
+    });
+    /* 🧮 فلاتر الأعمدة */
+    box.querySelectorAll('[data-cf]').forEach(inp => {
+      const k = inp.getAttribute('data-cf');
+      const ev = (inp.tagName === 'SELECT') ? 'change' : 'input';
+      let tm = null;
+      inp.addEventListener(ev, () => {
+        clearTimeout(tm);
+        tm = setTimeout(() => {
+          S.col = S.col || {};
+          S.col[k] = inp.value;
+          renderList();
+          /* ⛔ بعد إعادة الرسم، نرجّع التركيز للحقل (إلا لو اتغيّر الـDOM) */
+          const nx = $('rdList') && $('rdList').querySelector('[data-cf="' + k + '"]');
+          if (nx && document.activeElement !== nx) { try { nx.focus(); } catch (e) { } }
+        }, 220);
+      });
+    });
+    /* 👆 فتح السهم */
+    box.querySelectorAll('tbody [data-code]').forEach(n => {
       n.addEventListener('click', () => openStock(n.getAttribute('data-code')));
       n.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openStock(n.getAttribute('data-code')); }
@@ -567,16 +716,38 @@
   /* ══════════════════════════════════════════════════════════════
    🔍 4) لوحة السهم
    ══════════════════════════════════════════════════════════════ */
+  /* ══════════════════════════════════════════════════════════════
+   🔍 فتح السهم — في **صفحة مستقلة** (٢٣ أكتوبر ٢٠٢٦)
+   ──────────────────────────────────────────────────────────────
+   📌 طلب أحمد: «لما ندوس على سهم يفتح صفحة تانية بكل المعلومات
+   — عشان التصفح ميبقاش طويل تحت كده».
+   ⛔ مفيش أي محتوى اتشال — نفس الـdetailHTML بالظبط.
+   ══════════════════════════════════════════════════════════════ */
   function openStock(code) {
     const a = S.byCode[code];
     if (!a) return;
     S.selected = code;
-    const d = $('rdDetail');
-    if (!d) return;
-    d.style.display = '';
-    d.innerHTML = detailHTML(a);
+    const body = $('rdStockBody');
+    if (!body) return;
+    body.innerHTML = detailHTML(a);
     bindDetail(a);
-    d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    bindBack();
+    /* ⛔ لازم الصفحة تكون مسجّلة كـtool عشان الـhash يتبعها
+       والرجوع يشتغل صح */
+    if (typeof switchPage === 'function') {
+      try { switchPage('radar-stock'); }
+      catch (e) { window.scrollTo(0, 0); }
+    } else {
+      try { window.scrollTo(0, 0); } catch (e) { }
+    }
+  }
+
+  /* ↩ رجوع لقائمة الرادار */
+  function backToList() {
+    if (typeof switchPage === 'function') {
+      try { switchPage('radar'); return; } catch (e) { }
+    }
+    window.scrollTo(0, 0);
   }
 
   function tipBtn(key) {
@@ -853,10 +1024,10 @@
     const cls = $('rdCls');
     if (cls) cls.addEventListener('change', () => { S.cls = cls.value; renderList(); });
     const sort = $('rdSort');
-    if (sort) sort.addEventListener('change', () => { S.sort = sort.value; renderList(); });
+    if (sort) sort.addEventListener('change', () => { S.sort = sort.value; syncSortUI(); renderList(); });
     const dir = $('rdDir');
     if (dir) dir.addEventListener('click', () => {
-      S.dir = -S.dir; dir.textContent = S.dir < 0 ? '⬇' : '⬆'; renderList();
+      S.dir = -S.dir; syncSortUI(); renderList();
     });
     const prof = $('rdProfile');
     if (prof) prof.addEventListener('change', () => {
@@ -883,8 +1054,9 @@
     if (scanB) scanB.addEventListener('click', () => scan());
     const closeB = $('rdClose');
     if (closeB) closeB.addEventListener('click', () => {
-      const d = $('rdDetail'); if (d) { d.style.display = 'none'; d.innerHTML = ''; }
+      /* ⛔ بقى في صفحة مستقلة — «الإغلاق» بقى رجوع للقائمة */
       S.selected = null;
+      backToList();
     });
   }
 
@@ -907,8 +1079,9 @@
     renderStats();
     renderList();
     if (S.selected && S.byCode[S.selected]) {
-      const d = $('rdDetail');
-      if (d) { d.style.display = ''; d.innerHTML = detailHTML(S.byCode[S.selected]); bindDetail(S.byCode[S.selected]); }
+      /* ⛔ صفحة السهم المستقلة */
+      const d = $('rdStockBody');
+      if (d) { d.innerHTML = detailHTML(S.byCode[S.selected]); bindDetail(S.byCode[S.selected]); }
     }
   }
 
@@ -946,16 +1119,24 @@
   /* 🩺 زرار تشخيص — يظهر للمستخدم في الترويسة */
   function mountDiagBtn() {
     const b = $('rdDiagBtn');
-    if (b && !b.dataset.bound) {
-      b.dataset.bound = '1';
+    if (b && !b._rdBound) {
+      b._rdBound = 1;
       b.onclick = showDiag;
     }
+  }
+
+  /* ↩ زرار الرجوع — مرة واحدة */
+  function bindBack() {
+    const b = $('rdBack');
+    if (b && !b._rdBound) { b._rdBound = 1; b.onclick = backToList; }
   }
 
   /* ⛔ إتاحة الدالة للاختبارات */
   window.OCTA_RADAR_UI = {
     state: S, scan: scan, renderList: renderList, renderStats: renderStats,
     detailHTML: detailHTML, filtered: filtered, resetFilters: resetFilters,
-    showDiag: showDiag, loadCache: loadCache, note: note
+    showDiag: showDiag, loadCache: loadCache, note: note,
+    openStock: openStock, backToList: backToList, COLS: COLS,
+    numFilterOk: numFilterOk, uniqStates: uniqStates
   };
 })();

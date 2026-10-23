@@ -440,3 +440,69 @@ test('🛟 النتيجة ما فيهاش entry بـcode=undefined (Display تد
     });
   });
 });
+
+/* ═══════════════════════════════════════════════════════════
+   📊 10) الجدول الجديد + صفحة السهم المستقلة (٢٣ أكتوبر ٢٠٢٦)
+   ───────────────────────────────────────────────────────────
+   📌 طلب أحمد: «الأسهم كلها في جدول، والصف الأول فيه فلاتر
+   لكل مكونات الصف» + «لما ندوس على سهم يفتح صفحة تانية».
+   ═══════════════════════════════════════════════════════════ */
+
+test('📊 الجدول فيه صف ترتيب + صف فلترة لكل عمود', () => {
+  const sb = loadUI();
+  const cols = sb.win.OCTA_RADAR_UI.COLS;
+  assert.ok(cols.length >= 10, 'عدد الأعمدة: ' + cols.length);
+  cols.forEach(c => {
+    assert.ok(c.t, 'عمود من غير عنوان');
+    assert.ok(['text', 'num', 'sel'].indexOf(c.f) >= 0, 'نوع فلتر معروف: ' + c.k);
+    assert.equal(typeof c.get, 'function', 'لكل عمود get: ' + c.k);
+  });
+  /* ⛔ كل عمود لازم يكون قابل للترتيب — إما get أو sb */
+  cols.forEach(c => {
+    assert.ok(c.get || c.sb, '⛔ عمود بلا ترتيب: ' + c.k);
+  });
+});
+
+test('🧮 فلتر الأرقام يقبل > < >= <= = والرقم لوحده', () => {
+  const f = loadUI().win.OCTA_RADAR_UI.numFilterOk;
+  assert.equal(f(10, '5'), true, 'رقم لوحده = أكبر من أو يساوي');
+  assert.equal(f(3, '5'), false, 'رقم لوحده = أكبر من أو يساوي');
+  assert.equal(f(10, '>5'), true);
+  assert.equal(f(3, '>5'), false);
+  assert.equal(f(3, '<5'), true);
+  assert.equal(f(5, '>=5'), true);
+  assert.equal(f(5, '<=5'), true);
+  assert.equal(f(5, '=5'), true);
+  assert.equal(f(5, '=6'), false);
+  assert.equal(f(null, '5'), false, '⛔ null ما يعدّيش');
+  assert.equal(f(10, ''), true, 'فاضي = مفيش فلتر');
+  assert.equal(f(10, 'abc'), true, '⛔ نص غريب = مفيش فلتر (مش crash)');
+});
+
+test('📄 صفحة السهم المنفصلة موجودة في الـHTML وفي KEEP', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  assert.ok(html.indexOf('id="page-radar-stock"') >= 0, '⛔ صفحة السهم ناقصة');
+  assert.ok(html.indexOf('id="rdBack"') >= 0, '⛔ زرار الرجوع ناقص');
+  const pages = fs.readFileSync(path.join(ROOT, 'assets/js/octa-pages.js'), 'utf8');
+  const m = pages.match(/const KEEP = \[([^\]]+)\]/);
+  assert.ok(m, 'KEEP مش موجود');
+  assert.ok(m[1].indexOf("'radar-stock'") >= 0, '⛔ radar-stock مش في KEEP (هتتمسح!)');
+  const core = fs.readFileSync(path.join(ROOT, 'assets/js/octa-core.js'), 'utf8');
+  const m2 = core.match(/const TOOL_PAGES = \[([^\]]+)\]/);
+  assert.ok(m2 && m2[1].indexOf("'radar-stock'") >= 0, '⛔ radar-stock مش في TOOL_PAGES');
+});
+
+test('📄 فتح السهم بيحط المحتوى في صفحة مستقلة (مش في الصفحة الرئيسية)', () => {
+  const sb = loadUI();
+  const S = sb.win.OCTA_RADAR_UI.state;
+  const a = R.analyze(mkCandles(250, 0.004, 41), {
+    code: 'PG', name: 'سهم صفحة', sector: 'بنوك', price: 90, marketCap: 4e9
+  });
+  S.byCode.PG = a;
+  sb.win.OCTA_RADAR_UI.openStock('PG');
+  const body = sb.els.rdStockBody;
+  assert.ok(body.innerHTML.length > 800, '⛔ صفحة السهم فاضية: ' + body.innerHTML.length);
+  assert.ok(body.innerHTML.indexOf('الاتجاه') >= 0, '⛔ مفيش كارت الاتجاه');
+  assert.ok(body.innerHTML.indexOf('الزخم') >= 0, '⛔ مفيش كارت الزخم');
+  assert.equal(S.selected, 'PG', '⛔ السهم متسجل');
+});
