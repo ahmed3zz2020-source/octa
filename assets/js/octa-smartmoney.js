@@ -670,17 +670,26 @@
       levels: null
     };
     if (a != null && price) {
-      var up = !(out.structure && out.structure.state === 'bear');
-      /* ⛌ التقريب حسب حجم السعر (مش خانة واحدة) — شوف pxDec فوق. */
+      /* ⛔⛔ قرار أحمد (٢٣ أكتوبر ٢٠٢٦): المستويات **دايمًا** لصفقة شراء:
+         ⛌   الوقف **تحت** الدخول والهدف **فوق** الدخول.
+         ⛌   قبل كده كان في وضع «بيع» بيحط الهدف تحت السعر ⇒ المستخدم
+         ⛌   شايف «هدف ٠.٢٢٠ والسعر ٠.٢٤٨» وبيعتبره خطأ.
+         ⛌ ✅ دلوقتي: entry < stop? لا — entry > stop و entry < target دايمًا.
+         ⛌   ولو البنية هابطة بنقوله صراحةً إن ده سيناريو ارتداد. */
+      var bear = !!(out.structure && out.structure.state === 'bear');
       out.levels = {
         entry: pxRound(price, price),
-        stop: pxRound(up ? price - 1.5 * a : price + 1.5 * a, price),
-        target: pxRound(up ? price + 2 * a : price - 2 * a, price),
-        stopPct: round1((up ? -1 : 1) * 1.5 * a / price * 100),
-        targetPct: round1((up ? 1 : -1) * 2 * a / price * 100),
-        /* ⭐ الاتجاه — عشان الواجهة تقول للUSER مين فوق ومين تحت */
-        dir: up ? 'up' : 'down',
-        dirLabel: up ? 'إعداد شراء — الوقف تحت والهدف فوق' : 'إعداد بيع — الوقف فوق والهدف تحت'
+        stop: pxRound(price - 1.5 * a, price),
+        target: pxRound(price + 2 * a, price),
+        stopPct: round1(-1.5 * a / price * 100),
+        targetPct: round1(2 * a / price * 100),
+        dir: 'up',
+        dirLabel: 'سيناريو شراء — الوقف تحت والهدف فوق',
+        /* ⚠️ البنية هابطة = لازم نقوله مينفعش نشتري من فوق */
+        bear: bear,
+        bearNote: bear
+          ? '⚠️ البنية الحالية هابطة — المستويات دي لصفقة شراء على أساس ارتداد من الدعم، مش كسر صاعد.'
+          : ''
       };
     }
     return out;

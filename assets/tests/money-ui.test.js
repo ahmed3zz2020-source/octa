@@ -25,14 +25,24 @@ const SM = require('../js/octa-smartmoney.js');
 
 /* ═══════════ DOM مصغّر ═══════════ */
 function makeEl(id) {
-  return {
+  const el = {
     id: id,
     innerHTML: '', textContent: '', value: '', checked: false,
     style: { display: '' },
-    classList: { _s: {}, toggle() { }, add() { }, remove() { }, contains() { return false; } },
-    addEventListener() { }, removeEventListener() { }, remove() { }, appendChild() { },
-    setAttribute() { }, focus() { }, click() { }
+    _l: {},
+    classList: {
+      _s: new Set(),
+      toggle(c, on) { if (on === undefined) { this._s.has(c) ? this._s.delete(c) : this._s.add(c); } else if (on) { this._s.add(c); } else { this._s.delete(c); } },
+      add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
+      contains(c) { return this._s.has(c); }
+    },
+    addEventListener(t, fn) { (el._l[t] = el._l[t] || []).push(fn); },
+    removeEventListener() { }, remove() { }, appendChild() { },
+    setAttribute() { }, getAttribute() { return null; }, focus() { },
+    click() { (el._l.click || []).forEach(f => { try { f({ type: 'click' }); } catch (e) { } }); },
+    dispatch(t) { (el._l[t] || []).forEach(f => { try { f({ type: t }); } catch (e) { } }); }
   };
+  return el;
 }
 
 /* بيانات السوق من الملف الثابت → شكل الـAPI */
@@ -152,7 +162,7 @@ test('الواجهة: بتحمّل وبترتّب الأسهم وبترسم ال
   assert.ok(html.indexOf('sm-score') !== -1, 'عمود النتيجة موجود');
   assert.ok(els.smTotal.textContent !== '—', 'عدد الأسهم اتحسب');
   assert.ok(Number(els.smOk.textContent) > 200, 'عدد المؤهّلين > 200');
-  assert.ok(Number(els.smAgree.textContent) > 0, 'في أسهم متفقة على ٤ محاور');
+  assert.ok(Number(els.smAgreeN.textContent) > 0, 'في أسهم متفقة على ٤ محاور');
   assert.ok(els.smList.innerHTML.indexOf('undefined') === -1, 'مافيش undefined في الجدول');
   assert.ok(els.smList.innerHTML.indexOf('NaN') === -1, 'مافيش NaN في الجدول');
 });
@@ -334,4 +344,133 @@ test('كارت الاستراتيجية: موجود في آخر الصفحة و�
   /* ⛔ وممنوع أرقام مخترعة (ادعاءات دقة) */
   assert.ok(h.indexOf('دقة') === -1, 'مافيش ادعاء دقة');
   assert.ok(h.indexOf('مضمون') === -1, 'مافيش ضمان ربح');
+});
+
+
+/* ═══════════════════════════════════════════════════════════
+   🔘 الفلاتر تشتغل (زرار توافق ٤ محاور + أظهر ناقص البيانات)
+   ═══════════════════════════════════════════════════════════ */
+test('فلتر «توافق ٤ محاور» بيشتغل وبيقلّل النتائج', async () => {
+  const fixture = marketFixture();
+  if (!fixture) { assert.ok(true, 'مفيش بيانات — تخطّي'); return; }
+  const { sandbox, els } = boot(fixture);
+  sandbox.window.moneyInit();
+  await new Promise(r => setTimeout(r, 80));
+  const before = els.smList.innerHTML.match(/sm-row/g) || [];
+  assert.ok(before.length > 10, 'فيه صفوف قبل الفلترة');
+  const btn = els.smAgree;
+  assert.ok(btn, 'زرار توافق ٤ محاور موجود');
+  btn.click();
+  await new Promise(r => setTimeout(r, 40));
+  const after = els.smList.innerHTML.match(/sm-row/g) || [];
+  assert.ok(after.length < before.length, 'النتائج قلّت بعد الفلترة');
+  /* كل صف متبقي لازم يكون فيه شارة توافق */
+  assert.ok(els.smList.innerHTML.indexOf('توافق ٤ محاور') !== -1, 'الصفوف المتبقية فيها الشارة');
+});
+
+test('فلتر «أظهر ناقص البيانات» بيشتغل', async () => {
+  const fixture = marketFixture();
+  if (!fixture) { assert.ok(true, 'مفيش بيانات — تخطّي'); return; }
+  const { sandbox, els } = boot(fixture);
+  sandbox.window.moneyInit();
+  await new Promise(r => setTimeout(r, 80));
+  const before = (els.smList.innerHTML.match(/sm-row/g) || []).length;
+  const btn = els.smWeak;
+  assert.ok(btn, 'زرار ناقص البيانات موجود');
+  btn.click();
+  await new Promise(r => setTimeout(r, 40));
+  const after = (els.smList.innerHTML.match(/sm-row/g) || []).length;
+  assert.ok(after >= before, 'النتيجة ما قلّتش');
+  assert.ok(els.smList.innerHTML.indexOf('بيانات ناقصة') !== -1, 'صفوف ناقصة البيانات ظهرت');
+});
+
+
+/* ═══════════════════════════════════════════════════════════
+   🆔 مفيش id مكرر في index.html (باج «توافق ٤ محاور» ما كانش بيشتغل)
+   ═══════════════════════════════════════════════════════════ */
+test('مفيش id مكرر في index.html', () => {
+  const file = path.join(ROOT, 'index.html');
+  const html = fs.readFileSync(file, 'utf8');
+  const ids = (html.match(/\bid="([^"]+)"/g) || []).map(x => x.slice(4, -1));
+  const seen = {}; const dups = [];
+  ids.forEach((i) => { if (seen[i]) dups.push(i); seen[i] = 1; });
+  assert.deepEqual(dups, [], 'id مكرر: ' + dups.join(', '));
+  /* ⛔ الـid المكرر كان بيخلي getElementById يوقع على العدّاد مش الزرار */
+  assert.ok(ids.indexOf('smAgree') !== -1, 'زرار توافق ٤ محاور لسه موجود');
+  assert.ok(ids.indexOf('smAgreeN') !== -1, 'عدّاد توافق ٤ محاور');
+});
+
+
+/* ═══════════════════════════════════════════════════════════
+   🔘 الفلاتر الجديدة (تجميع مؤسسي · عائد · سعر · حجم · تذبذب) + تصفير
+   ═══════════════════════════════════════════════════════════ */
+test('فلتر تجميع مؤسسي: بيبقّي اللي تدفقه ≥ ٨٠٪ بس', async () => {
+  const fixture = marketFixture();
+  if (!fixture) { assert.ok(true, 'مفيش بيانات — تخطّي'); return; }
+  const { sandbox, els } = boot(fixture);
+  sandbox.window.moneyInit();
+  await new Promise(r => setTimeout(r, 80));
+  const before = (els.smList.innerHTML.match(/sm-row/g) || []).length;
+  els.smAccum.click();
+  await new Promise(r => setTimeout(r, 40));
+  const after = (els.smList.innerHTML.match(/sm-row/g) || []).length;
+  assert.ok(after <= before, 'النتائج ما زادتش');
+  const html = els.smList.innerHTML;
+  const rows = html.split('sm-row').length - 1;
+  const acc = (html.match(/تجميع مؤسسي/g) || []).length;
+  assert.ok(acc === 0 || acc === rows, 'كل صف متبقي لازم يكون عليه شارة تجميع مؤسسي');
+});
+
+test('فلتر العائد الشهري: بيشتغل وبيقلّل', async () => {
+  const fixture = marketFixture();
+  if (!fixture) { assert.ok(true, 'مفيش بيانات — تخطّي'); return; }
+  const { sandbox, els } = boot(fixture);
+  sandbox.window.moneyInit();
+  await new Promise(r => setTimeout(r, 80));
+  const before = (els.smList.innerHTML.match(/sm-row/g) || []).length;
+  els.smPerf.value = '20';
+  els.smPerf.dispatch('change');
+  await new Promise(r => setTimeout(r, 40));
+  const after = (els.smList.innerHTML.match(/sm-row/g) || []).length;
+  assert.ok(after <= before, 'النتائج ما زادتش');
+  assert.ok(after < before, 'لازم يقلّ (في أسهم بعائد ٢٠٪ فأكثر)');
+});
+
+test('فلتر نطاق السعر: بيشتغل', async () => {
+  const fixture = marketFixture();
+  if (!fixture) { assert.ok(true, 'مفيش بيانات — تخطّي'); return; }
+  const { sandbox, els } = boot(fixture);
+  sandbox.window.moneyInit();
+  await new Promise(r => setTimeout(r, 80));
+  els.smPrice.value = 'gt50';
+  els.smPrice.dispatch('change');
+  await new Promise(r => setTimeout(r, 40));
+  const html = els.smList.innerHTML;
+  const codes = (html.match(/data-code="([A-Z]+)"/g) || []);
+  assert.ok(codes.length > 0, 'فيه نتايج');
+  /* كل سعر ظاهر لازم يكون أكبر من ٥٠ */
+  const prices = (html.match(/sm-px[^>]*>([\d.]+)</g) || []).map(x => parseFloat(x.replace(/[^\d.]/g, '')));
+  prices.forEach(p => { assert.ok(p > 50, 'السعر ' + p + ' لازم يكون أكبر من ٥٠'); });
+});
+
+test('تصفير الفلاتر: بيرجّع كل حاجة', async () => {
+  const fixture = marketFixture();
+  if (!fixture) { assert.ok(true, 'مفيش بيانات — تخطّي'); return; }
+  const { sandbox, els } = boot(fixture);
+  sandbox.window.moneyInit();
+  await new Promise(r => setTimeout(r, 80));
+  const base = (els.smList.innerHTML.match(/sm-row/g) || []).length;
+  els.smAgree.click();
+  els.smAccum.click();
+  els.smWeak.click();
+  els.smPrice.value = 'gt50';
+  els.smPrice.dispatch('change');
+  await new Promise(r => setTimeout(r, 40));
+  els.smReset.click();
+  await new Promise(r => setTimeout(r, 40));
+  const after = (els.smList.innerHTML.match(/sm-row/g) || []).length;
+  assert.equal(after, base, 'النتائج رجعت زي ما كانت');
+  assert.equal(els.smAgree.classList.contains('on'), false, 'زرار التوافق اتشال');
+  assert.equal(els.smAccum.classList.contains('on'), false, 'زرار التجميع اتشال');
+  assert.equal(els.smPrice.value, 'all', 'نطاق السعر اتصفّر');
 });

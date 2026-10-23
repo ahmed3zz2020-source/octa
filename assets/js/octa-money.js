@@ -29,6 +29,12 @@
     q: '', sect: 'all',
     sort: 'score', dir: -1,
     min: 0, agreeOnly: false, showWeak: false,
+    /* 🔘 فلاتر إضافية (٢٣ أكتوبر ٢٠٢٦ — طلب أحمد) */
+    accum: false,      /* تجميع مؤسسي فقط */
+    perf: 0,           /* أقل عائد شهري % */
+    priceBand: 'all',  /* نطاق السعر */
+    relvol: 0,         /* أقل حجم نسبي */
+    volBand: 'all',    /* نطاق التذبذب */
     sel: null,       /* الكود المفتوح */
     detail: null,    /* نتيجة الشموع */
     loading: false,
@@ -328,6 +334,35 @@
       if (S.sect !== 'all' && r.sector !== S.sect) return false;
       if (S.min > 0 && r.score < S.min) return false;
       if (S.agreeOnly && !r.badges.some(b => b.id === 'agree')) return false;
+      /* 🔘 تجميع مؤسسي فقط — الشارة اللي بتقول إن الفلوس بتدخل */
+      if (S.accum && !r.badges.some(b => b.id === 'accum')) return false;
+      /* 📈 أقل عائد شهري */
+      if (S.perf > 0) {
+        const p1m = r.m && r.m.perf1m;
+        if (p1m == null || p1m < S.perf) return false;
+      }
+      /* 💵 نطاق السعر */
+      if (S.priceBand !== 'all') {
+        const px = r.price;
+        if (px == null) return false;
+        if (S.priceBand === 'lt5' && px >= 5) return false;
+        if (S.priceBand === '5_15' && (px < 5 || px > 15)) return false;
+        if (S.priceBand === '15_50' && (px <= 15 || px > 50)) return false;
+        if (S.priceBand === 'gt50' && px <= 50) return false;
+      }
+      /* ⚡ أقل حجم نسبي (مقارنة بمتوسط ٣٠ يوم) */
+      if (S.relvol > 0) {
+        const rv = r.m && r.m.relvol;
+        if (rv == null || rv < S.relvol) return false;
+      }
+      /* 🌊 نطاق التذبذب اليومي */
+      if (S.volBand !== 'all') {
+        const vd = r.m && r.m.volD;
+        if (vd == null) return false;
+        if (S.volBand === 'calm' && vd >= 1.5) return false;
+        if (S.volBand === 'ok' && (vd < 1.5 || vd > 4.5)) return false;
+        if (S.volBand === 'wild' && vd <= 4.5) return false;
+      }
       if (q) {
         const hay = (r.code + ' ' + r.name + ' ' + (r.sector || '')).toLowerCase();
         if (hay.indexOf(q) === -1) return false;
@@ -379,7 +414,7 @@
     const agree = S.rows.filter(r => r.badges.some(b => b.id === 'agree')).length;
     const t = $('smTotal'); if (t) t.textContent = S.rows.length;
     const o = $('smOk'); if (o) o.textContent = ok;
-    const a = $('smAgree'); if (a) a.textContent = agree;
+    const a = $('smAgreeN'); if (a) a.textContent = agree;
     const u = $('smUpd');
     if (u) u.textContent = S.ts ? S.ts.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '—';
     /* ⛌ مصدر البيانات — لازم المستخدم يعرف الأرقام جاية منين */
@@ -423,7 +458,12 @@
       box.innerHTML = '<div class="sm-empty">🚫 مفيش أسهم مطابقة للفلتر. جرّب حد أدنى أقل أو شيل الفلاتر.</div>';
       return;
     }
-    const rows = S.view.slice(0, 120);
+    /* ⛔⛔ باج ٢٣ أكتوبر ٢٠٢٦ — «أظهر ناقص البيانات» مكانش بيشتغل:
+       ⛌   الجدول كان بيعرض أول ١٢٠ صف بس، والأسهم الناقصة (٣٠ سهم)
+       ⛌   مرتبة في الآخر ⇒ كانت بره الشاشة ⇒ الفلتر مابغيّرش حاجة.
+       ⛌ ✅ دلوقتي: ٣٢٠ صف (كل أسهم EGX) + سطر «و X سهم تاني» لو زاد. */
+    const MAX_ROWS = 320;
+    const rows = S.view.slice(0, MAX_ROWS);
     box.innerHTML =
       '<div class="sm-list-head">' +
       '<span class="sm-c1">السهم</span>' +
@@ -801,19 +841,19 @@
     /* ── مستويات الـATR ── */
     if (d.levels) {
       const L = d.levels;
-      const down = L.dir === 'down';
       out.push('<div class="sm-card sm-card-wide">' +
         '<div class="sm-card-h"><span class="sm-card-i">🎯</span><span class="sm-card-t">الدخول ووقف الخسارة والهدف</span>' +
         '<span class="sm-card-v">ATR ' + fp(d.atr) + ' (' + f1(d.atrPct) + '% من السعر)</span></div>' +
         '<div class="sm-lv3">' +
         '<div class="sm-lv3-i"><span>دخول</span><b>' + fp(L.entry) + '</b></div>' +
-        '<div class="sm-lv3-i stop"><span>وقف الخسارة' + (down ? ' (فوق)' : ' (تحت)') + '</span>' +
+        '<div class="sm-lv3-i stop"><span>وقف الخسارة (تحت)</span>' +
           '<b>' + fp(L.stop) + '</b><i>' + f1(Math.abs(L.stopPct)) + '%</i></div>' +
-        '<div class="sm-lv3-i tgt"><span>هدف أول' + (down ? ' (تحت)' : ' (فوق)') + '</span>' +
+        '<div class="sm-lv3-i tgt"><span>هدف أول (فوق)</span>' +
           '<b>' + fp(L.target) + '</b><i>' + f1(Math.abs(L.targetPct)) + '%</i></div>' +
         '</div>' +
         '<div class="sm-card-m">📎 المسافة محسوبة من مدى التذبذب الحقيقي (ATR) — مش رقم مخترع.' +
-        (L.dirLabel ? ' · <b>' + L.dirLabel + '</b>' : '') + '</div>' +
+        (L.dirLabel ? ' · <b>' + L.dirLabel + '</b>' : '') +
+        (L.bearNote ? '<br>' + L.bearNote : '') + '</div>' +
         '</div>');
     }
 
@@ -903,6 +943,58 @@
     if (weak) weak.addEventListener('click', function () {
       S.showWeak = !S.showWeak;
       weak.classList.toggle('on', S.showWeak);
+      apply();
+    });
+    /* 🔘 تجميع مؤسسي فقط */
+    const acc = $('smAccum');
+    if (acc) acc.addEventListener('click', function () {
+      S.accum = !S.accum;
+      acc.classList.toggle('on', S.accum);
+      apply();
+    });
+    /* 📈 العائد الشهري الأدنى */
+    const perf = $('smPerf');
+    if (perf) perf.addEventListener('change', function () {
+      S.perf = Number(perf.value || 0);
+      apply();
+    });
+    /* 💵 نطاق السعر */
+    const pb = $('smPrice');
+    if (pb) pb.addEventListener('change', function () {
+      S.priceBand = pb.value || 'all';
+      apply();
+    });
+    /* ⚡ الحجم النسبي الأدنى */
+    const rl = $('smRel');
+    if (rl) rl.addEventListener('change', function () {
+      S.relvol = Number(rl.value || 0);
+      apply();
+    });
+    /* 🌊 نطاق التذبذب */
+    const vb = $('smVol');
+    if (vb) vb.addEventListener('change', function () {
+      S.volBand = vb.value || 'all';
+      apply();
+    });
+    /* ↺ تصفير كل الفلاتر */
+    const rs = $('smReset');
+    if (rs) rs.addEventListener('click', function () {
+      S.q = ''; S.sect = 'all'; S.min = 0; S.agreeOnly = false; S.showWeak = false;
+      S.accum = false; S.perf = 0; S.priceBand = 'all'; S.relvol = 0; S.volBand = 'all';
+      const qi = $('smQ'); if (qi) qi.value = '';
+      const so = $('smSort'); if (so) so.value = 'score';
+      const se = $('smSect'); if (se) se.value = 'all';
+      const mv = $('smMinV'); if (mv) mv.textContent = '0';
+      const mp = $('smPerf'); if (mp) mp.value = '0';
+      const mpb = $('smPrice'); if (mpb) mpb.value = 'all';
+      const mr = $('smRel'); if (mr) mr.value = '0';
+      const mv2 = $('smVol'); if (mv2) mv2.value = 'all';
+      const mi = $('smMin'); if (mi) mi.value = '0';
+      ['smAgree', 'smAccum', 'smWeak'].forEach(id => {
+        const b = $(id); if (b) b.classList.remove('on');
+      });
+      S.sort = 'score'; S.dir = -1;
+      const dr = $('smDir'); if (dr) dr.textContent = '\u2B06';
       apply();
     });
     const re = $('smReload');

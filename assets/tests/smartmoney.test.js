@@ -390,3 +390,22 @@ test('المستويات:Directions يتفق مع اتجاه البنية', () =
   assert.ok(r.levels.target > r.levels.entry, 'الهدف فوق في الصاعد');
   assert.ok(r.levels.stop < r.levels.entry, 'الوقف تحت في الصاعد');
 });
+
+
+/* ═══════════════════════════════════════════════════════════
+   🎯 القاعدة الذهبية: الوقف تحت والهدف فوق — دايمًا
+   ═══════════════════════════════════════════════════════════ */
+test('المستويات: الوقف تحت والهدف فوق دايمًا (حتى في البنية الهابطة)', () => {
+  /* اتجاه هابط واضح */
+  const down = [];
+  for (let i = 0; i < 80; i++) {
+    const p = 20 - i * 0.15;
+    down.push({ t: 'd' + i, o: p + 0.2, h: p + 0.35, l: p - 0.2, c: p, v: 100000 + i });
+  }
+  const r = SM.fromCandles(down, {});
+  assert.ok(r.levels, 'اتحسب');
+  assert.ok(r.levels.stop < r.levels.entry, 'الوقف تحت الدخول — got: ' + r.levels.stop + ' vs ' + r.levels.entry);
+  assert.ok(r.levels.target > r.levels.entry, 'الهدف فوق الدخول — got: ' + r.levels.target + ' vs ' + r.levels.entry);
+  assert.equal(r.levels.dir, 'up', 'الاتجاه دايمًا شراء');
+  assert.ok(r.levels.bearNote && r.levels.bearNote.length > 5, 'فيه تنبيه إن البنية هابطة');
+});
