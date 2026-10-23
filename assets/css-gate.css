@@ -323,6 +323,7 @@ button { font-family: inherit; }
   width: 268px; z-index: 9000;
   display: flex; flex-direction: column;
   background: var(--pri2);
+}
 /* ⛔ زر البصمة  في القائمة  يبيّن حالته */
 .sb-bio {
   width: 100%;
@@ -765,3 +766,4 @@ button { font-family: inherit; }
   gap: var(--s2);
   position: static;
   overflow: visible;
+  }

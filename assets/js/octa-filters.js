@@ -2987,7 +2987,7 @@ function fzFiveRender(){
 
 function fzFiveInit(){ fzFiveRender(); }
 /* ⛔ انحراف السعر الحي عن سعر اللقطة — ببال مئوية.
-   > 2٪ = المؤشرات기술ية من وقت تاني عن السعر اللي بتعرضه ⇒ نحذّر. */
+   > 2٪ = المؤشرات الفنية من وقت تاني عن السعر اللي بتعرضه ⇒ نحذّر. */
 function fzTripleDrift(f){
   const a = f.pxSnap, b = f.px;
   if (a==null || a<=0 || b==null || b<=0) return null;
