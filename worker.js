@@ -385,6 +385,27 @@ export default {
         const sc = upstream.headers.get('Set-Cookie');
         if (sc) out.set('Set-Cookie', sc);
         out.set('Cache-Control', 'no-store');
+        /* ⛔⛔⛔ ضغط الردود الكبيرة (gzip) — ٢٣ أكتوبر ٢٠٢٦
+           📌 المشكلة: ردود الـAPI كانت **من غير أي ضغط** (ولا
+             Content-Encoding) ⇒ الرادار ٤٩٢ ك.ب لكل دفعة × ٨
+             دفعات = ~٤ ميجا على موبايل ⇒ «البيانات بتتأخر».
+           📌 الحل: نضغط هنا بـCompressionStream (مضغوط natively
+             ⇒ رخيص جداً في CPU) والمتصفح بيفكّ الضغط لوحده.
+           ⛌ بنضغط بس الردود الكبيرة (فوق ٢٠ ك.ب) — الردود الصغيرة
+             بتاخد CPU من غير فايدة.
+           ⛌ ومفيش Content-Length (الرد بيطلع chunked) — صح. */
+        try {
+          const acceptEnc = String(request.headers.get('Accept-Encoding') || '');
+          if (body.length > 20000 && acceptEnc.indexOf('gzip') >= 0) {
+            const cs = new CompressionStream('gzip');
+            const stream = new Blob([body]).stream().pipeThrough(cs);
+            out.set('Content-Encoding', 'gzip');
+            out.delete('Content-Length');
+            return new Response(stream, { status: upstream.status, headers: out });
+          }
+        } catch (e) {
+          /* ⛔ الضغط فاشل ⇒ نرجع للرد العادي (مفيش كسر) */
+        }
         return new Response(body, { status: upstream.status, headers: out });
       } catch (e) {
         return new Response(JSON.stringify({ error: 'api-proxy-failed', message: String(e && e.message || e) }), {

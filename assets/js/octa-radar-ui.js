@@ -185,7 +185,7 @@
   /* 📜 تاريخ مجموعة أكواد — دفعة واحدة من السيرفر */
   async function loadHistory(codes) {
     const list = codes.join(',');
-    const r = await jget('/api/radar/history?list=' + encodeURIComponent(list) + '&n=320', 120000);
+    const r = await jget('/api/radar/history?list=' + encodeURIComponent(list) + '&n=240', 120000);
     if (!r || !r._ok) {
       note('✗ دفعة (' + codes.length + ' كود) فشلت: ' + ((r && r._err) || 'رد فاضي') + ' (' + ((r && r._ms) || 0) + 'ms)');
       return { got: {}, failed: codes.slice() };
