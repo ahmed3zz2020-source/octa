@@ -438,6 +438,24 @@ export default {
     }
 
     /* 3) static assets (الصور/HTML/CSS/JS) */
+    /* ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐⭐⭐ الـJS: no-store صريح
+     📌 السبب: Cloudflare Assets كان بيعمل cache للـJS
+     📌 ⛌ ⛌ ⛌ ⛌ (cf-cache-status: HIT) ⇒ المتصفح بيشغّل نسخة
+     📌 ⛌ ⛌ ⛌ ⛌ قديمة من octa-gate.js ⇒ المستخدم بيفضل يشوف
+     📌 ⛌ ⛌ ⛌ ⛌ نفس المشكلة («طلبت ٣ أكواد» + البوابة القديمة).
+     📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+     📌 ✅ الحل: نعمل fetch للـJS ونضيف cache-control صريح.
+     📌 ✅ (نفس الشغل في الـworker — أكتر موثوق من _headers)
+     */
+    if (/\.(js|mjs|css)$/.test(url.pathname)) {
+      const res = await env.ASSETS.fetch(request);
+      const h = new Headers(res.headers);
+      h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      h.set('Pragma', 'no-cache');
+      h.set('Expires', '0');
+      try { h.set('ETag', '"' + Date.now() + '"'); } catch (e) { }
+      return new Response(res.body, { status: res.status, headers: h });
+    }
     return env.ASSETS.fetch(request);
   }
 };

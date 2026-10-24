@@ -25,11 +25,10 @@
 # 📌 ⛌ ⛌ ⛌ الأثر: المستخدم بيفضل يشوف نفس المشكلة مهما صلحنا.
 # 📌 ✅ الحل: no-store لكل الـassets/JS. الأداء مش هيتأثر (الملفات
 # 📌 ✅ صغيرة والـCDN لسه بيقدّمها بسرعة).
-/assets/*
-  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
 
+
+
+# ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ الـJS: لا تخزين أبداً
+# 📌 (Cloudflare cache ⇒ نسخة قديمة ⇒ المستخدم بيفضل يشوف نفس المشكلة)
 /assets/js/*
-  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
-
-/assets/css/*
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
