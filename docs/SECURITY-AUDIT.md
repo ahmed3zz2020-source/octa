@@ -368,3 +368,50 @@ function verify() {
 ③ PIN غلط                          → 401 why=bad_pin ✅
 ④ حساب قديم                        → 401 why=new_device ✅
 ```
+
+
+---
+
+## 🎯🎯🎯🎯 السبب الجذري النهائي — الكوكي كان بيتحفظ على دومين Railway (٢٤ أكتوبر ٢٠٢٦)
+
+> أحمد: «لما الكود ييجي لي دخل على الصفحة قبل مكتبي الكود» +
+> «لما باقي أكتب الباسورد بيخش برضو» + «البوابة بعد كل refresh».
+
+### 🔴 السلسلة الكاملة (٤ طبقات مرتبطة)
+```
+الباك (octa-prices-production-4ccb.up.railway.app) بيرجّع Set-Cookie
+  ↓ (من غير Domain attribute)
+المتصفح بيحفظها على دومين Railway (مش octashares.com)
+  ↓
+المتصفح **بيرفضها** عند الصفحة (دومين غلط)
+  ↓
+⇒ مفيش كوكي على الموقع ⇒ /api/auth/me رجّع 401
+  ↓
+⇒ logoutLocal() + open() ⇒ **البوابة**
+  ↓
+⇒ + الـfail-safe (١٢ ثانية) ⇒ **الموقع بيفتح**
+  ↓
+⇒ + retry_after مفقود ⇒ **«استنى ١٥ دقيقة» بدل «بكرة»**
+```
+
+### ✅ الإصلاحات الأربعة
+| # | المكان | الإصلاح |
+|---|---|---|
+| ① | `worker.js` | نشيل `Domain=` من `Set-Cookie` + نضيف `SameSite=None; Secure` |
+| ② | `update_prices.py` | `set_cookie(..., samesite="None", secure=True)` |
+| ③ | `octa-gate.js` | `credentials: 'include'` على كل الـfetch (٦ مواضع) |
+| ④ | `octa-gate.js` | `/api/auth/me` بيرجّع `token` ⇒ الواجهة تحفظه |
+
+### 🧪 أداة تشخيص حاسمة
+```js
+p.on('request', r => console.log('cookie hdr:', r.headers()['cookie'] || '(مفيش)'));
+```
+⇦ ده اللي كشف الحقيقة (الكوكي مش بيوصل).
+
+### ✅ الاختبار النهائي
+```
+refresh → 200 ✅
+cookies: octa_token@octashares.com sameSite=None secure=true ✅
+manual /api/auth/me → 200 + token ✅
+بعد reload: gate=false (البوابة مقفولة) + token اتحفظ ✅
+```
