@@ -78,6 +78,7 @@ code{background:var(--card2);padding:2px 7px;border-radius:5px;font-size:11px;co
   <div style="display:flex;gap:9px">
     <button onclick="render()">🔄 إعادة رسم</button>
     <button id="fb" onclick="fetchLive()">🌐 سحب من السيرفر</button>
+<button id="bindDev" onclick="bindDevice()">🔗 ربط جهاز</button>
     <button onclick="exportCsv()">⬇️ تصدير CSV</button>
   </div>
 </header>
@@ -336,6 +337,40 @@ function loginDetail(u){
   }).join('');
   return `<details style="margin-top:4px"><summary style="font-size:11px;color:var(--gold);cursor:pointer">السجل</summary>
     <div style="min-width:230px;margin-top:4px">${rows}</div></details>`;
+}
+
+// ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ ربط جهاز بحساب (manually)
+// 📌 السبب: مستخدم شكا من «البوابة بعد كل refresh» وماوصلهوش
+// 📌 كود الإيميل ⇒ ربط الجهاز يدوياً مرة واحدة.
+// 📌 ⛌ ⛌ ⛌ البصمة بتقرأها من localStorage بتاع المتصفح ده —
+// 📌 ⛌ ⛌ ⛌ يعني لازم تفتح اللوحة **من نفس الجهاز** اللي عايز تربطه.
+function bindDevice(){
+  var email = prompt('الإيميل المسجّل:');
+  if(!email) return;
+  var dev = '';
+  try { dev = localStorage.getItem('octa_bio_key') || ''; } catch(e){}
+  if(!dev || dev.length < 32){
+    alert('⛔ مفيش بصمة جهاز في المتصفح ده.\n\n' +
+          'الحل: افتح octashares.com على الموبايل اللي عايز تربطه → ' +
+          'ادخل بالرقم (حتى لو طلب كود إيميل) → من القائمة فعّل ' +
+          '«الدخول بالبصمة» → بعدين ارجع هنا وابدأ تاني.');
+    return;
+  }
+  var tok = prompt('توكن الإدارة (X-OCTA-Admin):');
+  if(!tok) return;
+  var API='https://octa-prices-production-4ccb.up.railway.app';
+  fetch(API+'/api/admin/set_device', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-OCTA-Admin':tok},
+    body: JSON.stringify({email: email.trim(), device: dev})
+  }).then(function(r){ return r.json().then(function(j){ return {s:r.status, j:j}; }); })
+  .then(function(o){
+    if(o.s===200 && o.j.ok){
+      alert('✅ اتربط!\n\nالإيميل: '+o.j.email+'\nالجهاز اتسجّل.\nدلوقتي تقدر تدخل من الجهاز ده عادي.');
+    } else {
+      alert('❌ '+(o.j.error||'محصلش'));
+    }
+  }).catch(function(e){ alert('❌ '+e.message); });
 }
 
 function exportCsv(){
