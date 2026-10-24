@@ -450,11 +450,23 @@ export default {
     if (/\.(js|mjs|css)$/.test(url.pathname)) {
       const res = await env.ASSETS.fetch(request);
       const h = new Headers(res.headers);
-      h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-      h.set('Pragma', 'no-cache');
-      h.set('Expires', '0');
-      try { h.set('ETag', '"' + Date.now() + '"'); } catch (e) { }
-      return new Response(res.body, { status: res.status, headers: h });
+      /* ⛌⛌⛌ لازم نمسح كل الـcache-control القديم ونحط واحد
+       📌 ⛌ ⛌ ⛌ (لأن الـ_headers بيحط ٣ قواعد متلاصقة)
+       📌 ⛌ ⛌ ⛌ ⛌ ⇒ لازم نعمل delete قبل set
+       📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ */
+       h.delete('Cache-Control');
+       h.delete('Pragma');
+       h.delete('Expires');
+       h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+       h.set('Pragma', 'no-cache');
+       h.set('Expires', '0');
+       h.set('ETag', '"' + Date.now() + '"');
+       return new Response(res.body, { status: res.status, headers: h });
     }
     return env.ASSETS.fetch(request);
   }

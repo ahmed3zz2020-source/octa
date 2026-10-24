@@ -30,5 +30,3 @@
 
 # ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ الـJS: لا تخزين أبداً
 # 📌 (Cloudflare cache ⇒ نسخة قديمة ⇒ المستخدم بيفضل يشوف نفس المشكلة)
-/assets/js/*
-  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
