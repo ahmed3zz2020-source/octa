@@ -323,3 +323,48 @@ body.onclick = function (e) { ... toPin(); };  // ⛔ ⛌ ⛌ ⛌
 ② لمسة بره الكارت      : مااتحوّلش ❌→ لا (ثابت)
 ③ .gt-body.onclick     : null في كل الشاشات ✅
 ```
+
+
+---
+
+## 🐛🐛🐛 «hint is not defined» — البوابة كانت بتفتح وكل حاجة (٢٤ أكتوبر ٢٠٢٦)
+
+> أحمد: «نفس المشكلة — الموقع بيفتح قبل ما يجي الكود» + «البوابة بعد كل refresh».
+
+### 🔴 السبب الجذري (٣ طبقات مرتبطة)
+**① `clearHint()` و `hint()` كانوا معرّفين جوّه `function verify()`**
+```js
+function verify() {
+  ...
+  function clearHint(){ ... }   // ⛔⛔⛔ جوّه verify
+  function hint(msg,bg,fg){ ... }
+```
+⇒ أي استخدام **بره** `verify()` ⇒ **`ReferenceError: hint is not defined`**
+⇒ الـ`DOMContentLoaded` handler **وقع** ⇒ البوابة فتحت + الموقع اتفتح.
+
+**🛠️ الدرس:** `node --check` **مش بيكشف** ده (الـsyntax سليم).
+⛔ لازم **فحص الـscope** بالـAST (العمق + مكان كل تعريف/استخدام).
+
+**② البوابة كانت تفتح بـ`probeApi('/api/health')` لو مافيش توكن في localStorage**
+⇒ الكوكي (HttpOnly) ممكن يبقى صالح والـlocalStorage اتمسح ⇒ البوابة مفتوحة.
+**✅ الحل:** نطلب `/api/auth/me` الأول (الكوكي بيبعت تلقائياً) ⇒ 200 ⇒ فيه جلسة.
+
+**③ `renew()` لما يرجّع 401 ⇒ `logoutLocal() + open()` ⇒ البوابة فجأة**
+**✅ الحل:** نجرب `/api/auth/me` قبل ما نطلّع المستخدم.
+
+### ✅ الحل النهائي
+| المكان | التغيير |
+|---|---|
+| `octa-gate.js` | `clearHint` + `hint` اتنقلوا للنطاق المشترك (IIFE) |
+| `octa-gate.js` | `DOMContentLoaded`: `/api/auth/me` الأول ⇒ لو 200 ⇒ `put(token)` + `shut()` |
+| `octa-gate.js` | `renew()` 401 ⇒ `/api/auth/me` ⇒ لو 200 نجدد ونكمل |
+| `octa-gate.js` | `inFlow()` ⇒ ما نفتحش البوابة لو المستخدم في نص تدفّق (طلب كود/تسجيل) |
+| `update_prices.py` | `POST /api/admin/mint_session` (ATO · ttl 600s) ⇒ أداة تشخيص |
+
+### ✅ الاختبار (Playwright + كوكي HttpOnly حقيقي)
+```
+① زائر (مافيش كوكي)              → gate=false ✅
+② كوكي صالح + localStorage فاضي  → gate=false ✅ + token اتحفظ ✅
+③ PIN غلط                          → 401 why=bad_pin ✅
+④ حساب قديم                        → 401 why=new_device ✅
+```
