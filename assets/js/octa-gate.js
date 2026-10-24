@@ -2192,7 +2192,29 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  signal: ctrl ? ctrl.signal : undefined
  }).then(function (r) {
  clearTimeout(to);
- if (r.ok) { clearHint(); shut(); return; }
+ /* ⛔⛔⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐⭐⭐ إصلاح «البوابة بعد كل refresh»
+  📌 السبب: الكوكي HttpOnly بيفضل موجود، بس الـlocalStorage
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ممكن يتمسح ⇒ التوكن ضاع ⇒ /api/auth/me رجّع
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ 401 ⇒ logoutLocal() + البوابة ⇒ والمستخدم
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ مسجّل فعلاً!
+  📌 ✅ الحل: /api/auth/me بقى بيرجّع توكن جديد ⇒ نخزّنه.
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ (والكوكي لسه شغال كخط دفاع تاني)
+  */
+ if (r.ok) {
+ /* ⛌⛌⛌ ٢٤ أكتوبر ٢٠٢٦ — ⭐ نقرأ الـbody مرة واحدة كـtext
+  📌 (r.json() ممكن يت consume — safer نحمله ourselves)
+  */
+ try {
+ r.text().then(function (txt) {
+ try {
+ var _bd = JSON.parse(txt || '{}');
+ if (_bd && _bd.token && _bd.user) { put(_bd.token, _bd.user); }
+ } catch (e) { }
+ clearHint(); shut();
+ });
+ } catch (e) { clearHint(); shut(); }
+ return;
+ }
  /* ⛔⛔⛔⛔ ٢٢ أكتوبر ٢٠٢٦ — السيرفر واقع (5xx) مش توكن غلط
  ⛌ الكود القديم: أي !ok ⇒ logoutLocal() + البوابة.
  ⛌ النتيجة وقت حادثة Railway: الـWorker بيرجّع 502 ⇒ التوكن بيتمسح
