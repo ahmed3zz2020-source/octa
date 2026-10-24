@@ -215,3 +215,65 @@ _pin_locked_resp و _rate_check كانوا بيعملوا resp.status_code = 429
 الباك   : 0ab1378
 الواجهة : 96318e7d
 ```
+
+
+---
+
+## 🐛🐛🐛 ٤ أخطاء حقيقية — «يدخل ويطلع» + «محاولات كتيرة» (٢٤ أكتوبر ٢٠٢٦)
+
+> أحمد اشتكى: «كل شوية بيطلع ويخش… يدخل ويطلع ويدخل وبعدين محاولات كتيرة».
+> اتشخّص بـ**Flask 3.0.3 حقيقي** (نزّلته من GitHub) + **Playwright** على الإنتاج.
+
+### ① `_pin_locked_resp` و `_rate_check` ⇒ **500 بدل 429**
+```python
+# ⛔ الغلط: jsonify() بترجّع Response أصلاً ⇒ Response(<Response>)
+return Response(jsonify(body), status=429, headers={"Retry-After": str(retry)}), 429
+# ⇒ Werkzeug: TypeError: 'Response' object is not iterable ⇒ 500
+# ✅ الصح:
+resp = jsonify(body); resp.status_code = 429
+resp.headers["Retry-After"] = str(retry)
+return resp, 429
+```
+**الأثر:** القفل بيرجّع 500 ⇒ الواجهة مافيشش فهم ⇒ بتعامله زي خطأ.
+
+### ② `why` بتتشال من ردود المصادقة ⭐ (السبب المباشر لرسالة «محاولات كتيرة»)
+```python
+_HIDDEN_KEYS_OUTPUT = (..., "why", ...)   # ⛔ كان فيه why
+# ⇒ الـafter_request بيخفيها من **كل** رد JSON
+# ⇒ الواجهة شافت need_code بس، معرفش إنه new_device
+# ⇒ عرضت «محاولات كتيرة» بدل «دخول من جهاز جديد»
+```
+**✅ الحل:** استثناء صريح — `/api/auth/` يرجّع `why`.
+
+### ③ `_shows_output` دايم�� False في Flask 3 ⭐ (تسريب/نقص)
+```python
+p = str(getattr(resp, "request", None).path or "")   # ⛔ None دايماً في Flask 3
+# ⇒ /api/rank و /api/data_full و /api/portfolio شالت الدرجات!
+# ✅ request.path مباشرة
+```
+
+### ④ «جهاز جديد» و«device ناقص» بيتحسبوا **محاولات فاشلة**
+```python
+# ⛔ كان: _pin_window_fail(keys) في الحالتين
+# ⇒ ٤ محاولات ⇒ «محاولات كتيرة» من غير سبب (أو من غير باسورد غلط)
+# ✅ «جهاز غير معروف» = مسار توثيق، مش خطأ ⇒ صفر خصم
+```
+
+### ⑤ `pin/login` كان bucket `write` = ٥/دقيقة ⇒ يتقفل في نص الطريق
+```python
+"pin_login": [(10, 60)],     # ✅ جديد
+"pin_chal_send": [(5, 300)], # ✅ كان ٣
+```
+
+### ⭐ backfill
+أول challenge ناجح ⇒ نسجّل الجهاز (`bio_backfilled`) ⇒ بعد كده الدخول عادي.
+
+### الاختبار
+```
+① جهاز مسجّل + رقم صح    → 200
+② حساب قديم (مافيش bio)   → 401 why=new_device
+③ بلا device               → 401 why=new_device
+④ رقم غلط                  → 401 why=bad_pin (left=3)
+⑤ ١٠ دخول متتالي           → كلهم new_device، صفر قفل
+⑥ ٦ محاولات غلط            → 429 (مش 500!)
+```
