@@ -16,3 +16,20 @@
 
 /
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+# ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ الـJS ما يتخزّنش أبداً
+# 📌 السبب: Cloudflare كان بيعمل cache للـJS (cf-cache-status: HIT)
+# 📌 ⛌ ⛌ ⛌ ⇒ المتصفح بيشغّل نسخة قديمة من octa-gate.js ⇒
+# 📌 ⛌ ⛌ ⛌ ⇒ رسائل قديمة («طلبت ٣ أكواد» بدل «٥») + البوابة
+# 📌 ⛌ ⛌ ⛌ ⇒ سلوك قديم ⇒ «الموقع فتح عادي» عند المستخدم.
+# 📌 ⛌ ⛌ ⛌ الأثر: المستخدم بيفضل يشوف نفس المشكلة مهما صلحنا.
+# 📌 ✅ الحل: no-store لكل الـassets/JS. الأداء مش هيتأثر (الملفات
+# 📌 ✅ صغيرة والـCDN لسه بيقدّمها بسرعة).
+/assets/*
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+/assets/js/*
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+/assets/css/*
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
