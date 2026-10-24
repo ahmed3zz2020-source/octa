@@ -1623,12 +1623,40 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  /* 📌 429 — حد الإرسال (٣ أكواد للإيميل في اليوم) أو حد الـIP.
  ⛔ العدّاد بييجي من السيرفر مش متخيّنين. */
  function sayRate(d) {
- var s2 = Math.max(1, Number((d && (d.retry_after || d.retry)) || 0) || 900);
- if (btn) { btn.disabled = true; btn.textContent = '⏔ استنى'; }
+ /* ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ تفريق بين نوعين من القفل
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 السبب: الكود القديم كان بيقول «استنى ١٥ دقيقة» لكل حالة.
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ✅ daily_limit = «استنى بكرة» (مش ١٥ دقيقة!)
+ 📌 ✅ rate العادي = «استنى شوية»
+ */
+ var daily = !!(d && (d.why === 'daily_limit' || d.until_midnight));
+ var s2 = Math.max(1, Number((d && (d.retry_after || d.retry)) || 0) || (daily ? 3600 : 900));
+ if (btn) { btn.disabled = true; btn.textContent = daily ? '⛔ استنى بكرة' : '⛔ استنى'; }
  var m = document.getElementById('gtMsg');
  if (!m) return;
  m.className = 'gt-msg no';
- m.innerHTML = '⏔ استنى شوية واطلب تاني' +
+ if (daily) {
+ /* ⛔ «استنى بكرة» بوضوح + العدّاد ينزّل لحد نص الليل */
+ m.innerHTML = '⛔ طلبت ٣ أكواد على الإيميل ده اليوم — استنى بكرة' +
+ ' <span class="gt-cd" id="gtRateCd">(' + mm(s2) + ')</span>';
+ var td = setInterval(function () {
+ s2--;
+ var c = document.getElementById('gtRateCd');
+ if (s2 <= 0) {
+ clearInterval(td);
+ if (btn) { btn.disabled = true; btn.textContent = '⛔ استنى بكرة'; }
+ m.innerHTML = '⛔ الحد اليومي خلص — جرّب بكرة الصبح';
+ return;
+ }
+ if (c) c.textContent = '(' + mm(s2) + ')';
+ }, 1000);
+ return;
+ }
+ m.innerHTML = '⛔ استنى شوية واطلب تاني' +
  ' <span class="gt-cd" id="gtRateCd">(' + mm(s2) + ')</span>';
  var t = setInterval(function () {
  s2--;
@@ -1636,7 +1664,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  if (s2 <= 0) {
  clearInterval(t);
  if (btn) { btn.disabled = false; btn.textContent = 'ابعت الكود'; }
- m.innerHTML = '⏔ خلص الوقت — تقدر تطلب تاني';
+ m.innerHTML = '⛔ خلص الوقت — تقدر تطلب تاني';
  return;
  }
  if (c) c.textContent = '(' + mm(s2) + ')';
@@ -2482,11 +2510,35 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
   ⛌ الحل: بعد ٨ ثواني نسمح للزائر يفتح زي ما في حالة عدم وجود توكن
   ⛌ (كل endpoints محمية محمية بـrequire_user على السيرفر — فمش دخول). */
  if (elapsed >= 8) {
-  clearHint();
-  try { sessionStorage.setItem('octa_allow_browse', '1'); } catch (e) { }
-  hint('⚠️ السيرفر بطيء — بتفتح بدون تسجيل دخول. الداتا المحمية هتطلب الدخول.', '#7a2b16', '#ffd9c9');
-  shut();
-  return;
+ clearHint();
+ /* ⛔⛔⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐⭐⭐ إصلاح «الموقع فتح عادي»
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 السبب: الكود القديم هنا كان يعمل shut() ⇒ **الموقع بيفتح**
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⇒ ده بالظبط اللي شكا منه أحمد («الموقع فتح عادي كمان»).
+ 📌 ✅ الحل: (١) مستخدم في تدفّق ⇒ ما نفتحش
+ 📌 ✅ (٢) مستخدم عنده توكن ⇒ ما نفتحش (البوابة تفضل مقفولة)
+ 📌 ✅ (٣) زائر من غير توكن ⇒ التصفح مفتوح (صح)
+ */
+ try { sessionStorage.setItem('octa_allow_browse', '1'); } catch (e) { }
+ if (inFlow()) {
+ hint('⚠️ السيرفر بطيء — استنى ثانية وحاول تكمل.', '#7a2b16', '#ffd9c9');
+ mount(); welcome(); open();
+ return;
+ }
+ if (token()) {
+ hint('⚠️ السيرفر بطيء — بنحاول تاني. متقفلش الصفحة.', '#7a2b16', '#ffd9c9');
+ mount(); welcome(); open();
+ return;
+ }
+ /* ⛌ زائر من غير توكن ⇒ التصفح مفتوح (صح) */
+ hint('⚠️ السيرفر بطيء — بتفتح بدون تسجيل. الداتا المحمية هتطلب الدخول.', '#7a2b16', '#ffd9c9');
+ shut();
+ return;
  }
  if (tries < MAX_TRIES) {
   hint('⏳ بنحاول نتأكد من حسابك… (' + tries + '/' + MAX_TRIES + ')', '#0f2a44', '#cfe3f5');
