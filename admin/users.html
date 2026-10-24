@@ -115,6 +115,8 @@ code{background:var(--card2);padding:2px 7px;border-radius:5px;font-size:11px;co
       <option value="name">الاسم (أ-ي)</option>
       <option value="watch">الأكثر متابعة</option>
       <option value="keys">الأكثر استخداماً</option>
+      <!-- ⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ترتيب بالأدخالات -->
+      <option value="login_count">الأكثر دخولاً</option>
     </select>
   </div>
 
@@ -129,6 +131,9 @@ code{background:var(--card2);padding:2px 7px;border-radius:5px;font-size:11px;co
       <th class="num" onclick="sortBy('session_min')">«دقيقة» ↕</th>
       <th class="num" onclick="sortBy('last_seen')">آخر ظهور ↕</th>
       <th class="num">PIN</th>
+      <!-- ⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — سجل الدخول -->
+      <th class="num" onclick="sortBy('login_count')">دخول ↕</th>
+      <th class="num">آخر دخول</th>
       <th class="num" onclick="sortBy('watch')">متابعة ↕</th>
       <th class="num" onclick="sortBy('keys')">أقسام ↕</th>
       <th class="num">الحالة</th>
@@ -179,12 +184,15 @@ async function fetchLive(){
   const H={'X-OCTA-Admin':t};
   const API='https://octa-prices-production-4ccb.up.railway.app';
   try{
-    const [r1,r2]=await Promise.all([
+    const [r1,r2,r3]=await Promise.all([
       fetch(API+'/api/admin/users',{headers:H}).then(r=>r.json()),
-      fetch(API+'/api/admin/monthly',{headers:H}).then(r=>r.json())
+      fetch(API+'/api/admin/monthly',{headers:H}).then(r=>r.json()),
+      fetch(API+'/api/admin/logins',{headers:H}).then(r=>r.json()).catch(()=>({ok:false}))
     ]);
     if(!r1.ok) throw new Error(r1.error||'محمي');
     DATA.users=r1.users||[]; DATA.monthly=r2.ok?r2:null;
+    // ⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — سجل الدخول (مين دخل بالـPIN ومن جهاز تاني)
+    DATA.logins=(r3&&r3.ok)?(r3.users||[]):[];
     render();
     fetch('users.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(r1)}).catch(()=>{});
   }catch(e){ alert('فشل: '+e.message); }
@@ -208,7 +216,11 @@ function merge(){
       hasPin:!!(u.hasPin||s.pin_set),
       watch:(typeof u.watch==='number')?u.watch:((u.watch||[]).length||0),
       keys:(u.keys||[]).length, keyList:u.keys||[],
-      active7:!!s.active_7d
+      active7:!!s.active_7d,
+      // ⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — سجل الدخول
+      login_count:u.login_count||0,
+      last_login:u.last_login||0,
+      login_log:u.login_log||[]
     };
   });
 }
@@ -264,6 +276,7 @@ function render(){
     if(sort==='created'){x=a.created;y=b.created;}
     else if(sort==='days'){x=a.days;y=b.days;}
     else if(sort==='last_seen'){x=a.last_ts;y=b.last_ts;}
+    else if(sort==='login_count'){x=a.login_count||0;y=b.login_count||0;}
     else if(sort==='name'){return a.name.localeCompare(b.name,'ar')*dir;}
     else {x=a[sort];y=b[sort];}
     return (x-y)*dir;
@@ -280,6 +293,9 @@ function render(){
     <td class="num" style="color:var(--warn)">${u.session_min||0}</td>
     <td class="num" style="font-size:11px;color:var(--muted)">${(u.last_seen||'—').slice(0,16)}</td>
     <td class="num">${u.hasPin?'<span class="pill y">نعم</span>':'<span class="pill n">لا</span>'}</td>
+    <!-- ⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — سجل الدخول -->
+    <td class="num">${u.login_count||0}${loginDetail(u)}</td>
+    <td class="num" style="font-size:11px;color:var(--muted)">${u.last_login?new Date(u.last_login*1000).toISOString().slice(0,16).replace('T',' '):'—'}</td>
     <td class="num">${u.watch||0}</td>
     <td class="num"><details><summary>${u.keys} قسم</summary>
       <div class="keylist">${u.keyList.map(k=>`<span>${k}</span>`).join('')}</div></details></td>
@@ -304,11 +320,29 @@ function renderKeys(all){
     </div>`).join('');
 }
 
+// ⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — تفاصيل كل دخول (وقت · طريقة · جهاز · IP)
+// 📌 ⛌ ⛌ newdev=true يعني «دخل من جهاز مش مسجّل» ⇒ ده كان هيطلب كود
+function loginDetail(u){
+  const L=u.login_log||[];
+  if(!L.length) return '';
+  const rows=L.slice().reverse().map(l=>{
+    const t=l.t?new Date(l.t*1000).toISOString().slice(0,16).replace('T',' '):'—';
+    const via=(l.via==='pin')?'🔑 PIN':(l.via==='signup')?'🆕 تسجيل':(l.via==='challenge')?'✉️ كود':'—';
+    const nd=l.newdev?'<span class="pill w">جهاز جديد</span>':'';
+    return `<div style="font-size:11px;line-height:1.6;padding:2px 0;border-bottom:1px solid var(--card2)">
+      <span class="mono">${t}</span> · ${via} ${nd}<br>
+      <span class="mono" style="color:var(--muted)">dev:${(l.dev||'—').slice(0,8)} · ip:${(l.ip||'—').slice(0,20)}</span>
+    </div>`;
+  }).join('');
+  return `<details style="margin-top:4px"><summary style="font-size:11px;color:var(--gold);cursor:pointer">السجل</summary>
+    <div style="min-width:230px;margin-top:4px">${rows}</div></details>`;
+}
+
 function exportCsv(){
   const rows=merge();
-  const head=['name','email','uid','created_iso','days','hits','session_min','last_seen','hasPin','watch','keys'];
+  const head=['name','email','uid','created_iso','days','hits','session_min','last_seen','hasPin','login_count','last_login','watch','keys'];
   const csv=[head.join(',')].concat(rows.map(u=>[
-    u.name,u.email,u.uid,u.created_iso,u.days,u.hits,u.session_min,u.last_seen,u.hasPin,u.watch,u.keys
+    u.name,u.email,u.uid,u.created_iso,u.days,u.hits,u.session_min,u.last_seen,u.hasPin,u.login_count||0,u.last_login||0,u.watch,u.keys
   ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','))).join('\n');
   const b=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');
