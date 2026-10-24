@@ -3010,7 +3010,7 @@ function renderEngineBars(scores, finalScore, extra) {
   <div class="engine-bar">
   <div class="lbl">${s.label} <span style="color:var(--muted);font-size:0.7rem;">(${s.source || 'AI'})</span></div>
   <div class="bar">
-  <div class="fill" style="background:linear-gradient(90deg, ${s.value >= 80 ? '#16c79a, #4dabf7' : s.value >= 60 ? '#4dabf7, #f4d03f' : '#d4af37, #f97316'}); width:<span class="flt-ltr">0%</span>; --target:${s.value}%;">${s.value}</div>
+  <div class="fill" style="background:linear-gradient(90deg, ${s.value >= 80 ? '#16c79a, #4dabf7' : s.value >= 60 ? '#4dabf7, #f4d03f' : '#d4af37, #f97316'}); width:0%; --target:${s.value}%;">${s.value}</div>
   </div>
   </div>
   `).join('');
@@ -3088,7 +3088,7 @@ function renderEngineBars(scores, finalScore, extra) {
   </div>` : ''}
 
   <div style="color:var(--muted);font-size:0.72rem; text-align:center;">
-  🤖 تحليل محرك OCTA (${d.model || 'octa'})${d.cached ? ' • مُخزّن' : ''} • ${d.sector || ''}
+  🤖 تحليل محرك OCTA (${d.model || 'octa'})${d.cached ? ' • مُخزّن' : ''}${d.sector ? ' • ' + d.sector : ''}
   </div>
   `;
 }

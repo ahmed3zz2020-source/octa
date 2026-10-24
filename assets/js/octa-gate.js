@@ -232,6 +232,7 @@
  var g = mount();
  g.style.display = 'flex';
  document.body.style.overflow = 'hidden';
+ try { clearTimeout(_fsTimer); _fsTimer = _failSafe(); } catch(e){}
  setTimeout(function () {
  var gg = gateEl();
  var f = document.getElementById('gt-form');
@@ -239,10 +240,36 @@
  }, 120);
  }
 
+ /* ══════════════════════════════════════════════════════════════
+ 🛟 FAIL-SAFE — ٢٣ أكتوبر ٢٠٢٦
+ ⛔ المشكلة: لو open() اشتغلت وJS وقع بعد كده، الـoverflow بيفضل
+ ⛔ hidden والصفحة بتفضل بيضا Though الباك شغال ٢٠٠.
+ ⛌ الحل: بعد ١٢ ثانية، لو البوابة لسه موجودة → شيلها وافتح.
+ ⛌ ⛌ ده مش بيكسر الحماية: الـgate لو اتنفّذ صح بيشيل نفسه
+ ⛌ ⛌ بـshut() في أقل من ثانية. ده بس network/JS failure path.
+ ══════════════════════════════════════════════════════════════ */
+ var _fsTimer = null;
+ function _failSafe(){
+ return setTimeout(function(){
+ try {
+ var g = gateEl();
+ /* ⛌ البوابة موجودة + مانتحملناش بنجاح → الإقلاع وقع */
+ if (g && g.style.display === 'flex') {
+ g.remove();
+ document.body.style.overflow = '';
+ stopLock();
+ console.warn('[gate] fail-safe: البوابة اتفتحت تلقائيًا بعد ١٢ ثانية');
+ }
+ } catch(e){}
+ }, 12000);
+ }
+
  function shut() {
  var g = gateEl();
  if (g) g.remove();
  document.body.style.overflow = '';
+ /* ⛌ البوابة اشتغلت صح — نلغي الـfail-safe */
+ try { if (_fsTimer) { clearTimeout(_fsTimer); _fsTimer = null; } } catch(e){}
  stopLock();
  wipeFlow(); /* ⛔ الإيميل والكود يتمسحوا مع إغلاق البوابة */
  try { window.OCTAAuth && window.OCTAAuth.refresh && window.OCTAAuth.refresh(); } catch (e) { }
@@ -1307,7 +1334,11 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  paintPad(true);
  clearMsg();
 
- post('/api/auth/pin/login', { pin: p })
+ /* ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ نرسل الجهاز مع الباسورد.
+ 📌 الباك بقى يتحقق: الجهاز ده مسجّل على الحساب ولا لأ.
+ 📌 ⛌ ⛌ ⛌ لو م=new ⇒ 401 need_code ⇒ كود على الإيميل.
+ 📌 ⛌ ⛌ ⛌ (ده يمنع حد يدخل بحساب حد تاني من موبايل تاني) */
+ post('/api/auth/pin/login', { pin: p, device: bioSecret() })
  .then(function (o) {
  if (o.s === 200 && o.d && o.d.token) {
  strikeReset();
@@ -1325,6 +1356,11 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  return;
  }
  if (o.s === 429) { locked(o.d.retry_after || o.d.retry || 60); return; }
+ /* ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ device جديد ⇒ شاشة إيميل مخصصة
+ 📌 (مش «محاولات كتيرة» — الرقم صح، الجهاز مختلف) */
+ if (o.d && (o.d.why === 'new_device' || o.d.why === 'new_device_code')) {
+ askCode('newdev'); return;
+ }
  if (needCode(o.d)) { askCode('need'); return; }
  /* ⛌ كل حاجة تانية = الباسورد غلط. ما نقولش حاجة عن الحساب. */
  /* ⛔⛔⛔ ٢١ أكتوبر ٢٠٢٦ — نسجّل الرقم اللي اتجرّب.
@@ -1370,7 +1406,8 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  if (d.need_code === true) return true;
  var w = String(d.why || '');
  return w === 'need_code' || w === 'code_required' || w === 'challenge'
- || w === 'need_email' || w === 'need_challenge';
+ || w === 'need_email' || w === 'need_challenge'
+ || w === 'new_device' || w === 'new_device_code';
  }
 
  /* 📌 كام محاولة في **نافذة الدقيقة** فاضلة — الباك بيبعتها في
@@ -1430,7 +1467,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
   ⛌ الحل: 'locked' → تحذير · 'forgot' → رسالة عادية · 'need' → محاولات كتيرة */
  function askCode(cause) {
  stopLock();
- var why = (cause === 'locked') ? 'locked' : (cause === 'forgot' ? 'forgot' : 'need');
+ var why = (cause === 'locked') ? 'locked' : (cause === 'newdev' ? 'newdev' : (cause === 'forgot' ? 'forgot' : 'need'));
  state.pin = ''; state.len = PIN_LEN; flow.tries = 0;
  /* ⛔ ٢١ أكتوبر: منسيب العدّادات القديمة عند بداية جلسة جديدة */
  if (flow.triedPins && flow.triedPins.length) {
@@ -1448,6 +1485,10 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
    ? '<div class="gt-alert">⚠️ عملت محاولات كتيرة غلط</div>' +
      '<h1 class="gt-h">استنى بصوت شوية وجرّب تاني</h1>' +
      '<p class="gt-sub2">عملنا قفل مؤقت عشان أمانك — مش فيه مشكلة في حسابك</p>'
+   : why === 'newdev'
+     ? '<div class="gt-alert">📱 دخول من جهاز جديد</div>' +
+       '<h1 class="gt-h">هنبعتلك كود على الإيميل المسجّل</h1>' +
+       '<p class="gt-sub2">الباسورد صح، بس ده جهاز مختلف — كود على الإيميل عشان نتأكد إنك إنت</p>'
    : why === 'need'
      ? '<div class="gt-alert">⛔ محاولات كتيرة</div>' +
        '<h1 class="gt-h">هنبعتلك كود على الإيميل المسجّل</h1>' +
@@ -1700,7 +1741,10 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  clearMsg();
  /* 📌 تروكن الفتح في هيدر Authorization (مش في الـbody) —
  زي ما الباك بيقرا (_bearer). والـbody فيه new_pin بس. */
- postAuth(reg ? SIGNUP.newpin : PATHS.newpin, { new_pin: v }, flow.unlock)
+ /* ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ نرسل الجهاز مع الباسورد الجديد.
+ 📌 الباك بيخزّنه على الحساب ⇒ أول دخول بعد التسجيل يشتغل. */
+ postAuth(reg ? SIGNUP.newpin : PATHS.newpin,
+ { new_pin: v, device: bioSecret() }, flow.unlock)
  .then(function (o) {
  var d = o.d || {};
  if (o.s === 200 && d.token) {
