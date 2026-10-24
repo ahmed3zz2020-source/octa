@@ -2329,6 +2329,48 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  } catch (e) { cb(false); }
  }
 
+ /* ⛔⛔⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐⭐⭐ إصلاح «hint is not defined»
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 السبب: `clearHint` و `hint` كانوا معرّفين **جوّه verify()**
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⇒ أي استخدام **بره** verify() ⇒ ReferenceError ⇒ «hint is
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 not defined» ⇒ الـDOMContentLoaded handler وقع ⇒ البوابة
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ✅ الحل: نرفعهم للنطاق المشترك (IIFE) عشان كل الشاشات
+ 📌 ✅ تقدر تستخدمهم.
+ */
+ function clearHint(){
+ try {
+ var hs = document.querySelectorAll('.gt-netbar');
+ for (var i = 0; i < hs.length; i++) hs[i].remove();
+ } catch (e) { }
+ }
+
+ function hint(msg, bg, fg){
+ clearHint();
+ try {
+ var b = document.createElement('div');
+ b.className = 'gt-netbar';
+ b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:999999;'
+ + 'background:' + bg + ';color:' + fg + ';padding:11px 14px;'
+ + 'font:600 14px/1.5 system-ui;text-align:center';
+ b.textContent = msg;
+ try { document.body.appendChild(b); } catch (e) { }
+ } catch (e) { }
+ }
+
  /* التأكد إن التوكن لسه صالح — لو مش كده نرجع للبوابة */
  function verify() {
  var t = token();
@@ -2342,26 +2384,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  ⛌ كومنت الكود نفسه كان مكتوب فيه «شك = مقفول» — والسلوك كان معاكس.
  ⛌ ⛔ الحل: البوابة تفضل مقفولة لحد ما نعرف. ما نرسمهاش أبداً. */
 
- function clearHint(){
- try {
-  var hs = document.querySelectorAll('.gt-netbar');
-  for (var i = 0; i < hs.length; i++) hs[i].remove();
- } catch (e) { }
- }
-
- function hint(msg, bg, fg){
- clearHint();
- try {
-  var b = document.createElement('div');
-  b.className = 'gt-netbar';
-  b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:999999;'
-  + 'background:' + bg + ';color:' + fg + ';padding:11px 14px;'
-  + 'font:600 14px/1.5 system-ui;text-align:center';
-  b.textContent = msg;
-  document.body.appendChild(b);
- } catch (e) { }
- }
-
+ 
  /* ⛌ القاعدة: شك = مقفول لمدة ٨ ثواني، بعدها نسأل الواجهة عن
    الإجابة من cache (يدوي/افتراضي: مفتوح). ده يمنع الـrace condition
    في أول load (الداتا في طريقها) من إنه يدخل حلقة شك لا تنتهي.
