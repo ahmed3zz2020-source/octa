@@ -408,6 +408,27 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  if (state.jump) { clearTimeout(state.jump); state.jump = null; }
  state.lock = 0;
  stopCd(); /* ⛌ عدّاد الكود يموت مع أي شاشة جديدة */
+ /* ⛔⛔⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐⭐⭐ امسح مستمع الكليك العام
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 السبب: مستمع `.gt-body.onclick` (من شاشة البصمة) كان
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ فاضل
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ عالـDOM
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ أي لمسة في أي شاشة بعدين ⇒
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ toPin() ⇒ login(1) ⇒ الشاشة
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⇒ «دخل قبل ما أكتب الباسورد» و«الكود وصل فرقع».
+ 📌 ✅ الحل: نمسحه في stopLock() — أي شاشة جديدة بتمسحه.
+ 📌 ✅ (الـscreenId increment بيكفي日为 But الكليك مربوط بالـDOM)
+ */
+ try {
+ var _bdy = document.querySelector('.gt-body');
+ if (_bdy) { _bdy.onclick = null; }
+ } catch (e) { }
  screenId++; /* ⛌ أي مستمع شاشة قديم يموت فورًا (زي مستمع البصمة) */
  }
 
@@ -1184,7 +1205,24 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
 
  function bioLogin() {
  stopLock();
+ /* ⛔⛔⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐⭐⭐ إصلاح «بيخش برضو قبل
+ 📌 ما أكتب الباسورد / الكود».
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ السبب: مستمع الـclick على .gt-body كان فاضل من
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ شاشة البصمة ⇒ أي لمسة بره الكارت (والمستخدم
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ بيضغط «رجوع» أو بيكتب الكود) ⇒ toPin() ⇒
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ login(1) ⇒ الشاشة بتتبدّل لـ٤ أرقام!
+ 📌 ✅ الحل: (١) نضمن إن كل شاشة جديدة تلغي المستمع
+ 📌 ✅ (٢) ونتأكد إن المستمع لسه على الشاشة الصح.
+ */
  var me = screenId;
+ /* ⛔ ⛌ ⛌ ⛌ ⛌ امسح أي مستمع click قديم على body
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ (من أي شاشة قبلها) — غير كده الكليك
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ بره الكارت بيرجّعنا لشاشة ٤ أرقام.
+ */
+ try {
+ var _bd = document.querySelector('.gt-body');
+ if (_bd) { _bd.onclick = null; }
+ } catch (e) { }
  mount();
  head('تسجيل الدخول', 0);
  boxEl().className = 'gt-box bio';
@@ -1282,6 +1320,12 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  الأرقام بنفسه»، فماشيش تاني على البصمة. */
  function login(noBio) {
  stopLock();
+ /* ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ شاشة الـPIN-login مفيش فيها
+ 📌 «تسجيل» ولا «استرجاع» ⇒ نخلّي الـmode فاضي.
+ 📌 ⛌ ⛌ ⛌ (كان بيفضل 'signup' من محاولة سابقة ⇒ والرجوع
+ 📌 ⛌ ⛌ ⛌ من شاشة الكود بيرجع لـlogin بـmode غلط)
+ */
+ s.mode = '';
  state.pin = ''; state.tries = 0; state.len = PIN_LEN;
  /* ⛔⛔⛔ ⭐ الترحيب  الحل
  ⛌ كل ما المستخدم يفتح شاشة الدخول  العدّاد يصفّر.
@@ -1468,6 +1512,19 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  function askCode(cause) {
  stopLock();
  var why = (cause === 'locked') ? 'locked' : (cause === 'newdev' ? 'newdev' : (cause === 'forgot' ? 'forgot' : 'need'));
+ /* ⛔⛔⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐⭐⭐ إصلاح «الكود بيوصل بخطأ»
+ 📌 السبب: `s.mode` كان بيتحدد **مرة واحدة** عند الـsignup
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ (سطر 907) وبيتفضل 'signup' للأبد!
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ بعد ما يعمل signup، لو رجع وطلب «نسيت
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ الباسورد» ⇒ codeEntry() شايفها signup ⇒
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ «كود التأكيد» + «ارجع — عدّل الإيميل» ⇒
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ المستخدم محتار + يظن إنه بيعمل حساب جديد.
+ 📌 ✅ الحل: كل مسار يحدّد الـmode بتاعه صراحةً.
+ 📌 ✅ forgot → 'forgot' · newdev/need/locked → 'forgot' كمان
+ 📌 ✅ (كلهم استرجاع، مش تسجيل)
+ */
+ s.mode = (why === 'locked' || why === 'newdev' || why === 'need' || why === 'forgot')
+ ? 'forgot' : 'forgot';
  state.pin = ''; state.len = PIN_LEN; flow.tries = 0;
  /* ⛔ ٢١ أكتوبر: منسيب العدّادات القديمة عند بداية جلسة جديدة */
  if (flow.triedPins && flow.triedPins.length) {
@@ -1519,6 +1576,11 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  if (o.s === 200) {
  /* ⛔⛔ نفس الشاشة ونفس الكلام — مسجّل أو لأ. */
  flow.email = v;
+ /* ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ ثبّت الـmode صراحةً
+ 📌 (استرجاع — مش تسجيل).askCode ضبطها بس نتأكد هنا كمان
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ خاطرة لو flow اتنادى من مكان تاني.
+ */
+ s.mode = 'forgot';
  codeEntry();
  return;
  }
