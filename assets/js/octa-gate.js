@@ -107,6 +107,7 @@
  return fetch(apiBase() + path, {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
+ credentials: 'include',
  body: JSON.stringify(body || {})
  }).then(function (r) {
  return r.text().then(function (txt) {
@@ -140,6 +141,7 @@
  return fetch(apiBase() + path, {
  method: 'POST',
  headers: h,
+ credentials: 'include',
  body: JSON.stringify(body || {})
  }).then(function (r) {
  return r.text().then(function (txt) {
@@ -2112,6 +2114,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ */
  return fetch(apiBase() + '/api/auth/me', {
  headers: { 'Authorization': 'Bearer ' + token() },
+ credentials: 'include',
  cache: 'no-store'
  }).then(function (rr) {
  return rr.text().then(function (txt) {
@@ -2313,6 +2316,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  hint('⏳ بنتحقق من حسابك…', '#0f2a44', '#cfe3f5');
  fetch(apiBase() + '/api/auth/me', {
  headers: token() ? { 'Authorization': 'Bearer ' + token() } : {},
+ credentials: 'include',
  cache: 'no-store'
  }).then(function (r) {
  clearHint();
@@ -2427,7 +2431,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  try {
  var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
  var to = setTimeout(function () { if (ctrl) try { ctrl.abort(); } catch (e) { } }, 3000);
- fetch(apiBase() + '/api/health', { cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
+ fetch(apiBase() + '/api/health', { credentials: 'include', cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
  .then(function (r) {
  clearTimeout(to);
  /* 5xx = السيرفر واقع · أي 2xx/4xx = شغال (الـhealth مفتوح) */
@@ -2515,6 +2519,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  var to = setTimeout(function () { if (ctrl) try { ctrl.abort(); } catch (e) { } }, 8000);
  return fetch(apiBase() + '/api/auth/me', {
  headers: { 'Authorization': 'Bearer ' + t },
+ credentials: 'include',
  cache: 'no-store',
  signal: ctrl ? ctrl.signal : undefined
  }).then(function (r) {
