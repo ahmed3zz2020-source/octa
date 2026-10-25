@@ -56,8 +56,25 @@
   ];
   let M = MARKS[0];
   let MK = null;
+  /* ══════════════════════════════════════════════════════════════
+  🗂️ مصدر البيانات — EGX_DB (الغني) — ٢٥ أكتوبر ٢٠٢٦
+  ────────────────────────────────────────────────────────────────
+  📌 ⛔ المشكلة: الفلتر كان بيقرا `/api/markets` — وده **مضغوط**:
+  📌   فيه السعر والتغيير والمحاور، بس **مفيش** الأساسيات
+  📌   (ROE · P/E · صافي ربح · هامش · ROIC · شارب · CAGR · هبوط).
+  📌   ⇒ ٩ أعمدة كانت بتطلع «—» لكل ٢٨٤ سهم.
+  📌 ✅ الحل: `EGX_DB` (من `/api/data_full` المحمي) فيه كل ده
+  📌   + الدرجة + القرار — وهو نفس مصدر باقي الموقع.
+  📌 ⛔ fallback: لو EGX_DB لسه ما اتحمّلش ⇒ /api/markets (أنضف).
+  ══════════════════════════════════════════════════════════════ */
   function mkData() {
   if (MK) return MK;
+  try {
+  if (typeof EGX_DB !== 'undefined' && EGX_DB && Object.keys(EGX_DB).length) {
+  MK = { egypt: EGX_DB };
+  return MK;
+  }
+  } catch (e) { }
   try { if (typeof OCTA_MK !== 'undefined' && OCTA_MK) { MK = OCTA_MK; return MK; } } catch (e) { }
   return null;
   }
@@ -135,10 +152,21 @@
   📌 ✅ الحل: نطبّع هنا مرة واحدة ⇒ باقي الكود يفضل زي ما هو.
   ══════════════════════════════════════════════════════════════ */
   const FIELD_ALIAS = {
-  dy: ['div_yield', 'dy'], de: ['de_ratio', 'de'], mc: ['mkt_cap', 'mc'],
-  nm: ['net_margin', 'nm'], om: ['op_margin', 'om'], gm: ['gross_margin', 'gm'],
+  /* ⭐ أسماء EGX_DB (data_full) — دي الغنية */
+  dy: ['dy', 'div_yield'], de: ['de', 'de_ratio'], mc: ['mc', 'mkt_cap'],
+  nm: ['nm', 'net_margin'], om: ['om', 'op_margin'], gm: ['gm', 'gross_margin'],
+  roic: ['roic', 'roic'], mdd1y: ['mdd1y', 'mdd1y'], vol1y: ['vol1y', 'vol1y'],
+  sharpe3y: ['sharpe3y', 'sharpe3y'], cagr3y: ['cagr3y', 'cagr3y'],
+  cr: ['cr', 'current_ratio'], qr: ['qr', 'quick_ratio'],
+  av30: ['av30', 'avg_volume_30d'], p1y: ['perf1y', 'perf_y', 'p1y'],
+  p1m: ['perf1m', 'perf_1m', 'p1m'], p3m: ['perf3m', 'perf_3m', 'p3m'],
+  p6m: ['perf6m', 'perf_6m', 'p6m'], pYtd: ['perfYtd', 'perf_ytd', 'pYtd'],
+  p1w: ['perf1w', 'perf_w', 'p1w'], rel_volume: ['relvol', 'rel_volume'],
+  volatility: ['volatility', 'volatility'], upside: ['upside', 'upside'],
   roic: ['roic', 'roic'], cr: ['current_ratio', 'cr'], qr: ['quick_ratio', 'qr'],
-  conf: ['confidence', 'conf'], total: ['total', 'score'],
+  conf: ['conf', 'confidence'], total: ['total', 'score', 'final_score'],
+  verdict: ['verdict', 'decision'], tvRec: ['tvRec', 'tv_rating'],
+  ma50: ['ma50', 'sma50'], ma200: ['ma200', 'sma200'],
   av30: ['avg_volume_30d', 'av30'], volume: ['volume', 'vol'],
   p1w: ['perf_w', 'p1w'], p1m: ['perf_1m', 'p1m'], p3m: ['perf_3m', 'p3m'],
   p6m: ['perf_6m', 'p6m'], p1y: ['perf_y', 'p1y'], pYtd: ['perf_ytd', 'pYtd'],
@@ -157,6 +185,11 @@
   function normalize(r) {
   if (!r || typeof r !== 'object') return r;
   const o = Object.assign({}, r);
+  /* ⭐ EGX_DB بيستخدم أسماء مختلفة عن /api/markets */
+  if (o.change == null && o.c != null) o.change = o.c;
+  if (o.price == null && o.p != null) o.price = o.p;
+  if (o.volume == null && o.v != null) o.volume = o.v;
+  if (o.score == null && o.total != null) o.score = o.total;
   Object.keys(FIELD_ALIAS).forEach(function (k) {
   if (o[k] != null) return;
   const alt = FIELD_ALIAS[k];
@@ -271,7 +304,7 @@
   /* ⚠️ أسهم بلا بيانات (موقوفة / غير متاحة) — نستبعدها من الجدول
   لأنها مش قابلة للتحليل — مفيش سعر ولا مؤشرات */
   if (s.noData) return false;
-  const px = N(gq(s, ['price'], 0));
+  const px = N(gq(s, ['price', 'p'], 0));
   if (!px) return false;
   if (q) {
   const c = (s.code || '').toLowerCase();
@@ -1876,6 +1909,16 @@
   function loadMK(cb) {
   const d = mkData();
   if (MK_DONE && d && d[M.id] && d[M.id].length) { cb(); return; }
+  /* ⭐ ٢٥ أكتوبر ٢٠٢٦ — لو EGX_DB اتحمّل ⇒ فيه كل الحقول الغنية
+     ⛔ ⇒ نكتفي بيه (أغنى من /api/markets). */
+  try {
+  if (typeof window !== 'undefined' && window.EGX_DB && Object.keys(window.EGX_DB).length) {
+  MK = { egypt: window.EGX_DB };
+  MK_DONE = true;
+  cb();
+  return;
+  }
+  } catch (e) { }
   const base = (typeof window !== 'undefined' && window.OCTA_API) || '';
   const url = base + '/api/markets?market=' + encodeURIComponent(M.id);
   let done = false;
@@ -1896,7 +1939,17 @@
   window.scInit = function () {
   window.__scMarket = M.id;
   render();
+  /* ⭐ ٢٥ أكتوبر ٢٠٢٦ — نستنى `octaLoadDB` (بيجيب EGX_DB الغني)
+     ⛔ قبل ما نرسم. ⛔ من غير كده: الفلتر بيرسم بصفوف فاضية
+     ⛔   ومحدش بيعرف يعيد الرسم بعد ما الداتا توصل. */
+  const wait = (typeof octaLoadDB === 'function')
+  ? Promise.resolve().then(function () { return octaLoadDB(); }).catch(function () { })
+  : Promise.resolve();
+  wait.then(function () {
+  MK = null;           /* ⛔ نخلّي mkData تقرا EGX_DB تاني */
+  render();
   loadMK(function () { render(); startLive(); });
+  });
   };
 
   /* ⛔ كان غلاف رابع لـswitchPage وبيعمل scInit **متلتين**

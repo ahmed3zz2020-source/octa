@@ -1249,6 +1249,12 @@ async function loadEgxFile(){
   ⛌ في fallback (لو data_full رجع null). */
   rankRows: rankRows };
   console.log('📚 سجل EGX:', EGX_META);
+  /* ⭐ ٢٥ أكتوبر ٢٠٢٦ — نعرّضه عالمياً.
+     📌 السبب: فلتر الأسهم (octa-screener.js) كان بيقرا /api/markets
+     📌   اللي مفيهوش الأساسيات ⇒ ٩ أعمدة «—».
+     📌 ✅ EGX_DB فيه كل الحقول الغنية + الدرجة + القرار.
+     📌 ⚠️ نفس المصدر بتاع باقي الموقع (مفيش مصدرين). */
+  try { window.EGX_DB = EGX_DB; window.EGX_META = EGX_META; } catch (e) { }
   return EGX_DB;
   } catch(e) {
   console.warn('⚠️ سجل EGX:', e.message);
