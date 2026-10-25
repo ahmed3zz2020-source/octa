@@ -9,8 +9,10 @@
    ② PUT /workers/assets/upload/<hash> (multipart base64)
    ③ PUT /workers/scripts/<name> (multipart: metadata + modules + assets.jwt)
 
- ⚠️ مفيش force-push. ⛔ مفيش نشر على الإنتاج من هنا — الاسم
-    بيتحدد بالمتغير NAME (octa-preview افتراضياً).
+ ⚠️ مفيش force-push.
+ ⛔⛔⛔ حارس: النشر على الإنتاج (`octa`) **محتاج موافقة صريحة**
+ ⛌   من أحمد. الاسم الافتراضي octa-preview. لو NAME=octa لازم
+ ⛌  -ALLOW_PROD=1 — من غير كده السكربت بيرفض ويقفل.
  ══════════════════════════════════════════════════════════════ */
 'use strict';
 const fs = require('fs');
@@ -24,6 +26,22 @@ const TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 const BASE = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}`;
 
 if (!TOKEN) { console.error('⛔ CLOUDFLARE_API_TOKEN مش موجود'); process.exit(1); }
+
+/* ⛔⛔⛔ حارس الإنتاج — ٢٥ أكتوبر ٢٠٢٦
+   📌 الـworker `octa` اتكسر ٥ دقايق بسبب نشر بدون assets binding
+   ⛌ ⛌ ⛌ ⛌ ⛌ (1101 على كل حاجة). ⇒ من غير حارس، أي غلطة بتوقع
+   ⛌ ⛌ ⛌ ⛌ ⛌ الموقع. الخطر ده بيبقى أكبر من فايدة النشر السريع. */
+const PROD_NAMES = ['octa'];
+if (PROD_NAMES.includes(NAME) && process.env.ALLOW_PROD !== '1') {
+  console.error(`⛔⛔⛔ رفض النشر على الإنتاج (${NAME}).`);
+  console.error(`   الإنتاج محتاج موافقة صريحة من أحمد.`);
+  console.error(`   لو اتفقنا: ALLOW_PROD=1 NAME=${NAME} node tools/cf-deploy.js`);
+  process.exit(1);
+}
+if (PROD_NAMES.includes(NAME)) {
+  console.log(`⚠️  ⚠️  ⚠️  نشر على الإنتاج (${NAME}) —ALLOW_PROD مفعّل ⚠️  ⚠️  ⚠️`);
+}
+
 
 async function api(pathname, opts = {}) {
   const res = await fetch(BASE + pathname, {
