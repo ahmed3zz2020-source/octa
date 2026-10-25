@@ -488,3 +488,39 @@ OCTAView    : COMI ظهر ✅
 Challenge   : forgot → إيميل → send 200 → شاشة الكود ✅
 API errors  : صفر ✅
 ```
+
+---
+
+## 🔴 تحديث ٢٥ أكتوبر ٢٠٢٦ — إصلاح 401 عام + تخطيط كارت السهم
+
+### 🔴 الخلل الجذري: `octaFetch` المشترك (٤٠+ نداء كان بيرجع 401)
+**السبب:** `octa-api.js` كان بيلفّ `window.fetch` — بس **بالـURL النسبي فقط** (نفس الأصل).
+الملفات التانية (`octa-pages.js` · `octa-app.js`) بتعمل `fetch(OCTA_API + ...)` **مباشرة**
+⇒ مفيش `Authorization` header ⇒ **401 على كل المسارات المحمية**
+⇒ النتيجة: صفحة السهم بتقول «فشل تحميل بيانات ABUK — `/api/intelligence/ABUK`».
+
+**✅ الإصلاح:** `window.octaFetch(url, opts)` في `assets/js/octa-api.js`:
+- يضيف `Authorization: Bearer <token>` من `localStorage.octa_token` لكل نداء فيه `/api/`.
+- يضيف `credentials: 'include'` (الكوكي HttpOnly).
+- **لا يلمس** أي URL خارجي (TradingView · RSS · IPO sources) — بيحافظ على `_isOurs()`.
+
+**✅ التغطية:** ٤٧ موضع تم تحويله عبر `octa-pages.js` (٣٣) و `octa-app.js` (١٤).
+
+### 🎨 إصلاحات الواجهة
+| المشكلة | السبب | الإصلاح |
+|---|---|---|
+| «القرار —» فاضي | `intel.decision` مخفي في `/api/intelligence` | `octaStockMeta(code).decision` من `OS_DB` |
+| المحاور إنجليزي | `k` مباشرة بدل `AR_MS[k]` | `AR_MS` (٧ محاور عربي) |
+| `rgba(255,255,255,...)` في الكارت | inline styles مش متحوّلة | `var(--wash)` |
+| كارت لوحده في آخر صف | `auto-fit minmax(130px)` مع ٧ عناصر | `repeat(3,1fr)` للكر��ت + `repeat(2,1fr)` للمحاور |
+
+### 🧪 نتيجة الفحص النهائي (production، موبايل ٣٩٠px)
+```
+١٨/١٨ صفحة: صفر NaN · صفر undefined · صفر «النتيجة 0/100» · صفر «القرار —»
+صفر JS errors · صفر API 4xx/5xx (غير 429 transient)
+OS_DB = 285 في كل الصفحات · CFG موجود · ٧ أوزان · مجموع ١٠٠٪
+```
+
+### 📦 النشر
+- Production worker version: `4e2c149f-86c4-4c5e-9ecb-3af734cdcb50`
+- Commits: `050bc8d` (octaFetch + كارت السهم) · `d293ab7` (تخطيط الكارت)
