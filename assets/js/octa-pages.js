@@ -272,7 +272,7 @@ function renderTicker() {
 
 async function loadTicker() {
   try {
-  const res = await fetch(OCTA_API + '/api/ticker?_=' + Date.now());
+  const res = await octaFetch(OCTA_API + '/api/ticker?_=' + Date.now());
   const data = await res.json();
   if (data.ticker && data.ticker.length) {
   TICKER_DATA = data.ticker;
@@ -318,7 +318,7 @@ async function openIntel(code) {
   window.scrollTo({top: 0, behavior: 'smooth'});
 
   try {
-  const res = await fetch(OCTA_API + '/api/intelligence/' + code);
+  const res = await octaFetch(OCTA_API + '/api/intelligence/' + code);
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const d = await res.json();
   if (d.error) throw new Error(d.error);
@@ -517,7 +517,7 @@ async function loadOpportunities(force) {
   if (!octaHasToken()) return;  /* ⛔ لسه داخلش — نتخطى، مش نفتح المسار */
   if (!grid.innerHTML || force) grid.innerHTML = '<div class="opps-loading">جاري التحميل...</div>';
   try {
-  const res = await fetch(OCTA_API + '/api/ranking?_=' + Date.now());
+  const res = await octaFetch(OCTA_API + '/api/ranking?_=' + Date.now());
   const d = await res.json();
   const list = (d.top20 || []).slice(0, 12);
   if (!list.length) { grid.innerHTML = '<div class="opps-loading">لا توجد بيانات</div>'; return; }
@@ -571,7 +571,7 @@ async function loadEarlyOpps(force) {
   if (!grid) return;
   if (EARLY_LOADED && !force) return;
   try {
-  const res = await fetch(OCTA_API + '/api/opportunities?_=' + Date.now());
+  const res = await octaFetch(OCTA_API + '/api/opportunities?_=' + Date.now());
   const d = await res.json();
   const list = (d.early_opportunities || []).slice(0, 10);
   if (!list.length) {
@@ -606,7 +606,7 @@ const STRAT_CACHE = {};
 async function loadStrategies() {
   if (STRATS) return STRATS;
   try {
-  const r = await fetch(OCTA_API + '/api/strategies');
+  const r = await octaFetch(OCTA_API + '/api/strategies');
   const d = await r.json();
   STRATS = d.strategies || [];
   } catch (e) { STRATS = []; }
@@ -621,7 +621,7 @@ async function renderStrategies(code) {
   if (STRAT_CACHE[code] === undefined) STRAT_CACHE[code] = {};
   if (STRAT_CACHE[code][CUR_STRAT] === undefined) {
   try {
-  const r = await fetch(OCTA_API + '/api/strategy/' + code + '/' + CUR_STRAT);
+  const r = await octaFetch(OCTA_API + '/api/strategy/' + code + '/' + CUR_STRAT);
   const j = await r.json();
   STRAT_CACHE[code][CUR_STRAT] = j.strategy || null;
   } catch (e) { STRAT_CACHE[code][CUR_STRAT] = null; }
@@ -679,7 +679,7 @@ async function loadDashboard(force) {
   if (!ld || !bd) return;
   ld.style.display = 'block'; bd.style.display = 'none';
   try {
-  const r = await fetch(OCTA_API + '/api/dashboard?_=' + Date.now());
+  const r = await octaFetch(OCTA_API + '/api/dashboard?_=' + Date.now());
   const d = await r.json();
   if (d.error) throw new Error(d.error);
   renderDashboard(d);
@@ -1042,7 +1042,7 @@ async function apiGet(path, timeout) {
   const ctl = new AbortController();
   const tm = setTimeout(() => ctl.abort(), t);
   try {
-  const r = await fetch(OCTA_API + path, { signal: ctl.signal });
+  const r = await octaFetch(OCTA_API + path, { signal: ctl.signal });
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return await r.json();
   } catch (e) {
@@ -1662,10 +1662,10 @@ async function vLoadCard(silent){
   try{
   const bust='?_='+Date.now();
   const [ir,er,rr,tr]=await Promise.all([
-  fetch(OCTA_API+'/api/intelligence/'+code+bust).then(r=>{if(!r.ok) throw new Error('السهم '+code+' غير موجود');return r.json();}),
-  fetch(OCTA_API+'/api/explain/'+code+bust).then(r=>r.ok?r.json():{}).catch(()=>({})),
-  fetch(OCTA_API+'/'+bust).then(r=>r.ok?r.json():{}).catch(()=>({})),
-  fetch(OCTA_API+'/api/technical/'+code+bust).then(r=>r.ok?r.json():{}).catch(()=>({}))
+  octaFetch(OCTA_API+'/api/intelligence/'+code+bust).then(r=>{if(!r.ok) throw new Error('السهم '+code+' غير موجود');return r.json();}),
+  octaFetch(OCTA_API+'/api/explain/'+code+bust).then(r=>r.ok?r.json():{}).catch(()=>({})),
+  octaFetch(OCTA_API+'/'+bust).then(r=>r.ok?r.json():{}).catch(()=>({})),
+  octaFetch(OCTA_API+'/api/technical/'+code+bust).then(r=>r.ok?r.json():{}).catch(()=>({}))
   ]);
   if(ir.error) throw new Error(ir.error);
   vSetPhase(rr.market_phase || 'closed');
@@ -1857,7 +1857,7 @@ async function initMarketTicker(goldData) {
   </div>`).join('') + '</div>';
 
   try {
-  const d = await fetch(OCTA_API + '/api/ticker').then(r => r.json());
+  const d = await octaFetch(OCTA_API + '/api/ticker').then(r => r.json());
   const map = {}; const seen = new Set();
   for (const t of (d.ticker || [])) { if (!seen.has(t.id)) { seen.add(t.id); map[t.id] = t; } }
 
@@ -2024,8 +2024,8 @@ function buildSectorHeatmap(stocks, sectorList) {
 /* ══════ ② الفني — كروت ══════ */
 async function armTechnical(box) {
   const [rank, screen] = await Promise.all([
-  fetch(OCTA_API + '/api/rank?limit=20&decision=تجميع').then(r=>r.json()).catch(()=>({results:[]})),
-  fetch(OCTA_API + '/api/rank?limit=20&min_safety=65').then(r=>r.json()).catch(()=>({results:[]})),
+  octaFetch(OCTA_API + '/api/rank?limit=20&decision=تجميع').then(r=>r.json()).catch(()=>({results:[]})),
+  octaFetch(OCTA_API + '/api/rank?limit=20&min_safety=65').then(r=>r.json()).catch(()=>({results:[]})),
   ]);
   const setups = (rank.results||[]);
   const stable = (screen.results||[]);
@@ -2046,13 +2046,13 @@ async function armTechnical(box) {
 
   ic('⚠️', 'أضعف فنياً', 'أسهم بنتيجة سلبية — احذر',
   `<span>${setups.length}</span>`,
-  icRows((await fetch(OCTA_API + '/api/rank?limit=20&decision=بيع').then(r=>r.json()).catch(()=>({results:[]}))).results || [])) +
+  icRows((await octaFetch(OCTA_API + '/api/rank?limit=20&decision=بيع').then(r=>r.json()).catch(()=>({results:[]}))).results || [])) +
   '</div>';
 }
 
 /* ══════ ③ الأساسي — كروت ══════ */
 async function armFundamental(box) {
-  const d = await fetch(OCTA_API + '/api/rank?limit=50&max_pe=50').then(r=>r.json());
+  const d = await octaFetch(OCTA_API + '/api/rank?limit=50&max_pe=50').then(r=>r.json());
   const all = (d.results||[]);
   const cheap = all.filter(s => s.pe && s.pe>0).sort((a,b)=>a.pe-b.pe);
   const withDiv = all.filter(s => s.div_yield>0).sort((a,b)=>b.div_yield-a.div_yield);
@@ -2081,12 +2081,12 @@ async function armFundamental(box) {
 /* ══════ ④ السيولة — كروت ══════ */
 async function armLiquidity(box) {
   const [liq, weak] = await Promise.all([
-  fetch(OCTA_API + '/api/rank?limit=25&min_liquidity=55').then(r=>r.json()).catch(()=>({results:[]})),
-  fetch(OCTA_API + '/api/rank?limit=20&decision=بيع').then(r=>r.json()).catch(()=>({results:[]})),
+  octaFetch(OCTA_API + '/api/rank?limit=25&min_liquidity=55').then(r=>r.json()).catch(()=>({results:[]})),
+  octaFetch(OCTA_API + '/api/rank?limit=20&decision=بيع').then(r=>r.json()).catch(()=>({results:[]})),
   ]);
   const top = (liq.results||[]);
   const thin = (weak.results||[]).filter(s => (s.liquidity||0) < 45);
-  const sec = await fetch(OCTA_API + '/api/sector-stats').then(r=>r.json()).catch(()=>({}));
+  const sec = await octaFetch(OCTA_API + '/api/sector-stats').then(r=>r.json()).catch(()=>({}));
   const secList = Object.entries(sec).slice(0,12);
 
   box.innerHTML =
@@ -2110,7 +2110,7 @@ async function armLiquidity(box) {
 
 /* ══════ ⑤ الأخبار — أحداث مؤثرة ══════ */
 async function armNews(box) {
-  const d = await fetch(OCTA_API + '/api/dividends').then(r => r.json());
+  const d = await octaFetch(OCTA_API + '/api/dividends').then(r => r.json());
   const events = (d.actions || d.events || []).slice(0, 20);
 
   box.innerHTML =
@@ -2129,9 +2129,9 @@ async function armNews(box) {
 /* ══════ ⑥ المخاطر — أسوأ + ضغط ══════ */
 async function armRisk(box) {
   const [d, st, cal] = await Promise.all([
-  fetch(OCTA_API + '/api/dashboard').then(r=>r.json()),
-  fetch(OCTA_API + '/api/stress?scenario=all').then(r=>r.json()),
-  fetch(OCTA_API + '/api/calibration').then(r=>r.json()),
+  octaFetch(OCTA_API + '/api/dashboard').then(r=>r.json()),
+  octaFetch(OCTA_API + '/api/stress?scenario=all').then(r=>r.json()),
+  octaFetch(OCTA_API + '/api/calibration').then(r=>r.json()),
   ]);
 
   const worst = (d.bottom10 || []).slice().reverse().slice(0,10);
@@ -2175,8 +2175,8 @@ async function armPortfolio(box) {
   return;
   }
   const [pf, d] = await Promise.all([
-  fetch(OCTA_API + '/api/portfolio').then(r=>r.json()).catch(()=>({})),
-  fetch(OCTA_API + '/api/rank?limit=20').then(r=>r.json()).catch(()=>({results:[]})),
+  octaFetch(OCTA_API + '/api/portfolio').then(r=>r.json()).catch(()=>({})),
+  octaFetch(OCTA_API + '/api/rank?limit=20').then(r=>r.json()).catch(()=>({results:[]})),
   ]);
   const rows = (d.results||[]);
   const hold = pf.holdings || {};
@@ -2229,11 +2229,11 @@ async function armOpportunity(box) {
   return;
   }
   const [opp, strat] = await Promise.all([
-  fetch(OCTA_API + '/api/opportunities').then(r=>r.json()),
-  fetch(OCTA_API + '/api/strategies').then(r=>r.json()),
+  octaFetch(OCTA_API + '/api/opportunities').then(r=>r.json()),
+  octaFetch(OCTA_API + '/api/strategies').then(r=>r.json()),
   ]);
   const early = (opp.early_opportunities || []);
-  const rank = await fetch(OCTA_API + '/api/ranking').then(r=>r.json());
+  const rank = await octaFetch(OCTA_API + '/api/ranking').then(r=>r.json());
 
   box.innerHTML =
   '<div class="arm-sect"><div class="arm-sect-h">🔎 فرص مبكرة — قبل ما تتحرك</div>' +
@@ -2295,7 +2295,7 @@ function startOctaClock() {
   const el = document.getElementById('octaClock');
   if (!el) return;
   function tick() {
-  fetch(OCTA_API + '/').then(r => r.json()).then(d => {
+  octaFetch(OCTA_API + '/').then(r => r.json()).then(d => {
   const lu = d.lastUpdate ? new Date(d.lastUpdate) : null;
   const age = lu ? Math.round((Date.now() - lu.getTime()) / 60000) : null;
   const txt = age === null ? '—' :
@@ -2353,7 +2353,7 @@ async function openStock(code) {
 
   try {
   // نجمع كل البيانات بالتوازي
-  const get = (path) => fetch(OCTA_API + path)
+  const get = (path) => octaFetch(OCTA_API + path)
   .then(r => { if (!r.ok) throw new Error(path + ' → HTTP ' + r.status); return r.json(); })
   .catch(e => { console.error('❌ fetch failed', path, e.message); return null; });
 
@@ -2379,7 +2379,7 @@ async function openStock(code) {
   const ax = intel.axes || {};
   const f = intel.fundamental || {};
   sc.innerHTML =
-  '<div style="background:rgba(255,255,255,.04);border:1px solid var(--line);' +
+  '<div style="background:var(--wash);border:1px solid var(--line);' +
   'border-radius:16px;padding:20px;margin-bottom:16px">' +
   '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">' +
   '<div><div style="font-size:1.5rem;font-weight:900;color:var(--gold)">' + code + '</div>' +
@@ -2389,25 +2389,25 @@ async function openStock(code) {
   '<div style="color:' + ((intel.change||0)>=0?'var(--sec)':'var(--red2)') + ';font-weight:800">' +
   ((intel.change||0)>=0?'+':'') + (intel.change||0).toFixed(2) + '%</div></div>' +
   '</div></div>' +
-  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">' +
+  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">' +
   '<div style="background:rgba(212,175,55,.1);border:1px solid rgba(212,175,55,.3);border-radius:12px;padding:14px;text-align:center">' +
   '<div style="font-size:1.6rem;font-weight:900;color:var(--gold)">' + (octaScore(code, intel.final_score) ?? 0) + '</div>' +
   '<div style="font-size:.7rem;color:var(--muted)">النتيجة</div></div>' +
   '<div style="background:rgba(22,199,154,.1);border:1px solid rgba(22,199,154,.3);border-radius:12px;padding:14px;text-align:center">' +
   '<div style="font-size:1.6rem;font-weight:900;color:var(--sec)">' + (intel.confidence??0) + '%</div>' +
   '<div style="font-size:.7rem;color:var(--muted)">الثقة</div></div>' +
-  '<div style="background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center">' +
-  '<div style="font-size:1.3rem;font-weight:900">' + (intel.decision||'—') + '</div>' +
+  '<div style="background:var(--wash);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center">' +
+  '<div style="font-size:1.3rem;font-weight:900">' + ((typeof octaStockMeta==='function' && octaStockMeta(code).decision) || intel.decision || '—') + '</div>' +
   '<div style="font-size:.7rem;color:var(--muted)">القرار</div></div>' +
   (f.fair_value ? '<div style="background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.3);border-radius:12px;padding:14px;text-align:center">' +
   '<div style="font-size:1.3rem;font-weight:900;color:#a855f7">' + Number(f.fair_value).toFixed(2) + '</div>' +
   '<div style="font-size:.7rem;color:var(--muted)">القيمة العادلة</div></div>' : '') +
   '</div>' +
-  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:14px">' +
+  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px">' +
   Object.entries(ax).map(([k,v]) =>
-  '<div style="background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:11px;padding:12px;text-align:center">' +
+  '<div style="background:var(--wash);border:1px solid var(--line);border-radius:11px;padding:12px;text-align:center">' +
   '<div style="font-size:1.15rem;font-weight:900;color:var(--gold)">' + (v==null?'—':Math.round(v)) + '</div>' +
-  '<div style="font-size:.68rem;color:var(--muted)">' + k + '</div></div>').join('') +
+  '<div style="font-size:.68rem;color:var(--muted)">' + ((typeof AR_MS!=='undefined' && AR_MS[k]) ? AR_MS[k] : k) + '</div></div>').join('') +
   '</div>' +
   (f.valuation_status ? '<div style="margin-top:14px;padding:12px;background:rgba(212,175,55,.08);' +
   'border:1px solid rgba(212,175,55,.25);border-radius:11px;font-size:.86rem">' +
@@ -2457,7 +2457,7 @@ async function rssFetch(query){
   // 📌 كان: https://api.cors.lol/?url=… ⇒ كان بيرجّع **429** (rate limit)
   // ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ والـworker بيجيب الـRSS من الـedge
   // ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ ويرجّع JSON على شكل rss2json.
-  const r = await fetch('/api/rss?url=' + enc);
+  const r = await octaFetch('/api/rss?url=' + enc);
   if (r.ok) {
   const d = await r.json();
   if (d && d.items && d.items.length) return d.items.slice(0, 12).map(it => ({
@@ -2472,7 +2472,7 @@ async function rssFetch(query){
   // 📌 كان: https://api.rss2json.com/v1/api.json?rss_url=…
   // ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ المتصفح بيمنع الرد (مش فيه ACAO) ⇒ "blocked by CORS"
   // ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ الـworker بيجيبه من الـedge (نفس الأصل) ⇒ مفيش CORS.
-  const r = await fetch('/api/rss?url=' + enc);
+  const r = await octaFetch('/api/rss?url=' + enc);
   if (r.ok) {
   const d = await r.json();
   if (d.items && d.items.length) return d.items.slice(0, 12).map(it => ({
@@ -2576,7 +2576,7 @@ async function obFetch(path){
      السبب: لو الطلبات طلعت من المتصفح، المفتاح بيتسرّب لأي حد
      يفتح مصدر الصفحة، والحد الشهري بيننفد وهو مش شايف. */
   const sym = String(path || '').split('/').filter(Boolean).pop() || '';
-  const r = await fetch(window.OCTA_API + '/api/obdepth/' + encodeURIComponent(sym),
+  const r = await octaFetch(window.OCTA_API + '/api/obdepth/' + encodeURIComponent(sym),
                         { headers: { 'X-OCTA-Client': 'web' } });
   let j = null;
   try { j = await r.json(); } catch (e) { }
@@ -3546,7 +3546,7 @@ async function dvLoad(){
   if (DV_DATA || DV_LOADING) { if (DV_DATA) dvRender(); return; }
   DV_LOADING = true;
   try {
-  const r = await fetch(OCTA_API + '/api/dividends?_=' + Date.now());
+  const r = await octaFetch(OCTA_API + '/api/dividends?_=' + Date.now());
   if (!r.ok) throw new Error('HTTP ' + r.status);
   DV_DATA = await r.json();
   dvRender();
@@ -3936,7 +3936,7 @@ async function openAudit() {
   window.scrollTo({top:0, behavior:'smooth'});
 
   try {
-  const d = await fetch(OCTA_API + '/api/audit/redundancy').then(r => r.json());
+  const d = await octaFetch(OCTA_API + '/api/audit/redundancy').then(r => r.json());
   const s = d.summary || {};
   const sim = d.axis_similarity || {};
   const cr = d.score_crowding || {};

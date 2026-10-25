@@ -93,8 +93,8 @@ function phaseOf(mk){
 async function loadEgypt(){
   const B=OCTA_API, bus='?_='+Date.now();
   const [prices,ticker]=await Promise.all([
-  fetch(B+'/api/prices'+bus).then(r=>r.ok?r.json():null).catch(()=>null),
-  fetch(B+'/api/ticker'+bus).then(r=>r.ok?r.json():null).catch(()=>null)
+  octaFetch(B+'/api/prices'+bus).then(r=>r.ok?r.json():null).catch(()=>null),
+  octaFetch(B+'/api/ticker'+bus).then(r=>r.ok?r.json():null).catch(()=>null)
   ]);
   if(!prices||!prices.egx30) throw new Error('ما قدرتش أوصل لسيرفر السوق المصري');
   const idx=(ticker&&ticker.ticker||[]).find(t=>t.id==='tk-egx');
@@ -449,14 +449,14 @@ async function openCard(code,row,mk){
 async function cardEGX(code,row){
   const B=OCTA_API, bus='?_='+Date.now();
   const [intel,expl,tech,fund,risk,news,opp,pf]=await Promise.all([
-  fetch(B+'/api/intelligence/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null),
-  fetch(B+'/api/explain/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null),
-  fetch(B+'/api/technical/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null),
-  fetch(B+'/api/fundamental/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null),
-  fetch(B+'/api/risk/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null),
-  fetch(B+'/api/news/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null),
-  fetch(B+'/api/opportunity/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null),
-  fetch(B+'/api/portfolio/fit/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null)
+  octaFetch(B+'/api/intelligence/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null),
+  octaFetch(B+'/api/explain/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null),
+  octaFetch(B+'/api/technical/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null),
+  octaFetch(B+'/api/fundamental/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null),
+  octaFetch(B+'/api/risk/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null),
+  octaFetch(B+'/api/news/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null),
+  octaFetch(B+'/api/opportunity/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null),
+  octaFetch(B+'/api/portfolio/fit/'+code+bus).then(r=>r.ok?r.json():null).catch(()=>null)
   ]);
   if(!intel) throw new Error('السهم «'+code+'» مش موجود');
 
@@ -1344,9 +1344,9 @@ async function openStockModal(code) {
   try {
   const B = OCTA_API, q = '?_=' + Date.now();
   const [intel, expl, tech] = await Promise.all([
-  fetch(B + '/api/intelligence/' + code + q).then(r => r.ok ? r.json() : null).catch(() => null),
-  fetch(B + '/api/explain/' + code + q).then(r => r.ok ? r.json() : null).catch(() => null),
-  fetch(B + '/api/technical/' + code + q).then(r => r.ok ? r.json() : null).catch(() => null),
+  octaFetch(B + '/api/intelligence/' + code + q).then(r => r.ok ? r.json() : null).catch(() => null),
+  octaFetch(B + '/api/explain/' + code + q).then(r => r.ok ? r.json() : null).catch(() => null),
+  octaFetch(B + '/api/technical/' + code + q).then(r => r.ok ? r.json() : null).catch(() => null),
   ]);
   if (!intel) throw new Error('بيانات غير متاحة للسهم ' + code);
   const ax = intel.axes || {}, f = intel.fundamental || {}, rk = intel.risk_engine || {};
@@ -2477,7 +2477,7 @@ async function pickAuto(){
   if (btn){ btn.disabled = true; btn.textContent = '⏳'; }
   let list = [];
   try {
-  const r = await fetch(OCTA_API + '/api/rank?limit=10&decision='
+  const r = await octaFetch(OCTA_API + '/api/rank?limit=10&decision='
   + encodeURIComponent('إشارة إيجابية') + '&_=' + Date.now())
   .then(x => x.ok ? x.json() : null).catch(() => null);
   if (r && r.results && r.results.length){

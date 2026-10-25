@@ -204,4 +204,35 @@
   return ORIG.call(window, nu, _withToken(nu, opts));
   });
   };
+
+/* ════════════════════════════════════════════════════════════════
+ 🌐 ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ octaFetch: fetch بتوكن (لكل المسارات)
+ ────────────────────────────────────────────────────────────────
+ 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌
+ 📌 المشكلة: `octa-api.js` كان بيلفّ `window.fetch` — بس الّف
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ بيحط التوكن بس لو الـURL نسبي (نفس الأصل).
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+ 📌 ⛌ ⛌ ⇒ الملفات التانية (octa-pages · octa-config …) بتعمل
+ 📌 ⛌ ⛌ fetch **مباشرة** ⇒ مفيش Authorization ⇒ 401 على
+ 📌 ⛌ ⛌ المسارات المحمية (intelligence · ranking · strategies).
+ 📌 ✅ الحل: helper مشترك — كل الـfetch تمر عليه.
+ ════════════════════════════════════════════════════════════════ */
+window.octaFetch = function (url, opts) {
+  var o = opts || {};
+  try {
+    var s = String(url || '');
+    if (s.indexOf('/api/') >= 0) {
+      var h = new Headers(o.headers || {});
+      var t = '';
+      try { t = localStorage.getItem('octa_token') || ''; } catch (e) { }
+      if (t && !h.get('Authorization')) h.set('Authorization', 'Bearer ' + t);
+      o.headers = h;
+      if (!o.credentials) o.credentials = 'include';
+    }
+  } catch (e) { }
+  return window.fetch(url, o);
+};
+
 })();
