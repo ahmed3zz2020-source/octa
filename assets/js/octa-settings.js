@@ -258,7 +258,7 @@
   us: { technical: 15, fundamental: 20, valuation: 15, liquidity: 10, news: 10, sentiment: 10, risk: 10, portfolio: 10 },
   egx: { technical: 18, fundamental: 22, valuation: 0, liquidity: 18, news: 5, sentiment: 4, risk: 24, portfolio: 9 },
   intel: { technical: 20, fundamental: 25, liquidity: 10, news: 7, sentiment: 5, risk: 20, portfolio: 13 },
-  usScan: { technical: 15, fundamental: 20, valuation: 15, liquidity: 10, sentiment: 10, risk: 10 }
+  usScan: { technical: 15, fundamental: 20, valuation: 15, liquidity: 10, news: 10, sentiment: 10, risk: 10, portfolio: 10 }
   };
   var W_NAME = {
   technical: 'الفني', fundamental: 'الأساسي', valuation: 'التقييم',
