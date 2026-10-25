@@ -344,7 +344,7 @@ function closeIntel() {
 function renderIntel(d) {
   const ax = d.axes || {};
   const dec = d.decision || '—';
-  const decClass = /تجميع|شراء/.test(dec) ? 'buy' : (/بيع|تجنّب|تجنب/.test(dec) ? 'sell' : (/غير كاف/.test(dec) ? 'unknown' : 'hold'));
+  const decClass = octaDecCls(dec);
 
   // المحاور
   let axisHtml = '';
@@ -522,7 +522,7 @@ async function loadOpportunities(force) {
   const list = (d.top20 || []).slice(0, 12);
   if (!list.length) { grid.innerHTML = '<div class="opps-loading">لا توجد بيانات</div>'; return; }
   grid.innerHTML = list.map((s, i) => {
-  const dec = /تجميع|شراء/.test(s.decision) ? 'buy' : (/بيع|تجنّب|تجنب/.test(s.decision) ? 'sell' : (/غير كاف/.test(s.decision) ? 'unknown' : 'hold'));
+  const dec = octaDecCls(s.decision);
   const up = s.upside;
   return '<div class="opp-card" onclick="openIntel(\'' + s.code + '\')">' +
   '<div class="opp-rank">' + (i + 1) + '</div>' +
@@ -631,7 +631,7 @@ async function renderStrategies(code) {
   '<button class="strat-tab ' + (x.key === CUR_STRAT ? 'active' : '') + '" onclick="pickStrategy(\'' + x.key + '\')">' +
   x.name + '</button>').join('') + '</div>';
   if (!s) { box.innerHTML = tabs + '<div class="opps-loading">—</div>'; return; }
-  const vc = /تجميع/.test(s.decision) ? 'buy' : (/بيع|تجنّب/.test(s.decision) ? 'sell' : (/غير كاف/.test(s.decision) ? 'unknown' : 'hold'));
+  const vc = octaDecCls(s.decision);
   /* الأعمدة = نتيجة كل محور (s.axes).
      الأوزان نفسها مخفية عن الـAPI عن قصد (وصفة المحرك) — فبنعرض النتيجة. */
   const A = s.axes || {};
@@ -758,7 +758,7 @@ function renderDashboard(d) {
 
   var rows = function(list, positive) {
   return list.map(function(s){
-  var cl = /تجميع|شراء/.test(s.decision||'') ? 'pos' : (/بيع|تجنّب/.test(s.decision||'') ? 'neg' : '');
+  var cl = octaDecCls(s.decision) === 'buy' ? 'pos' : (octaDecCls(s.decision) === 'sell' ? 'neg' : '');
   return '<tr onclick="openIntel(\'' + s.code + '\')">' +
   '<td><b>' + s.code + '</b></td><td>' + (s.name||'').slice(0,22) + '</td>' +
   '<td>' + (s.sector||'—') + '</td><td>' + Number(s.price||0).toFixed(2) + '</td>' +
@@ -2797,10 +2797,41 @@ let SP_FILTER = 'all', SP_LOADED = false;
 
 function spColor(v){ return v >= CFG.th.safe ? '#16c79a' : v >= CFG.th.mid ? '#f4d03f' : '#ff8a80'; }
 function spDecStyle(d){
-  if (/تجميع|شراء/.test(d)) return { c:'#16c79a', bg:'rgba(22,199,154,.16)' };
-  if (/بيع|تجنّب|تجنب|غير/.test(d)) return { c:'#ff8a80', bg:'rgba(255,82,82,.16)' };
+  return octaDecColor(d);
+}
+
+/* ════════════════════════════════════════════════════════════════
+ 🏷️ ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ تصنيف القرار (مصدر واحد للحقيقة)
+ ────────────────────────────────────────────────────────────────
+ 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌
+ 📌 المشكلة: القرار الفعلي من الباك هو:
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ «إشارة إيجابية» / «إشارة محايدة» / «إشارة سلبية»
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ — مش «تجميع» / «احتفظ» / «بيع»
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⇒ كل الـregex القديم كان بيرجّع false ⇒ كل الأسهم
+ 📌 ⛌ ⛌ ⛌ ⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+ 📌 ⛌ ⛌ ⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+ 📌 ⛌ ⛌ ⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+ 📌 ⛌ ⛌ ⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+ 📌 ✅ الحل: helper واحد + regex يقبل الصيغتين.
+ ════════════════════════════════════════════════════════════════ */
+function octaDecCls(d){
+  const s = String(d||'');
+  if (/تجميع|شراء|إشارة\s*إيجابية/.test(s)) return 'buy';
+  if (/بيع|تجنّب|تجنب|إشارة\s*سلبية/.test(s)) return 'sell';
+  if (/غير\s*كاف|بيانات\s*ناقصة/.test(s)) return 'unknown';
+  return 'hold';   /* محايد (أو فاضي) */
+}
+function octaDecColor(d){
+  const c = octaDecCls(d);
+  if (c === 'buy') return { c:'#16c79a', bg:'rgba(22,199,154,.16)' };
+  if (c === 'sell') return { c:'#ff8a80', bg:'rgba(255,82,82,.16)' };
+  if (c === 'unknown') return { c:'#f4d03f', bg:'rgba(244,208,63,.16)' };
   return { c:'#4dabf7', bg:'rgba(77,171,247,.16)' };
 }
+
 function spFmtCap(v){ const n = Number(v)||0;
   return n>=1e9 ? (n/1e9).toFixed(1)+' مليار' : n>=1e6 ? (n/1e6).toFixed(0)+' مليون' : '—'; }
 function spFmtNum(v){ return v==null||v===0 ? '—' : Number(v).toFixed(1); }
@@ -2809,10 +2840,19 @@ function spFmtPct(v){ return v==null||v===0 ? '—' : Number(v).toFixed(1)+'%'; 
 function spChips(){
   const box = document.getElementById('spChips');
   if (!box || !OS_DB.length) return;
+  /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ إصلاح عدّادات تبويبات «الأسهم»
+  📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌
+  📌 السبب: القرار الفعلي من الباك هو «إشارة إيجابية» /
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⛌ ⛌ «إشارة محايدة» / «إشارة سلبية» — مش «تجميع» / «احتفظ» / «بيع»
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⛌ ⛌ ⇒ العدّادات كانت ٠ (🟢 تجميع ٠ · 🔵 احتفظ ٠)
+  📌 ✅ الحل: نقبل الصيغتين (القديمة والجديدة) معاً.
+  ════════════════════════════════════════════════════════════════ */
   const dec = c => OS_DB.filter(s => c === 'all' ? true :
-  c === 'buy' ? /تجميع|شراء/.test(s.decision||'')
-  : c === 'hold' ? /احتفظ/.test(s.decision||'')
-  : c === 'sell' ? /بيع|تجنّب|تجنب/.test(s.decision||'')
+  c === 'buy' ? /تجميع|شراء|إشارة\s*إيجابية/.test(s.decision||'')
+  : c === 'hold' ? /احتفظ|محايد/.test(s.decision||'')
+  : c === 'sell' ? /بيع|تجنّب|تجنب|إشارة\s*سلبية/.test(s.decision||'')
   : c === 'live' ? s._live
   : c === 'chance' ? (s.rsi!=null && s.rsi<32 && s.rsi>0)
   : c === 'risk' ? (s.mdd!=null && s.mdd>60)
@@ -2849,9 +2889,10 @@ function spRows(){
   const sort = document.getElementById('spSort')?.value || 'score';
 
   let rows = OS_DB.filter(s => {
-  if (SP_FILTER === 'buy'  && !/تجميع|شراء/.test(s.decision||'')) return false;
-  if (SP_FILTER === 'hold' && !/احتفظ/.test(s.decision||'')) return false;
-  if (SP_FILTER === 'sell' && !/بيع|تجنّب|تجنب/.test(s.decision||'')) return false;
+  /* ⭐ ٢٥ أكتوبر ٢٠٢٦ — نفس الـregex للعدّادات (Decision الحقيقي من الباك) */
+  if (SP_FILTER === 'buy'  && !/تجميع|شراء|إشارة\s*إيجابية/.test(s.decision||'')) return false;
+  if (SP_FILTER === 'hold' && !/احتفظ|محايد/.test(s.decision||'')) return false;
+  if (SP_FILTER === 'sell' && !/بيع|تجنّب|تجنب|إشارة\s*سلبية/.test(s.decision||'')) return false;
   if (SP_FILTER === 'live' && !s._live) return false;
   /* 🆕 قائم على الأرقام الحقيقية */
   if (SP_FILTER === 'chance' && !(s.rsi!=null && s.rsi < 32 && s.rsi > 0)) return false;
@@ -3501,7 +3542,7 @@ function renderStockPage() {
   const exRaw = (explain && (explain.explanation || explain)) || {};
   const ax = intel.axes || {};
   const dec = intel.decision || '—';
-  const decCls = /تجميع|شراء/.test(dec) ? 'buy' : (/بيع|تجنّب|تجنّب/.test(dec) ? 'sell' : (/غير كاف/.test(dec) ? 'unknown' : 'hold'));
+  const decCls = octaDecCls(dec);
   const stockNews = ((news.actions || []).filter(a => a.code === SI_CODE) || []);
 
   // المحاور
