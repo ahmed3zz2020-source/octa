@@ -1,0 +1,32 @@
+# ⛔⛔ صفحة الـHTML ما تتخزّنش أبداً.
+#    Cloudflare كان بيقدّم نسخة قديمة للمتصفح، فالمستخدم بيشغّل
+#    JavaScript من يوم فاتت — ورسالة خطأ قديمة معاه.
+#    الـassets نفسها لسه متخزّنة (الحمد لله) لأن اسمها فيه ?v=
+/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/index.html
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+# ⛔ ٢١ أكتوبر ٢٠٢٦ — صفحة البوابة: لازم تفضل طازجة دايماً
+# (الـworker بيقدّمها للزائر المجهول — النسخة القديمة تعني كوكي
+#  قديم وعرض غلط).
+/gate.html
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+/
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+# ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ الـJS ما يتخزّنش أبداً
+# 📌 السبب: Cloudflare كان بيعمل cache للـJS (cf-cache-status: HIT)
+# 📌 ⛌ ⛌ ⛌ ⇒ المتصفح بيشغّل نسخة قديمة من octa-gate.js ⇒
+# 📌 ⛌ ⛌ ⛌ ⇒ رسائل قديمة («طلبت ٣ أكواد» بدل «٥») + البوابة
+# 📌 ⛌ ⛌ ⛌ ⇒ سلوك قديم ⇒ «الموقع فتح عادي» عند المستخدم.
+# 📌 ⛌ ⛌ ⛌ الأثر: المستخدم بيفضل يشوف نفس المشكلة مهما صلحنا.
+# 📌 ✅ الحل: no-store لكل الـassets/JS. الأداء مش هيتأثر (الملفات
+# 📌 ✅ صغيرة والـCDN لسه بيقدّمها بسرعة).
+
+
+
+# ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ الـJS: لا تخزين أبداً
+# 📌 (Cloudflare cache ⇒ نسخة قديمة ⇒ المستخدم بيفضل يشوف نفس المشكلة)

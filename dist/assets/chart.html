@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="شارت OCTA — تحليل فني للأسهم المصرية على TradingView: شموع كاكي، مؤشرات، أدوات رسم، وفريم يومي وأسبوعي وشهري.">
+  <title>شارت OCTA — تحليل فني للأسهم المصرية</title>
+  <link rel="icon" type="image/png" href="/assets/octa-logo.png">
+  <link rel="stylesheet" href="/assets/octa-tokens.css">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--pri); color: var(--txt);
+      font-family: "Segoe UI", Tahoma, system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 16px 14px 40px; }
+
+    /* ── الترويسة ── */
+    .head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+    .head h1 { font-size: 1.35rem; margin: 0; font-weight: 800; }
+    .head h1 span { color: var(--gold); }
+    .tag {
+      font-size: .74rem; color: var(--muted); border: 1px solid var(--line);
+      border-radius: 999px; padding: 4px 12px;
+    }
+    .head .sp { flex: 1; }
+
+    /* ── شريط الأدوات ── */
+    .bar {
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+      background: var(--pri2); border: 1px solid var(--line);
+      border-radius: 14px; padding: 10px 12px; margin-bottom: 12px;
+    }
+    .group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .glabel { font-size: .74rem; color: var(--muted); margin-inline-end: 2px; }
+    .inp {
+      background: var(--pri3); border: 1px solid var(--line2); color: var(--txt);
+      border-radius: 10px; padding: 9px 12px; font-size: .9rem; min-height: 42px;
+      min-width: 130px; font-family: inherit;
+    }
+    .inp:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+    .btn {
+      background: var(--pri3); border: 1px solid var(--line2); color: var(--txt);
+      border-radius: 10px; padding: 9px 16px; font-size: .84rem; font-weight: 700;
+      cursor: pointer; min-height: 42px; font-family: inherit;
+    }
+    .btn:hover { border-color: var(--goldLine2); }
+    .btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+    .btn.main { background: var(--goldBg); border-color: var(--goldLine2); color: var(--gold); }
+    .btn[aria-pressed="true"] { background: var(--goldBg); border-color: var(--goldLine2); color: var(--gold); }
+
+    /* ── الشارت ── */
+    .chartbox {
+      background: var(--pri2); border: 1px solid var(--line);
+      border-radius: 14px; overflow: hidden; position: relative;
+    }
+    .charthost { position: relative; width: 100%; height: min(70vh, 620px); min-height: 380px; }
+    .charthost iframe { display: block; width: 100%; height: 100%; border: 0; }
+    .octa-tv-open {
+      display: inline-flex; align-items: center; gap: 5px; text-decoration: none;
+      color: var(--gold); border: 1px solid var(--goldLine2); background: var(--goldBg);
+      border-radius: 10px; padding: 8px 14px; font-size: .8rem; font-weight: 800;
+      margin: 10px 0 0;
+    }
+    .tvbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 2px; }
+    .tvbar .src { font-size: .74rem; color: var(--muted); }
+    .msg {
+      padding: 10px 14px; border-radius: 10px; font-size: .84rem; margin-bottom: 10px;
+      background: rgba(220, 38, 38, .12); border: 1px solid rgba(220, 38, 38, .4);
+      color: #fca5a5;
+    }
+    .msg[hidden] { display: none; }
+    .foot {
+      display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+      margin-top: 16px; font-size: .78rem; color: var(--muted);
+    }
+    .foot a { color: var(--gold); text-decoration: none; }
+    @media (max-width: 620px) {
+      .charthost { height: 62vh; min-height: 320px; }
+      .wrap { padding: 12px 10px 30px; }
+    }
+  </style>
+  <style>
+    /* 19 أكتوبر ٢٠٢٦ — ترويسة /chart موحّدة مع المودال (UTOP) */
+    .ocm-head {
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 11px 13px;
+      background: var(--pri2, #0a1929);
+      border-bottom: 1px solid var(--line, rgba(255,255,255,.09));
+      margin: -16px -14px 12px;
+    }
+    .ocm-row1 {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      min-width: 0;
+    }
+    .ocm-row1 .ocm-price {
+      display: inline-flex; align-items: baseline; gap: 4px;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: .86rem; font-weight: 800; color: var(--txt, #e8eef5);
+      direction: ltr; margin-inline-start: auto; flex: none;
+    }
+    .ocm-row1 .ocm-price:empty,
+    .ocm-row1 .ocm-price[data-pending="1"] { display: none; }
+    .ocm-title { font-weight: 800; font-size: 1rem; color: var(--txt, #e8eef5); }
+    .ocm-code {
+      font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .78rem;
+      font-weight: 800; color: var(--gold, #d4af37);
+      background: var(--goldBg, rgba(212,175,55,.12));
+      border: 1px solid var(--goldLine, rgba(212,175,55,.32));
+      border-radius: 8px; padding: 3px 9px; direction: ltr;
+    }
+    .ocm-change { font-size: .68rem; padding: 1px 5px; border-radius: 6px; }
+    .ocm-change.up { background: rgba(20,180,90,.18); color: #2cd17e; }
+    .ocm-change.down { background: rgba(220,40,40,.18); color: #ff6e6e; }
+    .ocm-change.flat { background: rgba(150,150,150,.15); color: #b0b0b0; }
+    .ocm-row2 {
+      display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap;
+    }
+    .ocm-row2 > * { flex: none; }
+    .ocm-slot-search { flex: 1 1 auto !important; min-width: 0; display: flex; gap: 6px; align-items: center; }
+    .ocm-slot-search .inp { flex: 1; min-width: 0; }
+    .ocm-close {
+      width: 40px; height: 40px; flex: none; border-radius: 9px;
+      border: 1px solid var(--line, rgba(255,255,255,.09));
+      background: var(--pri3, #102a43); color: var(--txt, #e8eef5);
+      font-size: 1.05rem; line-height: 1; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; padding: 0;
+    }
+    .ocm-fs {
+      width: 40px; height: 40px; flex: none; border-radius: 9px;
+      border: 1px solid var(--line, rgba(255,255,255,.09));
+      background: var(--pri3, #102a43); color: var(--txt, #e8eef5);
+      font-size: 1.15rem; line-height: 1; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; padding: 0;
+      text-decoration: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <div class="ocm-head" id="chart-head">
+      <div class="ocm-row1">
+        <span class="ocm-title" id="ch-title">البنك التجاري الدولي - مصر</span>
+        <span class="ocm-code" id="ch-code">EGX:COMI</span>
+        <span class="ocm-price" id="ch-price-box" data-pending="1"><span id="ch-price-v"></span><span class="ocm-change" id="ch-price-c"></span></span>
+      </div>
+      <div class="ocm-row2">
+        <button class="ocm-close" type="button" id="ch-close" aria-label="رجوع" title="رجوع">✕</button>
+        <a class="ocm-fs" id="ch-fs" href="https://www.tradingview.com/chart/?symbol=EGX%3ACOMI" target="_blank" rel="noopener noreferrer" aria-label="افتح في TradingView" title="افتح في TradingView (الرسم الكامل)">⛶</a>
+        <span class="ocm-slot ocm-slot-search" id="ch-pick">
+          <input id="sym" class="inp" type="text" list="stock-list" placeholder="COMI" maxlength="12"
+            value="COMI" autocomplete="off" spellcheck="false" dir="ltr">
+          <datalist id="stock-list"></datalist>
+          <button class="btn main" id="go" type="button">تحميل</button>
+        </span>
+      </div>
+    </div>
+
+    <div class="msg" id="msg" hidden></div>
+
+    <div class="chartbox">
+      <div class="charthost" id="chart"></div>
+    </div>
+
+    <div class="tvbar" style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="btn main" id="ch-tv-big" href="https://www.tradingview.com/chart/?symbol=EGX%3ACOMI" target="_blank" rel="noopener noreferrer" style="flex:1;padding:11px 14px">⛶ افتح في TradingView (الرسم الكامل)</a>
+      <span class="src" style="align-self:center">المصدر: TradingView · البورصة المصرية (EGX)</span>
+    </div>
+
+    <footer class="foot">
+      <span>تصميم وتنفيذ المهندس أحمد عز</span>
+    </footer>
+
+  </div>
+
+  <script src="js/tv-shim.js?v=2026102901"></script>
+  <script>
+    /* ═══ نفس وضع الموقع (فاتح/داكن/تلقائي) — من localStorage ═══ */
+    (function () {
+      var t = 'auto';
+      try { t = localStorage.getItem('octa_theme') || 'auto'; } catch (e) { }
+      if (t === 'auto') {
+        var mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)');
+        t = (mq && mq.matches) ? 'light' : 'dark';
+      }
+      var lt = (t === 'light');
+      document.body.classList.toggle('light', lt);
+      document.documentElement.classList.toggle('light', lt);
+      document.documentElement.setAttribute('data-theme', lt ? 'light' : 'dark');
+    })();
+  </script>
+  <script>
+    (function () {
+      'use strict';
+      var host = document.getElementById('chart');
+      var msg = document.getElementById('msg');
+      var symInput = document.getElementById('sym');
+      var codeEl = document.getElementById('ch-code');
+      var tf = '1D';
+
+      function say(t) {
+        if (!msg) return;
+        if (!t) { msg.hidden = true; msg.textContent = ''; return; }
+        msg.hidden = false;
+        msg.textContent = t;
+      }
+
+      function norm(s) {
+        s = String(s || '').trim().toUpperCase();
+        if (!s) return '';
+        if (s.indexOf(':') > 0) return s;
+        return 'EGX:' + s;
+      }
+
+      function load(code) {
+        var sym = norm(code || symInput.value);
+        if (!sym) { say('اكتب كود السهم الأول.'); return; }
+        say('');
+        symInput.value = sym.indexOf(':') > 0 ? sym.split(':')[1] : sym;
+        if (codeEl) codeEl.textContent = sym;
+        var chTv = document.getElementById('ch-tv-big');
+        if (chTv) chTv.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
+        var chFs = document.getElementById('ch-fs');
+        if (chFs) chFs.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(sym);
+        var chClose = document.getElementById('ch-close');
+        if (chClose) chClose.onclick = function () { window.location.href = '../index.html'; };
+        try {
+          window.OCTA_TV.whenSized(host, function () {
+            window.OCTA_TV.mount(host, { symbol: sym, interval: tf });
+          });
+        } catch (e) {
+          say('مقدرناش نفتح الشارت دلوقتي.');
+        }
+      }
+
+      document.getElementById('go').addEventListener('click', function () { load(); });
+      symInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); load(); }
+      });
+
+      document.querySelectorAll('[data-tf]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          document.querySelectorAll('[data-tf]').forEach(function (x) { x.setAttribute('aria-pressed', 'false'); });
+          b.setAttribute('aria-pressed', 'true');
+          tf = b.getAttribute('data-tf');
+          load();
+        });
+      });
+
+      /* قائمة الأسهم — من الـAPI المحمي (مش ملف عام) */
+      /* ⛔⛔ ٢١ أكتوبر ٢٠٢٦ — كان بيقرا /data/data_markets.js
+         (٣٫٤ ميجا عامة) ⇒ أي حد بينزّل داتا المنصّة.
+         ⛌ دلوقتي: /api/markets?market=egypt — محمي بتوكن. */
+      try {
+        var TK = ''; try { TK = localStorage.getItem('octa_token') || ''; } catch (e) {}
+        var AH = TK ? { 'Authorization': 'Bearer ' + TK } : {};
+        fetch('/api/markets?market=egypt', { headers: AH, credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          var rows = (j && j.egypt) || [];
+          var seen = {}, out = '';
+          rows.forEach(function (row) {
+            var c = (row && row.code) || '';
+            if (!c || seen[c] || c.length > 8) return;
+            seen[c] = 1;
+            out += '<option value="' + c + '">';
+          });
+          var dl = document.getElementById('stock-list');
+          if (dl) dl.innerHTML = out;
+        }).catch(function () {});
+      } catch (e) {}
+
+      load('COMI');
+    })();
+
+    /* 19 أكتوبر ٢٠٢٦ — السعر اللحظي (legend) */
+    (function () {
+      var priceEl = document.getElementById('ch-price-v');
+      var chgEl = document.getElementById('ch-price-c');
+      var titleEl = document.getElementById('ch-title');
+      var codeEl = document.getElementById('ch-code');
+      var priceBox = document.getElementById('ch-price-box');
+      var symInput = document.getElementById('sym');
+      if (!priceEl || !chgEl) return;
+      var API = '';  /* same-origin: /api/stocks → worker proxy */
+      /* ⛔⛔ التوكن — المسارات كلها بقت محمية (٢١ أكتوبر ٢٠٢٦) */
+      var TK2 = ''; try { TK2 = localStorage.getItem('octa_token') || ''; } catch (e) {}
+      var AH2 = TK2 ? { 'Authorization': 'Bearer ' + TK2 } : {};
+      function fmt(n) { if (n == null || isNaN(n)) return '—'; return Number(n).toFixed(2); }
+      function update() {
+        fetch(API + '/api/stocks', { headers: AH2, credentials: 'same-origin' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) {
+            if (!d) return;
+            var all = [].concat(d.egx30 || [], d.egx70 || [], d.egx33 || [], d.egx100 || [], d.amwal || [], d.dawabet || []);
+            var cur = (symInput && symInput.value || 'COMI').toUpperCase();
+            var stk = all.find(function (s) { return s && (s.code || '').toUpperCase() === cur; });
+            if (!stk) return;
+            if (titleEl) titleEl.textContent = '📈 ' + (stk.name || cur);
+            if (priceEl) priceEl.textContent = fmt(stk.price) + ' EGP';
+            if (chgEl) {
+              var ch = stk.change;
+              chgEl.textContent = (ch > 0 ? '▲ +' : ch < 0 ? '▼ ' : 'ـ ') + fmt(ch) + '%';
+              chgEl.className = 'ocm-change ' + (ch > 0 ? 'up' : ch < 0 ? 'down' : 'flat');
+            }
+            if (priceBox) priceBox.removeAttribute('data-pending');
+          }).catch(function () {});
+      }
+      
+      update();
+      if (window.__chPriceTimer) clearInterval(window.__chPriceTimer);
+      window.__chPriceTimer = setInterval(update, 15000);
+    })();
+  </script>
+
+</body>
+
+</html>

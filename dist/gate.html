@@ -1,0 +1,82 @@
+<!doctype html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0a1929">
+<title>OCTA — تسجيل الدخول</title>
+<!--
+  ═══════════════════════════════════════════════════════════════
+  🚪 صفحة البوابة —standalone
+  ──────────────────────────────────────────────────────────────
+  ⛔⛔ ٢١ أكتوبر ٢٠٢٦ — الـWorker بيقدّم الصفحة دي للزائر
+  المجهول بدل التطبيق كله (١٫٨ ميجا ← ٥٠ ك.ب).
+  ⛌ الـWorker مش بيقدر يقرا localStorage ⇒ الجلسة كوكي
+  HttpOnly على نفس الدومين.
+
+  📌 نفس ستايل البوابة في التطبيق (assets/css-gate.css
+     مستخرج من octa.css) + نفس السكربتات بالظبط.
+
+  ⚠️ بعد ما يسجّل دخول ⇒ بنحوّله على التطبيق.
+  ═══════════════════════════════════════════════════════════════ -->
+<link rel="stylesheet" href="assets/octa-tokens.css?v=202610250257">
+<link rel="stylesheet" href="assets/css-gate.css?v=202610250257">
+<link rel="icon" href="assets/octa-logo.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="stylesheet" href="assets/octa.css">
+<link rel="stylesheet" href="assets/octa-tokens.css">
+</head>
+<body>
+
+<!-- البوابة — الهيكل نفسه اللي في index.html (Copy-paste مقصود:
+     octa-gate.js بيبني الهيكل لوحده لو الـDOM اتشال) -->
+<div id="gate" class="gt-wrap" style="position:fixed;inset:0;z-index:999999;background:var(--bg,#0a1929)">
+  <div class="gt-top">
+    <div class="gt-top-t" id="gtTopT">تسجيل الدخول</div>
+    <button class="gt-top-b" id="gtTopB" type="button">أريد مساعدة</button>
+  </div>
+  <div class="gt-body">
+    <div class="gt-box" id="gtBox">
+      <div id="gt-form"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ⛔ صفحة البوابة: بعد الدخول بنحوّل على التطبيق
+     (الـWorker سيبعت التطبيق كمان — الكوكي بقى موجود).
+
+     ⛔⛔ مهم — لازم الكوكي يكون موجود **قبل** التحويل:
+     ⛌ الـWorker بيفحص كوكي الجلسة. لو حوّلنا والكوكي لسه
+     ⛌ ما اتحفظش (لأن الـAPI القديم مش بيرجّع Set-Cookie) ⇒
+     ⛌ البوابة هترجع تاني… للأبد.
+     ⛌ الحل: /api/auth/refresh بيرجّع كوكي جديد مع كل رد.
+     ⛌ (الكوكي HttpOnly ⇒ JS مش شايفه — فبنعمل ده قبل التحويل.) */
+  window.OCTA_GATE_PAGE = true;
+
+  function octaGateReady(cb) {
+    var t = '';
+    try { t = localStorage.getItem('octa_token') || ''; } catch (e) { }
+    if (!t) { cb(); return; }
+    try {
+      fetch('/api/auth/refresh', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Authorization': 'Bearer ' + t }
+      }).then(function () { cb(); }, function () { cb(); });
+    } catch (e) { cb(); }
+  }
+
+  window.OCTA_GATE_REDIRECT = function () {
+    octaGateReady(function () { location.replace('/'); });
+  };
+</script>
+<script src="assets/js/octa-api.js?v=202610250257"></script>
+<script src="assets/js/octa-auth.js?v=202610250257"></script>
+<script src="assets/js/octa-gate.js?v=202610250257"></script>
+<script src="assets/js/octa-back.js?v=202610250257"></script>
+
+</body>
+</html>
