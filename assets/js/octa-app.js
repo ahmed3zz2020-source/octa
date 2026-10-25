@@ -127,10 +127,18 @@ async function loadEgypt(){
   for (var i=0;i<OS_DB.length;i++) scoreMap[OS_DB[i].code] = OS_DB[i];
   }
   } catch (e) { }
+  /* ⭐⭐⭐ OS_DB هو المصدر الموحّد: السعر + التغير + الدرجة + القرار
+     ⭐ (من /api/rank + /api/data_full — الاتنين محميين ومتناسقين)
+     ⭐ ⇒ كل الأرقام في الكارت من نفس اللحظة (مفيش تضارب) */
   const merged = all.map(function(s){
   const db = scoreMap[s.code];
   if (!db) return s;
+  const hasDbPrice = (db.price!=null && db.price!==0);
   return Object.assign({}, s, {
+  /* ⭐ السعر: OS_DB (من /api/rank — نفس مصدر الدرجة) */
+  price: hasDbPrice ? db.price : s.price,
+  change: (db.change!=null && db.change!==0) ? db.change : s.change,
+  /* ⭐ الدرجة والقرار: من data_full (محمي) */
   final_score: (db.score!=null)?db.score:(s.final_score!=null?s.final_score:null),
   score: (db.score!=null)?db.score:(s.score!=null?s.score:null),
   decision: db.decision || s.decision || null,
