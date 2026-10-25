@@ -2876,6 +2876,22 @@ function spFmtCap(v){ const n = Number(v)||0;
 function spFmtNum(v){ return v==null||v===0 ? '—' : Number(v).toFixed(1); }
 function spFmtPct(v){ return v==null||v===0 ? '—' : Number(v).toFixed(1)+'%'; }
 
+/* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ «العرض الحالي» = القطاع المختار + البحث
+   📌 ده الأساس اللي العدّادات بتبني عليه (الكل · تجميع · احتفظ …).
+   📌 ⛔⛔⛔ ملاحظة مهمة: الفلتر (شيب تجميع/احتفظ/بيع) **مش** جزء
+   📌 ⛔⛔⛔ من الحساب — عشان كل شيب يفضل بيقول «كام جواها» بدل صفر.
+   📌 ⛌ البحث النصي جزء من الحساب: النتيجة المعروضة = اللي بتعدّ.
+   ════════════════════════════════════════════════════════════════ */
+function spViewRows(){
+  const q = (document.getElementById('spQ')?.value || '').trim().toUpperCase();
+  const sect = document.getElementById('spSect')?.value || '';
+  return OS_DB.filter(s => {
+    if (sect && s.sector !== sect) return false;
+    if (q && !((s.code||'').toUpperCase().includes(q) || (s.name||'').toUpperCase().includes(q) || (s.sector||'').includes(q))) return false;
+    return true;
+  });
+}
+
 function spChips(){
   const box = document.getElementById('spChips');
   if (!box || !OS_DB.length) return;
@@ -2888,7 +2904,16 @@ function spChips(){
   📌 ⛌ ⛌ ⇒ العدّادات كانت ٠ (🟢 تجميع ٠ · 🔵 احتفظ ٠)
   📌 ✅ الحل: نقبل الصيغتين (القديمة والجديدة) معاً.
   ════════════════════════════════════════════════════════════════ */
-  const dec = c => OS_DB.filter(s => c === 'all' ? true :
+  /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ العدّادات تتبّع الفلتر (قطاع + بحث)
+  ────────────────────────────────────────────────────────────────
+  📌 المشكلة: العدّادات (الكل · تجميع · احتفظ · بيع · مُقيَّم …) كانت
+  📌 ⛌⛌⛌ بتتحسب على **كل الـ285 سهم** ⇒ لما تختار قطاع الأرقام ما
+  📌 ⛌⛌⛌ بتتغيّرش ⇒ المستخدم مش عارف قطاعه فيه كام فرصة.
+  📌 ✅ الحل: العدّادات تتحسب على «العرض الحالي» = القطاع المختار
+  📌    + البحث النصي — ومش على شيب الفلتر نفسه، عشان كل شيب
+  📌    يفضل بيقول «كام جواها» بدل ما يبقى صفر. */
+  const VIEW = spViewRows();
+  const dec = c => VIEW.filter(s => c === 'all' ? true :
   c === 'buy' ? /تجميع|شراء|إشارة\s*إيجابية/.test(s.decision||'')
   : c === 'hold' ? /احتفظ|محايد/.test(s.decision||'')
   : c === 'sell' ? /بيع|تجنّب|تجنب|إشارة\s*سلبية/.test(s.decision||'')
@@ -2900,11 +2925,11 @@ function spChips(){
   const mk = (id,label,n) => '<button class="sp-chip' + (SP_FILTER===id?' on':'') +
   '" onclick="spFilter(\'' + id + '\')">' + label + ' <b>' + n + '</b></button>';
   box.innerHTML =
-  mk('all','📋 الكل',OS_DB.length)
+  mk('all','📋 الكل',VIEW.length)
   + mk('buy','🟢 تجميع',dec('buy'))
   + mk('hold','🔵 احتفظ',dec('hold'))
   + mk('sell','🔴 بيع',dec('sell'))
-  + mk('live','⚡ مُقيَّم',OS_DB.filter(s=>s._live).length) +
+  + mk('live','⚡ مُقيَّم',VIEW.filter(s=>s._live).length) +
   /* 🆕 مبنية على أرقام حقيقية — مش كلام */
   '<span class="sp-sep"></span>' +
   mk('chance','⚡ فرصة (RSI&lt;32)', dec('chance')) +
@@ -2917,17 +2942,20 @@ function spSectorSelect(){
   if (!sel || !OS_DB.length || sel.dataset.ready) return;
   sel.dataset.ready = '1';
   const secs = [...new Set(OS_DB.map(s=>s.sector).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar'));
+  /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ عدد كل قطاع جوّه القايمة
+  📌 عشان المستخدم يشوف من غير ما يختار: «البنوك (23)» — كام سهم في
+  📌 كل قطاع. والسهم بينكتب في نص الـoption (HTML attribute). */
+  const cnt = {};
+  OS_DB.forEach(s => { const k = String(s.sector || '').trim(); if (k) cnt[k] = (cnt[k] || 0) + 1; });
   sel.innerHTML = '<option value="">كل القطاعات (' + OS_DB.length + ')</option>' +
-  secs.map(x=>'<option value="'+x+'">'+x+'</option>').join('');
+  secs.map(x=>'<option value="'+x+'">'+x+' ('+(cnt[x]||0)+')</option>').join('');
 }
 
 function spRows(){
   if (!OS_DB.length) return [];
-  const q = (document.getElementById('spQ')?.value || '').trim().toUpperCase();
-  const sect = document.getElementById('spSect')?.value || '';
   const sort = document.getElementById('spSort')?.value || 'score';
 
-  let rows = OS_DB.filter(s => {
+  let rows = spViewRows().filter(s => {
   /* ⭐ ٢٥ أكتوبر ٢٠٢٦ — نفس الـregex للعدّادات (Decision الحقيقي من الباك) */
   if (SP_FILTER === 'buy'  && !/تجميع|شراء|إشارة\s*إيجابية/.test(s.decision||'')) return false;
   if (SP_FILTER === 'hold' && !/احتفظ|محايد/.test(s.decision||'')) return false;
@@ -2937,8 +2965,6 @@ function spRows(){
   if (SP_FILTER === 'chance' && !(s.rsi!=null && s.rsi < 32 && s.rsi > 0)) return false;
   if (SP_FILTER === 'risk'  && !(s.mdd!=null && s.mdd > 60)) return false;
   if (SP_FILTER === 'safe'  && !(s.vol1y!=null && s.vol1y < 30 && s.mdd!=null && s.mdd < 45)) return false;
-  if (sect && s.sector !== sect) return false;
-  if (q && !((s.code||'').toUpperCase().includes(q) || (s.name||'').toUpperCase().includes(q) || (s.sector||'').includes(q))) return false;
   return true;
   });
 
@@ -3011,7 +3037,8 @@ function spRender(){
   const rows = spRows();
   document.getElementById('spCount').textContent = rows.length + ' سهم';
   const info = document.getElementById('spDataInfo');
-  if (info) info.textContent = OS_DB.filter(s=>s._live).length + ' بيقيّمهم محرك OCTA لحظياً';
+  /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ العدّاد يتبع الفلتر زي الشيبات */
+  if (info) info.textContent = spViewRows().filter(s=>s._live).length + ' بيقيّمهم محرك OCTA لحظياً';
   box.innerHTML = rows.length
   ? rows.slice(0, 300).map(spCard).join('')
   : '<div class="sp-empty">📭 مفيش نتائج للفلتر ده.<br>جرّب كلمة تانية أو غيّر الفلتر.</div>';
