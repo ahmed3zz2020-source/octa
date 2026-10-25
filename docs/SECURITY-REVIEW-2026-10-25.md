@@ -458,3 +458,33 @@ Cloudflare edge بيضغط كمان
 |---|---|---|
 | ① | `injectEngineWidget` بيقع `null` | `try/catch` + `isConnected` check |
 | ② | عنوان خبر فيه HTML (من الـRSS) ⇒ المستخدم بيشوف الكود | `octaCleanText()` — تشيل الـtags + تفك الـentities |
+
+
+---
+
+## ✅ النشر على الإنتاج (٢٥ أكتوبر ٢٠٢٦) — بعد موافقة أحمد
+
+**Worker:** `dc631297-d25d-406a-b01a-7dd04425ed5e` → `9deff7db-cf0c-4a76-a90b-d66b21bf524a`
+**Preview:** `dcbb8493-d85f-483d-a702-6fac098668da`
+
+### 🔴 ٣ أخطاء لازم تتذكر
+| # | الخطأ | السبب | الإصلاح |
+|---|---|---|---|
+| ① | `env.ASSETS.fetch('/')` → **404** | مافيش asset اسمه `/` | fetch مباشر لـ`/index.html` |
+| ② | HTML مبيوصلش تحديث | الـJS كان no-store بس الـHTML لأ | no-store للـHTML كمان |
+| ③ | **gzip×٢** | الباك + worker + Cloudflare | شلت الضغط من الـworker |
+
+### 🧪 الفحص النهائي على الإنتاج
+```
+CORE        : OS_DB=285 · gate=false
+صفحات      : ١٦/١٨ سليمة (home مش موجودة بالتصميم · news بتحدّث)
+فلاتر      : ١١/١١ ✅
+أذرع       : ٨/٨ ✅
+الرادار     : ٤٠ كارت في ١٦ ثانية (بيزيد) ✅
+Smart Money : ٢٥٨+ نتيجة ✅
+OCTAView    : COMI ظهر ✅
+المقارنة   : ١٣ صف ✅
+صفحة السهم  : كل الأرقام + شارت ✅
+Challenge   : forgot → إيميل → send 200 → شاشة الكود ✅
+API errors  : صفر ✅
+```
