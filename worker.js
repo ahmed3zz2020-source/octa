@@ -337,8 +337,110 @@ async function assetsFresh(env, request) {
 }
 
 export default {
+  /* ══════════════════════════════════════════════════════════════
+   🛡️ ⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ هيدرات الأمان على كل رد
+   ────────────────────────────────────────────────────────────────
+   📌 المشكلة: مافيش ولا هيدر أمان واحد كان بيتقدّم من Cloudflare.
+   📌 ⛔⛔⛔ ⇒ ولا X-Content-Type-Options (نوع المحتوى بيتخمن)
+   📌 ⛔⛔⛔ ⇒ ولا X-Frame-Options (الصفحة تتحط في iframe)
+   📌 ⛔⛔⛔ ⇒ ولا Referrer-Policy (الـReferer بيسرّب روابط)
+   📌 ⛔⛔⛔ ⇒ ولا Permissions-Policy (الكاميرا/المايك/GPS)
+   📌 ⛔⛔⛔ ⇒ ولا HSTS.
+   📌 📌 السبب إن `_headers` مالوش تأثير مع `run_worker_first: true`
+   📌 📌 ⛌⛌⛌ (الـworker بيرد الأول ⇒ هو اللي بيمسك الرد).
+   📌 ✅ الحل: غلاف واحد على كل رد — مفيش استثناء ممكن ينسى.
+   ══════════════════════════════════════════════════════════════ */
   async fetch(request, env, ctx) {
-    const url = new URL(request.url);
+    let res;
+    try {
+      res = await handle(request, env, ctx);
+    } catch (e) {
+      res = new Response(JSON.stringify({ ok: false, error: 'worker-failed' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    try {
+      const h = new Headers(res.headers);
+      h.set('X-Content-Type-Options', 'nosniff');
+      h.set('X-Frame-Options', 'DENY');
+      h.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+      h.set('Permissions-Policy',
+        'geolocation=(), microphone=(), camera=(), payment=(), usb=(), ' +
+        'magnetometer=(), accelerometer=(), gyroscope=()');
+      h.set('Strict-Transport-Security',
+        'max-age=31536000; includeSubDomains; preload');
+      h.set('Cross-Origin-Opener-Policy', 'same-origin');
+      h.set('Cross-Origin-Resource-Policy', 'same-origin');
+      /* ⛌⛌⛌ CORP على ردود الـAPI: الباك بيرد
+         ⛌⛌⛌ cross-origin-resource-policy: same-site والـworker
+         ⛌⛌⛌ بيربط الأصول ⇒ ما نكسرش الـfetch من workers.dev. */
+      try {
+        const p = new URL(request.url).pathname;
+        if (p.indexOf('/api/') === 0
+          && h.get('Content-Type')
+          && h.get('Content-Type').indexOf('application/json') === 0) {
+          h.set('Cross-Origin-Resource-Policy', 'same-site');
+        }
+      } catch (e) { }
+      return new Response(res.body, { status: res.status, headers: h });
+    } catch (e) {
+      return res;
+    }
+  }
+};
+
+async function handle(request, env, ctx) {
+  const url = new URL(request.url);
+
+    /* ══════════════════════════════════════════════════════════════
+    🛡️ ⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ منع بيانات الإدارة من الوصول العام
+    ────────────────────────────────────────────────────────────────
+    📌 المشكلة (ثغرة حرجة): مجلد `admin/` كان **منشور بالكامل**
+    📌 ⛔⛔⛔ على الإنتاج. و `admin/users.json` فيه:
+    📌 ⛔⛔⛔   · إيميلات مستخدمين حقيقية (gmail + octashares)
+    📌 ⛔⛔⛔   · أسماء حقيقية
+    📌 ⛔⛔⛔   · uid لكل مستخدم
+    📌 ⛔⛔⛔ ⇒ https://octashares.com/admin/users.json → HTTP 200
+    📌 ⛔⛔⛔ ⇒ أي حد على الإنترنت يقدر ينزّل قاعدة بيانات المستخدمين.
+    📌 ✅ الحل (٤ طبقات):
+    📌   ① الملف اتشال من git + من البناء (tools/check-dist.js).
+    📌   ② الـworker بيرجّع 404 لكل **ملف بيانات** في /admin/.
+    📌   ③ الـ_assets نفسها مالهاش الأصل (الملف مش موجود) ⇒ 404 طبيعي.
+    📌   ④ الـ_headers بتعمل no-store على /admin/*.
+    📌 ⛌⛌⛌ ⭐ قرار المشرف: **صفحات الـHTML تفضل متاحة** (لوحة
+    📌 ⛌⛌⛌ الإدارة لازم تفتح) — بس **ملفات البيانات JSON ممنوعة**.
+    📌 ⛌⛌⛌ ⇒ نشيل /admin من القائمة السوداء، ونمنع JSON بس.
+    ══════════════════════════════════════════════════════════════ */
+    if (url.pathname === '/admin' || url.pathname.indexOf('/admin/') === 0) {
+      /* ⛔⛔⛔ ملفات البيانات — ممنوعة تماماً (دي اللي فيها PII) */
+      const ADMIN_DATA = /\.(json|csv|tsv)$/i;
+      if (ADMIN_DATA.test(url.pathname)) {
+        return new Response(JSON.stringify({
+          ok: false, error: 'المسار ده مش متاح'
+        }), {
+          status: 404,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+          }
+        });
+      }
+      /* ⛌⛌⛌ صفحات الـHTML — تفضل متاحة (اللوحة لازم تفتح) */
+      const h2 = new Headers();
+      h2.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      h2.set('X-Robots-Tag', 'noindex, nofollow');
+      h2.set('Content-Type', 'text/html; charset=utf-8');
+      return env.ASSETS.fetch(new Request(url.toString(), request)).then(
+        (r) => {
+          try {
+            const hh = new Headers(r.headers);
+            hh.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+            hh.set('X-Robots-Tag', 'noindex, nofollow');
+            return new Response(r.body, { status: r.status, headers: hh });
+          } catch (e) { return r; }
+        }
+      );
+    }
 
     /* 1.5) ⭐ جسر سكانر TradingView — الفلتر يشتغل من غير الباك
        ⛌ مقفول على الإنتاج: شغّال بس لو OCTA_TV_PROXY === 'on'
@@ -984,6 +1086,9 @@ export default {
       '/': '/index.html',
       '/chart': '/chart.html',
       '/gate': '/gate.html',
+      /* ⛔ '/admin' — ٢٥ أكتوبر ٢٠٢٦: الصفحة نفسها تفضل متاحة
+         ⛌ (قرار المشرف — لوحة الإدارة لازم تفتح)، بس ملفات
+         ⛌ البيانات (JSON/CSV) مرفوضة من فوق (404). */
       '/admin': '/admin/index.html'
     };
     if (PAGE_MAP[url.pathname]) {
@@ -1000,5 +1105,4 @@ export default {
     }
 
     return env.ASSETS.fetch(request);
-  }
-};
+}

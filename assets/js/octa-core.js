@@ -3154,7 +3154,11 @@ function renderEngineBars(scores, finalScore, extra) {
   };
   const decMeta = DEC_MAP[d.decision] || { icon: '🐙', cls: '#d4af37' };
 
-  const reasons = (d.reasons || []).map(r => `<li>${r}</li>`).join('');
+  /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ الـreasons من الـAPI بتتحط في
+     ⛌⛌⛌ innerHTML. الباك بيبنيها من أرقام محسوبة (آمنة دلوقتي)
+     ⛌⛌⛌ ⇒ بس ده نص من مصدر خارجي ⇒ لازم يتهرب قبل الـHTML.
+     ⛌⛌⛌ (defense-in-depth: لو الباك اتغيّر بعدين). */
+  const reasons = (d.reasons || []).map(r => `<li>${octaEsc(r)}</li>`).join('');
 
   dec.innerHTML = `
   <div style="background:linear-gradient(135deg, rgba(212,175,55,0.14), rgba(13,33,55,0.6)); border:1px solid var(--gold); border-radius:14px; padding:18px; margin-bottom:14px;">

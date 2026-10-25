@@ -1,16 +1,41 @@
+# ══════════════════════════════════════════════════════════════
+# 🔒 هيدرات الأمان — Cloudflare Workers Assets (_headers)
+# ══════════════════════════════════════════════════════════════
+# 📌 ٢٥ أكتوبر ٢٠٢٦ — تقرير المراجعة الأمنية:
+# 📌 ⛔⛔⛔ مافيش ولا هيدر أمان واحد كان بيتقدّم من Cloudflare!
+# 📌 ⛔⛔⛔ (الباك بيحط nosniff/DENY/HSTS — بس ده على ردود الـAPI
+# 📌 ⛔⛔⛔  فقط، مش على صفحات HTML/JS/CSS اللي بتتقدّم من الـedge).
+# 📌 ⛔⛔⛔ ⇒ المتصفح كان بيحمّل صفحاتنا من غير:
+# 📌 ⛔⛔⛔   · X-Content-Type-Options  (نوع المحتوى بيتخمن)
+# 📌 ⛔⛔⛔   · X-Frame-Options        (الصفحة تتحط في iframe)
+# 📌 ⛔⛔⛔   · Referrer-Policy        (الـReferer بيسرّب روابط)
+# 📌 ⛔⛔⛔   · Permissions-Policy     (الكاميرا/المايك/GPS)
+# 📌 ✅ الحل: القواعد دي على /* ⇒ بتتطبق على كل حاجة.
+# 📌 ⛌⛌⛌ ملاحظة: مافيش CSP هنا — الـCSP موجود كـmeta في index.html
+# 📌 ⛌⛌⛌ وموجود report-only. متحوّلهوش لـenforce دلوقتي (فيه
+# 📌 ⛌⛌⛌ onclick في الـHTML — الـenforce هيكسر ٧٠ زر).
+# 📌 ⛌⛌⛌ ⇒ المرجع النهائي بعد تثبيت الـonclick: CSP enforce في الهيدر.
+
+/*
+  Cache-Control: public, max-age=0, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), accelerometer=(), gyroscope=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+
 # ⛔⛔ صفحة الـHTML ما تتخزّنش أبداً.
 #    Cloudflare كان بيقدّم نسخة قديمة للمتصفح، فالمستخدم بيشغّل
 #    JavaScript من يوم فاتت — ورسالة خطأ قديمة معاه.
 #    الـassets نفسها لسه متخزّنة (الحمد لله) لأن اسمها فيه ?v=
-/*
-  Cache-Control: public, max-age=0, must-revalidate
-
 /index.html
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
 
 # ⛔ ٢١ أكتوبر ٢٠٢٦ — صفحة البوابة: لازم تفضل طازجة دايماً
-# (الـworker بيقدّمها للزائر المجهول — النسخة القديمة تعني كوكي
-#  قديم وعرض غلط).
+#    (الـworker بيقدّمها للزائر المجهول — النسخة القديمة تعني كوكي
+#    قديم وعرض غلط).
 /gate.html
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
 
@@ -30,3 +55,18 @@
 
 # ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ الـJS: لا تخزين أبداً
 # 📌 (Cloudflare cache ⇒ نسخة قديمة ⇒ المستخدم بيفضل يشوف نفس المشكلة)
+
+# ══════════════════════════════════════════════════════════════
+# 🛡️ ⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ منع الوصول للوحة الإدارة
+# ────────────────────────────────────────────────────────────────
+# 📌 السبب: `admin/` كان **منشور بالكامل** على الإنتاج.
+# 📌 ⛔⛔⛔ ⇒ admin/users.json (إيميلات + أسماء + uids حقيقية)
+# 📌 ⛔⛔⛔   كانت عامة ⇒ https://octashares.com/admin/users.json
+# 📌 ⛔⛔⛔   بيرجّع HTTP 200 لحد مش مسجّل دخول.
+# 📌 ✅ الحل: الملف اتشال من git + من البناء (tools/check-dist.js
+# 📌    بيرفض أي بناء فيه) + الـworker بيرجّع 404 لكل /admin/*.
+# 📌 📌 ملاحظة: الـCSP/الهيدرات لوحدها مش بتوقف تحميل JSON.
+# 📌    الحجب الحقيقي = **الملف مش موجود** + **الـworker بيرفضه**.
+
+/admin/*
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0

@@ -4066,6 +4066,27 @@ function renderSearchUI() {
   </div>`;
 }
 
+/* ══════════════════════════════════════════════════════════════
+ 🛡️ ⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ escaping للمدخلات في innerHTML
+ ────────────────────────────────────────────────────────────────
+ 📌 المشكلة: `q` (اللي المستخدم كتبه في البحث) كان بينزل
+ 📌 ⛔⛔⛔ في innerHTML **من غير escape** ⬇️
+ 📌 ⛔⛔⛔   box.innerHTML = `... لا توجد نتائج لـ "${q}" ...`
+ 📌 ⛔⛔⛔ ⇒ `<img src=x onerror=alert(1)>` في حقل البحث ⬇️
+ 📌 ⛔⛔⛔ ⇒ ينفّذ كود.
+ 📌 📌 التصنيف: **self-XSS** (المستخدم لازم يكتب Payload بنفسه)
+ 📌 📌 ⛌⛌⛌ ⇒ مش reflected من URL ⇒ مش ثغرة استغلال عن بُعد.
+ 📌 📌 ⛌⛌⛌ ⇒ بس: لوجو/خط/امتداد في المتصفح ممكن يحقنPayload،
+ 📌 📌 ⛌⛌⛌   وكمان defense-in-depth: أي نص ييجي من المستخدم
+ 📌 📌 ⛌⛌⛌   لازم يتهرب قبل ما يدخل innerHTML.
+ 📌 ✅ الحل: نستخدم textContent (أأمن) مش string concatenation.
+ ══════════════════════════════════════════════════════════════ */
+function ssEsc(s) {
+  return String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 async function ssSearch(q) {
   q = String(q || '').trim();
   const box = document.getElementById('ssResults');
@@ -4082,7 +4103,9 @@ async function ssSearch(q) {
   ).slice(0, 25);
 
   if (!SS_FILTERED.length) {
-  box.innerHTML = `<div class="ss-empty">لا توجد نتائج لـ "${q}"<br>
+  /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — الـq اتهرب قبل ما يدخل الـHTML.
+     ⛌⛌⛌ قبل: `${q}` خام ⬇️ ⛌⛌⛌ دلوقتي: `ssEsc(q)`. */
+  box.innerHTML = `<div class="ss-empty">لا توجد نتائج لـ "${ssEsc(q)}"<br>
   <span style="font-size:.74rem;opacity:.7">${SS_ALL.length} سهم في قاعدة البيانات</span></div>`;
   box.classList.add('open');
   return;
@@ -4091,15 +4114,20 @@ async function ssSearch(q) {
   box.innerHTML = SS_FILTERED.map((s, i) => {
   const c = s.change || 0;
   const col = c > 0 ? 'var(--sec)' : (c < 0 ? 'var(--red2)' : 'var(--muted)');
+  /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ الـcode والـname جايين من الـAPI.
+     ⛌⛌⛌ قبل: `${s.code}` و `${s.name}` خام ⬇️
+     ⛌⛌⛌ ⇒ لو الـAPI رجّع اسم فيه HTML ⇒ XSS.
+     ⛌⛌⛌ دلوقتي: ssEsc() على كل قيمة نصية.
+     ⛌⛌⛌ (الأرقام والـindex آمنين — p是真 رقم). */
   return `<div class="ss-row" data-i="${i}" onclick="event.stopPropagation(); ssPick(${i})">
-  <div class="ss-badge">${(s.code||'').slice(0,2)}</div>
+  <div class="ss-badge">${ssEsc((s.code||'').slice(0,2))}</div>
   <div class="ss-info">
-  <div class="ss-code">${s.code}</div>
-  <div class="ss-name">${(s.name||'').slice(0,30)}</div>
+  <div class="ss-code">${ssEsc(s.code)}</div>
+  <div class="ss-name">${ssEsc((s.name||'').slice(0,30))}</div>
   </div>
   <div class="ss-price">
-  <div class="ss-p" style="color:${col}">${s.price.toFixed(2)}</div>
-  <div class="ss-c" style="color:${col}">${c>=0?'+':''}${c.toFixed(2)}%</div>
+  <div class="ss-p" style="color:${col}">${Number(s.price).toFixed(2)}</div>
+  <div class="ss-c" style="color:${col}">${c>=0?'+':''}${Number(c).toFixed(2)}%</div>
   </div>
   </div>`;
   }).join('');
