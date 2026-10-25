@@ -377,7 +377,21 @@ export default {
        ⛌ نفس بوابة المعاينة (OCTA_TV_PROXY) — الإنتاج مقفول.
        📌 المصدر: startamarkets (نفس مصدر الباك) — شموع يومية حقيقية. */
     if (url.pathname === '/api/tvcandles' && env && env.OCTA_TV_PROXY === 'on') {
-      const code = (url.searchParams.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      /* ⛔⛔⛔⛔⛔⛔⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+       📌 ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ التنضيف كان **بيمسح** `.CA`!
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ الكود القديم كان:
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌   .replace(/[^A-Z0-9]/g, '')
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ "COMI.CA" بقى "COMICA" ❌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ وبعدين startamarkets ملقاش الرمز ⇒ [] ⇒ 502
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ والبديل "COMI" (من غير CA) كان **بيشتغل**!
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ✅ الحل: نحتفظ بالرمز زي ما هو (حروف + أرقام + نقطة)،
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ونشيل `.CA` قبل طلب startamarkets. */
+      const rawCode = (url.searchParams.get('code') || '').toUpperCase().replace(/[^A-Z0-9.]/g, '');
+      const code = rawCode.replace(/\.CA$/, '');
       const n = Math.max(60, Math.min(400, Number(url.searchParams.get('n') || 320)));
       if (!code) {
         return new Response(JSON.stringify({ ok: false, error: 'bad code' }),
@@ -390,7 +404,9 @@ export default {
         if (hit) return hit;
       }
       try {
-        const up = await fetch('https://startamarkets.com/api/v1/egx/history/' + code, {
+        /* 📌 startamarkets.com عايز الرمز **من غير** `.CA` (شِّلناها فوق) */
+        const saCode = code;
+         const up = await fetch('https://startamarkets.com/api/v1/egx/history/' + saCode, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
             'Accept': 'application/json,text/plain,*/*',
