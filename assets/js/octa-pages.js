@@ -2389,24 +2389,24 @@ async function openStock(code) {
   '<div style="color:' + ((intel.change||0)>=0?'var(--sec)':'var(--red2)') + ';font-weight:800">' +
   ((intel.change||0)>=0?'+':'') + (intel.change||0).toFixed(2) + '%</div></div>' +
   '</div></div>' +
-  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">' +
-  '<div style="background:rgba(212,175,55,.1);border:1px solid rgba(212,175,55,.3);border-radius:12px;padding:14px;text-align:center">' +
-  '<div style="font-size:1.6rem;font-weight:900;color:var(--gold)">' + (octaScore(code, intel.final_score) ?? 0) + '</div>' +
+  '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' +
+  '<div style="background:rgba(212,175,55,.1);border:1px solid rgba(212,175,55,.3);border-radius:12px;padding:14px 8px;text-align:center;min-width:0">' +
+  '<div style="font-size:1.45rem;font-weight:900;color:var(--gold);white-space:nowrap">' + (octaScore(code, intel.final_score) ?? 0) + '</div>' +
   '<div style="font-size:.7rem;color:var(--muted)">النتيجة</div></div>' +
   '<div style="background:rgba(22,199,154,.1);border:1px solid rgba(22,199,154,.3);border-radius:12px;padding:14px;text-align:center">' +
-  '<div style="font-size:1.6rem;font-weight:900;color:var(--sec)">' + (intel.confidence??0) + '%</div>' +
+  '<div style="font-size:1.45rem;font-weight:900;color:var(--sec);white-space:nowrap">' + (intel.confidence??0) + '%</div>' +
   '<div style="font-size:.7rem;color:var(--muted)">الثقة</div></div>' +
   '<div style="background:var(--wash);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center">' +
-  '<div style="font-size:1.3rem;font-weight:900">' + ((typeof octaStockMeta==='function' && octaStockMeta(code).decision) || intel.decision || '—') + '</div>' +
+  '<div style="font-size:.98rem;font-weight:900;line-height:1.35">' + ((typeof octaStockMeta==='function' && octaStockMeta(code).decision) || intel.decision || '—') + '</div>' +
   '<div style="font-size:.7rem;color:var(--muted)">القرار</div></div>' +
   (f.fair_value ? '<div style="background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.3);border-radius:12px;padding:14px;text-align:center">' +
   '<div style="font-size:1.3rem;font-weight:900;color:#a855f7">' + Number(f.fair_value).toFixed(2) + '</div>' +
   '<div style="font-size:.7rem;color:var(--muted)">القيمة العادلة</div></div>' : '') +
   '</div>' +
-  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px">' +
+  '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px">' +
   Object.entries(ax).map(([k,v]) =>
   '<div style="background:var(--wash);border:1px solid var(--line);border-radius:11px;padding:12px;text-align:center">' +
-  '<div style="font-size:1.15rem;font-weight:900;color:var(--gold)">' + (v==null?'—':Math.round(v)) + '</div>' +
+  '<div style="font-size:1.15rem;font-weight:900;color:var(--gold);white-space:nowrap">' + (v==null?'—':Math.round(v)) + '</div>' +
   '<div style="font-size:.68rem;color:var(--muted)">' + ((typeof AR_MS!=='undefined' && AR_MS[k]) ? AR_MS[k] : k) + '</div></div>').join('') +
   '</div>' +
   (f.valuation_status ? '<div style="margin-top:14px;padding:12px;background:rgba(212,175,55,.08);' +
