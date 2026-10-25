@@ -769,11 +769,21 @@ function renderDashboard(d) {
   };
 
   // ═══ المقارنة مع السوق ═══
+  /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ كل رقم تحت اسمه + شرح مبسّط
+  ────────────────────────────────────────────────────────────────
+  📌 المشكلة: كانت ٣ أرقام بلا أسماء («-18.03 ← -10.54 +7.48») ⇒
+  📌 ⛌⛌⛌ المستخدم مش فاهم إيه رقم وإيه التاني.
+  📌 ⛔⛔⛔ تصحيح مهم (متحقَّق من الكود): رقم «السوق» = **متوسط أداء
+  📌 ⛔⛔⛔ كل أسهم البورصة** — مش عائد مؤشر EGX30 نفسه ⇒ التسمية
+  📌 ⛔⛔⛔ لازم تبقى «متوسط البورصة» ومش «المؤشر» (صدق قبل شكل).
+  📌 ✅ الحل: ٣ أعمدة، كل رقم تحته اسم واضح + سطر شرح + سطر «مهم».
+  ════════════════════════════════════════════════════════════════ */
   var bench = (d.benchmark && d.benchmark.periods || []).map(function(p){
   return '<div class="bench-row"><span class="bench-p">' + p.period + '</span>' +
-  '<span class="bench-m">' + p.market + '%</span><span style="color:var(--muted)">←</span>' +
-  '<span class="bench-t">' + p.top20 + '%</span>' +
-  '<span class="bench-a ' + (p.alpha>=0?'pos':'neg') + '">' + (p.alpha>=0?'+':'') + p.alpha + '%</span></div>';
+  '<span class="bench-c"><i>متوسط البورصة</i><b class="bench-m">' + p.market + '%</b></span>' +
+  '<span class="bench-c"><i>أفضل ٢٠ عندنا</i><b class="bench-t">' + p.top20 + '%</b></span>' +
+  '<span class="bench-c"><i>فرق العائد</i><b class="bench-a ' + (p.alpha>=0?'pos':'neg') + '">' +
+  (p.alpha>=0?'+':'') + p.alpha + '%</b></span></div>';
   }).join('');
 
   // ═══ اختبار الضغط ═══
@@ -796,17 +806,25 @@ function renderDashboard(d) {
   dist(d.risk_levels || {}, {'منخفض':'low','متوسط':'mid','مرتفع':'high','مرتفع جداً':'vhigh'}) + '</div>' +
   '</div>' +
 
+  /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ تمرير أفقي للجدولين (٧ أعمدة)
+     📌 على الموبايل الأعمدة الأخيرة كانت بتختفي من غير سبب. */
   '<div class="dash-section"><div class="dash-h">🏆 أفضل ١٠ أسهم</div>' +
-  '<table class="mini-table"><thead><tr><th>الرمز</th><th>الاسم</th><th>القطاع</th><th>السعر</th><th>النتيجة</th><th>القرار</th><th>فرصة</th></tr></thead>' +
-  '<tbody>' + rows(d.top10 || []) + '</tbody></table></div>' +
+  '<div class="dash-tbl-hint"><span>←</span> اسحب الجدول جنباً عشان تشوف باقي الأعمدة <span>←</span></div>' +
+  '<div class="dash-tbl-wrap"><table class="mini-table"><thead><tr><th>الرمز</th><th>الاسم</th><th>القطاع</th><th>السعر</th><th>النتيجة</th><th>القرار</th><th>فرصة</th></tr></thead>' +
+  '<tbody>' + rows(d.top10 || []) + '</tbody></table></div></div>' +
 
   '<div class="dash-section"><div class="dash-h">📉 أسوأ ١٠ أسهم <small>تحتاج انتباه</small></div>' +
-  '<table class="mini-table"><thead><tr><th>الرمز</th><th>الاسم</th><th>القطاع</th><th>السعر</th><th>النتيجة</th><th>القرار</th><th>فرصة</th></tr></thead>' +
-  '<tbody>' + rows(d.bottom10 || []) + '</tbody></table></div>' +
+  '<div class="dash-tbl-hint"><span>←</span> اسحب الجدول جنباً عشان تشوف باقي الأعمدة <span>←</span></div>' +
+  '<div class="dash-tbl-wrap"><table class="mini-table"><thead><tr><th>الرمز</th><th>الاسم</th><th>القطاع</th><th>السعر</th><th>النتيجة</th><th>القرار</th><th>فرصة</th></tr></thead>' +
+  '<tbody>' + rows(d.bottom10 || []) + '</tbody></table></div></div>' +
 
   (d.benchmark && d.benchmark.interpretation ?
-  '<div class="dash-section"><div class="dash-h">📈 مقارنة مع السوق <small>' + (d.benchmark.interpretation||'') + '</small></div>' + bench +
-  '<div style="font-size:.7rem;color:var(--muted);margin-top:8px">⚠️ ' + (d.benchmark.caveat||'') + '</div></div>' : '') +
+  '<div class="dash-section"><div class="dash-h">📈 أداء أفضل ٢٠ سهم عندنا مقابل متوسط البورصة <small>' + (d.benchmark.interpretation||'') + '</small></div>' +
+  bench +
+  '<div class="bench-note">الرقم الموجب (فرق العائد) يعني إن أفضل ٢٠ سهم عندنا كانت أعلى من متوسط البورصة في نفس الفترة، والسالب يعني إنها كانت أقل.</div>' +
+  '<div class="bench-note">💡 الأرقام دي بتوصف فترة فاتت بس، ومش ضمان إن نفس الفرق هيتكرر في الفترة الجاية.</div>' +
+  '<div class="bench-note warn">⚠️ مقارنة على أسعار النهارده بس، مش اختبار على بيانات قديمة — الاختبار الحقيقي محتاج لقطة يومية (صورة أسعار كل يوم) وبيتراكم مع الوقت.</div>' +
+  '</div>' : '') +
 
   (stress ?
   '<div class="dash-section"><div class="dash-h">🛡️ اختبار الضغط <small>النظام تحت سيناريوهات صعبة</small></div>' +

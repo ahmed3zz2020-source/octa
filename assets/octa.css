@@ -1516,6 +1516,37 @@
   .mini-table td { padding: 9px 10px; border-bottom: 1px solid var(--wash); }
   .mini-table tbody tr { cursor: pointer; transition: background .15s; }
   .mini-table tbody tr:hover { background: var(--wash); }
+  /* ════════════════════════════════════════════════════════════════
+  ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ جداول لوحة التحكم بتمرير أفقي
+  ────────────────────────────────────────────────────────────────
+  📌 المشكلة: ٧ أعمدة (الرمز · الاسم · القطاع · السعر · النتيجة ·
+  📌 ⛌⛌⛌ القرار · فرصة) على موبايل ٣٩٠px ⇒ الأعمدة بتتضغط والأخيرة
+  📌 ⛌⛌⛌ بتختفي من غير ما المستخدم يدري إن في حاجة ورا.
+  📌 ✅ الحل: غلاف بـoverflow-x + min-width للجدول + مؤشّر سحب
+  📌    (زي جدول الفلتر) — والجدول يفضل مقروء وكل الأعمدة موجودة.
+  ════════════════════════════════════════════════════════════════ */
+  .dash-tbl-wrap {
+    overflow-x: auto; overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
+    border: 1px solid var(--line); border-radius: 11px;
+    background: var(--card);
+    scrollbar-width: thin;
+  }
+  .dash-tbl-wrap::-webkit-scrollbar { height: 6px; }
+  .dash-tbl-wrap::-webkit-scrollbar-track { background: transparent; }
+  .dash-tbl-wrap::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+  .dash-tbl-wrap .mini-table { min-width: 640px; }
+  .dash-tbl-hint {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 7px 10px; margin-bottom: 7px; border-radius: 9px;
+    background: linear-gradient(180deg, rgba(212,175,55,.16), rgba(212,175,55,.04));
+    border: 1px solid rgba(212,175,55,.3);
+    font-size: .72rem; color: var(--gold); font-weight: 700;
+  }
+  .dash-tbl-hint span { font-size: .95rem; }
+  @media (min-width: 760px) { .dash-tbl-hint { display: none; } }
 
   .stress-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(160px,1fr)); gap: 9px; }
   .stress-card { background: var(--wash); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
@@ -1526,13 +1557,17 @@
   .stress-card.weak .sc-a { color: #ff9800; }
   .stress-card.bad .sc-a { color: var(--red2); }
 
-  .bench-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--wash); }
-  .bench-p { font-size: .82rem; width: 70px; color: var(--txt); font-weight: 700; }
-  .bench-m, .bench-t { font-size: .84rem; font-weight: 800; }
+  /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ كل رقم تحت اسمه (٤ أعمدة) */
+  .bench-row { display: grid; grid-template-columns: 42px 1fr 1fr 1fr; gap: 5px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--wash); }
+  .bench-p { font-size: .78rem; color: var(--txt); font-weight: 800; }
+  .bench-c { display: flex; flex-direction: column; gap: 2px; text-align: center; min-width: 0; }
+  .bench-c i { font-style: normal; font-size: .6rem; color: var(--muted); font-weight: 600; line-height: 1.25; }
+  .bench-c b { font-size: .88rem; font-weight: 900; }
   .bench-m { color: var(--muted); }
   .bench-t { color: var(--gold); }
-  .bench-a { margin-right: auto; font-weight: 900; font-size: .86rem; }
   .bench-a.pos { color: var(--sec); } .bench-a.neg { color: var(--red2); }
+  .bench-note { font-size: .72rem; color: var(--muted); line-height: 1.65; margin-top: 7px; }
+  .bench-note.warn { color: var(--gold); }
 
   .dash-loading { padding: 40px; text-align: center; color: var(--muted); }
 
