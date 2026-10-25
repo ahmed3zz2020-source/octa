@@ -1403,7 +1403,29 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
 
  ⭐ الحل  الرقم الشاشة  ورقم البصمة  جنب بعض
   والموبايل يشوف البصمة  والتابلت واللاب لأ. */
- if (!noBio && bioEnabled() && isPhone()) { bioScreen(); return; }
+ /* ⛔⛔⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐⭐⭐ إصلاح «الدخول السريع مش بيتيح»
+ 📌 📌 📌 المشكلة الحقيقية (مش البصمة):
+ ⛌ ⛌ ⛌ ⛌ ⛌ ① السطر اللي كان هنا:
+ ⛌ ⛌ ⛌ ⛌ ⛌    if (!noBio && bioEnabled() && isPhone()) { bioScreen(); return; }
+ ⛌ ⛌ ⛌ ⛌ ⛌    ⇒ لو البصمة مفعّلة + الموبايل ⇒ المستخدم
+ ⛌ ⛌ ⛌ ⛌ ⛌    **مش بيوصل** للوحة ٤ أرقام خالص. بيوصل
+ ⛌ ⛌ ⛌ ⛌ ⛌    لشاشة البصمة ⇒ يضغط «ادخل دلوقتي» ⇒
+ ⛌ ⛌ ⛌ ⛌ ⛌    المسار بيرجّع 404 (bio_not_found) ⇒
+ ⛌ ⛌ ⛌ ⛌ ⛌    ٢.٢ ثانية حيرة ⇒ رجوع للأرقام.
+ ⛌ ⛌ ⛌ ⛌ ⛌    ⇒ المستخدم حاسس إن «الدخول السريع مش بيتيح».
+ ⛌ ⛌ ⛌ ⛌ ⛌ ② والأهم: `post('/api/auth/pin/login', {pin, device})`
+ ⛌ ⛌ ⛌ ⛌ ⛌    ⇒ لو الجهاز مش مسجّل على الحساب ⇒ 401
+ ⛌ ⛌ ⛌ ⛌ ⛌    new_device ⇒ **كود إيميل** ⇒ «لازم أعمل
+ ⛌ ⛌ ⛌ ⛌ ⛌    حساب جديد + كود». وده بالظبط اللي اتعطّل.
+ ✅ ✅ القاعدة النهائية:
+ ⛌ ⛌ ⛌ ⛌ ⛌ ① لوحة ٤ أرقام هي **الافتراضي دايماً**.
+ ⛌ ⛌ ⛌ ⛌ ⛌    البصمة **خيار تاني** جوّه نفس الشاشة
+ ⛌ ⛌ ⛌ ⛌ ⛌    (زرار جنب لوحة الأرقام) — مش بديل.
+ ⛌ ⛌ ⛌ ⛌ ⛌ ② زرار «ادخل بـ٤ أرقام» **ظاهر دايماً**
+ ⛌ ⛌ ⛌ ⛌ ⛌    في الشاشة الأولى (موبايل وتابلت ولاب).
+ ⛌ ⛌ ⛌ ⛌ ⛌ ③ شاشة البصمة نفسها لازم فيها زرار
+ ⛌ ⛌ ⛌ ⛌ ⛌    «ادخل بـ٤ أرقام» واضح.
+ */
  mount();
  head('تسجيل الدخول', 0);
  boxEl().className = 'gt-box pin';
@@ -1411,6 +1433,13 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  '<div class="gt-ico">🗝️</div>' +
  '<h1 class="gt-h">مرحباً بك في OCTA</h1>' +
  padHtml(0) +
+ /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ «ادخل بـ٤ أرقام» ظاهر دايماً.
+ ⛌ ده الزرار اللي المستخدم بيدور عليه. لازم يكون في
+ ⛌ الشاشة الأولى — مش ورا شاشة البصمة. */
+ (isPhone()
+ ? '<button class="gt-go alt" id="gtPinGo" type="button">'
+ + '\uD83D\uDD22 ادخل بـ٤ أرقام</button>'
+ : '') +
  '<button class="gt-forgot" id="gtForgot" type="button">نسيت كلمة المرور؟</button>' +
  /* ⭐⭐ البصمة  في نفس شاشة الأرقام  موبايل بس
  ⛌ التابلت واللاب  مافيش  بالظبط زي ما طلب.
@@ -2377,11 +2406,18 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  } catch (e) { }
  var nb = document.createElement('div');
  nb.className = 'gt-netbar';
- nb.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:999999;'
+ /* ⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ مش fixed (مش بيفوق المحتوى). */
+ nb.style.cssText = 'position:relative;z-index:60;'
  + 'background:#7a2b16;color:#ffd9c9;padding:11px 14px;'
+ + 'margin:0 0 10px;border-radius:12px;'
  + 'font:600 14px/1.5 system-ui;text-align:center';
  nb.textContent = '⚠️ السيرفر بينزل — بتفتح بدون تسجيل. الداتا المحمية هتطلب الدخول.';
- try { document.body.appendChild(nb); } catch (e) { }
+ try {
+ var _body = document.body;
+ var _anchor = document.getElementById('sideHost') || _body.firstElementChild;
+ if (_anchor && _anchor.parentNode === _body) _body.insertBefore(nb, _anchor);
+ else _body.appendChild(nb);
+ } catch (e) { }
  /* ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
  ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
  ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
@@ -2475,11 +2511,26 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  try {
  var b = document.createElement('div');
  b.className = 'gt-netbar';
- b.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:999999;'
+ /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ إصلاح «البانر المتفي»
+ 📌 السبب: الشريط ده كان `position:fixed;bottom:0` ⇒
+ 📌   بيقعد فوق آخر صف في كارت المؤشر والسوق، والمستخدم
+ 📌   بيحس إن الموقع بايظ.
+ 📌 ⛌⛌⛌ كمان `hint()` كان بيرفع الشريط جوّه الـgate
+ 📌   (z-index 999999 فوق كل حاجة) ⇒ بيغطي كمان لوحة الأرقام.
+ ✅ الحل: جوّه تدفّق الصفحة العادي (مش fixed) + بلون تحذير
+    أوضح + بيفضل مقروء. */
+ b.style.cssText = 'position:relative;z-index:60;'
  + 'background:' + bg + ';color:' + fg + ';padding:11px 14px;'
+ + 'margin:0 0 10px;border-radius:12px;'
  + 'font:600 14px/1.5 system-ui;text-align:center';
  b.textContent = msg;
- try { document.body.appendChild(b); } catch (e) { }
+ try {
+ /* ⛔ جوّه الـbody — قبل أول عنصر (الشريط الجانبي) */
+ var body = document.body;
+ var anchor = document.getElementById('sideHost') || body.firstElementChild;
+ if (anchor && anchor.parentNode === body) body.insertBefore(b, anchor);
+ else body.appendChild(b);
+ } catch (e) { }
  } catch (e) { }
  }
 

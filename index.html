@@ -117,35 +117,55 @@ window.octaGuardApi = function(){
     throw 0;
     })
     .catch(function(){
-    /* ⛌ الباك واقع — نعرض الصيانة.
-    📌 ⛌⛌ ملاحظة: مش بنمنع التكرار — لو المستخدم قفل الشريط
-    📌 ⛌⛌ وعايز يشوفه تاني، يبقى يقدر. */
+    /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ إصلاح «البانر المتفي»
+    📌 السبب: الشريط كان `position:fixed;bottom:0` ⇒ بيفوق آخر
+    📌   صف في كارت المؤشر والسوق، والمستخدم مبيعرفش ليه.
+    📌 ⛌⛌⛌ كمان كان فيه زرار «إخفاء» بيحفظ في sessionStorage
+    📌   بس **مافيش حاجة بتقرا** ⇒ بعد الـreload بيرجع تاني.
+    📌 ⛌⛌⛌ وكمان الـpoll كل ١٠ ثواني بيعمل location.replace
+    📌   ⇒ الصفحة بتتحدّد ⇒ البانر بيرجع ⇒ «بيظهر ويختفي».
+    ✅ الحل:
+    ① الشريط بقى **جوه الصفحة** (مش fixed) ⇒ ما بيغطّيش حاجة.
+    ② «إخفاء» بقى بيحفظ في sessionStorage **والفلاش بيقراه** ⇒
+       مش بيرجع تاني في نفس الجلسة.
+    ③ الـpoll بقى **بيحدّث الشريط في مكانه** من غير reload.
+    */
+    /* ⛌ 用户 ضغط «إخفاء» قبل كده في نفس الجلسة ⇒ متظهرش تاني. */
+    try { if (sessionStorage.getItem('octa_api_down') === '1') return; } catch(e){}
     try { sessionStorage.setItem('octa_api_down','1'); } catch(e){}
-    /* ⛔⛔⛔ ٢٢ أكتوبر ٢٠٢٦ — بقى **شريط تحت** مش شاشة كاملة.
-       ⛌ كان: overlay بيفوق الموقع كله (position:fixed inset:0)
-       ⛌   ⇒ المستخدم مش بيفتح حاجة خالص.
-       ⛌ دلوقتي: شريط صغير تحت + الموقع شغال عادي.
-       ⛌   (الفلتر بيجيب داتاه من TradingView مباشرة — مش محتاج السيرفر)
-       ⛌ لو ما عجبك الشريط ⇒ زرار «إخفاء». */
+
     var d = document.createElement('div');
     d.id = 'octaApiDown';
-    d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999999;'
-     + 'background:#7a2b16;color:#ffd9c9;padding:10px 12px;'
+    /* ⛌ ⛌ ⛌ مش fixed! — جوّه تدفّق الصفحة العادي.
+    ⛌ بياخد عرض الصفحة كامل ويقف فوق المحتوى،
+    ⛌ فما بيغطّيش آخر صف في أي كارت. */
+    d.style.cssText = 'position:relative;z-index:60;'
+     + 'background:#7a2b16;color:#ffd9c9;padding:10px 12px;margin:0 0 10px;'
      + 'display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;'
-     + 'font:600 13.5px/1.5 system-ui;text-align:center';
+     + 'font:600 13.5px/1.5 system-ui;text-align:center;border-radius:12px';
     d.innerHTML = '<span>⚠️ السيرفر بينزل — الأدوات اللي محتاجته هتطلع فاضية. '
      + 'الفلتر شغّال ببيانات مباشرة.</span>'
      + '<button id="octaApiRetry" style="background:#2563eb;color:#fff;border:0;padding:8px 16px;'
      + 'border-radius:8px;font:700 13px system-ui;cursor:pointer">\u062a\u062c\u062f\u064a\u062f</button>'
      + '<button id="octaApiSkip" style="background:transparent;color:#ffd9c9;border:1px solid #a4543a;'
      + 'padding:8px 14px;border-radius:8px;font:700 13px system-ui;cursor:pointer">إخفاء</button>';
-    document.body.appendChild(d);
-    /* ⛔⛔ ٢١ أكتوبر ٢٠٢٦ — المشكله: لو الباك رجع، الصفحة بتفضل
-    ⛌ الصيانة واقفه والمستخدم مش عارف. الحل: فحص تلقائي كل ١٠ ثواني.
-    ⛌ أول ما الباك يرد 200 → الصفحة تختفي لوحدها والصفحة تشتغل. */
+
+    /* ⛔⛔⛔ فين بالظبط؟ — أول حاجة جوه الـbody بعد الـgate.
+    ⛌ الـgate بيتشال بعد الدخول، فلو حطينا الشريط قبله
+    ⛌ هيتشال معاه. فبنحطه قبل الـgate بأول child في الـbody. */
+    try {
+    var body = document.body;
+    var anchor = document.getElementById('sideHost') || body.firstElementChild;
+    if (anchor && anchor.parentNode === body) body.insertBefore(d, anchor);
+    else body.appendChild(d);
+    } catch (e) { try { document.body.appendChild(d); } catch (e2) { } }
+
+    /* ⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ الـpoll بقى **من غير reload**.
+    📌 قبل كده: كل ١٠ ثواني لو الباك رجع ⇒ location.replace()
+    📌 ⇒ الصفحة بتتحدّد ⇒ البانر بيرجع ⇒ «بيظهر ويختفي».
+    ✅ دلوقتي: بنغيّر نص الشريط بس، والصفحة ما بتتحدّدش. */
     var tick = 0;
-    var h1 = d.querySelector('h2');
-    var p1 = d.querySelector('p');
+    var span = d.querySelector('span');
     var poll = setInterval(function(){
     tick++;
     fetch(base + '/api/health', { cache: 'no-store' })
@@ -153,23 +173,26 @@ window.octaGuardApi = function(){
     if (r && r.ok) {
     clearInterval(poll);
     try { sessionStorage.removeItem('octa_api_down'); } catch(e){}
-    /* ⛌⛌ ٢٤ أكتوبر ٢٠٢٦ — reload نضيف عشان الـgate يبني من الأول */
-    try { sessionStorage.removeItem('octa_gate_done'); } catch(e){}
-    location.replace(location.pathname + '?ok=' + Date.now());
+    /* ⛌ ⛌ ⛌ ما بنعملش reload — بنشيل الشريط ونسيب الصفحة. */
+    if (d && d.parentNode) d.parentNode.removeChild(d);
     }
     })
     .catch(function(){ });
-    if (h1 && tick === 3) h1.textContent = 'لسه بنستنى السيرفر…';
-    if (p1 && tick === 6) p1.textContent = 'الخدمة بترجع دلوقتي — الصفحة هتتحدث لوحدها في ثواني.';
+    if (span) {
+    if (tick === 3) span.textContent = 'لسه بنستنى السيرفر…';
+    if (tick === 6) span.textContent = 'الخدمة بترجع دلوقتي — استنى ثواني.';
+    }
     }, 10000);
+
     var b = document.getElementById('octaApiRetry');
     if (b) b.onclick = function(){
     clearInterval(poll);
     try { sessionStorage.removeItem('octa_api_down'); } catch(e){}
+    if (d && d.parentNode) d.parentNode.removeChild(d);
     location.reload();
     };
-    /* ⛔ «ادخل برضو» — يقفل شاشة الصيانة ويفتح الموقع
-       (الأدوات اللي مش محتاجة السيرفر بتفضل شغالة) */
+    /* ⛔ «إخفاء» — يقفل الشريط ويفضل مقفول في نفس الجلسة.
+    ⛌ ⛌ (العلم في sessionStorage + الفلاش بيقراه ⇒ مش بيرجع) */
     var sk = document.getElementById('octaApiSkip');
     if (sk) sk.onclick = function(){
     clearInterval(poll);

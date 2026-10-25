@@ -113,10 +113,39 @@
   try { return localStorage.getItem('octa_token') || ''; } catch (e) { return ''; }
   }
 
+  /* ═══════════════════════════════════════════════════════════
+  ⭐⭐⭐ ٢٤ أكتوبر ٢٠٢٦ — ⭐ تمييز نداءاتنا عن أي URL خارجي
+  ───────────────────────────────────────────────────────────
+  ⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔
+  📌 المشكلة: `indexOf('/api/')` كان بيعتبر أي URL فيه '/api/'
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 «نداء بتاعنا» — حتى لو URL خارجي!
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⇒ tradingview-widget.com/api/v1/quote كان بيتبعت للـRailway!
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⇒ (١) 405 من Railway (٢) CORS error (٣) ⛔⛔⛔ طلب لطرف ثالث
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ✅ الحل: نديو على **أصل** الـURL + مثال على السيرفر المباشر.
+  ═══════════════════════════════════════════════════════════ */
+  function _isOurs(url) {
+  const s = String(url || '');
+  if (!s) return false;
+  if (s.charAt(0) === '/') return true;         /* ⛌ نسبي ⇒ نداء بتاعنا */
+  try {
+  const u = new URL(s);
+  if (u.origin === (location.origin || '')) return true;
+  /* ⛌ السيرفر المباشر (الاحتياطي) — نداء بتاعنا برضه */
+  const d = String(window.OCTA_DIRECT || '');
+  if (d && u.href.indexOf(d) === 0) return true;
+  } catch (e) { }
+  return false;
+  }
+
   /* ⭐ التوكن + الكوكي على كل نداء /api/
      ⛌ credentials: 'same-origin' عشان الكوكي HttpOnly يمشي مع
         الطلب — هو ده اللي يخلي الـWorker يقدر يفحص الجلسة. */
   function _withToken(url, opts) {
+  if (!_isOurs(url)) return opts;
   if (String(url || '').indexOf('/api/') === -1) return opts;
   const o = opts || {};
   try {
@@ -136,6 +165,7 @@
 
   /* 🩺 لو الـWorker وقع → جرّب السيرفر المباشر */
   function _directUrl(s) {
+  if (!_isOurs(s)) return s;
   const i = s.indexOf('/api/');
   if (i === -1) return s;
   return window.OCTA_DIRECT + s.slice(i);
@@ -145,6 +175,8 @@
   const ORIG = ORIG_FETCH;
   window.fetch = function (url, opts) {
   const s = String(url || '');
+  /* ⛌ URL خارجي (مش نداء بتاعنا) → يفضل زي ما هو */
+  if (!_isOurs(s)) return ORIG.apply(this, arguments);
   /* ⛌ مش /api/ → يفضل زي ما هو */
   if (s.indexOf('/api/') === -1) return ORIG.apply(this, arguments);
 
