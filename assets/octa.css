@@ -3584,7 +3584,12 @@ body{margin:0;padding:0 10px 50px;
   font-family:inherit;font-size:.81rem;font-weight:800;cursor:pointer;transition:.2s;
   display:flex;align-items:center;justify-content:center;gap:5px}
 .tab.active{background:linear-gradient(135deg,var(--gold),#b8860b);color:var(--pri)}
-.tab .ic{font-size:.95rem}
+/* ⛔⭐ ٢٥ أكتوبر ٢٠٢٦ — `.tab .ic` كان بياخد تنسيق `.ic` (كارت info:
+   padding 16px + border-radius 15px + gradient) ⇒ العلم كان مربع أبيض كبير.
+   ✅ class خاص: .tab-ic — حجم صغير وبس. */
+.tab .ic,.tab .tab-ic{font-size:.95rem;padding:0;border:0;border-radius:0;background:none;
+  box-shadow:none;position:static;overflow:visible;cursor:inherit;transition:none}
+.tab .ic::before,.tab .tab-ic::before{content:none}
 
 /* ===== الفلتر فوق السيرش ===== */
 .filters{display:flex;gap:5px;margin-bottom:10px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;
