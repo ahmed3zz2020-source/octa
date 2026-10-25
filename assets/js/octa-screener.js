@@ -125,7 +125,74 @@
   }
   return d;
   }
-  function db() { const d = mkData(); return (d && d[M.id]) || []; }
+  /* ══════════════════════════════════════════════════════════════
+  🗂️ تطبيع أسماء الحقول — ٢٥ أكتوبر ٢٠٢٦
+  ────────────────────────────────────────────────────────────────
+  📌 المشكلة: الـAPI (/api/markets) بيرجّع أسماء زي
+  📌   `div_yield` · `de_ratio` · `mkt_cap` · `net_margin` · `confidence`
+  📌 والواجهة بتقرأ `dy` · `de` · `mc` · `nm` · `conf`.
+  📌 ⛔ النتيجة: أعمدة كاملة في الفلتر بتطلع «—» (فاضية).
+  📌 ✅ الحل: نطبّع هنا مرة واحدة ⇒ باقي الكود يفضل زي ما هو.
+  ══════════════════════════════════════════════════════════════ */
+  const FIELD_ALIAS = {
+  dy: ['div_yield', 'dy'], de: ['de_ratio', 'de'], mc: ['mkt_cap', 'mc'],
+  nm: ['net_margin', 'nm'], om: ['op_margin', 'om'], gm: ['gross_margin', 'gm'],
+  roic: ['roic', 'roic'], cr: ['current_ratio', 'cr'], qr: ['quick_ratio', 'qr'],
+  conf: ['confidence', 'conf'], total: ['total', 'score'],
+  av30: ['avg_volume_30d', 'av30'], volume: ['volume', 'vol'],
+  p1w: ['perf_w', 'p1w'], p1m: ['perf_1m', 'p1m'], p3m: ['perf_3m', 'p3m'],
+  p6m: ['perf_6m', 'p6m'], p1y: ['perf_y', 'p1y'], pYtd: ['perf_ytd', 'pYtd'],
+  upside: ['upside', 'upside'], beta: ['beta', 'beta'],
+  pb: ['pb', 'pb'], rel_volume: ['rel_volume', 'rel_volume'],
+  volatility: ['volatility', 'volatility'], risk_level: ['risk_level', 'risk_level'],
+  rsi: ['rsi', 'rsi'], eps: ['eps', 'eps'],
+  sma50: ['sma50', 'sma50'], sma200: ['sma200', 'sma200'],
+  ema20: ['ema20', 'ema20'], ema50: ['ema50', 'ema50'], ema200: ['ema200', 'ema200']
+  };
+
+  /* ⛔ نحسب الدرجة من المحاور لو مش موجودة */
+  const AXIS_W = { fundamental: 22, technical: 18, liquidity: 18, risk: 24,
+  news: 5, sentiment: 4, portfolio: 9 };
+
+  function normalize(r) {
+  if (!r || typeof r !== 'object') return r;
+  const o = Object.assign({}, r);
+  Object.keys(FIELD_ALIAS).forEach(function (k) {
+  if (o[k] != null) return;
+  const alt = FIELD_ALIAS[k];
+  for (let i = 0; i < alt.length; i++) {
+  if (o[alt[i]] != null) { o[k] = o[alt[i]]; break; }
+  }
+  });
+  /* ⛔ الدرجة: `total` أو `score` أو محسوبة من `all_axes` */
+  if (o.total == null && o.all_axes && typeof o.all_axes === 'object') {
+  let sum = 0, w = 0;
+  Object.keys(AXIS_W).forEach(function (a) {
+  const v = o.all_axes[a];
+  if (typeof v === 'number' && isFinite(v)) { sum += v * AXIS_W[a]; w += AXIS_W[a]; }
+  });
+  if (w > 0) o.total = Math.round(sum / w * 10) / 10;
+  }
+  /* ⛔ الأمان: من محور المخاطرة (risk أعلى = أمان أعلى) */
+  if (o.safety == null && o.all_axes && typeof o.all_axes === 'object') {
+  const rk = o.all_axes.risk;
+  if (typeof rk === 'number' && isFinite(rk)) o.safety = Math.round(rk);
+  }
+  /* ⛔ القرار: من المحور الإيجابي */
+  if (!o.verdict && o.all_axes && typeof o.all_axes === 'object') {
+  const t = o.total;
+  o.verdict = (t == null) ? '—'
+  : t >= 65 ? 'إشارة إيجابية'
+  : t >= 50 ? 'إشارة محايدة' : 'إشارة سلبية';
+  }
+  return o;
+  }
+
+  function db() {
+  const d = mkData();
+  const rows = (d && d[M.id]) || [];
+  return rows.map(normalize);
+  }
 
   /* ══════════════ لوغوهات ══════════════ */
   const LB = [
@@ -290,6 +357,9 @@
   p6m: ['p6m'], p1y: ['p1y'], pYtd: ['pYtd'], tv: ['tvRec'],
   ema20: ['ema20'], sma50: ['sma50'], sma200: ['sma200'],
   score: ['total'], verdict: ['verdict'], conf: ['conf'],
+  /* ⛔ ٢٥ أكتوبر ٢٠٢٦ — أعمدة جديدة متاحة في الـAPI */
+  pb: ['pb'], nm: ['nm'], om: ['om'], rvol: ['rel_volume'],
+  upside: ['upside'], volatility: ['volatility'], dy: ['dy'],
   sharpe: ['sharpe3y'], cagr: ['cagr3y'], mdd: ['mdd1y'],
   float: ['float'], rev: ['rev'], ebitda: ['ebitda'], fcf: ['fcf'],
   epsF: ['epsF'], sector: ['__sec']
@@ -326,7 +396,12 @@
   }
   let va, vb;
   if (k === 'val') { va = a.volume != null ? a.volume * a.price : null; vb = b.volume != null ? b.volume * b.price : null; }
-  else va = N(a[k]), vb = N(b[k]);
+  /* ⛔ ٢٥ أكتوبر ٢٠٢٦ — `k` ممكن يكون الاسم المختصر (rvol) والفعلي
+     (rel_volume) ⇒ نحلّه من SORTK قبل القراءة. */
+  else {
+  const sk = (SORTK[k] && SORTK[k][0]) || k;
+  va = N(a[sk]), vb = N(b[sk]);
+  }
   if (va == null && vb == null) return 0;
   if (va == null) return 1;
   if (vb == null) return -1;
@@ -458,8 +533,8 @@
   const rows = sortRows(filter());
   const total = db().length;
 
-  const tE = document.getElementById('scTotal'); if (tE) tE.textContent = total;
-  const cE = document.getElementById('scCount'); if (cE) cE.textContent = rows.length;
+  const tE = document.getElementById('scTotal'); if (tE) tE.textContent = ar(total);
+  const cE = document.getElementById('scCount'); if (cE) cE.textContent = ar(rows.length);
   renderLiveDot();
 
   /* ⭐ السطر الأول: البحث + عدّاد النتيجة + الأمثلة السريعة */
@@ -620,6 +695,13 @@
   ⛌   لو مفيش ولا رقم متاح ⇒ null ⇒ «—» (مش صفر — الصفر كذب). */
   function safetyOf(r) {
   const parts = [];
+  /* ⛔ ٢٥ أكتوبر ٢٠٢٦ — الحقول دي (mdd1y · sharpe3y · vol1y · cr)
+     مش موجودة في /api/markets ⇒ الملخص كان بيطلع «—» دايماً.
+     ✅ نحسب الأمان من محور المخاطرة (available) + نسبة الدين (de_ratio). */
+  if (N(r.safety) != null) parts.push(Math.max(0, Math.min(100, r.safety)));
+  else if (r.all_axes && typeof r.all_axes.risk === 'number' && isFinite(r.all_axes.risk)) {
+  parts.push(Math.max(0, Math.min(100, r.all_axes.risk)));
+  }
   if (N(r.de) != null) parts.push(Math.max(0, Math.min(100, (1.5 - r.de) / 1.5 * 100)));
   if (N(r.mdd1y) != null) parts.push(Math.max(0, Math.min(100, 100 - r.mdd1y * 1.4)));
   if (N(r.sharpe3y) != null) parts.push(Math.max(0, Math.min(100, 50 + r.sharpe3y * 25)));
@@ -1507,6 +1589,11 @@
   ];
 
   /* أعمدة OCTA */
+  /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — الأعمدة دي (ROIC · هبوط سنة · شارب · CAGR)
+     ⛌ مش موجودة في /api/markets ⇒ كانت بتطلع «—» لكل ٢٨٤ سهم.
+     📌 استبدلناها بأعمدة **موجودة فعلاً** في الـAPI:
+     📌   P/B · صافي الربح · الهامش التشغيلي · التقييم · السيولة · التذبذب.
+     ⚠️ مفيش عمود «فاضي» — كل عمود إما فيه رقم أو «غير متاح» صراحة. */
   const COLS_O = [
   { k: 'code', t: 'الرمز', cls: 'c' },
   { k: 'price', t: 'السعر', cls: 'n' },
@@ -1515,14 +1602,15 @@
   { k: 'verdict', t: 'القرار', cls: 'tv' },
   { k: 'conf', t: 'الثقة', cls: 'n' },
   { k: 'roe', t: 'ROE', cls: 'n' },
-  { k: 'roic', t: 'ROIC', cls: 'n' },
+  { k: 'pb', t: 'P/B', cls: 'n' },
   { k: 'pe', t: 'P/E', cls: 'n' },
+  { k: 'nm', t: 'صافي ربح %', cls: 'n' },
+  { k: 'om', t: 'هامش تشغيلي %', cls: 'n' },
   { k: 'de', t: 'دين/الأصول ٪', cls: 'n' },
   { k: 'dy', t: 'عائد', cls: 'n' },
-  { k: 'mdd', t: 'هبوط سنة %', cls: 'n' },
-  { k: 'vol', t: 'تذبذب %', cls: 'n', k2: 'vol1y' },
-  { k: 'sharpe', t: 'شارب', cls: 'n', k2: 'sharpe3y' },
-  { k: 'cagr', t: 'CAGR 3س %', cls: 'n', k2: 'cagr3y' },
+  { k: 'vol', t: 'تذبذب', cls: 'n', k2: 'volatility' },
+  { k: 'rvol', t: 'حجم نسبي', cls: 'n', k2: 'rel_volume' },
+  { k: 'upside', t: 'فرصة %', cls: 'n' },
   { k: 'p1y', t: 'أداء سنة', cls: 'n' },
   { k: 'sector', t: 'القسم', cls: 'sn' },
   { k: 'act', t: '', cls: 'c' }
@@ -1572,17 +1660,18 @@
   '<td class="n ' + (s.conf == null ? 'na' : s.conf >= 70 ? 'gg' : s.conf >= 50 ? 'ym' : 'rm') + '">' +
   (s.conf != null ? f0(s.conf) + '%' : '—') + '</td>' +
   '<td class="n ' + cP(s.roe, 20, 5) + '">' + (s.roe != null ? f0(s.roe) + '%' : '—') + '</td>' +
-  '<td class="n ' + cP(s.roic, 15, 5) + '">' + (s.roic != null ? f0(s.roic) + '%' : '—') + '</td>' +
+  '<td class="n ' + cP(s.pb, 2, 0) + '">' + (s.pb && s.pb > 0 ? f1(s.pb) : '—') + '</td>' +
   '<td class="n ' + cP(s.pe, 12, 0) + '">' + (s.pe && s.pe > 0 ? f1(s.pe) : '—') + '</td>' +
+  '<td class="n ' + cP(s.nm, 10, 0) + '">' + (s.nm != null ? f1(s.nm) + '%' : '—') + '</td>' +
+  '<td class="n ' + cP(s.om, 15, 0) + '">' + (s.om != null ? f1(s.om) + '%' : '—') + '</td>' +
   /* 🔴 de نسبة (1.0 = 100٪). الكود كان cP(s.de, 50, 100) ⇒ كل سهم أحمر،
      و f0(s.de) من 0.44 = «0» ⇒ العمود كان بيعرض صفر لكل السهم.
      الصح: نحول لنسبة مئوية ونقارن على 50٪ و100٪. */
   '<td class="n ' + cP(s.de != null ? s.de*100 : null, 50, 100) + '">' + (s.de != null ? f0(s.de*100) + '٪' : '—') + '</td>' +
   '<td class="n ' + cP(s.dy, 5, 0) + '">' + (s.dy != null ? f2(s.dy) + '%' : '—') + '</td>' +
-  '<td class="n ' + cP(s.mdd1y, 0, 25) + '">' + (s.mdd1y != null ? f0(s.mdd1y) + '%' : '—') + '</td>' +
-  '<td class="n ' + cP(s.vol1y, 0, 44) + '">' + (s.vol1y != null ? f0(s.vol1y) + '%' : '—') + '</td>' +
-  '<td class="n ' + cP(s.sharpe3y, 1, 0) + '">' + (s.sharpe3y != null ? f2(s.sharpe3y) : '—') + '</td>' +
-  '<td class="n ' + cP(s.cagr3y, 15, 0) + '">' + (s.cagr3y != null ? f0(s.cagr3y) + '%' : '—') + '</td>' +
+  '<td class="n ' + cP(s.volatility, 60, 30) + '">' + (s.volatility != null ? f0(s.volatility) : '—') + '</td>' +
+  '<td class="n ' + cP(s.rel_volume, 1.5, 0.6) + '">' + (s.rel_volume != null ? f2(s.rel_volume) + '×' : '—') + '</td>' +
+  '<td class="n ' + cP(s.upside, 20, 0) + '">' + (s.upside != null ? f1(s.upside) + '%' : '—') + '</td>' +
   '<td class="n ' + dirCls(s.p1y) + '">' + (sg(s.p1y) || '—') + '</td>' +
   '<td class="sn">' + esc(sectorAr(s)) + '</td>' +
   '<td class="c"><button class="sv-bell" onclick="event.stopPropagation();watchEdit(\'' + s.code + '\')">🔔</button></td>' +
