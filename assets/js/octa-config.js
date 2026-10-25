@@ -123,7 +123,26 @@ const CFG = {
   function load() {
     if (window.OCTA_API === undefined) return;
     try {
-      fetch(window.OCTA_API + '/api/engine-weights', { cache: 'no-store' })
+      /* ════════════════════════════════════════════════════════════════
+      ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ إرسال التوكن مع طلب الأوزان
+      ────────────────────────────────────────────────────────────────
+      📌 المشكلة: الطلب كان **من غير Authorization** ⇒ 401 ⇒
+      📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+      📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+      📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+      📌 ⛌ ⛌ ⇒ الأوزان فضل فاضية ⇒ «أوزان المحرك» مش بتظهر.
+      📌 ✅ الحل: نبعت الـBearer من localStorage + credentials.
+      ════════════════════════════════════════════════════════════════ */
+      var _h = { 'Accept': 'application/json' };
+      try {
+        var _tok = localStorage.getItem('octa_token') || '';
+        if (_tok) _h['Authorization'] = 'Bearer ' + _tok;
+      } catch (e) { }
+      fetch(window.OCTA_API + '/api/engine-weights', {
+        cache: 'no-store',
+        headers: _h,
+        credentials: 'include'
+      })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(apply).catch(function () { });
     } catch (e) { }
@@ -132,4 +151,17 @@ const CFG = {
   document.addEventListener('octa:authed', function () { setTimeout(load, 60); });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(load, 900); });
   else setTimeout(load, 500);
+  /* ⭐ إعادة محاولة: لو التوكن لسه مش متخزن وقت الطلب الأول */
+  setTimeout(load, 2500);
+  setTimeout(load, 6000);
+  /* ⭐ ونشوف لو localStorage اتغيّر (البوابة حفظت توكن) */
+  try {
+    var _lastTok = '';
+    setInterval(function () {
+      try {
+        var _t = localStorage.getItem('octa_token') || '';
+        if (_t && _t !== _lastTok) { _lastTok = _t; load(); }
+      } catch (e) { }
+    }, 2000);
+  } catch (e) { }
 })();

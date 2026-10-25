@@ -649,7 +649,7 @@ async function cardEGX(code,row){
   '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'+
   '<div><div style="font-size:.95rem;font-weight:900;color:#fff">'+esc(intel.name)+'</div>'+
   '<div style="font-size:.71rem;color:var(--muted);margin-top:3px">'+esc(code)+' · '+esc(f.sector||intel.sector||'—')+
-  ' · أمان '+(re.safety_score!=null?re.safety_score:'—')+' · قرار المحرك: <b>'+esc(_dec||'—')+'</b></div></div>'+
+  ' · أمان '+((re.safety_score!=null)?re.safety_score:((_meta.safety!=null)?_meta.safety:((ax.safety!=null)?ax.safety:'—')))+' · قرار المحرك: <b>'+esc(_dec||'—')+'</b></div></div>'+
   '<div style="text-align:left"><div style="font-size:1.3rem;font-weight:900;color:#fff">'+
   nf(intel.price)+' <span style="font-size:.72rem;color:var(--muted)">ج.م</span></div>'+
   '<span style="font-size:.78rem;font-weight:800;color:'+(intel.change>=0?'var(--sec)':'var(--red2)')+'">'+

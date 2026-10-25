@@ -1759,7 +1759,7 @@ function buildOctaVerdictCard(d, results) {
   '<div class="vc-p-code">' + s.code + '</div>' +
   '<div class="vc-p-name">' + (s.name || '') + '</div>' +
   '<div class="vc-p-dec" style="color:' + m.c + ';background:' + m.bg + '">' + (s.decision || '—') + '</div>' +
-  '<div class="vc-p-sc" style="color:' + vcColor(s.final_score) + '">' + (Number(s.final_score || 0).toFixed(0)) + '</div>' +
+  '<div class="vc-p-sc" style="color:' + vcColor(octaScore(s.code, s.final_score) || 0) + '">' + (Number(octaScore(s.code, s.final_score) || 0).toFixed(0)) + '</div>' +
   '</div>';
   }).join('');
 
@@ -2391,7 +2391,7 @@ async function openStock(code) {
   '</div></div>' +
   '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">' +
   '<div style="background:rgba(212,175,55,.1);border:1px solid rgba(212,175,55,.3);border-radius:12px;padding:14px;text-align:center">' +
-  '<div style="font-size:1.6rem;font-weight:900;color:var(--gold)">' + (intel.final_score??0) + '</div>' +
+  '<div style="font-size:1.6rem;font-weight:900;color:var(--gold)">' + (octaScore(code, intel.final_score) ?? 0) + '</div>' +
   '<div style="font-size:.7rem;color:var(--muted)">النتيجة</div></div>' +
   '<div style="background:rgba(22,199,154,.1);border:1px solid rgba(22,199,154,.3);border-radius:12px;padding:14px;text-align:center">' +
   '<div style="font-size:1.6rem;font-weight:900;color:var(--sec)">' + (intel.confidence??0) + '%</div>' +
@@ -2830,6 +2830,29 @@ function octaDecColor(d){
   if (c === 'sell') return { c:'#ff8a80', bg:'rgba(255,82,82,.16)' };
   if (c === 'unknown') return { c:'#f4d03f', bg:'rgba(244,208,63,.16)' };
   return { c:'#4dabf7', bg:'rgba(77,171,247,.16)' };
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+ 🏷️ ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ الدرجة من OS_DB (مصدر واحد)
+ ────────────────────────────────────────────────────────────────
+ 📌 /api/intelligence و /api/data_full بيخفيوا final_score
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⇒ كل الكروت كانت بتعرض ٠
+ 📌 ✅ الحل: نقرأ من OS_DB (من /api/rank المحمي).
+ ════════════════════════════════════════════════════════════════ */
+function octaScore(code, fallback) {
+  try {
+    if (typeof OS_DB !== 'undefined' && OS_DB && OS_DB.length) {
+      for (var i = 0; i < OS_DB.length; i++) {
+        var s = OS_DB[i];
+        if (!s || s.code !== code) continue;
+        if (s.final_score != null && isFinite(s.final_score)) return Number(s.final_score);
+        if (s.score != null && isFinite(s.score)) return Number(s.score);
+      }
+    }
+  } catch (e) { }
+  return (fallback != null && isFinite(fallback)) ? Number(fallback) : null;
 }
 
 function spFmtCap(v){ const n = Number(v)||0;
@@ -3616,7 +3639,7 @@ function renderStockPage() {
 
   <div class="si-scores">
   <div class="si-score final">
-  <div class="sv">${intel.final_score ?? '—'}</div>
+  <div class="sv">${octaScore(code, intel.final_score) ?? '—'}</div>
   <div class="sl">النتيجة النهائية (من 100)</div>
   </div>
   <div class="si-score conf">
