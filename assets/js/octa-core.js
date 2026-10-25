@@ -189,7 +189,11 @@ function formatTimeAgo(dateStr) {
 // جلب أخبار من مصدر واحد
 async function fetchFromSource(source) {
   try {
-  const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(source.url)}`;
+  // ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ جسر الـCORS
+  // 📌 كان: https://api.rss2json.com/v1/api.json?rss_url=…
+  // ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ المتصفح بيمنع الرد (مش فيه ACAO) ⇒ CORS error
+  // ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ والـworker بيجيبه من الـedge (نفس الأصل) ⇒ مفيش CORS.
+  const proxyUrl = `/api/rss?url=${encodeURIComponent(source.url)}`;
   const res = await fetch(proxyUrl);
   if (!res.ok) return [];
   const data = await res.json();
@@ -2405,9 +2409,14 @@ function loadTVQuoteWidget(containerId, symbol, valueId, changeId) {
   <div class="tv-quote-change" data-symbol="${symbol}">0%</div>
   `;
   container.appendChild(widget);
-  // نستخدم TradingView quote feed
-  fetch(`https://www.tradingview-widget.com/api/v1/quote?symbol=${encodeURIComponent(symbol)}`)
-  .then(r => r.json())
+  // ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ جسر الـCORS
+  // 📌 كان: fetch('https://www.tradingview-widget.com/api/v1/quote?...')
+  // ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  // ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ المتصفح بيمنع الرد (مش فيه ACAO) ⇒ "blocked by CORS"
+  // ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ وكمان octa-api.js كان بيعيد توجيهه للـRailway ⇒ 405
+  // ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ نطلب من نفس الأصل (الـworker بيجيبه من الـedge) ⇒ مفيش CORS.
+  fetch(`/api/tvquote?symbol=${encodeURIComponent(symbol)}`)
+  .then(r => r.ok ? r.json() : null)
   .then(data => {
   if (data && data.v) {
   const price = data.v.lp; // last price
@@ -2477,7 +2486,8 @@ async function loadHomeNews() {
   if (!el) return;
   try {
   // Use rss2json to fetch Yahoo Finance Egypt news
-  const url = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent('https://feeds.finance.yahoo.com/rss/2.0/headline?s=COMI.CA&region=CA')}`;
+  // ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ جسر الـCORS (نفس الأصل — مفيش CORS error)
+  const url = `/api/rss?url=${encodeURIComponent('https://feeds.finance.yahoo.com/rss/2.0/headline?s=COMI.CA&region=CA')}`;
   const res = await fetch(url);
   const data = await res.json();
   if (data.status === 'ok' && data.items && data.items.length > 0) {

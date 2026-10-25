@@ -2453,20 +2453,26 @@ async function rssFetch(query){
   const enc  = encodeURIComponent(feed);
 
   try {
-  const r = await fetch('https://api.cors.lol/?url=' + enc);
+  // ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ جسر الـCORS (نفس الأصل)
+  // 📌 كان: https://api.cors.lol/?url=… ⇒ كان بيرجّع **429** (rate limit)
+  // ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ والـworker بيجيب الـRSS من الـedge
+  // ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ ويرجّع JSON على شكل rss2json.
+  const r = await fetch('/api/rss?url=' + enc);
   if (r.ok) {
-  const doc = new DOMParser().parseFromString(await r.text(), 'text/xml');
-  const nodes = [...doc.querySelectorAll('item')];
-  if (nodes.length) return nodes.slice(0, 12).map(it => ({
-  title: (it.querySelector('title')?.textContent || '').replace(/\s+[-–]\s+[^-–]{2,30}$/, '').trim(),
-  link : it.querySelector('link')?.textContent || '',
-  date : it.querySelector('pubDate')?.textContent || ''
+  const d = await r.json();
+  if (d && d.items && d.items.length) return d.items.slice(0, 12).map(it => ({
+  title: (it.title || '').replace(/\s+[-–]\s+[^-–]{2,30}$/, '').trim(),
+  link : it.link || '', date : it.pubDate || ''
   }));
   }
   } catch(e){}
 
   try {
-  const r = await fetch('https://api.rss2json.com/v1/api.json?rss_url=' + enc);
+  // ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ جسر الـCORS
+  // 📌 كان: https://api.rss2json.com/v1/api.json?rss_url=…
+  // ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ المتصفح بيمنع الرد (مش فيه ACAO) ⇒ "blocked by CORS"
+  // ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ الـworker بيجيبه من الـedge (نفس الأصل) ⇒ مفيش CORS.
+  const r = await fetch('/api/rss?url=' + enc);
   if (r.ok) {
   const d = await r.json();
   if (d.items && d.items.length) return d.items.slice(0, 12).map(it => ({

@@ -66,6 +66,99 @@ const TV_COLS = [
   'earnings_per_share_diluted_ttm', 'total_revenue'
 ];
 
+/* ══════════════════════════════════════════════════════════════
+   ⭐⭐⭐ خريطة رموز TradingView → Yahoo Finance
+   ──────────────────────────────────────────────────────────────
+   📌 ٢٥ أكتوبر ٢٠٢٦ — جسر الأسعار (أذهب · دولار ·.normalize
+   ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+   ⛌ ⛌ ⛌ ⛌ ⛌ tradingview-widget.com بيقاوم على داتاسنتر (403 bot)
+   ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ Yahoo chart API هو المصدر البديل
+   ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+   📌 Yahoo symbol: GC=F (ذهب) · EGP=X (دولار) · ^EGX30 (مؤشر مصر)
+   ⛌ ⛌ ⛌ ⛌ ⛌ CL=F (نفط WTI) · BZ=F (برنت)
+   ══════════════════════════════════════════════════════════════ */
+const TV_TO_YAHOO = {
+  'OANDA:XAUUSD': 'GC=F',
+  'OANDA:XAGUSD': 'SI=F',
+  'EGP=X': 'EGP=X',
+  'EGX:EGX30': '^EGX30',
+  'EGX:EGX20': '^EGX20',
+  'EGX:EGX100': '^EGX100',
+  'TVC:USOIL': 'CL=F',
+  'TVC:UKOIL': 'BZ=F',
+  'NYMEX:CL1!': 'CL=F',
+  'TVC:GOLD': 'GC=F',
+  'TVC:UKOIL.C': 'BZ=F',
+  'CAPITALCOM:GOLD': 'GC=F',
+  'PEPPERSTONE:GOLD': 'GC=F',
+  'OANDA:WTICOUSD': 'CL=F',
+  'OANDA:BCOUSD': 'BZ=F',
+  'FOREXCOM:XAUUSD': 'GC=F',
+  'TVC:DXY': 'DX-Y.NYB',
+  'INDEX:EGX30': '^EGX30',
+  'EGX:EGX30P': '^EGX30'
+};
+
+function tvToYahoo(sym) {
+  const s = String(sym || '').trim();
+  if (!s) return null;
+  if (TV_TO_YAHOO[s]) return TV_TO_YAHOO[s];
+  const up = s.toUpperCase();
+  if (TV_TO_YAHOO[up]) return TV_TO_YAHOO[up];
+  /* سهم مصري عادي (COMI.CA) → Yahoo ticker */
+  if (/^[A-Z0-9]+\.CA$/i.test(s)) return s.toUpperCase();
+  /* أي symbol تاني بـ : → نجرب الجزء التاني */
+  const parts = s.split(':');
+  if (parts.length === 2) {
+    const p2 = parts[1].toUpperCase();
+    if (/^[A-Z0-9]+\.CA$/i.test(p2)) return p2;
+  }
+  return null;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ⭐⭐⭐ محلّل RSS بسيط (regex) — شكل rss2json
+   ──────────────────────────────────────────────────────────────
+   📌 بنرجّع {status, items:[{title,link,pubDate,description,categories}]}
+   ⛌ ⛌ ⛌ ⛌ ⛌ بالظبط زي rss2json ⇒ الـJS مش محتاج يتغير.
+   ══════════════════════════════════════════════════════════════ */
+function xmlUnescape(s) {
+  return String(s || '')
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'")
+    .replace(/&apos;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&');
+}
+function xmlTag(xml, tag, block) {
+  const re = new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)</' + tag + '>', 'i');
+  const m = block.match(re);
+  return m ? xmlUnescape(m[1]).trim() : '';
+}
+function parseRssItems(xml) {
+  const out = [];
+  const s = String(xml || '');
+  const blocks = s.match(/<item[\s>][\s\S]*?<\/item>/gi) || s.match(/<entry[\s>][\s\S]*?<\/entry>/gi) || [];
+  for (let i = 0; i < blocks.length && out.length < 30; i++) {
+    const b = blocks[i];
+    let link = xmlTag(b, 'link');
+    if (!link) {
+      const m = b.match(/<link[^>]*href=["']([^"']+)["']/i);
+      if (m) link = xmlUnescape(m[1]);
+    }
+    const title = xmlTag(b, 'title');
+    if (!title) continue;
+    out.push({
+      title: title,
+      link: link,
+      pubDate: xmlTag(b, 'pubDate') || xmlTag(b, 'published') || xmlTag(b, 'updated') || '',
+      description: xmlTag(b, 'description') || xmlTag(b, 'summary') || '',
+      categories: []
+    });
+  }
+  return out;
+}
+
 /* ⛔ خريطة العمود → اسم الحقل اللي محرك OCTA بيفهمه */
 const TV_MAP = {
   'close': 'price', 'change': 'change', 'volume': 'volume',
@@ -346,6 +439,224 @@ export default {
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: 'candles-failed', msg: String(e && e.message || e) }),
           { status: 502, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
+    /* 1.7) ⭐⭐⭐ جسور CORS لأطراف تالتة — ٢٥ أكتوبر ٢٠٢٦
+       ──────────────────────────────────────────────────────────
+       📌 المشكلة: المتصفح كان بيطلب:
+         · https://www.tradingview-widget.com/api/v1/quote?symbol=…
+         · https://api.rss2json.com/v1/api.json?rss_url=…
+       ⛌ مباشرة من الـJS ⇒ الـserverين مش بيقبلوا CORS من
+       ⛌ دوميننا ⇒ المتصفح بيمنع الرد ⇒ "blocked by CORS".
+       ⛌ (وكمان الـocta-api.js كان بيعيد توجيههم للـRailway ⇒ 405)
+
+       ✅ الحل: نجيبهم من الـedge (نفس-origin) ⇒ مفيش CORS خالص.
+       ⛌ الكاش على الـedge: ٦٠ ثانية للأسعار · ٣٠٠ ثانية للأخبار.
+
+       📌 ملاحظة مهمة: المسارات دي **مش** من الباك — هي جسر
+       ⛌   للـedge بس. ولوWorker واقع، الـJS بيرجع لطلب-party
+       ⛌   مباشر (وهو هيفشل CORS برضه ⇒ الأرقام تفضل «---»).
+       ⛌   ⇒ مفيش ضرر أمني: البيانات دي عامة ومفتوحة أصلاً. */
+    if (url.pathname === '/api/tvquote') {
+      const sym = (url.searchParams.get('symbol') || '').trim();
+      if (!sym) {
+        return new Response(JSON.stringify({ ok: false, error: 'no symbol' }),
+          { status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+      const ck = new Request('https://octa.internal/v2/tvquote/' + encodeURIComponent(sym), { method: 'GET' });
+      const cache = caches && caches.default;
+      if (cache) {
+        const hit = await cache.match(ck);
+        if (hit) return hit;
+      }
+      try {
+        /* ⛔⛔⛔⛔⛔⛔⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+         📌 ٢٥ أكتوبر ٢٠٢٦ — tradingview-widget.com **مش** بيقبل
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ الطلب من داتاسنتر (403 Cloudflare bot
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ protection) ⇒ جسر الـworker مش هينفع.
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ✅ البديل: **Yahoo Finance chart API** — شغّال ٢٠٠ من الـedge
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ⛌ ⛌ ⛌ ⛌ ⛌ (بي conversion map من TradingView symbol لـ Yahoo).
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         📌 وبنرجّع **بنفس الشكل** اللي الـJS متوقعه
+         ⛌ ⛌ ⛌ ⛌ ⛌ (data.v.lp / data.v.ch) ⇒ مفيش تعديل في الـJS. */
+        const ySym = tvToYahoo(sym);
+        if (!ySym) throw new Error('unmapped symbol: ' + sym);
+        const up = await fetch(
+          'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(ySym) + '?range=5d&interval=1d',
+          { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120', 'Accept': 'application/json' } }
+        );
+        if (!up.ok) throw new Error('yahoo ' + up.status);
+        const raw = await up.json();
+        const meta = raw && raw.chart && raw.chart.result && raw.chart.result[0] && raw.chart.result[0].meta;
+        if (!meta) throw new Error('no meta');
+        const price = Number(meta.regularMarketPrice);
+        const prev = Number(meta.chartPreviousClose != null ? meta.chartPreviousClose : meta.previousClose);
+        if (!isFinite(price) || price <= 0) throw new Error('bad price');
+        const chg = isFinite(prev) && prev > 0 ? ((price - prev) / prev) * 100 : 0;
+        const body = {
+          ok: true, source: 'yahoo', symbol: sym, yahoo: ySym,
+          v: { lp: price, ch: +chg.toFixed(4), chp: +chg.toFixed(4), volume: meta.regularMarketVolume || 0 }
+        };
+        const res = new Response(JSON.stringify(body), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=60',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+        if (cache) { try { await cache.put(ck, res.clone()); } catch (e) { } }
+        return res;
+      } catch (e) {
+        /* ⛔⛔⛔⛔⛔⛔⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+         📌 Yahoo مش عنده مؤشرات EGX (EGX30 · EGX20 · EGX100) ⇒ 404.
+         ✅ Fallback: **سكانر TradingView** (شغّال ٢٠٠ من الـedge) — جسر
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         📌 بيبعت ticker صريح للـscanner (EGX:EGX30) وبيرجّع السعر. */
+        try {
+          const tv = await fetch('https://scanner.tradingview.com/global/scan', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              symbols: { tickers: [sym] },
+              columns: ['close', 'change', 'volume', 'name']
+            })
+          });
+          if (tv.ok) {
+            const t = await tv.json();
+            const d = t && t.data && t.data[0];
+            if (d && d.d && d.d.length >= 2 && isFinite(Number(d.d[0]))) {
+              const p2 = Number(d.d[0]);
+              const c2 = Number(d.d[1]);
+              const body2 = {
+                ok: true, source: 'tradingview', symbol: sym,
+                v: { lp: p2, ch: c2, chp: c2, volume: d.d[2] || 0 }
+              };
+              const res2 = new Response(JSON.stringify(body2), {
+                status: 200,
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Cache-Control': 'public, max-age=60',
+                  'Access-Control-Allow-Origin': '*'
+                }
+              });
+              if (cache) { try { await cache.put(ck, res2.clone()); } catch (e2) { } }
+              return res2;
+            }
+          }
+        } catch (e2) { }
+        return new Response(JSON.stringify({ ok: false, error: 'tvquote-failed', msg: String(e && e.message || e) }),
+          { status: 502, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+    }
+
+    if (url.pathname === '/api/rss') {
+      const rss = (url.searchParams.get('url') || '').trim();
+      if (!rss) {
+        return new Response(JSON.stringify({ ok: false, error: 'no url' }),
+          { status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+      /* ⛔⛔⛔ حماية SSRF — مينفعش نخلي الـworker يجيب أي URL.
+         ⛌   بنسمح بس بنطاقات RSS معروفة ( Yahoo · Google News ). */
+      let allowed = false;
+      try {
+        const h = new URL(rss).hostname;
+        allowed = /(^|\.)(yahoo\.com|finance\.yahoo\.com|feeds\.finance\.yahoo\.com|news\.google\.com|google\.com)$/i.test(h);
+      } catch (e) { }
+      if (!allowed) {
+        return new Response(JSON.stringify({ ok: false, error: 'rss host not allowed' }),
+          { status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+      const ck = new Request('https://octa.internal/v2/rss/' + encodeURIComponent(rss), { method: 'GET' });
+      const cache = caches && caches.default;
+      if (cache) {
+        const hit = await cache.match(ck);
+        if (hit) return hit;
+      }
+      try {
+        /* ⛔⛔⛔⛔⛔⛔⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+         📌 ٢٥ أكتوبر ٢٠٢٦ — rss2json.com **مش** بيقبل الطلب من
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ داتاسنتر (403 Cloudflare bot protection)
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ جسر الـworker مش هينفع كده.
+         ✅ البديل: نجيب الـRSS **مباشرة** (news.google.com بيقبل ٢٠٠
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ من الـedge) ونحلّله **هنا** بـregex
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ ونرجّع **بنفس الشكل** اللي
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ rss2json كان بيرجّعه
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ({status, items:[{title,link,pubDate,description}]})
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ مفيش أي تعديل في الـJS. */
+        const up = await fetch(rss, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+            'Accept': 'application/rss+xml,application/xml,text/xml,*/*'
+          }
+        });
+        if (!up.ok) throw new Error('feed ' + up.status);
+        const xml = await up.text();
+        const items = parseRssItems(xml);
+        if (!items.length) throw new Error('feed empty');
+        const body = { status: 'ok', items: items };
+        const res = new Response(JSON.stringify(body), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=300',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+        if (cache) { try { await cache.put(ck, res.clone()); } catch (e) { } }
+        return res;
+      } catch (e) {
+        /* ⛔⛔⛔⛔⛔⛔⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+         📌 ٢٥ أكتوبر ٢٠٢٦ — news.google.com بيرجّع **503** للـedge
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ (بيحجب نطاقات Cloudflare) ⇒ يا إما نجرّب
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ مصدر تاني، يا إما نرجّع **فاضي**
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ (degrade) بدل ما نكسر الصفحة.
+         ✅ Fallback: rss2json.com (شغال أحياناً) ⇒ لو هيك ⇒ نرجّع فاضي
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ بأمان (٢٠٠ مش ٥٠٢) — الـJS بيتعامل
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ مع items=[] فاضي بهدوء. */
+        try {
+          const alt = await fetch('https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(rss), {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+              'Accept': 'application/json,text/plain,*/*'
+            }
+          });
+          if (alt.ok) {
+            const txt = await alt.text();
+            const res = new Response(txt, {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'public, max-age=300',
+                'Access-Control-Allow-Origin': '*'
+              }
+            });
+            if (cache) { try { await cache.put(ck, res.clone()); } catch (e2) { } }
+            return res;
+          }
+        } catch (e2) { }
+        /* ⛔ آخر حاجة: فاضي بأمان (٢٠٠) — الـJS مش هيعمل error */
+        return new Response(JSON.stringify({ status: 'error', items: [], ok: false, msg: String(e && e.message || e) }), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=60',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
       }
     }
 
