@@ -112,6 +112,8 @@
   --orange:    var(--warn);
   --pct:       var(--gold);
   --slot:      rgba(255, 255, 255, .04);
+  --slotT:     var(--txt);
+  --d:         var(--gold);          /* ⛔ ٢٥ أكتوبر — كان مستخدم ومش معرّف (نقطة اختيار الثيم) */
   --ac:        var(--gold);
   --grad-blue: linear-gradient(135deg, #4dabf7, #16c79a);
 
@@ -185,6 +187,8 @@ body.light {
   --dc-bad-dim:  #b91c1c;
   --dc-warn:     rgba(180, 83, 9, .1);
   --slot:        rgba(15, 27, 43, .04);
+  --slotT:       var(--txt);
+  --d:           #9a7b18;
   --grad-blue:   linear-gradient(135deg, #0284c7, #04855f);
 }
 

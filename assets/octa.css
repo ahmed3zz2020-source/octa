@@ -4,60 +4,8 @@
   ═══════════════════════════════════════════════════ */
 
 /* ═══ CSS block 0 ═══ */
-  :root {
-  --pri: #0a1929; --pri2: #0d2137; --pri3: #102a43;
-  --sec: var(--up2); --sec2: #4dabf7;
-  --gold: #d4af37; --gold2: #f4d03f; --gold3: #b8860b;
-  --red: #ff5252; --red2: #ff8a80;
-  --muted: #8b9eb0; --white: #ffffff; --txt: #e3eaf2;
-  /* ⛔⭐ ٢٥ أكتوبر ٢٠٢٦ — `--wash` كان **مش معرّف خالص**!
-     ⇒ `--line: var(--wash)` ⇒ invalid ⇒ كل `background: var(--wash)` شفاف.
-     ⇒ كروت لوحة الأسواق كانت غامقة/شفافة في الوضع الأبيض.
-     ✅ التعريف: غسلة بيضا خفيفة في الداكن، ورمادية خفيفة في النهاري. */
-  --wash: rgba(255,255,255,.05);
-  --line: var(--wash);
-
-  /* ════════════════════════════════════════════════════════════════
-   ⛔⭐ ٢٥ أكتوبر ٢٠٢٦ — ٣١ متغير CSS كان **مستخدم ومش معرّف خالص**!
-   ────────────────────────────────────────────────────────────────
-   📌 الأثر: كل `background: var(--slot)` / `border-color: var(--goldLine)`
-   📌 بيرجع لـ initial ⇒ عناصر بتفقد لونها أو حدودها.
-   📌 وكان `--wash` نفسه ناقص ⇒ `--line: var(--wash)` invalid ⇒
-   📌 الكروت بتبقى شفافة (و ده سبب الكروت الغامقة في لوحة الأسواق).
-   ✅ التعريفات هنا — قيم متناسقة مع الثيم الداكن.
-   ════════════════════════════════════════════════════════════════ */
-  /* ألوان الحالة */
-  --up2: #16a34a; --down2: #ff5252;   /* ⛔ كان مستخدم في root ومش معرّف */
-  --up: #16a34a; --upSoft: rgba(22,163,74,.14);
-  --dn: #f4626a; --dn2: #ff8a80;
-  --warn: #f4b740; --d: #f4626a;
-  --text: #e3eaf2;
-  /* اللون المميّز (الأزرق المخضر) — للمقارنة والفرص */
-  --slot: #4dabf7; --slotT: #7cc4ff;
-  /* الذهبي */
-  --goldBg: rgba(212,175,55,.14);
-  --goldLine: rgba(212,175,55,.38);
-  --goldLine2: rgba(212,175,55,.55);
-  /* المحايد */
-  --ntr2: rgba(139,158,176,.16);
-  --ntrSoft: rgba(139,158,176,.10);
-  --card: #102a43;
-  --bg: #0a1929; --bg-card: #0e2033;
-  --line2: rgba(255,255,255,.10);
-  --grad-blue: linear-gradient(135deg, var(--up2), #4dabf7);
-  /* الانحناءات */
-  --r2: 8px; --r3: 12px; --r4: 16px; --rfull: 999px;
-  /* المسافات */
-  --s2: 8px; --s3: 12px; --s4: 16px;
-  /* الظلال */
-  --sh2: 0 1px 4px rgba(0,0,0,.28);
-  --sh3: 0 4px 14px rgba(0,0,0,.34);
-  /* الحركات */
-  --t1: .18s;
-  /* لون ديناميكي (بتحدده JS) */
-  --tc: #4dabf7;
-  }
-  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  /* ✅ المتغيرات (:root + body.light) كلها في assets/octa-tokens.css — المصدر الوحيد.
+   ⛔ ٢٥ أكتوبر ٢٠٢٦: كانت هنا بلوكات مكرّرة كانت بتكسد الثيمين. */  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   /* 🛡️ خلفية الـhtml — لو الـbody اتعطل، الألوان ماتبقاش بيضاء */
   html { background: var(--pri);
   /* ⛔⛔⛔ قفل انزلاق الصفحة أفقياً على التابلت.
@@ -3602,16 +3550,7 @@
 
   /* ══════ MARKETS PAGE ══════ */
 
-:root{
-  --pri:#0a1929; --pri2:#0d2137; --pri3:#102a43;
-  --sec:var(--up2); --sec2:#4dabf7;
-  --gold:#d4af37; --gold2:#f4d03f;
-  --red:#ff5252; --red2:#ff8a80;
-  --muted:#8b9eb0; --txt:#e3eaf2;
-  --wash: rgba(255,255,255,.05);
-  --up2: #16a34a; --down2: #ff5252;
-  --line: var(--wash);
-}
+/* ✅ المتغيرات موحّدة في octa-tokens.css */
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;padding:0 10px 50px;
   background:radial-gradient(1200px 600px at 50% -10%,#12283f 0%,var(--pri) 55%);
@@ -3812,23 +3751,7 @@ body{margin:0;padding:0 10px 50px;
   .dc-sect-h small{font-size:.7rem;color:var(--muted);font-weight:500}
 
   /* ═══ لايت مود ═══ */
-  body.light{
-  --pri:#fff; --pri2:#fff; --pri3:#f9fafb;
-  --txt:#111827; --muted:#6b7280; --line:#e5e7eb;
-  --gold:#b8860b; --gold2:#d4af37; --sec:#059669; --sec2:#0284c7;
-  --red:#dc2626; --red2:#dc2626; --white:#fff;
-  --wash: rgba(15,27,43,.045);
-  --up: #16a34a; --upSoft: rgba(22,163,74,.12);
-  --dn: #dc2626; --dn2: #dc2626;
-  --warn: #b45309; --d: #dc2626; --text: #111827;
-  --slot: #0284c7; --slotT: #0369a1;
-  --goldBg: rgba(184,134,11,.10);
-  --goldLine: rgba(184,134,11,.30); --goldLine2: rgba(184,134,11,.50);
-  --ntr2: rgba(15,27,43,.09); --ntrSoft: rgba(15,27,43,.06);
-  --card: #fff; --bg: #fff; --bg-card: #fff; --line2: rgba(15,27,43,.13);
-  --tc: #0284c7;
-  background:#fff!important; background-image:none!important; color:#111827!important;
-  }
+/* ✅ متغيرات الـlight موحّدة في octa-tokens.css */
   body.light .octa-topbar{background:#fff;border-bottom-color:#e5e7eb}
   body.light .arm-btn{background:#f9fafb;border-color:#e5e7eb;color:#6b7280}
   body.light .arm-btn.active{background:#fffbeb;border-color:#b8860b;color:#92400e}
@@ -4280,37 +4203,9 @@ body{margin:0;padding:0 10px 50px;
   .vfoot b { color: var(--gold); }
 
   /* ══════════ الوضع النهاري — نظيف وواضح ══════════ */
-  body.light {
-  --pri:#f4f6f9; --pri2:#ffffff; --pri3:#ffffff;
-  --txt:#0f1b2b; --muted:#55657a;
-  --line:rgba(15,27,43,.11);
-  --gold:#9a7b18; --gold2:#8a6d12; --gold3:#7a5f0e;
-  --sec:#04855f; --sec2:#0369a1;
-  --red:#c62828; --red2:#c62828; --red:#d32f2f;
-  --up2:#16a34a; --down2:#dc2626;
-  --white:#fff; --vring-track: rgba(15,27,43,.08);
-  /* ⛔⭐ `--wash` النهاري — قبل كده كان بيفضل قيمة الداكن (فاتحة)
-     ⇒ الكروت بتبقى شبه شفافة والنص بيختفي في الوضع الأبيض. */
-  --wash: rgba(15,27,43,.045);
-
-  /* ⛔⭐ نفس الـ٣١ متغير — بقيم النهاري (٢٥ أكتوبر ٢٠٢٦) */
-  --up: #16a34a; --upSoft: rgba(22,163,74,.12);
-  --dn: #dc2626; --dn2: #dc2626;
-  --warn: #b45309; --d: #dc2626;
-  --text: #0f1b2b;
-  --slot: #0284c7; --slotT: #0369a1;
-  --goldBg: rgba(154,123,24,.10);
-  --goldLine: rgba(154,123,24,.30);
-  --goldLine2: rgba(154,123,24,.50);
-  --ntr2: rgba(15,27,43,.09);
-  --ntrSoft: rgba(15,27,43,.06);
-  --card: #ffffff;
-  --bg: #f4f6f9; --bg-card: #ffffff;
-  --line2: rgba(15,27,43,.13);
-  --grad-blue: linear-gradient(135deg, #16a34a, #0284c7);
-  --tc: #0284c7;
-  background: #f4f6f9 !important; background-image: none !important; color: var(--txt) !important;
-  }
+/* ✅ الثيمين (داكن/نهاري) موحّدين بالكامل في assets/octa-tokens.css
+   ⛔ ٢٥ أكتوبر ٢٠٢٦: البلوك ده كان بيعيد تعريف الألوان بقيم مختلفة
+      ⇒ كروت لوحة الأسواق بتبقى غامقة في النهاري. */
   body.light .octa-topbar { background: var(--wash); border-bottom-color: var(--line);
   box-shadow: 0 2px 14px rgba(15,27,43,.06); }
   body.light .toolbar-wrap { background: #fff; border-top-color: var(--line); }
