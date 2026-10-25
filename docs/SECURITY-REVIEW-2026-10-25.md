@@ -378,3 +378,41 @@ octa-gate.js:71-77  function renewDelayMs(expiresInSec) {
 ---
 
 *كل نتيجة في التقرير دي اتأكدت منها بتشغيل Flask 3.0.3 حقيقي + قراءة الكود. اللي اتأكدت منه بالتشغيل اتكتب «مُختبَر» — واللي كان تحليل من قراءة بس اتhekker عليه. مفيش أي ملف اتعدّل (read-only).*
+
+
+---
+
+## ✅ ملحق ٢٥ أكتوبر — تطبيق الإصلاحات (المشرف)
+
+### ما اتصلح واتنشر
+| # | الإصلاح | الملف | الحالة |
+|---|---|---|---|
+| ① | `idleCheck` ٣٠ دقيقة ⇒ بقى يعمل `renew` مش `logout` | `octa-gate.js:2278` | ✅ منتشر |
+| ② | `/api/tg-status` + `/api/tg-test` + `/api/alerts/test` ⇒ `_require_admin()` | `update_prices.py` | ✅ ٤٠١ مُختبَر |
+| ③ | `/api/market_tech` ⇒ `require_user()` | `update_prices.py` | ✅ ٤٠١ مُختبَر |
+| ④ | `/api/charts/list` ⇒ `require_user()` | `update_prices.py` | ✅ ٤٠١ مُختبَر |
+| ⑤ | `/api/auth/logout` ⇒ `token_epoch` bump | `update_prices.py` | ✅ |
+| ⑥ | `challenge/newpin` + `signup/newpin` ⇒ `token_epoch` bump | `update_prices.py` | ✅ |
+| ⑦ | `/api/auth/me` ⇒ `expires_in` | `update_prices.py` | ✅ |
+| ⑧ | `TOKEN_TTL` ٢ ساعة ⇒ ٣٠ يوم | `update_prices.py:1004` | ✅ منتشر |
+| ⑨ | **bootstrap متزامن** — استرجاع الجلسة قبل أي سكربت | `index.html` | ✅ منتشر |
+| ⑩ | ترتيب السكربتات — البوابة قبل الـcore | `index.html` | ✅ منتشر |
+| ⑪ | URL خارجي بـ`/api/` مابقاش نداء داخلي | `octa-api.js` | ✅ منتشر |
+| ⑫ | جسر CORS: `/api/tvquote` + `/api/rss` | `worker.js` | ✅ منتشر |
+| ⑬ | البانر المتفي (شريط «السيرفر بينزل») | `index.html` | ✅ |
+| ⑭ | «ادخل بـ٤ أرقام» ظاهر دايماً | `octa-gate.js` | ✅ |
+| ⑮ | `deploy` = `build:strict` + check-dist يفشل دايماً | `package.json` | ✅ |
+
+### 🎯 السبب الجذري للـlogout — ملاحظة المشرف
+كريم قال «الـTTL ٣٠ يوم تصعيد خطورة». **ملاحظة المشرف:**
+الـidle (٣٠ دقيقة) هو السبب الحقيقي — اتصلح. الـTTL ٣٠ يوم **فضل** لأن:
+- القفل الحقيقي موجود (عمر التوكن + `token_epoch` عند تغيير الباسورد + بصمة الجهاز + كوكي HttpOnly)
+- ٧ أيام هتسبب نفس المشكلة بالظبط (المستخدم بيرجع بعد أسبوع ولقى البوابة)
+- **لو في疑虑 أمني ⇒ `token_epoch` bump + `logout` server-side هما الحل — مش تقصير العمر**
+
+### 🔎 الـidle بعد الإصلاح
+```
+قبل:  ٣٠ دقيقة بلا لمس ⇒ logoutLocal() ⇒ البوابة ⇒ «اعمل حساب جديد»
+بعد:  ٣٠ دقيقة بلا لمس ⇒ renew() ⇒ لو الكوكي صالح ⇒ الجلسة بتكمّل
+      (لو فشل فعلاً ⇒ وقتها بس البوابة)
+```
