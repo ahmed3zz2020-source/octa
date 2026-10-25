@@ -1558,7 +1558,7 @@
   .stress-card.bad .sc-a { color: var(--red2); }
 
   /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ كل رقم تحت اسمه (٤ أعمدة) */
-  .bench-row { display: grid; grid-template-columns: 42px 1fr 1fr 1fr; gap: 5px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--wash); }
+  .bench-row { display: grid; grid-template-columns: 56px 1fr 1fr 1fr; gap: 5px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--wash); }
   .bench-p { font-size: .78rem; color: var(--txt); font-weight: 800; }
   .bench-c { display: flex; flex-direction: column; gap: 2px; text-align: center; min-width: 0; }
   .bench-c i { font-style: normal; font-size: .6rem; color: var(--muted); font-weight: 600; line-height: 1.25; }
@@ -1568,6 +1568,17 @@
   .bench-a.pos { color: var(--sec); } .bench-a.neg { color: var(--red2); }
   .bench-note { font-size: .72rem; color: var(--muted); line-height: 1.65; margin-top: 7px; }
   .bench-note.warn { color: var(--gold); }
+  /* ⭐ ٢٥ أكتوبر ٢٠٢٦ — سطر تاريخ المرجع + سطر ملخص نقطة الدخول */
+  .bench-ref { font-size: .66rem; color: var(--muted); opacity: .85; padding: 0 0 8px; line-height: 1.5; }
+  .entry-sum {
+  font-size: .78rem; color: var(--txt); background: rgba(212,175,55,.07);
+  border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px;
+  margin: 2px 0 10px; line-height: 1.7;
+  }
+  .entry-sum b.pos { color: var(--sec); }
+  .entry-sum b.neg { color: var(--red2); }
+  .mini-table td.pos, .mini-table td.pos b { color: var(--sec); }
+  .mini-table td.neg, .mini-table td.neg b { color: var(--red2); }
 
   .dash-loading { padding: 40px; text-align: center; color: var(--muted); }
 

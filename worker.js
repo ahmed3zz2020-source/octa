@@ -625,6 +625,103 @@ async function handle(request, env, ctx) {
       }
     }
 
+    /* 1.65) ⭐⭐⭐ /api/bench — مقارنة المصداقية (٢٥ أكتوبر ٢٠٢٦)
+       ──────────────────────────────────────────────────────────
+       📌 المشكلة اللي اتحلّت: مقارنة «أفضل ٢٠ عندنا» بالمؤشر كانت
+       📌 متبنية على حقول جاهزة (Perf.*) من TradingView. وفي حالة
+       📌 **المؤشر** المرجع بتاعها مزحزح (شهر ⇒ مرجع 3 شهور ورا)،
+       📌 وكمان الصفوف الناقصة (0.00%) كانت بتدخل كعوائد حقيقية.
+       📌 ⇒ متوسطغلط في الاتجاهين.
+
+       ✅ الحل: نقارن الطرفبن على **نفس الإغلاقات** و**نفس تواريخ
+       📌 المرجع** بالظبط. الواجهة بتحسب تواريخ المرجع من سلسلة
+       📌 المؤشر الرسمية، وبتطلب هنا إغلاق كل سهم عند نفس التاريخ.
+
+       📌 المدخل:  ?codes=LUTS,PHTV,…&d1=2026-09-24&d2=2026-04-23&d3=2025-10-23
+       📌 المخرج:  {ok, rows:[{code, now, m1:{date,close}, m6:{..}, y1:{..}}]}
+       📌 ملاحظة: لو السهم مافتrawlش في تاريخ المرجع ⇒ بناخد آخر
+       📌   إغلاق **قبله** (مش صفر!) ⇒ وده الرقم الحقيقي.
+
+       📌 الكاش: نفس مفتاح شموع الأسهم ⇒ الجسور بيشارك الكاش. */
+    if (url.pathname === '/api/bench' && env && (env.OCTA_TV_PROXY === 'on' || env.OCTA_BENCH === 'on')) {
+      const codes = (url.searchParams.get('codes') || '')
+        .toUpperCase().split(',').map(s => s.trim().replace(/[^A-Z0-9]/g, ''))
+        .filter(Boolean).slice(0, 30);
+      const dates = ['d1', 'd2', 'd3'].map(k => (url.searchParams.get(k) || '').trim());
+      if (!codes.length) {
+        return new Response(JSON.stringify({ ok: false, error: 'no codes' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } });
+      }
+      const cache = caches && caches.default;
+      const N = 400;
+      try {
+        const rows = await Promise.all(codes.map(async (code) => {
+          const ck = new Request('https://octa.internal/v2/tvcandles/' + code + '/' + N, { method: 'GET' });
+          let candles = null;
+          if (cache) {
+            const hit = await cache.match(ck);
+            if (hit) { try { const j = await hit.json(); candles = j.candles || null; } catch (e) { } }
+          }
+          if (!candles) {
+            const up = await fetch('https://startamarkets.com/api/v1/egx/history/' + code, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+                'Accept': 'application/json,text/plain,*/*',
+                'Origin': 'https://startamarkets.com',
+                'Referer': 'https://startamarkets.com/egx'
+              }
+            });
+            if (!up.ok) throw new Error('sa-' + up.status);
+            const raw = await up.json();
+            if (!Array.isArray(raw) || raw.length < 25) throw new Error('no data');
+            candles = [];
+            for (let i = Math.max(0, raw.length - N); i < raw.length; i++) {
+              const c = raw[i];
+              try {
+                const close = (c.adj_close != null && isFinite(Number(c.adj_close)))
+                  ? Number(c.adj_close) : Number(c.close);
+                candles.push({ t: c.date, c: +close.toFixed(4) });
+              } catch (e) { }
+            }
+            if (cache) {
+              try {
+                const fake = new Response(JSON.stringify({ ok: true, code: code, candles: candles }), {
+                  headers: { 'Content-Type': 'application/json' }
+                });
+                await cache.put(ck, fake);
+              } catch (e) { }
+            }
+          }
+          /* آخر إغلاق ≤ كل تاريخ مرجعي */
+          const at = (iso) => {
+            if (!iso) return null;
+            let pick = null;
+            for (const c of candles) {
+              if (String(c.t) <= iso && (!pick || String(c.t) > String(pick.t))) pick = c;
+            }
+            return pick ? { date: String(pick.t), close: pick.c } : null;
+          };
+          const last = candles.length ? candles[candles.length - 1] : null;
+          return {
+            code: code,
+            now: last ? { date: String(last.t), close: last.c } : null,
+            m1: at(dates[0]), m6: at(dates[1]), y1: at(dates[2])
+          };
+        }));
+        return new Response(JSON.stringify({ ok: true, rows: rows, dates: dates }),
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'public, max-age=1800',
+              'Access-Control-Allow-Origin': '*'
+            }
+          });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: 'bench-failed', msg: String(e && e.message || e) }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
     /* 1.7) ⭐⭐⭐ جسور CORS لأطراف تالتة — ٢٥ أكتوبر ٢٠٢٦
        ──────────────────────────────────────────────────────────
        📌 المشكلة: المتصفح كان بيطلب:

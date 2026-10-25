@@ -840,13 +840,19 @@ function renderDashboard(d) {
   '<div class="dash-tbl-wrap"><table class="mini-table"><thead><tr><th>الرمز</th><th>الاسم</th><th>القطاع</th><th>السعر</th><th>النتيجة</th><th>القرار</th><th>فرصة</th></tr></thead>' +
   '<tbody>' + rows(d.bottom10 || []) + '</tbody></table></div></div>' +
 
-  (d.benchmark && d.benchmark.interpretation ?
+  /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ بلوك جديد بيتحسب في المتصفح
+  📌 السبب: أرقام المقارنة القديمة كانت متبنية على حقول جاهزة
+  📌 (Perf.*) مرجعها مزحزح عند المؤشر، والصفوف الناقصة كانت بتدخل
+  📌 كعوائد صفر ⇒ متوسط غلط. دلوقتي بنحسب كل رقم من الإغلاقات
+  📌 الرسمية وعلى نفس تواريخ المرجع للطرفين ( octaLoadBench ).
+  📌 البلوك القديم بيظل ظاهر لحد ما الجديد يجهز (أو لو فشل). */
+  '<div id="benchNew">' + (d.benchmark && d.benchmark.interpretation ?
   '<div class="dash-section"><div class="dash-h">📈 أداء أفضل ٢٠ سهم عندنا مقابل متوسط البورصة <small>' + (d.benchmark.interpretation||'') + '</small></div>' +
   bench +
   '<div class="bench-note">الرقم الموجب (فرق العائد) يعني إن أفضل ٢٠ سهم عندنا كانت أعلى من ' + MLBL + ' في نفس الفترة، والسالب يعني إنها كانت أقل.</div>' +
   '<div class="bench-note">💡 الأرقام دي بتوصف فترة فاتت بس، ومش ضمان إن نفس الفرق هيتكرر في الفترة الجاية.</div>' +
   '<div class="bench-note warn">⚠️ مقارنة على أسعار النهارده بس، مش اختبار على بيانات قديمة — الاختبار الحقيقي محتاج لقطة يومية (صورة أسعار كل يوم) وبيتراكم مع الوقت.</div>' +
-  '</div>' : '') +
+  '</div>' : '') + '</div>' +
 
   (stress ?
   '<div class="dash-section"><div class="dash-h">🛡️ اختبار الضغط <small>النظام تحت سيناريوهات صعبة</small></div>' +
@@ -862,6 +868,181 @@ function renderDashboard(d) {
   '</div>';
 
   document.getElementById('dashBody').innerHTML = html;
+  octaLoadBench(d);
+}
+
+/* ════════════════════════════════════════════════════════════════
+  📊 مقارنة المصداقية + نقاط الدخول — ٢٥ أكتوبر ٢٠٢٦
+  ────────────────────────────────────────────────────────────────
+  📌 الهدف: كل رقم في اللوحة لازم يكون:
+  📌   ① من مصدر واحد (إغلاقات رسمية)
+  📌   ② على نفس تاريخ المرجع للطرفين
+  📌   ③ وتاريخ المرجع مكتوب جنبه
+  📌   ④ وفاصل بين «مقارنة» و«أداء حقيقي من نقطة الدخول».
+  📌 سبب التغيير: حقول Perf عند TradingView مرجعها مزحزح على
+  📌 المؤشر (شهر ⇒ مرجع 3 شهور ورا)، والصفوف الناقصة (0.00%)
+  📌 كانت بتدخل في المتوسط كعوائد صفر ⇒ متوسط غلط في الاتجاهين.
+  ════════════════════════════════════════════════════════════════ */
+
+function octaPct(v) {
+  if (v == null || isNaN(v)) return '—';
+  return (v >= 0 ? '+' : '') + Number(v).toFixed(2) + '%';
+}
+
+/* آخر إغلاق قبل (النهارده − N شهر) */
+function octaRefDate(rows, monthsBack) {
+  var now = new Date();
+  var t = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - monthsBack, now.getUTCDate()));
+  var iso = t.toISOString().slice(0, 10);
+  var pick = null;
+  for (var i = 0; i < rows.length; i++) if (rows[i][0] <= iso) pick = rows[i][0];
+  return pick;
+}
+
+function octaCloseAt(rows, iso) {
+  for (var i = rows.length - 1; i >= 0; i--) if (rows[i][0] <= iso) return rows[i][1];
+  return null;
+}
+
+async function octaLoadBench(d) {
+  var box = document.getElementById('benchNew');
+  if (!box) return;
+  try {
+    /* ① سلسلة المؤشر الرسمية */
+    var hist = await fetch('/data/egx30_history.json?_=' + Date.now())
+      .then(function (r) { return r.ok ? r.json() : null; });
+    if (!hist || !hist.rows || hist.rows.length < 30) throw new Error('no index history');
+    var rows = hist.rows;
+    var d1 = octaRefDate(rows, 1), d2 = octaRefDate(rows, 6), d3 = octaRefDate(rows, 12);
+    var ref1 = octaCloseAt(rows, d1), ref2 = octaCloseAt(rows, d2), ref3 = octaCloseAt(rows, d3);
+    if (!ref1 || !ref2 || !ref3) throw new Error('no ref closes');
+
+    /* السعر الحالي للمؤشر: من الملف لو محدث، وإلا من السعر الحي */
+    var nowIso = new Date().toISOString().slice(0, 10);
+    var idxNow = (hist.as_of === nowIso) ? Number(hist.last_close) : null;
+    var idxAsOf = hist.as_of;
+    if (idxNow == null) {
+      try {
+        var q = await octaFetch(OCTA_API + '/api/tvquote?symbol=EGX%3AEGX30&_=' + Date.now())
+          .then(function (r) { return r.ok ? r.json() : null; });
+        if (q) {
+          var c = (q.close != null) ? q.close : ((q.price != null) ? q.price : ((q.c != null) ? q.c : null));
+          if (c) { idxNow = Number(c); idxAsOf = nowIso; }
+        }
+      } catch (e) { }
+    }
+    if (idxNow == null) { idxNow = Number(hist.last_close); idxAsOf = hist.as_of; }
+
+    /* ② أعلى ٢٠ سهم + سعرهم الحي الحالي */
+    var rank = await octaFetch(OCTA_API + '/api/rank?_=' + Date.now())
+      .then(function (r) { return r.ok ? r.json() : null; });
+    var top = ((rank && rank.results) || []).slice(0, 20);
+    var codes = top.map(function (s) { return s.code; }).filter(Boolean);
+    var livePrice = {};
+    top.forEach(function (s) { if (s.price != null) livePrice[s.code] = Number(s.price); });
+    if (!codes.length) throw new Error('no codes');
+
+    /* ③ إغلاق كل سهم عند نفس تواريخ المرجع */
+    var b = await octaFetch(OCTA_API + '/api/bench?codes=' + encodeURIComponent(codes.join(',')) +
+      '&d1=' + d1 + '&d2=' + d2 + '&d3=' + d3 + '&_=' + Date.now())
+      .then(function (r) { return r.ok ? r.json() : null; });
+    if (!b || !b.rows || !b.rows.length) throw new Error('no bench data');
+
+    /* المتوسط: السهم اللي مفيش ليه إغلاق في تاريخ المرجع بيتشال
+       — مش بيتحسب صفر (دي كانت الخطأ القديم).
+       📌 السعر الحالي = السعر الحي اللي ظهر في اللوحة (من /api/rank)
+       📌 مش آخر إغلاق قديم عند مزوّد البيانات (في أسهم قليلة التداول
+       📌 بياناتها متأخرة ⇒ كانت هتزيح الرقم). */
+    var staleList = [];
+    function avgAt(key) {
+      var sum = 0, n = 0;
+      for (var i = 0; i < b.rows.length; i++) {
+        var r = b.rows[i];
+        if (!r || !r[key] || !r[key].close) continue;
+        var live = livePrice[r.code];
+        if (!live) continue;
+        sum += (live / r[key].close - 1) * 100; n++;
+        if (r.now && r.now.date !== nowIso && staleList.indexOf(r.code) < 0) staleList.push(r.code);
+      }
+      return n ? { avg: sum / n, n: n } : null;
+    }
+    var a1 = avgAt('m1'), a2 = avgAt('m6'), a3 = avgAt('y1');
+    if (!a1 || !a2 || !a3) throw new Error('no averages');
+
+    var per = [
+      { label: 'شهر', ref: d1, mkt: (idxNow / ref1 - 1) * 100, ours: a1 },
+      { label: '6 شهور', ref: d2, mkt: (idxNow / ref2 - 1) * 100, ours: a2 },
+      { label: 'سنة', ref: d3, mkt: (idxNow / ref3 - 1) * 100, ours: a3 }
+    ];
+
+    var html = '<div class="dash-section"><div class="dash-h">📈 أفضل ٢٠ سهم عندنا مقابل مؤشر البورصة <small>EGX30 · من الإغلاقات الرسمية</small></div>';
+    var behind = [], ahead = [];
+    per.forEach(function (p) {
+      var diff = p.ours.avg - p.mkt;
+      if (diff >= 0) ahead.push(p.label + ' (' + octaPct(diff) + ')'); else behind.push(p.label + ' (' + octaPct(diff) + ')');
+      html += '<div class="bench-row">' +
+        '<span class="bench-p">' + p.label + '</span>' +
+        '<span class="bench-c"><i>مؤشر البورصة</i><b class="bench-m">' + octaPct(p.mkt) + '</b></span>' +
+        '<span class="bench-c"><i>أفضل ٢٠ عندنا</i><b class="bench-t">' + octaPct(p.ours.avg) + '</b></span>' +
+        '<span class="bench-c"><i>فرق العائد</i><b class="bench-a ' + (diff >= 0 ? 'pos' : 'neg') + '">' + octaPct(diff) + '</b></span>' +
+        '</div>' +
+        '<div class="bench-ref">📅 المقارنة من إغلاق ' + p.ref + ' · ' + p.ours.n + ' سهم دخلوا في المتوسط</div>';
+    });
+    html += '<div class="bench-note">' +
+      (behind.length
+        ? '⚠️ ورا المؤشر في: ' + behind.join(' · ') + ' — وقدام في: ' + (ahead.length ? ahead.join(' · ') : 'ولا فترة')
+        : '✅ قدام المؤشر في الفترات التلاتة: ' + ahead.join(' · ')) +
+      '</div>';
+    html += '<div class="bench-note">📌 كل الأرقام محسوبة من <b>نفس الإغلاقات</b> و<b>نفس تاريخ المرجع</b> للطرفين — المؤشر والأسهم مع بعض، فالمقارنة عدلة.</div>';
+    html += '<div class="bench-note">📌 رقم «أفضل ٢٠» = متوسط أداء الأسهم الـ20 اللي محركنا رشحها النهارده. وده فيه تفاؤل مدمج (اخترناهم بعد ما رجعت) ⇒ الرقم الصادق هو أداؤها <b>من نقطة الدخول</b> — تحت.</div>';
+    if (staleList.length) {
+      html += '<div class="bench-note">📌 ' + staleList.length + ' سهم إغلاقاته متأخرة عند مزوّد البيانات (' + staleList.join('، ') + ') — استخدمنا سعره الحي، بس إغلاق تاريخ المرجع عنده أقدم من باقي الأسهم.</div>';
+    }
+    html += '<div class="bench-note">📌 مقارنة على فترة فاتت — مش backtest، ومش ضمان للفترة الجاية.</div>';
+    html += '<div class="bench-note">📌 إغلاق المؤشر: ' + idxNow + ' (بتاريخ ' + idxAsOf + ').</div>';
+    html += '</div>';
+
+    /* ④ النتائج الحقيقية من نقطة الدخول */
+    try {
+      var bt = await octaFetch(OCTA_API + '/api/backtest?_=' + Date.now())
+        .then(function (r) { return r.ok ? r.json() : null; });
+      if (bt && bt.windows && bt.windows.length) {
+        var ws = bt.windows.slice().sort(function (a, b2) { return (b2.age_days || 0) - (a.age_days || 0); });
+        var old = ws[0];
+        var names = {};
+        try {
+          var db = (typeof OS_DB !== 'undefined' && OS_DB) ? OS_DB : [];
+          db.forEach(function (s) { names[s.code] = s.name; });
+        } catch (e) { }
+        html += '<div class="dash-section"><div class="dash-h">🎯 نتائج توصياتنا من نقطة الدخول <small>الحقيقة من غير تجميل</small></div>';
+        html += '<div class="entry-sum">📌 لقطة ' + old.snapshot_date + ' (' + old.age_days + ' يوم) · ' + old.count +
+          ' توصية · متوسط <b class="' + (old.avg_return >= 0 ? 'pos' : 'neg') + '">' + octaPct(old.avg_return) + '</b>' +
+          ' · ' + old.wins + ' ربح · ' + old.flat + ' محايد · ' + old.losses + ' خسارة</div>';
+        html += '<div class="dash-tbl-hint"><span>←</span> اسحب الجدول جنباً عشان تشوف باقي الأعمدة <span>←</span></div>';
+        html += '<div class="dash-tbl-wrap"><table class="mini-table"><thead><tr><th>الرمز</th><th>العائد من الدخول</th><th>سعر الدخول</th><th>السعر دلوقتي</th><th>الاسم</th><th>القرار يوم الاختيار</th></tr></thead><tbody>';
+        (old.picks || []).slice().sort(function (x, y2) { return (x.actual_return || 0) - (y2.actual_return || 0); })
+          .forEach(function (p) {
+            var rr = p.actual_return;
+            html += '<tr><td><b>' + p.code + '</b></td>' +
+              '<td class="' + (rr >= 0 ? 'pos' : 'neg') + '"><b>' + octaPct(rr) + '</b></td>' +
+              '<td>' + Number(p.price_then || 0).toFixed(3) + '</td>' +
+              '<td>' + Number(p.price_now || 0).toFixed(3) + '</td>' +
+              '<td>' + (names[p.code] || '—') + '</td>' +
+              '<td>' + (p.decision_at_pick || '—') + '</td></tr>';
+          });
+        html += '</tbody></table></div>';
+        html += '<div class="bench-note">📌 سعر الدخول = السعر وقت ما المحرك رشح السهم · السعر الحالي = السعر دلوقتي. ده قياس حقيقي، مش تقدير.</div>';
+        html += '<div class="bench-note warn">⚠️ المدة ' + old.age_days + ' يوم بس، فالمشكلة لسه صغيرة الأجل. بنسجل لقطة كل يوم، وكل ما المدة زادت الرقم بيبقى أصدق.</div>';
+        html += '<div class="bench-note">📌 عدد اللقطات المسجلة: ' + (bt.snapshots_count || 0) + '.</div>';
+        html += '</div>';
+      }
+    } catch (e) { }
+
+    box.innerHTML = html;
+  } catch (e) {
+    /* فشل ⇒ نسيب البلوك القديم زي ما هو */
+    try { console.warn('bench load failed:', e && e.message); } catch (e2) { }
+  }
 }
 
 /* ════════════════════════════════════════════════════════════

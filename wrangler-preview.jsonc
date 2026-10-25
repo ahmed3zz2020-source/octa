@@ -24,6 +24,7 @@
   "observability": { "enabled": false },
   "vars": {
     "OCTA_GATE": "off",
-    "OCTA_TV_PROXY": "on"
+    "OCTA_TV_PROXY": "on",
+    "OCTA_BENCH": "on"
   }
 }
