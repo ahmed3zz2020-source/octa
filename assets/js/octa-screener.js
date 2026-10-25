@@ -223,7 +223,12 @@
 
   function db() {
   const d = mkData();
-  const rows = (d && d[M.id]) || [];
+  let rows = (d && d[M.id]) || [];
+  /* ⛔ ٢٥ أكتوبر ٢٠٢٦ — EGX_DB object (code → row) مش array.
+     ⛔ ⇒ rows.map بيرمي «rows.map is not a function». */
+  if (!Array.isArray(rows)) {
+  rows = Object.keys(rows).map(function (k) { return rows[k]; });
+  }
   return rows.map(normalize);
   }
 
