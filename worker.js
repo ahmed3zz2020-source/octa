@@ -910,8 +910,11 @@ export default {
     📌 «لوحة الأسواق» من غير ما يرجع بالزر.
     ✅ الحل: أي مسار صفحة معروف ⇒ نخدّم index.html (نفس الـSPA).
     */
+    /* ⭐ كل المسارات دي بتقابل TOOL_PAGES في octa-core.js */
     const SPA_ROUTES = ['/markets', '/stocks', '/tools', '/engine', '/arms', '/filters',
-      '/compare', '/radar', '/smartmoney', '/money', '/news', '/academy', '/watchlist'];
+      '/filter', '/best', '/screener', '/dividends', '/octasearch', '/verdict', '/pick',
+      '/compare', '/radar', '/smartmoney', '/money', '/news', '/academy', '/watchlist',
+      '/search', '/calc', '/bestpick', '/radar-stock'];
     if (SPA_ROUTES.indexOf(url.pathname) !== -1) {
       const res = await assetsFresh(env, new Request(new URL('/index.html', url), request));
       const h = new Headers(res.headers);
