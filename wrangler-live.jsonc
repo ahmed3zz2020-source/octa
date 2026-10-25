@@ -1,7 +1,0 @@
-{
-  "account_id": "74e046678adabf0706024b97b205882b",
-  "name": "octa",
-  "compatibility_date": "2026-10-10",
-  "assets": { "directory": "./dist" },
-  "observability": { "enabled": false }
-}
