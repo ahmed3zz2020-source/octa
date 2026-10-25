@@ -2083,8 +2083,24 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  post('/api/auth/pin/change', { old_pin: oldPin, new_pin: newPin })
  .then(function (o) {
  if (o.s === 200 && o.d && (o.d.ok || o.d.token)) {
+ /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ الباك بقى يبطل كل الجلسات
+    ⛌⛌⛌ القديمة لما الباسورد يتغير (token_epoch bump) ⬇️
+    ⛌⛌⛌ ⇒ لازم نحفظ التوكن **الجديد** اللي رجع مع الرد ⬇️
+    ⛌⛌⛌ ⇒ ولازم نبلّغ المستخدم إن جلسات تانية اتقفلت.
+    ⛌⛌⛌ (لو ما حفظناوش ⇒ 401 في الطلب الجاي ⇒ البوابة). */
  if (o.d.token) put(o.d.token, o.d.user);
  shut();
+ if (o.d.sessions_revoked) {
+ try {
+ var nx = document.createElement('div');
+ nx.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);' +
+ 'z-index:100001;background:rgba(16,185,129,.95);color:#04231a;padding:12px 20px;' +
+ 'border-radius:12px;font:700 .88rem/1.5 system-ui;max-width:90vw;text-align:center';
+ nx.textContent = '✅ الباسورد اتغيّر — اتقفلت كل الجلسات القديمة (لازم تدخل تاني)';
+ document.body.appendChild(nx);
+ setTimeout(function () { if (nx.remove) nx.remove(); }, 5200);
+ } catch (e) { }
+ }
  return;
  }
  state.pin = ''; paintDots(); paintPad(false);
