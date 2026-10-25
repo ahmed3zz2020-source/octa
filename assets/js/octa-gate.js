@@ -475,7 +475,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
  📌 ⇒ «دخل قبل ما أكتب الباسورد» و«الكود وصل فرقع».
  📌 ✅ الحل: نمسحه في stopLock() — أي شاشة جديدة بتمسحه.
- 📌 ✅ (الـscreenId increment بيكفي日为 But الكليك مربوط بالـDOM)
+ 📌 ✅ (الـscreenId increment بيكفي — بس الكليك مربوط بالـDOM)
  */
  try {
  var _bdy = document.querySelector('.gt-body');
@@ -1170,8 +1170,11 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  '⛔ تقدر تلغيه في أي وقت' +
  '</div>' +
  '<button class="gt-go" id="gtBioYes" type="button">\uD83D\uDC46 فعّل البصمة</button>' +
- '<button class="gt-back" id="gtBioNo" type="button">' +
- 'لا  عايز ٤ أرقام كل مرة</button>';
+ /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ زرار «ادخل بـ٤ أرقام» **ظاهر دايماً**.
+ ⛌ الأول كان مكتوب «لا عايز ٤ أرقام كل مرة» — جملة سلبية
+ ⛌ المستخدم بيقراها ويقفل. دلوقتي إيجابية وواضحة. */
+ '<button class="gt-go alt" id="gtBioNo" type="button">' +
+ '\uD83D\uDD22 ادخل بـ٤ أرقام</button>';
 
  /* ⭐⭐⭐ ⭐ الأهم 
  ⛌ الشاشة دي  كانت دايماً «فعّل البصمة» 
@@ -1284,8 +1287,11 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  '<h1 class="gt-h">ادخل ببصمة</h1>' +
  '<p class="gt-sub2">ضع إصبعك على المستشعر — أسرع وأأمن من ٤ أرقام</p>' +
  '<button class="gt-go" id="gtBioGo" type="button">\uD83D\uDC46 ادخل دلوقتي</button>' +
- '<button class="gt-back" id="gtBioPin" type="button">ادخل بـ٤ أرقام</button>' +
- '<p class="gt-note">لو البصمة مشتغلتش، دوس بره الكارت وهتدخل بأرقام</p>' +
+ /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ «ادخل بـ٤ أرقام» باين زي زرار
+ ⛌ من الدرجة الأولى (مش نص صغير تحت) ⇒ المستخدم مش بيفتكره. */
+ '<button class="gt-go alt" id="gtBioPin" type="button">' +
+ '\uD83D\uDD22 ادخل بـ٤ أرقام</button>' +
+ '<p class="gt-note">لو البصمة مشتغلتش، دوس «ادخل بـ٤ أرقام» فوق</p>' +
  '</div>';
 
  function off() {
@@ -1348,16 +1354,29 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
 
  ⛌ ⭐ الحل  نقوله السبب  ونسيبه  مش بنطرده. */
  off();
- var msg = '❌ البصمة مش هتنفع على الجهاز ده  استخدم ٤ أرقام';
+ /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ السبب بيتقول بالظبط.
+ ⛌ 404 bio_not_found = البصمة **مش مسجّلة** على الحساب
+ ⛌   (يعني الجهاز ده مش متسجّل) ⇒ ٤ أرقام هي الحل.
+ ⛌ 401 unauthorized = التوكن مش صالح.
+ ⛌ ⛌⛌⛌ المهم: مش بنستنى ٢.٢ ثانية.
+ ⛌ ⛌⛌⛌ الكود القديم كان بيعمل setTimeout(login, 2200)
+ ⛌ ⛌⛌⛌ ⇒ المستخدم واقف قدام شاشة ميتة ٢.٢ ثانية
+ ⛌ ⛌⛌⛔ ⇒ «الدخول السريع مش بيتيح». */
+ var why = (o && o.d && o.d.why) || '';
+ var msg = '❌ البصمة مش هتنفع على الجهاز ده — استخدم ٤ أرقام';
+ if (why === 'bio_not_found') msg = 'ℹ️ البصمة مش مسجّلة على الحساب ده — ادخل بـ٤ أرقام';
+ else if (why === 'unauthorized') msg = '⛔ لازم تسجّل دخول الأول — ادخل بـ٤ أرقام';
  var m = document.getElementById('gtMsg');
  if (m) { m.className = 'gt-msg no'; m.textContent = msg; }
- setTimeout(function () { login(1); }, 2200);
+ /* ⛌⛌⛔ ٢٥ أكتوبر — رجوع **فوري** للوحة الأرقام.
+ ⛌ + الشاشة نفسها فيها زرار «ادخل بـ٤ أرقام» واضح. */
+ login(1);
  }).catch(function () {
  off();
  var m2 = document.getElementById('gtMsg');
  if (m2) { m2.className = 'gt-msg no';
- m2.textContent = '❌ مش قادرين نوصل للسيرفر  جرّب ٤ أرقام'; }
- setTimeout(function () { login(1); }, 2200);
+ m2.textContent = '❌ مش قادرين نوصل للسيرفر — جرّب ٤ أرقام'; }
+ login(1);
  });
  }
 
@@ -1511,6 +1530,18 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
 
  document.getElementById('gtForgot').onclick = function () { forgot(); };
  document.getElementById('gtBack').onclick = function () { welcome(); };
+ /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ زرار «ادخل بـ٤ أرقام» في الشاشة الأولى.
+ ⛌ مهم: ده بيقف أي مسار بيحاول يوديه لشاشة البصمة.
+ ⛌ المستخدم اللي عايز أرقام ⇒ أرقام. من غير لف ودوران. */
+ var pg = document.getElementById('gtPinGo');
+ if (pg) {
+ pg.onclick = function () {
+ stopLock();
+ state.pin = ''; state.tries = 0; state.len = PIN_LEN;
+ try { strikeReset(); } catch (e) { }
+ login(1); /* ⛌ noBio = 1 ⇒ مفيش رجوع للبصمة تاني */
+ };
+ }
  /* ⭐ زرار البصمة  موبايل بس  في نفس شاشة الأرقام */
  var bb = document.getElementById('gtBio');
  if (bb) {
@@ -1638,10 +1669,28 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  'autocomplete="email" inputmode="email" placeholder="name@mail.com">' +
  '<div class="gt-msg" id="gtMsg"></div>' +
  '<button class="gt-go" id="gtChSend" type="button">ابعت الكود</button>' +
+ /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ مخرج واضح من شاشة الكود.
+ ⛌ السبب: المستخدم اللي جهازه «جديد» بيدخل ٤ أرقام ⇒
+ ⛌ الباك بيرجّع 401 new_device ⇒ بيوصل هنا. لو مافيش
+ ⛌ مخرج واضح ⇒ يحس إنه اتحبس ويضطر يعمل حساب جديد.
+ ⛌ دلوقتي: زرار «ادخل بـ٤ أرقام» + «رجوع للدخول» —
+ ⛌ الاتنين بيرجعوه للوحة الأرقام فوراً. */
+ '<button class="gt-go alt" id="gtChPin" type="button">' +
+ '\uD83D\uDD22 ادخل بـ٤ أرقام</button>' +
  '<button class="gt-back" id="gtChBack" type="button">رجوع للدخول</button>';
 
  var btn = document.getElementById('gtChSend');
  var mail = document.getElementById('gtChMail');
+
+ /* ⛔⛔⛔ ٢٥ أكتوبر — مخرج «ادخل بـ٤ أرقام» من شاشة الكود. */
+ var chp = document.getElementById('gtChPin');
+ if (chp) {
+ chp.onclick = function () {
+ stopLock();
+ state.pin = ''; state.tries = 0; state.len = PIN_LEN;
+ login(1);
+ };
+ }
 
  function send() {
  var v = (mail.value || '').trim();
@@ -2135,7 +2184,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  📌 ✅ الحل: قبل ما نطلّع المستخدم — نجيب /api/auth/me
  📌 ✅ (الكوكي HttpOnly ممكن يبقى صالح!) ⇒ لو رجّع 200
  📌 ✅ ⇒ نجدد التوكن ونكمل. لو 401 ⇒ فعلاً خلص ⇒ البوابة.
- 📌 ⛌ (ومتنسحبش الـtoken لوSessionShopekh还会话)
+ 📌 ⛌ (ومتنسحبش الـtoken لو الجلسة اتقفلت)
  */
  /* ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ /api/auth/me = GET (مش POST!)
  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
@@ -2230,18 +2279,62 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  /* ⛔ مفيش توكن (في البوابة دلوقتي) → مافيش قفل */
  if (!token()) { lastTouch = Date.now(); return; }
  if (Date.now() - lastTouch <= IDLE_MS) return;
- /* ⛔ عدّى نص ساعة خامل → البوابة. التوكن يتمسح. */
- logoutLocal();
- wipeFlow();
+ /* ════════════════════════════════════════════════════════════════
+ 📌 ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ إصلاح «لازم أعمل حساب جديد بعد ساعات»
+ ────────────────────────────────────────────────────────────────
+ 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌
+ 📌 المشكلة: بعد ٣٠ دقيقة من غير لمس، الكود كان بيعمل
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 logoutLocal() ⇒ مسح التوكن ⇒ البوابة ⇒ «اعمل حساب جديد
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⇒ و«بعد ساعات» أطول كمان ⇒ المستخدم بيرجع ولقى البوابة.
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌
+ 📌 ⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔
+ 📌 ⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔
+ 📌 ✅ الحل: **متمسحش الجلسة!** بدل القفل:
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ (١) نجرب التجديد (`renew`) — لو الكوكي لسه صالح ⇒
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ (٢) بس لوonga نجح ⇒ نكمل عادي (مفيش بوابة).
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ (٣) لو فشل ⇒ وقتها بس نقفل (الجلسة فعلاً خلصت).
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 📌 أمان: القفل **حقيقي** لسه موجود — الكوكي HttpOnly
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ عمر التوكن (٣٠ يوم) + بطلانه عند تغيير الباسورد.
+ ════════════════════════════════════════════════════════════════ */
  lastTouch = Date.now();
- welcome();
- open();
+ try { renew(); } catch (e) { }
  }
 
  /* 📌 التابات بتجمّد المؤقّتات في الخلفية. أول ما المستخدم يرجع
  للتاب بنشوف: عدّى وقت الخمول ولا التجديد ولا لأ. بصمت. */
  document.addEventListener('visibilitychange', function () {
  if (document.visibilityState !== 'visible') return;
+ /* ⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ نفس المنطق: متقفلش البوابة
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⇒ idleCheck() دلوقتي بتعمل renew (مش logout). تمام.
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ */
  if (token() && Date.now() - lastTouch > IDLE_MS) { idleCheck(); return; }
  if (Date.now() - renewAt >= 0) renew();
  });
@@ -2412,12 +2505,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  + 'margin:0 0 10px;border-radius:12px;'
  + 'font:600 14px/1.5 system-ui;text-align:center';
  nb.textContent = '⚠️ السيرفر بينزل — بتفتح بدون تسجيل. الداتا المحمية هتطلب الدخول.';
- try {
- var _body = document.body;
- var _anchor = document.getElementById('sideHost') || _body.firstElementChild;
- if (_anchor && _anchor.parentNode === _body) _body.insertBefore(nb, _anchor);
- else _body.appendChild(nb);
- } catch (e) { }
+ try { placeTopBanner(nb); } catch (e) { }
  /* ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
  ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
  ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
@@ -2524,14 +2612,30 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  + 'margin:0 0 10px;border-radius:12px;'
  + 'font:600 14px/1.5 system-ui;text-align:center';
  b.textContent = msg;
+ try { placeTopBanner(b); } catch (e) { }
+ } catch (e) { }
+ }
+
+ /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ بنحط الشريط **تحت الهيدر**
+ ⛌ وفوق المحتوى ⇒ ما بيغطّيش أي كارت.
+ 📌 الأسبقية: بعد شريط الأذرع → بعد الصفحة الأولى → أول عنصر.
+ 📌 ⛌ ⛌ مهم: **مش** قبل الـgate (الـgate بيتشال بعد الدخول
+ 📌 ⛌ ⛌ فالشريط كان هيتشال معاه وميبانش خالص). */
+ function placeTopBanner(node) {
  try {
- /* ⛔ جوّه الـbody — قبل أول عنصر (الشريط الجانبي) */
+ var placed = false;
+ var anchors = ['armsBar', 'page-home', 'page-engine'];
+ for (var i = 0; i < anchors.length && !placed; i++) {
+ var a = document.getElementById(anchors[i]);
+ if (a && a.parentNode) { a.parentNode.insertBefore(node, a.nextSibling); placed = true; }
+ }
+ if (!placed) {
  var body = document.body;
- var anchor = document.getElementById('sideHost') || body.firstElementChild;
- if (anchor && anchor.parentNode === body) body.insertBefore(b, anchor);
- else body.appendChild(b);
- } catch (e) { }
- } catch (e) { }
+ var first = body.firstElementChild;
+ if (first && first.parentNode === body) body.insertBefore(node, first);
+ else body.appendChild(node);
+ }
+ } catch (e) { try { document.body.appendChild(node); } catch (e2) { } }
  }
 
  /* التأكد إن التوكن لسه صالح — لو مش كده نرجع للبوابة */
