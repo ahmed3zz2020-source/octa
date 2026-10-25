@@ -3642,6 +3642,9 @@ body{margin:0;padding:0 10px 50px;
 .bdg{display:inline-block;padding:2px 7px;border-radius:5px;font-size:.62rem;font-weight:800}
 .b-buy{background:rgba(22,199,154,.16);color:var(--sec)}
 .b-hold{background:rgba(212,175,55,.15);color:var(--gold2)}
+/* ⛔⭐ ٢٥ أكتوبر ٢٠٢٦ — في النهاري `var(--gold2)` (#b8912f) على خلفية
+   ذهبية شفافة ⇒ تباين 1.61 (ضعيف). ✅ النص بياخد `--gold3` الغامق. */
+body.light .b-hold{background:rgba(154,123,24,.13);color:#7a5f0e}
 .b-sell{background:rgba(255,82,82,.15);color:var(--red2)}
 .b-otc{background:rgba(255,82,82,.14);color:var(--red2)}
 
