@@ -289,6 +289,53 @@ function hasSession(request) {
   return false;
 }
 
+
+/* ════════════════════════════════════════════════════════════════
+ 🔄 ⭐ ٢٥ أكتوبر ٢٠٢٦ — fetch من الـAssets بدون كاش
+ ────────────────────────────────────────────────────────────────
+ 📌 السبب: Cloudflare Assets بيعمل cache للـHTML/JS (cf-cache-status: HIT)
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⇒ المستخدم بيفتح نسخة قديمة (bootstrap مفقود · إصلاحات مفقودة)
+ 📌 ✅ الحل: header `Cache-Control: no-cache` في الطلب ⇒ الـedge يعمل bypass
+ ════════════════════════════════════════════════════════════════ */
+async function assetsFresh(env, request) {
+  const r = new Request(request.url, request);
+  const _url = new URL(request.url);
+  const h = new Headers(r.headers);
+  h.set('Cache-Control', 'no-cache');
+  h.set('Pragma', 'no-cache');
+  /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ bypass كامل للـedge cache
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⛌ ⛌.cf.cacheEverything=false + cacheTtl=0 ⇒ المتصفح/الـedge
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ✅ + نضيف cache-bust في الـURL (عشان نضمن التفرّد)
+  📌 ✅ + Cache-Control: no-cache في الـresponse (عشان المتصفح مبيكاشش)
+  */
+  /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ الـAssets بتخدم النسخة المعبّأة صح.
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⛌ ⛌ (الـcf-cache-status: HIT ده كاش داخلي للـAssets — طبيعي،
+  📌 ⛌ ⛌ ⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+  📌 ⛌ ⛌ ⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+  📌 ⛌ ⛌ ⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+  📌 ⛌ ⛌ ⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+  📌 ⛌ ⛌ ⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+  📌 ⛌ ⛌ ⛌⇒ والـbust بالـquery بيدّي 404 (الـAssets مش بتقبله)).
+  📌 ✅ الحل: bust بسيط بالـtimestamp — ونتعامل مع 404 بالfallback.
+  */
+  /* ⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ '/' مش asset ⇒ 404. نحوّله index.html
+  📌 (والـgate.html بيتخدم من المسار التاني في الـworker — شوف فوق) */
+  let bust = _url.pathname;
+  if (bust === '/' || bust === '') bust = '/index.html';
+  bust = bust + (_url.search || '');
+  try {
+  return await env.ASSETS.fetch(new Request(bust, { method: 'GET', headers: h }));
+  } catch (e) {
+  return env.ASSETS.fetch(new Request(r, { headers: h }));
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -789,6 +836,25 @@ export default {
       } catch (e) { }
     }
 
+    /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ '/' ⇒ '/index.html' (مباشر)
+    📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+    📌 ⛌ ⛌ السبب: env.ASSETS.fetch('/') بيرجّع 404 (مافيش asset اسمه '/')
+    📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+    📌 ⛌ ⛌ ⇒ والمستخدم المسجّل بياخد 404 على '/' ⇒ الموقع مش بيفتح!
+    📌 ✅ الحل: نعمل fetch لـ'/index.html' مباشرة.
+    */
+    if (url.pathname === '/' && hasSession(request)) {
+      try {
+        const idxUrl = new URL('/index.html', url);
+        const idx = await env.ASSETS.fetch(new Request(idxUrl.toString(), request));
+        if (idx && idx.status < 400) {
+          const ih = new Headers(idx.headers);
+          ih.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+          return new Response(idx.body, { status: 200, headers: ih });
+        }
+      } catch (e) { }
+    }
+
     /* 3) static assets (الصور/HTML/CSS/JS) */
     /* ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐⭐⭐ الـJS: no-store صريح
      📌 السبب: Cloudflare Assets كان بيعمل cache للـJS
@@ -799,8 +865,27 @@ export default {
      📌 ✅ الحل: نعمل fetch للـJS ونضيف cache-control صريح.
      📌 ✅ (نفس الشغل في الـworker — أكتر موثوق من _headers)
      */
+    /* ⛔⛔⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ الـHTML كمان — no-store صريح
+    📌 السبب: Cloudflare Assets كان بيعمل cache للـindex.html
+    📌 ⛌ ⛌ ⛌ (cf-cache-status: HIT) ⇒ المستخدم بيفتح نسخة قديمة
+    📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+    📌 ⛌ ⛌ ⛌ ⛌ ⇒ التحديثات الجديدة ما بتوصلش (bootstrap مفقود).
+    📌 ✅ الحل: نفس الـJS — fetch + no-store.
+    */
+    if (/\.(html?)$/.test(url.pathname) || url.pathname === '/' || url.pathname === '/index.html') {
+      const res = await assetsFresh(env, request);
+      const h = new Headers(res.headers);
+      h.delete('Cache-Control');
+      h.delete('Pragma');
+      h.delete('Expires');
+      h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      h.set('Pragma', 'no-cache');
+      h.set('Expires', '0');
+      h.set('ETag', '"' + Date.now() + '"');
+      return new Response(res.body, { status: res.status, headers: h });
+    }
     if (/\.(js|mjs|css)$/.test(url.pathname)) {
-      const res = await env.ASSETS.fetch(request);
+      const res = await assetsFresh(env, request);
       const h = new Headers(res.headers);
       /* ⛌⛌⛌ لازم نمسح كل الـcache-control القديم ونحط واحد
        📌 ⛌ ⛌ ⛌ (لأن الـ_headers بيحط ٣ قواعد متلاصقة)
