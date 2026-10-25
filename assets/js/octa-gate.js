@@ -1503,6 +1503,12 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  /* ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ device جديد ⇒ شاشة إيميل مخصصة
  📌 (مش «محاولات كتيرة» — الرقم صح، الجهاز مختلف) */
  if (o.d && (o.d.why === 'new_device' || o.d.why === 'new_device_code')) {
+ /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ نحتفظ بالأسورد
+ 📌 السبب: بعد ما يأكد الإيميل، الباك كان بيطلب «٤ أرقام جديدة»
+ 📌 ⛌⛌⛌ ⇒ المستخدم لازم يغيّر باسورده ويفتكر رقم تاني (كل مرة).
+ 📌 ✅ الحل: نحفظ الرقم ونبعته نفسه ⇒ يفضل يدخل بنفس الأرقام
+ 📌 والجهاز الجديد يتسجّل مرة واحدة وبس. */
+ try { flow.keepPin = p; } catch (e) { }
  askCode('newdev'); return;
  }
  if (needCode(o.d)) { askCode('need'); return; }
@@ -1945,7 +1951,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  boxEl().className = 'gt-box pin';
  formEl().innerHTML =
  '<div class="gt-ico">🔐</div>' +
- '<h1 class="gt-h">' + (reg ? 'اختار ٤ أرقام' : 'اختار ٤ أرقام جديدة') + '</h1>' +
+ '<h1 class="gt-h">' + (reg ? 'اختار ٤ أرقام' : (flow.keepPin ? 'بنأكد جهازك…' : 'اختار ٤ أرقام جديدة')) + '</h1>' +
  '<p class="gt-sub2">' +
  (reg ? 'دي اللي هتدخل بيه من هنا  من غيرها مفيش دخول'
  : 'دي اللي هتدخل بيه من هنا') + '</p>' +
@@ -1956,9 +1962,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  if (reg) { codeEntry(); } else { login(); }
  };
 
- onPad(function (v) {
- paintPad(true);
- clearMsg();
+ var submitPin = function (v) {
  /* 📌 تروكن الفتح في هيدر Authorization (مش في الـbody) —
  زي ما الباك بيقرا (_bearer). والـbody فيه new_pin بس. */
  /* ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐ نرسل الجهاز مع الباسورد الجديد.
@@ -2030,7 +2034,20 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  state.pin = ''; paintDots(); paintPad(false);
  down('تغيير الباسورد');
  });
+ };
+ onPad(function (v) {
+ paintPad(true);
+ clearMsg();
+ submitPin(v);
  });
+ /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ «جهاز جديد» ⇒ نفس الـ٤ أرقام
+ 📌 بعد التأكيد بالإيميل: لو الأسورد صح ⇒ نبعته نفسه ⇒
+ 📌 ⛌⛌⛌ مفيش «اختار ٤ أرقام جديدة» (الرقم ما يتغيرش).
+ 📌 ✅ والجهاز الجديد بيتسجّل ⇒ من بعدها ٤ أرقام وبس من غير كود. */
+ if (!reg && flow.keepPin) {
+ var kp = flow.keepPin; flow.keepPin = '';
+ setTimeout(function () { try { submitPin(kp); } catch (e) { } }, 120);
+ }
  }
 
  /* ═══ «أريد مساعدة» — صفحة مساعدة جوه البوابة ═══ */
