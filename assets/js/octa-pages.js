@@ -318,6 +318,13 @@ async function openIntel(code) {
   window.scrollTo({top: 0, behavior: 'smooth'});
 
   try {
+  /* ⭐ ٢٥ أكتوبر ٢٠٢٦ — لازم OS_DB يكون محمّل (فيه الدرجة والقرار)
+     📌 لو المستخدم فتح صفحة السهم من لينك مباشر من غير ما يعدّي على
+     📌 ⛌⛌ صفحة الأسهم ⇒ OS_DB فاضي ⇒ الدرجة «—» تاني. */
+  try {
+  if (typeof octaLoadDB === 'function'
+  && (typeof OS_DB === 'undefined' || !OS_DB || !OS_DB.length)) await octaLoadDB();
+  } catch (e) { }
   const res = await octaFetch(OCTA_API + '/api/intelligence/' + code);
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const d = await res.json();
@@ -343,12 +350,25 @@ function closeIntel() {
 
 function renderIntel(d) {
   const ax = d.axes || {};
-  const dec = d.decision || '—';
+  /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ الدرجة والقرار من مصدر واحد (OS_DB)
+  📌 السبب: /api/intelligence بيخفي final_score و decision عن قصد ⇒
+  📌 ⛌⛌⛌ ⇒ الدائرة كانت «—» والقرار فاضي (والمستخدم مش فاهم السبب).
+  📌 ✅ الحل: نفس مصدر كروت السوق — octaStockMeta (من /api/rank المحمي).
+  📌    وده نفس الرقم اللي في اللوحة وفي الفلتر — مصدر واحد للكل. */
+  const _meta = (typeof octaStockMeta === 'function') ? octaStockMeta(d.code)
+           : { score: null, decision: null, confidence: null };
+  const _score = (_meta.score != null && isFinite(_meta.score)) ? Math.round(_meta.score)
+              : (d.final_score != null && isFinite(d.final_score) ? Math.round(d.final_score) : null);
+  const dec = d.decision || _meta.decision || '—';
   const decClass = octaDecCls(dec);
 
   // المحاور
   let axisHtml = '';
-  const W = (CFG.weights && CFG.weights.intel) || {};
+  /* ⭐ ٢٥ أكتوبر ٢٠٢٦ — الأوزان الحقيقية من السيرفر
+     📌 كان CFG.weights.intel فاضي ⇒ كل الأوزان «0%» جنب كل محور.
+     📌 ✅ الحل: لو الأوزان مش جاهزة ⇒ نستخدم engineWeights (نفس المصدر). */
+  const W = (CFG.weights && CFG.weights.intel && Object.keys(CFG.weights.intel).length)
+  ? CFG.weights.intel : (CFG.engineWeights || {});
   for (const k of Object.keys(AXIS_LABELS)) {
   const v = ax[k];
   const val = (v === undefined || v === null) ? 0 : Math.round(v);
@@ -399,7 +419,7 @@ function renderIntel(d) {
   '<span class="intel-chg ' + (d.change >= 0 ? 'pos' : 'neg') + '">' +
   (d.change >= 0 ? '▲ +' : '▼ ') + Number(d.change).toFixed(2) + '%</span></div>' +
   '<div class="intel-scores">' +
-  '<div class="score-circle gold"><div class="sc-val">' + (d.final_score ?? '—') + '</div><div class="sc-label">النتيجة النهائية</div></div>' +
+  '<div class="score-circle gold"><div class="sc-val">' + (_score ?? '—') + '</div><div class="sc-label">النتيجة النهائية</div></div>' +
   '<div class="score-circle blue"><div class="sc-val">' + (d.confidence ?? '—') + '%</div><div class="sc-label">الثقة</div></div>' +
   '</div>' +
   '<div style="margin-top:18px">' +
@@ -469,7 +489,7 @@ function renderIntel(d) {
   }
   var risks = (rk.top_risks || []).map(function(r){ return '<li class="neg">' + r.الوصف + '</li>'; }).join('');
   return '<div class="why-box" style="grid-column: 1 / -1">' +
-  '<div class="why-title">⚠️ المخاطر المتقدمة — أمان ' + rk.safety_score + '/100 (' + rk.risk_level + ')</div>' +
+  '<div class="why-title">⚠️ المخاطر المتقدمة — أمان ' + ((rk.safety_score != null) ? rk.safety_score : ((rk.risk_score != null) ? rk.risk_score : '—')) + '/100 (' + rk.risk_level + ')</div>' +
   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">' +
   '<div>' + rows + (rk.risk_adjusted_opportunity ?
   '<div style="margin-top:10px;padding:8px;background:rgba(212,175,55,0.08);border-radius:8px;font-size:0.85rem">' +
@@ -649,7 +669,7 @@ async function renderStrategies(code) {
   '<div class="focus">' + s.focus + '</div>' +
   '<div class="strat-score-row">' +
   '<span class="strat-score-big">' + s.score + '</span>' +
-  '<span class="strat-verdict ' + vc + '">' + s.decision + '</span>' +
+  '<span class="strat-verdict ' + vc + '">' + (s.decision || '—') + '</span>' +
   '<span style="color:var(--muted);font-size:.8rem">ثقة ' + s.confidence + '%</span>' +
   '</div>' +
   '<div style="display:flex;gap:14px;margin-top:10px;font-size:.8rem;color:var(--muted)">' +

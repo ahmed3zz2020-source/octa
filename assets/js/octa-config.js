@@ -126,7 +126,15 @@ window.CFG = CFG;
 
   function apply(d) {
     if (!d || !d.ok) return;
-    if (d.engine && Object.keys(d.engine).length) CFG.engineWeights = d.engine;
+    if (d.engine && Object.keys(d.engine).length) {
+      CFG.engineWeights = d.engine;
+      /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ السيرفر بيبعت الأوزان في d.engine
+      📌 السبب: CFG.weights.egx / .intel كانوا فاضيين ⇒ كل الأوزان «0%».
+      📌 ✅ الحل: ننسخ نفس الأوزان لكل أسواق (مصدر واحد — الباك). */
+      ['us','egx','usScan','intel'].forEach(function (k) {
+        if (!CFG.weights[k] || !Object.keys(CFG.weights[k]).length) CFG.weights[k] = d.engine;
+      });
+    }
     if (d.weights) {
       ['us','egx','usScan','intel'].forEach(function (k) {
         if (d.weights[k] && Object.keys(d.weights[k]).length) CFG.weights[k] = d.weights[k];
