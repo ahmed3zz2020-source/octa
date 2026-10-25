@@ -153,19 +153,23 @@
   ══════════════════════════════════════════════════════════════ */
   const FIELD_ALIAS = {
   /* ⭐ أسماء EGX_DB (data_full) — دي الغنية */
-  dy: ['dy', 'div_yield'], de: ['de', 'de_ratio'], mc: ['mc', 'mkt_cap'],
+  dy: ['dy', 'yield', 'div_yield'], de: ['de', 'de_ratio'], mc: ['mc', 'mkt_cap'],
   nm: ['nm', 'net_margin'], om: ['om', 'op_margin'], gm: ['gm', 'gross_margin'],
   roic: ['roic', 'roic'], mdd1y: ['mdd1y', 'mdd1y'], vol1y: ['vol1y', 'vol1y'],
   sharpe3y: ['sharpe3y', 'sharpe3y'], cagr3y: ['cagr3y', 'cagr3y'],
   cr: ['cr', 'current_ratio'], qr: ['qr', 'quick_ratio'],
-  av30: ['av30', 'avg_volume_30d'], p1y: ['perf1y', 'perf_y', 'p1y'],
+  av30: ['av30', 'avgVol30', 'avg_volume_30d'],
+  p1y: ['perf1y', 'perf_y', 'p1y'],
   p1m: ['perf1m', 'perf_1m', 'p1m'], p3m: ['perf3m', 'perf_3m', 'p3m'],
   p6m: ['perf6m', 'perf_6m', 'p6m'], pYtd: ['perfYtd', 'perf_ytd', 'pYtd'],
   p1w: ['perf1w', 'perf_w', 'p1w'], rel_volume: ['relvol', 'rel_volume'],
+  revenue: ['rev', 'revenue'], sharpe: ['sharpe', 'sharpe3y'],
+  ema20: ['ema20', 'ema20'],
   volatility: ['volatility', 'volatility'], upside: ['upside', 'upside'],
   roic: ['roic', 'roic'], cr: ['current_ratio', 'cr'], qr: ['quick_ratio', 'qr'],
   conf: ['conf', 'confidence'], total: ['total', 'score', 'final_score'],
   verdict: ['verdict', 'decision'], tvRec: ['tvRec', 'tv_rating'],
+  perf1y: ['perf1y'], perf1m: ['perf1m'], perf3m: ['perf3m'], perf6m: ['perf6m'],
   ma50: ['ma50', 'sma50'], ma200: ['ma200', 'sma200'],
   av30: ['avg_volume_30d', 'av30'], volume: ['volume', 'vol'],
   p1w: ['perf_w', 'p1w'], p1m: ['perf_1m', 'p1m'], p3m: ['perf_3m', 'p3m'],
@@ -190,6 +194,11 @@
   if (o.price == null && o.p != null) o.price = o.p;
   if (o.volume == null && o.v != null) o.volume = o.v;
   if (o.score == null && o.total != null) o.score = o.total;
+  /* ⭐ EGX_DB: الدرجة في `score` والقرار في `decision` */
+  if (o.total == null && o.score != null) o.total = o.score;
+  if (!o.verdict && o.decision) o.verdict = o.decision;
+  if (o.dy == null && o.yield != null) o.dy = o.yield;
+  if (o.rel_volume == null && o.relvol != null) o.rel_volume = o.relvol;
   Object.keys(FIELD_ALIAS).forEach(function (k) {
   if (o[k] != null) return;
   const alt = FIELD_ALIAS[k];
