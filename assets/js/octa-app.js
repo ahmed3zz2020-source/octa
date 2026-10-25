@@ -100,8 +100,46 @@ async function loadEgypt(){
   const idx=(ticker&&ticker.ticker||[]).find(t=>t.id==='tk-egx');
   // كل الأسهم — مش بس أعلى 20
   const all=prices.egx30.filter(s=>s&&s.code);
+  /* ════════════════════════════════════════════════════════════════
+  ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ إصلاح الدرجة الـNaN في كروت لوحة الأسواق
+  ────────────────────────────────────────────────────────────────
+  📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌
+  📌 المشكلة: /api/prices بيخفي `final_score` (أمان) ⇒ `score` undefined
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⛌ ⛌ ⇒ `Math.round(undefined)` = NaN ⇒ **width:NaN% + «NaN»**
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⛌ ⛌ ⇒ ⇒ ⇒ المستخدم شايف مربع أحمر فاضي و«NaN» بدل الدرجة!
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌
+  📌 ✅ الحل: ندمج OS_DB (من /api/data_full المحمي — فيها الدرجة)
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⛌ ⛌ (السعر من /api/prices · الدرجة والقرار من OS_DB).
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  ════════════════════════════════════════════════════════════════ */
+  let scoreMap = {};
+  try {
+  /* ⛔ لو OS_DB لسه فاضي (الـcore لسه بيحمّل) ⇒ نستنى شوية */
+  if ((typeof OS_DB === 'undefined' || !OS_DB || !OS_DB.length) && typeof octaLoadDB === 'function') {
+  try { await octaLoadDB(); } catch (e) { }
+  }
+  if (typeof OS_DB !== 'undefined' && OS_DB && OS_DB.length) {
+  for (var i=0;i<OS_DB.length;i++) scoreMap[OS_DB[i].code] = OS_DB[i];
+  }
+  } catch (e) { }
+  const merged = all.map(function(s){
+  const db = scoreMap[s.code];
+  if (!db) return s;
+  return Object.assign({}, s, {
+  final_score: (db.score!=null)?db.score:(s.final_score!=null?s.final_score:null),
+  score: (db.score!=null)?db.score:(s.score!=null?s.score:null),
+  decision: db.decision || s.decision || null,
+  conf: (db.conf!=null)?db.conf:(s.conf!=null?s.conf:null),
+  safety: (db.safety!=null)?db.safety:(s.safety!=null?s.safety:null)
+  });
+  });
   return{index: idx?{name:'EGX 30',value:idx.value,change:idx.change}:null,
-  top10: all};
+  top10: merged};
 }
 
 async function loadUS(){
@@ -286,7 +324,10 @@ function render(){
   if(!rows.length){ $('out').innerHTML='<div class="empty">مفيش نتائج للفلتر ده</div>'; return }
 
   $('out').innerHTML='<div class="grid">'+rows.map(r=>{
-  const [vt,vc]=verdictOf(Math.round(r.score));
+  /* ⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ guard ضد NaN (لو الدرجة مش متاحة)
+  📌 ⇒ نعرض «—» بدل «NaN» ومفيش مربع أحمر فاضي */
+  const _sc = (r.score!=null && isFinite(r.score)) ? Math.round(r.score) : null;
+  const [vt,vc]=verdictOf(_sc==null?0:_sc);
   const ch=r.change;
   return'<div class="scard '+(ch>=0?'up':'down')+'" onclick="openCard(\''+r.code+'\',null,\''+MK+'\')">'+
   '<div class="sh"><div>'+
@@ -295,8 +336,8 @@ function render(){
   '<div class="snm">'+esc(r.name)+'</div>'+
   '</div><div class="spx"><b>'+nf(r.price)+'</b>'+
   '<span class="'+(ch>=0?'up':'down')+'">'+(ch>=0?'▲ +':'▼ ')+nf(ch)+'%</span></div></div>'+
-  '<div class="sbar"><span class="tk"><span class="fl '+cls(r.score)+'" style="width:'+Math.round(r.score)+'%"></span></span>'+
-  '<span class="nv '+cls(r.score)+'">'+Math.round(r.score)+'</span>'+
+  '<div class="sbar"><span class="tk"><span class="fl '+cls(_sc==null?0:_sc)+'" style="width:'+(_sc==null?0:_sc)+'%"></span></span>'+
+  '<span class="nv '+cls(_sc==null?0:_sc)+'">'+(_sc==null?'—':_sc)+'</span>'+
   '<span class="bdg '+vc+'">'+vt+'</span></div>'+
   '<div class="rmet">'+
   '<span>'+esc(r.sector)+'</span>'+
