@@ -911,7 +911,7 @@
     /* ── تحديد أسلوب الدخول ───────────────────────────────────
        ① كسر مقاومة: السعر تحت المقاومة closest
        ② ارتداد من دعم: السعر قريب من الدعم
-       ⛔ لو مفيش ⇒ ما في��ش خطة (مش نفترض السعر الحالي دخول) */
+       ⛔ لو مفيش ⇒ ما فيش خطة (مش نفترض السعر الحالي دخول) */
     var distRes = res ? (res - px) / px * 100 : null;
     var distSup = sup ? (px - sup) / px * 100 : null;
 
@@ -1523,6 +1523,17 @@
     if (corePass() === groups.core.length && risky) {
       return { code: 'C', state: CLASS.C, reasons: ok, failed: fail, missing: missing };
     }
+    /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — تدقيق التصنيف (نور-الكوانت)
+       ⛌ الباج: شرط «المخاطرة» كان في مجموعة مستقلة، وفرع B
+       ⛌ (أساس جيد + ناقص تأكيد) **مش بيفحصها خالص**.
+       ⛌ ⛌⛔ النتيجة: سهم مخاطرته VERY HIGH RISK + زخم ضعيف
+       ⛌ كان بياخد **B = «مرشح — محتاج تأكيد»** (شبه إيجابي!)
+       ⛌ ⛌⛔ التصحيح: المخاطرة العالية ليها الأولوية على B.
+       ⛌ أي سهم HIGH / VERY HIGH RISK ⇒ C (HIGH RISK) مش B.
+       ⛌ B معناها «مرشح» — ومينفعش نديها لسهم معروف إنه عالي الخطر. */
+    if (risky && confirmPass() >= 3) {
+      return { code: 'C', state: CLASS.C, reasons: ok, failed: fail, missing: missing };
+    }
     /* ── B: أساس جيد + ناقص تأكيد ───────────────────────── */
     if (corePass() >= groups.core.length - 1 && confirmPass() >= 3) {
       return { code: 'B', state: CLASS.B, reasons: ok, failed: fail, missing: missing };
@@ -1615,7 +1626,7 @@
   return {
     /* أدوات */
     num: num, clamp: clamp, round1: round1, round2: round2, pxRound: pxRound, pxDec: pxDec,
-    /* جود�� البيانات */
+    /* جودة البيانات */
     DQ: DQ, cleanCandles: cleanCandles, dataQuality: dataQuality, hasRealMovement: hasRealMovement,
     /* مؤشرات */
     sma: sma, ema: ema, emaSeries: emaSeries, emaAligned: emaAligned, rsi: rsi, rsiSeries: rsiSeries,
