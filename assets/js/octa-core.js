@@ -1238,6 +1238,79 @@ async function loadEgxFile(){
   }
 }
 
+
+/* ════════════════════════════════════════════════════════════════
+ 🏷️ ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ مصدر موحّد للدرجة والقرار
+ ────────────────────────────────────────────────────────────────
+ 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌 📌
+ 📌 المشكلة: /api/intelligence و /api/data_full بيخفيوا
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ `final_score` و `decision` (أمان — صح)
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⇒ كارت القرار كان بيعرض «الدرجة 0/100»!
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌
+ 📌 ✅ الحل: OS_DB مبني من /api/rank (محمي) ⇒ فيه الدرجة والقرار.
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⇒ helper واحد: octaStockMeta(code)
+ ════════════════════════════════════════════════════════════════ */
+function octaStockMeta(code) {
+  var out = { score: null, decision: null, confidence: null, safety: null };
+  try {
+    if (typeof OS_DB === 'undefined' || !OS_DB || !OS_DB.length) return out;
+    for (var i = 0; i < OS_DB.length; i++) {
+      var s = OS_DB[i];
+      if (!s || s.code !== code) continue;
+      if (s.score != null && isFinite(s.score)) out.score = Number(s.score);
+      if (s.decision) out.decision = s.decision;
+      if (s.conf != null && isFinite(s.conf)) out.confidence = Number(s.conf);
+      if (s.safety != null && isFinite(s.safety)) out.safety = Number(s.safety);
+      /* ⭐ الدرجة النهائية (من /api/rank) أدق من score المحسوب */
+      if (s.final_score != null && isFinite(s.final_score)) out.score = Number(s.final_score);
+      return out;
+    }
+  } catch (e) { }
+  return out;
+}
+
+/* ⚖️ ⭐ أوزان المحرك السبعة — من السيرفر (مجموع 100%)
+   📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+   📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+   📌 ⛌ ⛌ الكود القديم كان بيعرض ٣ أوزان بس (٢٤+٢٢+١٨ = ٦٤٪!)
+   📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+   📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+   📌 ✅ الحل: كل الأوزان السبعة بالترتيب + المجموع.
+ */
+function octaEngineWeights() {
+  var w = {};
+  try {
+    if (window.CFG && CFG.engineWeights && Object.keys(CFG.engineWeights).length) w = CFG.engineWeights;
+    else if (window.CFG && CFG.weights && CFG.weights.egx && Object.keys(CFG.weights.egx).length) w = CFG.weights.egx;
+  } catch (e) { }
+  return w || {};
+}
+function octaWeightsHtml() {
+  var w = octaEngineWeights();
+  var NAMES = { technical:'فني', fundamental:'أساسي', liquidity:'سيولة', news:'أخبار',
+    sentiment:'معنويات', risk:'مخاطرة', portfolio:'محفظة' };
+  var ORDER = ['technical','fundamental','liquidity','news','sentiment','risk','portfolio'];
+  var parts = [], total = 0;
+  for (var i = 0; i < ORDER.length; i++) {
+    var k = ORDER[i];
+    var v = Number(w[k]);
+    if (!isFinite(v) || v <= 0) continue;
+    total += v;
+    parts.push(NAMES[k] + ' <span class="flt-ltr">' + v + '%</span>');
+  }
+  if (!parts.length) return '';
+  var sumTxt = (total !== 100) ? ' · المجموع <span class="flt-ltr">' + total + '%</span>' : '';
+  return '<div style="font-size:.7rem;color:var(--muted);margin-top:8px;line-height:1.9">'
+    + 'أوزان المحرك: ' + parts.join(' · ') + sumTxt + '</div>';
+}
+
 async function octaLoadDB(){
   if (OS_READY) return OS_DB;
 

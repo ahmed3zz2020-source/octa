@@ -467,7 +467,16 @@ async function cardEGX(code,row){
   const RK=(risk&&risk.risk)||{};
   const NW=(news&&news.news)||news||{};
   const OP=(opp&&opp.opportunity)||{};
-  const S=Math.round(intel.final_score||0);
+  /* ════════════════════════════════════════════════════════════════
+  ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ الدرجة والقرار من OS_DB (مصدر واحد)
+  📌 السبب: /api/intelligence بيخفي final_score و decision (أمان)
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⛌ ⛌ ⇒ كانت الدرجة «0» والقرار فاضي.
+  📌 ✅ الحل: OS_DB (من /api/rank المحمي) فيه الدرجة والقرار.
+  ════════════════════════════════════════════════════════════════ */
+  const _meta = (typeof octaStockMeta === 'function') ? octaStockMeta(code) : {score:null,decision:null,confidence:null};
+  const S = Math.round((_meta.score!=null) ? _meta.score : (intel.final_score||0));
+  const _dec = _meta.decision || intel.decision || '';
   const [vt,vc]=verdictOf(S);
   const color=S>=CFG.th.buy?'#16c79a':(S>=CFG.th.hold?'#d4af37':'#ff5252');
 
@@ -640,7 +649,7 @@ async function cardEGX(code,row){
   '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'+
   '<div><div style="font-size:.95rem;font-weight:900;color:#fff">'+esc(intel.name)+'</div>'+
   '<div style="font-size:.71rem;color:var(--muted);margin-top:3px">'+esc(code)+' · '+esc(f.sector||intel.sector||'—')+
-  ' · أمان '+(re.safety_score!=null?re.safety_score:'—')+' · قرار المحرك: <b>'+esc(intel.decision||'—')+'</b></div></div>'+
+  ' · أمان '+(re.safety_score!=null?re.safety_score:'—')+' · قرار المحرك: <b>'+esc(_dec||'—')+'</b></div></div>'+
   '<div style="text-align:left"><div style="font-size:1.3rem;font-weight:900;color:#fff">'+
   nf(intel.price)+' <span style="font-size:.72rem;color:var(--muted)">ج.م</span></div>'+
   '<span style="font-size:.78rem;font-weight:800;color:'+(intel.change>=0?'var(--sec)':'var(--red2)')+'">'+
@@ -653,11 +662,11 @@ async function cardEGX(code,row){
   '<div class="mcard"><div class="msec">🎯 القرار</div>'+ ringHTML(S,color)+
   '<div style="text-align:center"><span class="bdg '+vc+'">'+vt+'</span></div>'+
   '<div style="text-align:center;font-size:.75rem;color:var(--muted);margin-top:8px">'+
-  'الدرجة '+S+'/100 · ثقة '+nf(intel.confidence,0)+'% · مكتمل '+(dc!=null?dc+'%':'—')+'</div>'+
+  'الدرجة <b style="color:'+color+'">'+S+'</b>/100 · ثقة '+nf((_meta.confidence!=null)?_meta.confidence:(intel.confidence||0),0)+'% · مكتمل '+(dc!=null?dc+'%':'—')+'</div>'+
   '</div>'+
 
   '<div class="mcard"><div class="msec">🦞 الأذرع السبعة</div>'+arms+
-  '<div style="font-size:.7rem;color:var(--muted);margin-top:8px">أوزان المحرك: مخاطرة <span class="flt-ltr">24%</span> · أساسي <span class="flt-ltr">22%</span> · سيولة <span class="flt-ltr">18%</span></div></div>'+
+  ((typeof octaWeightsHtml === 'function') ? octaWeightsHtml() : '')+'</div>'+
 
   '<div class="mcard"><div class="msec">🔍 ليه القرار</div>'+why+
   (ex.formula?'<div style="font-size:.7rem;color:var(--muted);margin-top:7px">المعادلة: '+esc(ex.formula)+'</div>':'')+
