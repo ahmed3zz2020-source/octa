@@ -798,9 +798,11 @@ function renderDashboard(d) {
   📌 ⛔⛔⛔ لازم تبقى «متوسط البورصة» ومش «المؤشر» (صدق قبل شكل).
   📌 ✅ الحل: ٣ أعمدة، كل رقم تحته اسم واضح + سطر شرح + سطر «مهم».
   ════════════════════════════════════════════════════════════════ */
+  /* ⭐ ٢٥ أكتوبر ٢٠٢٦ — اسم عمود المقارنة يجي من الباك (مؤشر ولا متوسط) */
+  var MLBL = (d.benchmark && d.benchmark.market_label) || 'متوسط أسهم البورصة';
   var bench = (d.benchmark && d.benchmark.periods || []).map(function(p){
   return '<div class="bench-row"><span class="bench-p">' + p.period + '</span>' +
-  '<span class="bench-c"><i>متوسط البورصة</i><b class="bench-m">' + p.market + '%</b></span>' +
+  '<span class="bench-c"><i>' + MLBL + '</i><b class="bench-m">' + p.market + '%</b></span>' +
   '<span class="bench-c"><i>أفضل ٢٠ عندنا</i><b class="bench-t">' + p.top20 + '%</b></span>' +
   '<span class="bench-c"><i>فرق العائد</i><b class="bench-a ' + (p.alpha>=0?'pos':'neg') + '">' +
   (p.alpha>=0?'+':'') + p.alpha + '%</b></span></div>';
@@ -841,7 +843,7 @@ function renderDashboard(d) {
   (d.benchmark && d.benchmark.interpretation ?
   '<div class="dash-section"><div class="dash-h">📈 أداء أفضل ٢٠ سهم عندنا مقابل متوسط البورصة <small>' + (d.benchmark.interpretation||'') + '</small></div>' +
   bench +
-  '<div class="bench-note">الرقم الموجب (فرق العائد) يعني إن أفضل ٢٠ سهم عندنا كانت أعلى من متوسط البورصة في نفس الفترة، والسالب يعني إنها كانت أقل.</div>' +
+  '<div class="bench-note">الرقم الموجب (فرق العائد) يعني إن أفضل ٢٠ سهم عندنا كانت أعلى من ' + MLBL + ' في نفس الفترة، والسالب يعني إنها كانت أقل.</div>' +
   '<div class="bench-note">💡 الأرقام دي بتوصف فترة فاتت بس، ومش ضمان إن نفس الفرق هيتكرر في الفترة الجاية.</div>' +
   '<div class="bench-note warn">⚠️ مقارنة على أسعار النهارده بس، مش اختبار على بيانات قديمة — الاختبار الحقيقي محتاج لقطة يومية (صورة أسعار كل يوم) وبيتراكم مع الوقت.</div>' +
   '</div>' : '') +
