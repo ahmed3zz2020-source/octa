@@ -274,7 +274,7 @@ window.addEventListener('error', function (e) {
 <script id="octa-cache-clear">
   /* 🧹 مسح كاش التطبيق — يخلي أي تعديل جديد يوصل فوراً */
   (function () {
-  var BUILD = 'v=202610251200';
+  var BUILD = 'v=202610251207';
   var KEY = 'octa_build_v1';
   try {
   var prev = localStorage.getItem(KEY);
@@ -415,16 +415,16 @@ window.addEventListener('error', function (e) {
 <meta name="apple-mobile-web-app-title" content="OCTA">
 <link rel="apple-touch-icon" href="assets/icon-192.png">
 <link rel="icon" type="image/png" href="assets/icon-192.png">
-<link rel="stylesheet" href="assets/octa-tokens.css?v=202610251200">
-<link rel="stylesheet" href="assets/octa.css?v=202610251200">
-  <link rel="stylesheet" href="assets/css-decide.css?v=202610251200">
-  <link rel="stylesheet" href="assets/css-screener.css?v=202610251200">
-  <link rel="stylesheet" href="assets/css-chart.css?v=202610251200">
+<link rel="stylesheet" href="assets/octa-tokens.css?v=202610251207">
+<link rel="stylesheet" href="assets/octa.css?v=202610251207">
+  <link rel="stylesheet" href="assets/css-decide.css?v=202610251207">
+  <link rel="stylesheet" href="assets/css-screener.css?v=202610251207">
+  <link rel="stylesheet" href="assets/css-chart.css?v=202610251207">
 <!-- 🆕 محرك إشارة الذهب (16 أكتوبر 2026) — شارة + مودال التحليل -->
-<link rel="stylesheet" href="assets/css-gold.css?v=202610251200">
+<link rel="stylesheet" href="assets/css-gold.css?v=202610251207">
 <!-- 💰 Smart Money (22 أكتوبر 2026) — صفحة الفلتر والكروت -->
-<link rel="stylesheet" href="assets/css-money.css?v=202610251200">
-<link rel="stylesheet" href="assets/css-radar.css?v=202610251200">
+<link rel="stylesheet" href="assets/css-money.css?v=202610251207">
+<link rel="stylesheet" href="assets/css-radar.css?v=202610251207">
   <!-- 🔒 سياسة الأمان — بتتقرأ وتتركّب من octa-csp.js (report-only) -->
   <meta name="octa-csp-report" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com https://s.tradingview.com https://www.tradingview.com; frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com; form-action 'self'; img-src 'self' data: blob: https://*.tradingview.com https://*.tradingview-widget.com; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' https://s3.tradingview.com; connect-src 'self' https://octa-prices-production-4ccb.up.railway.app https://scanner.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://www.tradingview-widget.com https://*.tradingview.com https://news.google.com https://api.rss2json.com https://foudalens.com https://api.cors.lol; frame-src https://s3.tradingview.com https://www.tradingview.com https://*.tradingview-widget.com https://*.tradingview.com; media-src 'self' blob:; worker-src 'self' blob:">
 </head>
@@ -861,7 +861,7 @@ window.addEventListener('error', function (e) {
   <p class="page-subtitle">قرار عقل الأخطبوط بناءً على 8 محاور — بيانات حية من TradingView</p>
 
   <!-- 1) الـ Search في الأول (فوق خالص) — خانة بحث + dropdown للنتايج -->
-  <div class="section" style="background: linear-gradient(135deg, rgba(212,175,55,0.1), rgba(77,171,247,0.05));">
+  <div class="section" style="background: linear-gradient(135deg, var(--goldBg), rgba(77,171,247,0.05));">
   <div class="section-title">🔍 اختر السهم للتحليل</div>
   <div class="search-box" style="margin-bottom: 0;">
   <input type="text" id="engineSearch" placeholder="اكتب كود السهم (COMI, AMOC, EAST...)" oninput="filterEngineStocks(this.value)" style="font-size: 1rem; padding: 14px 48px 14px 16px;">
@@ -887,7 +887,7 @@ window.addEventListener('error', function (e) {
   <!-- العنوان + السورت -->
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
   <div class="section-title" style="margin: 0;">📊 رابع الأساسي وشراء 19 سهم</div>
-  <button onclick="sortEngineStocks('change')" style="background: rgba(212,175,55,0.15); color: var(--gold); padding: 6px 12px; border-radius: 8px; border: 1px solid var(--gold); font-size: 0.78rem; font-weight: 700; cursor: pointer;">⇅ التغير %</button>
+  <button onclick="sortEngineStocks('change')" style="background: var(--goldBg); color: var(--gold); padding: 6px 12px; border-radius: 8px; border: 1px solid var(--goldLine); font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;">⇅ التغير٪</button>
   </div>
   <!-- الجدول -->
   <div class="engine-table-scroll">
@@ -901,7 +901,7 @@ window.addEventListener('error', function (e) {
   <th>الصفقات</th>
   <th>القيمة</th>
   <th>الحجم</th>
-  <th class="th-change">التغير %</th>
+  <th class="th-change">التغير٪</th>
   <th>السعر</th>
   <th>الاسم</th>
   <th class="th-code">الرمز</th>
@@ -926,7 +926,7 @@ window.addEventListener('error', function (e) {
 
   <div class="section-title" style="margin-bottom: 12px; display:flex; justify-content:space-between; align-items:center;">
   <span>🐙 الـ 8 محاور (تحليل محرك OCTA)</span>
-  <button onclick="AI_LOADING=false; fetchAiAnalysis(currentEngineSymbol || 'COMI')" style="background:rgba(212,175,55,0.15);color:var(--gold);padding:5px 12px;border-radius:100px;border:1px solid var(--gold);font-size:0.72rem;font-weight:700;cursor:pointer;">🔄 تحديث</button>
+  <button onclick="AI_LOADING=false; fetchAiAnalysis(currentEngineSymbol || 'COMI')" style="background:var(--goldBg);color:var(--gold);padding:5px 12px;border-radius:100px;border:1px solid var(--goldLine);font-size:0.72rem;font-weight:700;cursor:pointer;">🔄 تحديث</button>
   </div>
   <div class="engine-bars" id="engineBars"></div>
   <div class="engine-decision" id="engineDecision"></div>
@@ -1090,7 +1090,7 @@ window.addEventListener('error', function (e) {
   <div class="live-dot"></div>
   <span id="newsLiveStatus" class="live-text">⏳ جاري التحميل...</span>
   <span class="live-meta">| 3 مصادر: Google News + Yahoo + Mubasher</span>
-  <button onclick="fetchAllNews()" style="margin-right: auto; background: rgba(212,175,55,0.2); color: var(--gold); padding: 6px 14px; border-radius: 100px; border: 1px solid var(--gold); font-size: 0.78rem; font-weight: 700; cursor: pointer;">🔄 تحديث الآن</button>
+  <button onclick="fetchAllNews()" style="margin-right: auto; background: var(--goldBg); color: var(--gold); padding: 6px 14px; border-radius: 100px; border: 1px solid var(--goldLine); font-size: 0.78rem; font-weight: 700; cursor: pointer;">🔄 تحديث الآن</button>
   </div>
 
   <!-- Filters -->
@@ -1724,8 +1724,8 @@ window.addEventListener('error', function (e) {
   <h3>🏆 أفضل الفرص الآن</h3>
   <div class="sub">مرتّبة بالنتيجة النهائية المدمجة (فني + أساسي + سيولة + مخاطر)</div>
   </div>
-  <button onclick="loadOpportunities()" style="padding:8px 18px;background:rgba(212,175,55,.1);
-  border:1px solid rgba(212,175,55,.3);border-radius:9px;color:var(--gold);
+  <button onclick="loadOpportunities()" style="padding:8px 18px;background:var(--goldBg);
+  border:1px solid var(--goldLine);border-radius:9px;color:var(--gold);
   font-weight:800;font-size:.82rem;cursor:pointer">🔄 تحديث</button>
   </div>
   <div class="opps-grid" id="oppsGrid"><div class="opps-loading">جاري التحميل...</div></div>
@@ -1841,21 +1841,21 @@ window.addEventListener('error', function (e) {
  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
  📌 ⚠️ مهم: لو رجعت الـcore قبل البوابة ⇒ المشكلة دي هترجع تاني.
  ════════════════════════════════════════════════════════════════ -->
-<script src="assets/js/octa-api.js?v=202610251200"></script>
-<script src="assets/js/octa-config.js?v=202610251200"></script>
+<script src="assets/js/octa-api.js?v=202610251207"></script>
+<script src="assets/js/octa-config.js?v=202610251207"></script>
 <!-- ⭐ البوابة هنا — قبل الـcore (عشان استرجاع الجلسة يسبق الطلبات) -->
-<script src="assets/js/octa-gate.js?v=202610251200"></script>
-<script src="assets/js/octa-auth.js?v=202610251200"></script>
-<script src="assets/js/octa-stats.js?v=202610251200"></script>
-<script src="assets/js/octa-core.js?v=202610251200"></script>
-<script src="assets/js/octa-sidebar.js?v=202610251200"></script>
-<script src="assets/js/octa-dev.js?v=202610251200"></script>
-<script src="assets/js/octa-clock.js?v=202610251200"></script>
-<script src="assets/js/octa-screener.js?v=202610251200"></script>
-<script src="assets/js/octa-pages.js?v=202610251200"></script>
-<script src="assets/js/octa-app.js?v=202610251200"></script>
-<script src="assets/js/octa-back.js?v=202610251200"></script>
-<script src="assets/js/octa-filters.js?v=202610251200"></script>
+<script src="assets/js/octa-gate.js?v=202610251207"></script>
+<script src="assets/js/octa-auth.js?v=202610251207"></script>
+<script src="assets/js/octa-stats.js?v=202610251207"></script>
+<script src="assets/js/octa-core.js?v=202610251207"></script>
+<script src="assets/js/octa-sidebar.js?v=202610251207"></script>
+<script src="assets/js/octa-dev.js?v=202610251207"></script>
+<script src="assets/js/octa-clock.js?v=202610251207"></script>
+<script src="assets/js/octa-screener.js?v=202610251207"></script>
+<script src="assets/js/octa-pages.js?v=202610251207"></script>
+<script src="assets/js/octa-app.js?v=202610251207"></script>
+<script src="assets/js/octa-back.js?v=202610251207"></script>
+<script src="assets/js/octa-filters.js?v=202610251207"></script>
 
 <!-- ❓ شرح تبويبات الصف التاني (؟) — لازم بعد octa-filters.js عشان
      fzRenderTabs/fzGo يبقوا موجودين وقت الـhook. الـmount بيعيد نفسه
@@ -1864,24 +1864,24 @@ window.addEventListener('error', function (e) {
 <!-- 🐙 19 أكتوبر 2026 — tv-shim.js = مصدر الرسومات الوحيد في الموقع.
      شارت TradingView واحد للفلتر والذهب وصفحة الشارت وتحليل السهم.
      اتشال: octa-chart.js · octa-chart-v2.js (الشارت canvas القديم). -->
-<script src="assets/js/tv-shim.js?v=202610251200"></script>
-<script src="assets/js/octa-gold.js?v=202610251200"></script>
-<script src="assets/js/octa-copy.js?v=202610251200"></script>
-<script src="assets/js/octa-watch.js?v=202610251200"></script>
-<script src="assets/js/octa-decide.js?v=202610251200"></script>
-<script src="assets/js/octa-settings.js?v=202610251200"></script>
-<script src="assets/js/octa-csp.js?v=202610251200"></script>
-<script src="assets/js/octa-armsfilter.js?v=202610251200"></script>
+<script src="assets/js/tv-shim.js?v=202610251207"></script>
+<script src="assets/js/octa-gold.js?v=202610251207"></script>
+<script src="assets/js/octa-copy.js?v=202610251207"></script>
+<script src="assets/js/octa-watch.js?v=202610251207"></script>
+<script src="assets/js/octa-decide.js?v=202610251207"></script>
+<script src="assets/js/octa-settings.js?v=202610251207"></script>
+<script src="assets/js/octa-csp.js?v=202610251207"></script>
+<script src="assets/js/octa-armsfilter.js?v=202610251207"></script>
 
 <!-- 💰 Smart Money (22 أكتوبر 2026) — المحرك النقي + صفحة الفلتر.
      لازم بعد tv-shim.js عشان الشارت (OCTA_TV.mount) يكون موجود. -->
-<script src="assets/js/octa-egx-names.js?v=202610251200"></script>
-<script src="assets/js/octa-radar.js?v=202610251200"></script>
-<script src="assets/js/octa-radar-explain.js?v=202610251200"></script>
-<script src="assets/js/octa-radar-ref.js?v=202610251200"></script>
-<script src="assets/js/octa-radar-ui.js?v=202610251200"></script>
-<script src="assets/js/octa-smartmoney.js?v=202610251200"></script>
-<script src="assets/js/octa-money.js?v=202610251200"></script>
+<script src="assets/js/octa-egx-names.js?v=202610251207"></script>
+<script src="assets/js/octa-radar.js?v=202610251207"></script>
+<script src="assets/js/octa-radar-explain.js?v=202610251207"></script>
+<script src="assets/js/octa-radar-ref.js?v=202610251207"></script>
+<script src="assets/js/octa-radar-ui.js?v=202610251207"></script>
+<script src="assets/js/octa-smartmoney.js?v=202610251207"></script>
+<script src="assets/js/octa-money.js?v=202610251207"></script>
 
 <!-- 🛠️ أدوات المطوّر — بتظهر بالمصادفة ولا ما فيش زرار عادي -->
 <div class="octa-devbar">
