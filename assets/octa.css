@@ -2024,7 +2024,7 @@
   .si-nws-h { font-size: .78rem; font-weight: 900; color: var(--gold); margin: 4px 0 10px;
   padding-bottom: 6px; border-bottom: 1px solid var(--line); }
   .si-load2 { padding: 26px; text-align: center; color: var(--muted); font-size: .84rem; }
-  .si-formula { background: rgba(0,0,0,.28); border: 1px solid var(--line); border-radius: 12px;
+  .si-formula { background: var(--wash); border: 1px solid var(--line); border-radius: 12px;
   padding: 14px 16px; direction: ltr; text-align: center; }
   .si-formula code { font-size: 1.02rem; color: var(--gold2); font-weight: 900; letter-spacing: .5px;
   font-family: 'SF Mono', Consolas, monospace; }
@@ -2052,7 +2052,7 @@
   border-radius: 13px; padding: 12px 14px; margin-bottom: 14px;
   }
   .ob-key input { flex: 1; min-width: 190px; padding: 11px 14px; border-radius: 11px;
-  background: rgba(0,0,0,.25); border: 1px solid var(--line); color: var(--txt);
+  background: var(--wash); border: 1px solid var(--line); color: var(--txt);
   font-family: inherit; font-size: .86rem; outline: none; direction: ltr; text-align: left; }
   .ob-key input:focus { border-color: var(--gold); }
   .ob-key button { padding: 11px 20px; border-radius: 11px; font-family: inherit; font-size: .84rem;
@@ -3577,7 +3577,9 @@ body{margin:0;padding:0 10px 50px;
 .ph-pre{background:rgba(212,175,55,.15);color:var(--gold2)}
 
 /* ===== التابات ===== */
-.tabs{display:flex;gap:6px;background:rgba(0,0,0,.28);padding:4px;border-radius:13px;margin-bottom:13px}
+/* ⛔⭐ ٢٥ أكتوبر ٢٠٢٦ — كان `rgba(0,0,0,.28)` hardcoded ⇒ في الوضع
+   النهاري بيبقى شريط رمادي غامق. ✅ بقى token (شفاف في الداكن، رمادي فاتح في النهاري). */
+.tabs{display:flex;gap:6px;background:var(--wash);padding:4px;border-radius:13px;margin-bottom:13px}
 .tab{flex:1;padding:10px 6px;border-radius:10px;border:none;background:transparent;color:var(--muted);
   font-family:inherit;font-size:.81rem;font-weight:800;cursor:pointer;transition:.2s;
   display:flex;align-items:center;justify-content:center;gap:5px}
@@ -3704,7 +3706,7 @@ body{margin:0;padding:0 10px 50px;
   @keyframes omInB { from { opacity:0; transform:translateY(12px);} to { opacity:1; transform:none;} }
   .omb{max-width:820px;margin:0 auto;min-height:100%;padding:0 12px 60px}
   .ombar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:9px;
-  padding:13px 4px;background:rgba(10,25,41,.97);backdrop-filter:blur(10px);
+  padding:13px 4px;background:var(--pri);backdrop-filter:blur(10px);
   border-bottom:1px solid var(--wash)}
   .omttl{flex:1;font-size:.98rem;font-weight:900;color:#d4af37;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .omb2,.omfull,.omback{padding:8px 12px;border-radius:9px;border:1px solid var(--wash);
