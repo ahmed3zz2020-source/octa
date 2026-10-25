@@ -565,3 +565,17 @@ OS_DB = 285 في كل الصفحات · CFG موجود · ٧ أوزان · مج�
 ### 📦 النشر
 - Production worker version: `80f95082-8559-4e18-9df8-ad03d6928a0f`
 - Commits: `be3b643` · `45c2759` · `d0ce7fe` · `416546a` · `6dcadb2` · `7ec70fb` · `9408324`
+
+### 🔧 إصلاحات نهائية
+- `.tab .ic` (علم صغير) ⇒ override نزع `padding/border/background` من تنسيق `.ic` (كارت info).
+- `.tabs` (شريط تبديل السوق) ⇒ `var(--wash)` بدل `rgba(0,0,0,.28)`.
+- `--gold2` النهاري ⇒ `#8a6d12` (كان `#b8912f` ⇒ تباين ١.٦).
+- `.bdg.b-hold` النهاري ⇒ `#7a5f0e`.
+- `.sb-out` النهاري ⇒ `#b4471f` · `.sb-bio` ⇒ `#1f7a4d`.
+- ٤ أزرار ذهبية في `index.html` ⇒ `var(--goldBg)` + `var(--goldLine)`.
+- «التغير %» ⇒ «التغير٪» (سطر واحد بدل تلاتة).
+
+### 📦 النشر النهائي
+- Production worker version: `0e0372ab-de8b-418e-b278-88313c0c979d`
+- Preview worker version: `0e0372ab-de8b-418e-b278-88313c0c979d`
+- آخر commit: `81a7558`
