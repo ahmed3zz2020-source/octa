@@ -904,6 +904,23 @@ export default {
     📌 ⛌ ⛌ ⛌ ⛌ ⇒ التحديثات الجديدة ما بتوصلش (bootstrap مفقود).
     📌 ✅ الحل: نفس الـJS — fetch + no-store.
     */
+    /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — روابط مباشرة للصفحات
+    📌 السبب: `/markets` و `/stocks` بيرجعوا 404 (مفيش ملفات HTML منفصلة —
+    📌 كل الصفحات SPA جوه index.html). ⛔ المستخدم طلب يقدر يفتح
+    📌 «لوحة الأسواق» من غير ما يرجع بالزر.
+    ✅ الحل: أي مسار صفحة معروف ⇒ نخدّم index.html (نفس الـSPA).
+    */
+    const SPA_ROUTES = ['/markets', '/stocks', '/tools', '/engine', '/arms', '/filters',
+      '/compare', '/radar', '/smartmoney', '/money', '/news', '/academy', '/watchlist'];
+    if (SPA_ROUTES.indexOf(url.pathname) !== -1) {
+      const res = await assetsFresh(env, new Request(new URL('/index.html', url), request));
+      const h = new Headers(res.headers);
+      h.delete('Cache-Control'); h.delete('Pragma'); h.delete('Expires');
+      h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      h.set('Pragma', 'no-cache'); h.set('Expires', '0');
+      h.set('ETag', '"' + Date.now() + '"');
+      return new Response(res.body, { status: 200, headers: h });
+    }
     if (/\.(html?)$/.test(url.pathname) || url.pathname === '/' || url.pathname === '/index.html') {
       const res = await assetsFresh(env, request);
       const h = new Headers(res.headers);

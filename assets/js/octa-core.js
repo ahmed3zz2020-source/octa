@@ -490,7 +490,17 @@ const OS_NAV = {
   /* 🔗 رابط مباشر: #money يفتح أداة Smart Money فوراً.
      ⛌ الرابط **يغلب** على آخر صفحة محفوظة (ده المقصود من اللينك).
      ⛌ لو الـDOM لسه جاهزش ⇒ نرجّع false عشان الـstart يعيد المحاولة. */
-  const hash = (location.hash || '').replace(/^#/, '').trim();
+  /* ⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ نقرا الـpathname كمان (مش الـhash بس)
+   📌 السبب: `/markets` و `/stocks` روابط مباشرة (الـworker بيقدّم index.html)
+   📌 ⇒ من غير الكود ده، الرابط بيفتح الرئيسية بدل لوحة الأسواق.
+   📌 ترتيب الأولوية: hash › pathname › الصفحة المحفوظة.
+   */
+  let hash = (location.hash || '').replace(/^#/, '').trim();
+  if (hash && hash.charAt(0) === '/') hash = hash.slice(1);
+  if (!hash) {
+    const pPath = (location.pathname || '').replace(/^\//, '').replace(/\.html$/, '');
+    if (pPath && pPath !== 'index' && typeof TOOL_PAGES !== 'undefined' && TOOL_PAGES.indexOf(pPath) >= 0) hash = pPath;
+  }
   if (hash && typeof TOOL_PAGES !== 'undefined' && TOOL_PAGES.indexOf(hash) >= 0) {
     if (!this.valid(hash)) return false;   // ⏳ لسه مش جاهزة
     this.restored = true;
@@ -642,6 +652,10 @@ function switchPage(id) {
   // ملاحظة: صفحة «الأسهم» بقت مستقلة (285 سهم) — التحويل القديم للبحث اتشال
   // if (id === 'stocks') id = 'search';
 
+  // ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — 'markets' و 'stocks' = نفس الصفحة بالظبط.
+  // 📌 السبب: رابط `/markets` المباشر لازم يفتح نفس «لوحة الأسواق».
+  // 📌 ⇒ نوحّدهم على 'stocks' قبل أي logic تاني.
+  if (id === 'markets') id = 'stocks';
   // ═══ الأدوات/الفلاتر اللي جايبينها من الرابط القديم — نفتح الصفحة القديمة زي ما هي ═══
   const isTool = TOOL_PAGES.indexOf(id) >= 0;
 
@@ -721,7 +735,11 @@ function switchPage(id) {
 }
 
 /* ══════════ الأدوات/الفلاتر — من الرابط القديم، بنفس الميزات ══════════ */
-const TOOL_PAGES = ['filter','best','screener','dividends','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms','money','radar','radar-stock'];
+/* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — 'stocks' و 'markets' اتضافوا عشان:
+   📌 رابط مباشر `#/stocks` أو `#/markets` يفتح لوحة الأسواق.
+   📌 + URL كامل (octashares.com/markets) — الـworker بيقدّم index.html.
+   ⚠️ 'stocks' و 'markets' نقطة واحدة — كلهم بيفتحوا نفس الصفحة. */
+const TOOL_PAGES = ['filter','best','screener','dividends','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms','money','radar','radar-stock','stocks','markets','smartmoney','watchlist'];
 /* ══════════════════════════════════════════════════════════════
  *  🧰 شريط الأدوات — 8 أدوات بس، والباتاقي في الـsidebar
  *  ──────────────────────────────────────────────────────────
