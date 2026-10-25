@@ -316,7 +316,11 @@
           results: S.results.map(r => ({
             c: r.code, n: r.name, s: r.sector, sc: r.score, cl: r.classification,
             tr: r.trend, mo: r.momentum, vo: r.volume, va: r.volatility,
-            pl: r.plan, rk: r.risk, sm: r.smart, dq: r.dq
+            pl: r.plan, rk: r.risk, sm: r.smart, dq: r.dq,
+            /* ⛔⭐ ٢٥ أكتوبر ٢٠٢٦ — كان ناقص `sizing` ⇒ الكاش بيرجّع
+               سهم من غير sizing ⇒ `sz.qty` كراش («reading 'qty'»).
+               ✅ بنحفظه دلوقتي. */
+            sz: r.sizing
           }))
         }));
         note('💾 اتحفظ كاش محلي');
@@ -380,8 +384,30 @@
       S.results = c.results.map(x => ({
         code: x.c, name: x.n, sector: x.s, score: x.sc, classification: x.cl,
         trend: x.tr, momentum: x.mo, volume: x.vo, volatility: x.va,
-        plan: x.pl, risk: x.rk, smart: x.sm, dq: x.dq
+        plan: x.pl, risk: x.rk, smart: x.sm, dq: x.dq,
+        /* ⛔⭐ ٢٥ أكتوبر ٢٠٢٦ — `sizing` من الكاش. ⛔ لو الكاش قديم
+           (من قبل الإصلاح) ⇒ مش موجود ⇒ بنحسبه fallback. */
+        sizing: x.sz || null
       }));
+      /* ⛔ كاش قديم (قبل ٢٥ أكتوبر) ⇒ `sizing` ناقص ⇒ نحسبه من `plan`.
+         ⛔ بدون ده: `sz.qty` ⇒ TypeError. */
+      S.results.forEach(r => {
+        if (!r.sizing) {
+          try {
+            r.sizing = (typeof R !== 'undefined' && R.sizingEngine)
+              ? R.sizingEngine(r.plan || {}, (S.money || {}))
+              : { capital: null, riskPct: null, maxAllocPct: null, riskAmount: null,
+                  qty: null, positionValue: null, allocationPct: null,
+                  estLoss: null, estProfit: null, capped: false,
+                  costsIncluded: false, costsNote: '' };
+          } catch (e) {
+            r.sizing = { capital: null, riskPct: null, maxAllocPct: null, riskAmount: null,
+              qty: null, positionValue: null, allocationPct: null,
+              estLoss: null, estProfit: null, capped: false,
+              costsIncluded: false, costsNote: '' };
+          }
+        }
+      });
       S.byCode = {};
       S.results.forEach(r => { S.byCode[r.code] = r; });
       S.scan.done = c.done || 0; S.scan.failed = c.failed || 0;
@@ -725,12 +751,41 @@
    ══════════════════════════════════════════════════════════════ */
   function openStock(code) {
     const a = S.byCode[code];
-    if (!a) return;
+    /* ⛔⭐ ٢٥ أكتوبر ٢٠٢٦ — السهم موجود في الجدول بس مش في `byCode`
+       (كاش قديم / فشل جزئي) ⇒ كنا بنعمل `return` صامت ⇒ المستخدم
+       بيضغط السهم ومفيش حاجة بتحصل.
+       ✅ دلوقتي: بنحسبه لوين ما كانش موجود. */
+    if (!a) {
+      const u = (S.universe || []).find(x => x && x.code === code);
+      if (u) {
+        try {
+          const c = S.candles[code] || [];
+          const tech = S.tech[code] || {};
+          const q = S.quotes[code] || {};
+          const built = R.analyze(c, {
+            code: u.code, name: u.name, sector: u.sector,
+            price: q.close != null ? q.close : tech.p,
+            change: q.change, marketCap: tech.mc,
+            rec: q['Recommend.All'], profile: S.profile, money: S.money
+          });
+          S.byCode[code] = built;
+          if (!S.results.some(r => r && r.code === code)) S.results.push(built);
+        } catch (e) {
+          note('⛔ تعذّر تحليل ' + code + ': ' + (e && e.message ? e.message : 'خطأ'));
+        }
+      }
+    }
+    const a2 = S.byCode[code];
+    if (!a2) {
+      const body = $('rdStockBody');
+      if (body) body.innerHTML = '<div class="rd-load">⛔ بيانات السهم غير متاحة — جرّب تعمل مسح تاني</div>';
+      return;
+    }
     S.selected = code;
     const body = $('rdStockBody');
     if (!body) return;
-    body.innerHTML = detailHTML(a);
-    bindDetail(a);
+    body.innerHTML = detailHTML(a2);
+    bindDetail(a2);
     bindBack();
     /* ⛔ لازم الصفحة تكون مسجّلة كـtool عشان الـhash يتبعها
        والرجوع يشتغل صح */
@@ -756,9 +811,56 @@
   }
 
   function detailHTML(a) {
-    const card = X.card(a, 'ar');
-    const se = X.scoreExplain(a, 'ar');
-    const steps = X.steps(a, 'ar');
+    /* ════════════════════════════════════════════════════════════════
+     * 🛡️ ٢٥ أكتوبر ٢٠٢٦ — حارس البنية (Schema Guard)
+     * ────────────────────────────────────────────────────────────────
+     * 📌 المشكلة: الكاش المحلي (٢٤ ساعة) كان بيرجّع بيانات **من قبل**
+     * 📌 إضافة `sizing` ⇒ `a.sizing` = undefined ⇒ `sz.qty` ⇒
+     * 📌 TypeError: Cannot read properties of undefined (reading 'qty')
+     * 📌 ⛔ والكراش كان بيقفل الصفحة بالكامل.
+     * ✅ الحل: نملأ أي جزء ناقص بالقيمة الآمنة (null) قبل الاستخدام.
+     * 📌 ⛔ القاعدة: أي object من الكاش/الـAPI ⇒ يمرّ من هنا الأول.
+     * ════════════════════════════════════════════════════════════════ */
+    if (!a || typeof a !== 'object') return '<div class="rd-load">⛔ بيانات السهم غير متاحة</div>';
+
+    /* القيم الناقصة الآمنة */
+    const _sz = (a.sizing && typeof a.sizing === 'object') ? a.sizing : {
+      capital: null, riskPct: null, maxAllocPct: null, riskAmount: null,
+      qty: null, positionValue: null, allocationPct: null,
+      estLoss: null, estProfit: null, capped: false,
+      costsIncluded: false, costsNote: ''
+    };
+    const _plan = (a.plan && typeof a.plan === 'object') ? a.plan : {
+      current: null, entry: null, stop: null, target1: null, target2: null,
+      rr: null, status: null, confirm: null, notes: []
+    };
+    const _risk = (a.risk && typeof a.risk === 'object') ? a.risk : {
+      state: null, warnings: [], flags: {}
+    };
+    const _smart = (a.smart && typeof a.smart === 'object') ? a.smart : {
+      score: null, confidence: 0, components: []
+    };
+    const _trend = (a.trend && typeof a.trend === 'object') ? a.trend : { state: null, score: null, parts: [] };
+    const _mom = (a.momentum && typeof a.momentum === 'object') ? a.momentum : { state: null, score: null, parts: [] };
+    const _vol = (a.volume && typeof a.volume === 'object') ? a.volume : { state: null, score: null, parts: [], liq: null };
+    const _va = (a.volatility && typeof a.volatility === 'object') ? a.volatility : { state: null, score: null, parts: [] };
+    const _dq = (a.dq && typeof a.dq === 'object') ? a.dq : { lastDate: null };
+
+    /* ⛔ نعمل نسخة آمنة — نعدّل النسخة دي بس (مش الأصل) */
+    const a2 = Object.assign({}, a, {
+      sizing: _sz, plan: _plan, risk: _risk, smart: _smart,
+      trend: _trend, momentum: _mom, volume: _vol, volatility: _va, dq: _dq
+    });
+    /* ⛔ `risk.warnings` لازم array دايماً */
+    if (!Array.isArray(a2.risk.warnings)) a2.risk = Object.assign({}, a2.risk, { warnings: [] });
+    /* ⛔ `plan.notes` لازم array دايماً */
+    if (!Array.isArray(a2.plan.notes)) a2.plan = Object.assign({}, a2.plan, { notes: [] });
+    /* ⛔ `smart.components` لازم array دايماً */
+    if (!Array.isArray(a2.smart.components)) a2.smart = Object.assign({}, a2.smart, { components: [] });
+
+    const card = X.card(a2, 'ar');
+    const se = X.scoreExplain(a2, 'ar');
+    const steps = X.steps(a2, 'ar');
     const parts = (arr) => (arr || []).map(p =>
       '<div class="rd-part ' + (p.ok ? 'ok' : 'no') + '"><i>' + (p.ok ? '✓' : '✕') + '</i>' +
       '<span><b>' + esc(p.label) + '</b> — ' + esc(p.detail || '') +
@@ -776,7 +878,7 @@
         '</div>';
     }
 
-    const t = a.trend, m = a.momentum, v = a.volume, va = a.volatility, sm = a.smart;
+    const t = a2.trend, m = a2.momentum, v = a2.volume, va = a2.volatility, sm = a2.smart;
     const indicators =
       '<div class="rd-ind">' +
       indCard('الاتجاه', 'trend', t.state, t.score,
@@ -784,22 +886,22 @@
         (t.ema50 != null ? '<span>EMA50 <b>' + fmtNum(t.ema50) + '</b></span>' : '') +
         (t.ema200 != null ? '<span>EMA200 <b>' + fmtNum(t.ema200) + '</b></span>' : '') +
         (t.adx != null ? '<span>ADX <b>' + fmtNum(t.adx) + '</b></span>' : ''),
-        X.trendText(a, 'ar'), t.parts) +
+        X.trendText(a2, 'ar'), t.parts) +
       indCard('الزخم', 'momentum', m.state, m.score,
         (m.rsi != null ? '<span>RSI <b>' + fmtNum(m.rsi) + '</b></span>' : '') +
         (m.macd != null ? '<span>MACD <b>' + fmtNum(m.macd) + '</b></span>' : '') +
         (m.signal != null ? '<span>الإشارة <b>' + fmtNum(m.signal) + '</b></span>' : ''),
-        X.momentumText(a, 'ar'), m.parts) +
+        X.momentumText(a2, 'ar'), m.parts) +
       indCard('حجم التداول', 'rvol', v.state, v.score,
         (v.rvol != null ? '<span>الحجم النسبي <b>' + fmtNum(v.rvol) + '×</b></span>' : '') +
         (v.turnover != null ? '<span>الدوران <b>' + fmtNum(v.turnover) + '%</b></span>' : '') +
         '<span>السيولة <b>' + X.tr('ar', v.liq) + '</b></span>',
-        X.volumeText(a, 'ar'), v.parts) +
+        X.volumeText(a2, 'ar'), v.parts) +
       indCard('التذبذب', 'atr', va.state, va.score,
         (va.atr != null ? '<span>ATR <b>' + fmtNum(va.atr) + '</b></span>' : '') +
         (va.atrPct != null ? '<span>ATR% <b>' + fmtNum(va.atrPct) + '</b></span>' : '') +
         (va.avgRange != null ? '<span>متوسط النطاق <b>' + fmtNum(va.avgRange) + '</b></span>' : ''),
-        X.volatilityText(a, 'ar'), va.parts) +
+        X.volatilityText(a2, 'ar'), va.parts) +
       '</div>';
 
     /* ── الدليل الذكي ── */
@@ -812,14 +914,14 @@
       '<div class="rd-cardbox"><h3>🕵️ نشاط التداول ' + tipBtn('smartMoney') +
       '<span class="sp">الدرجة: ' + (sm.score == null ? 'غير متاحة' : sm.score + ' / 100') +
       ' · الثقة: ' + X.tr('ar', sm.confidence) + '</span></h3>' +
-      '<div class="rd-txt" style="margin-bottom:8px">' + esc(X.smartText(a, 'ar')) + '</div>' +
+      '<div class="rd-txt" style="margin-bottom:8px">' + esc(X.smartText(a2, 'ar')) + '</div>' +
       '<div class="rd-parts">' + smRows + '</div>' +
       '<div class="rd-warn na">⛔ بيانات نشاط المؤسسات غير متاحة — ' +
       '«دليل النشاط الذكي» بيقيس الأدلة المتاحة من السعر والحجم وتوصية المحللين، ' +
       'مش بيوثّق إن المؤسسات هي اللي بتشتري.</div></div>';
 
     /* ── الخطة والمخاطرة ── */
-    const p = a.plan, sz = a.sizing;
+    const p = a2.plan, sz = a2.sizing;
     const plan =
       '<div class="rd-cardbox"><h3>🎯 خطة الدخول وإدارة المخاطر ' + tipBtn('riskReward') +
       '<span class="sp">' + esc(X.tr('ar', p.status)) + '</span></h3>' +
@@ -836,9 +938,9 @@
       (p.confirm ? '<div class="rd-txt"><b>شرط التأكيد:</b> ' + esc(p.confirm) + '</div>' : '') +
       (p.notes && p.notes.length ? '<div class="rd-warns">' + p.notes.map(n =>
         '<div class="rd-warn">⚠️ ' + esc(n) + '</div>').join('') + '</div>' : '') +
-      (a.risk.warnings.length ? '<div class="rd-warns">' + a.risk.warnings.map(w =>
+      (a2.risk.warnings.length ? '<div class="rd-warns">' + a2.risk.warnings.map(w =>
         '<div class="rd-warn ' + (w.k === 'institutional_na' ? 'na' : '') + '">⚠️ ' + esc(w.msg) + '</div>').join('') + '</div>' : '') +
-      '<div class="rd-txt" style="margin-top:9px">' + esc(X.planText(a, 'ar')) + '</div>' +
+      '<div class="rd-txt" style="margin-top:9px">' + esc(X.planText(a2, 'ar')) + '</div>' +
       '<div class="rd-txt" style="margin-top:6px;opacity:.85">⛔ كل المستويات افتراضية — ' +
       'مش أوامر. ⛔ تكاليف المعاملة غير مشمولة. ⛔ الكمية محسوبة على إعداداتك: ' +
       'رأس مال ' + fmtNum(S.money.capital) + ' · مخاطرة ' + S.money.riskPct + '% · ' +
@@ -859,8 +961,8 @@
       ' · تغطية ' + se.completeness + '%' +
       (se.note ? ' · ' + esc(se.note) : '') + '</div>' +
       '<div class="rd-parts" style="margin-top:8px">' + scoreRows + '</div>' +
-      (a.classification.missing.length ?
-        '<ul>' + a.classification.missing.map(m => '<li>' + esc(m) + '</li>').join('') + '</ul>' : '') +
+      ((a2.classification && a2.classification.missing && a2.classification.missing.length) ?
+        '<ul>' + a2.classification.missing.map(m => '<li>' + esc(m) + '</li>').join('') + '</ul>' : '') +
       '</div></div>';
 
     /* ── الخطوات ── */
