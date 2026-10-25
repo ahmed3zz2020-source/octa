@@ -77,7 +77,36 @@
   async function jget(path, ms) {
     const lim = ms || 45000;
     const t0 = Date.now();
-    const base = window.OCTA_API || '';
+    /* ════════════════════════════════════════════════════════════════
+   * 🗄️ CACHE_VERSION — ٢٥ أكتوبر ٢٠٢٦
+   * ────────────────────────────────────────────────────────────────
+   * 📌 المشكلة: الكاش المحلي (٢٤ ساعة) ما كانش فيه version.
+   * 📌 ⇒ كاش من كود قديم + كود جديد = كراش («reading 'qty'»).
+   * 📌 ⇒ والكاش القديم بيسرد أسماء أسهم مش موجودة في الـuniverse الحالي.
+   * ✅ الحل: كل تغيير في بنية البيانات ⇒ نرقّي الـversion ⇒ الكاش القديم يتجاهل.
+   * ⚠️ مهم: ده-protection مش بديل عن الـSchema Guard — الاتنين لازم.
+   */
+  const CACHE_VERSION = '20261025-sizing';
+
+  /* 🧹 ⭐ ٢٥ أكتوبر ٢٠٢٦ — مسح أي كاش رادار قديم عند الإقلاع.
+   * 📌 السبب: الكاش القديم (٢٤ ساعة) بيسرد أسماء أسهم مش موجودة + ناقص sizing.
+   * 📌 ⛔ الكاش القديم سبب كراش «reading 'qty'» عند ضغط أي سهم.
+   * ✅ المسح بيتم مرة واحدة (عند أول تحميل للصفحة) — مش كل مرة.
+   * ⛔ ملاحظة: بنمسح كاش الرادار بس — ⛔ ⛔ ⛔ مش بنمسح أي حاجة تانية.
+   */
+  try {
+    var _rk = 'octa_radar_cache_migrated_' + CACHE_VERSION;
+    if (!localStorage.getItem(_rk)) {
+      Object.keys(localStorage).forEach(function (k) {
+        if (k.indexOf('octa_radar_cache_') === 0) {
+          try { localStorage.removeItem(k); } catch (e) { }
+        }
+      });
+      localStorage.setItem(_rk, '1');
+    }
+  } catch (e) { }
+
+  const base = window.OCTA_API || '';
     let r = await jgetOnce(base + path, lim);
     /* 🛟 شبكة أمان: لو فشل المسار الأساسي، جرّب السيرفر المباشر.
        ⛌ السبب: لو الـinterceptor عمل failover، الـOCTA_API بقى هو
@@ -222,7 +251,7 @@
       const c = S.candles[u.code];
       const tech = S.tech[u.code] || {};
       const q = S.quotes[u.code] || {};
-      let a;
+      let a = null;
       try {
         a = R.analyze(c || [], {
           code: u.code, name: u.name, sector: u.sector,
@@ -231,7 +260,26 @@
           rec: q['Recommend.All'], profile: meta.profile, money: meta.money
         });
       } catch (e) {
-        a = R.analyze([], { code: u.code, name: u.name, sector: u.sector, profile: meta.profile, money: meta.money });
+        /* ⛔⭐ ٢٥ أكتوبر ٢٠٢٦ — الـcatch القديم كان بيعمل
+           `R.analyze([], ...)` ⇒ لو هي رمت برضو ⇒ `a = undefined`
+           ⇒ `byCode[code] = undefined` ⇒ ضغط السهم ⇒ كراش.
+           ✅ دلوقتي: نحاول شوية، ولو فشل ⇒ نعمل نتيجة فارغة آمنة. */
+        try {
+          a = R.analyze([], {
+            code: u.code, name: u.name, sector: u.sector,
+            price: q.close != null ? q.close : tech.p,
+            change: q.change, marketCap: tech.mc,
+            rec: q['Recommend.All'], profile: meta.profile, money: meta.money
+          });
+        } catch (e2) {
+          note('⛔ فشل تحليل ' + u.code + ': ' + (e2 && e2.message ? e2.message : 'خطأ'));
+          a = null;
+        }
+      }
+      /* ⛔⭐ مفيش نتيجة ⇒ مش بنحطهاش (عشان ما يحصلش كراش لاحقاً) */
+      if (!a || typeof a !== 'object') {
+        S.scan.failed += 1;
+        return;
       }
       S.results.push(a);
       S.byCode[u.code] = a;
@@ -311,6 +359,7 @@
       /* 💾 كاش محلي — إعادة فتح الصفحة تطلع فوراً (مهم على الموبايل) */
       try {
         localStorage.setItem('octa_radar_cache_' + meta.profile, JSON.stringify({
+          v: CACHE_VERSION,
           ts: Date.now(), dataTs: S.scan.dataTs, snapshot: S.scan.snapshot,
           done: S.scan.done, failed: S.scan.failed,
           results: S.results.map(r => ({
@@ -379,6 +428,13 @@
       if (!raw) return false;
       const c = JSON.parse(raw);
       if (!c || !c.results || !c.results.length) return false;
+      /* ⛔⭐ ٢٥ أكتوبر ٢٠٢٦ — الـversion لازم يطابق.
+         ⛔ كاش من كود قديم = بنية مختلفة = كراش + أسماء أسهم وهمية. */
+      if (c.v !== CACHE_VERSION) {
+        note('⛔ كاش قديم (نسخة ' + (c.v || 'قديمة') + ') — تم تجاهله');
+        try { localStorage.removeItem('octa_radar_cache_' + S.profile); } catch (e) { }
+        return false;
+      }
       /* ⛔ الكاش بيصالح يوم واحد — بعدها الداتا بتكون قديمة */
       if (Date.now() - (c.ts || 0) > 24 * 3600 * 1000) return false;
       S.results = c.results.map(x => ({
