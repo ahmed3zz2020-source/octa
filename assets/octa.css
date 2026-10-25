@@ -5315,6 +5315,9 @@ body.sb-open .sb-scrim { display: block; }
   transition: all .18s ease;
 }
 .sb-bio:hover { background: rgba(60,180,120,.14); border-color: rgba(60,180,120,.5); }
+/* ⛔⭐ ٢٥ أكتوبر ٢٠٢٦ — ألوان فاتحة hardcoded ⇒ تباين ضعيف في النهاري */
+body.light .sb-out { color:#b4471f; background:rgba(224,120,80,.10); border-color:rgba(180,71,31,.28); }
+body.light .sb-bio { color:#1f7a4d; background:rgba(60,180,120,.10); border-color:rgba(31,122,77,.26); }
 
 /* ⛔⛔ ملاحظة البصمة  في الشاشة  بتشرح للمستخدم بالظبط
   إيه اللي بيتحفظ وإيه اللي لأ. من غير كده بيبقى غامض. */
