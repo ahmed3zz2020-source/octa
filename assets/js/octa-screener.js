@@ -44,7 +44,8 @@
   live: false,  /* التحديث اللحظي شغّال؟ */
   lastQ: null,  /* آخر وقت تحديث */
   mkt: null, mktT: null, /* حالة السوق */
-  advOpen: false, aboutOpen: false, grp: 'all', grpO: 'qual'
+  advOpen: false, aboutOpen: false, grp: 'all', grpO: 'qual',
+  preset: null   /* ⭐ اسم الـpreset المطبّق (null = مفيش) */
   };
 
   const MARKS = [
@@ -70,6 +71,30 @@
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
   const esc = safe;
+  /* ══════════════════════════════════════════════════════════════
+  🔢 الأرقام العربية (٠١٢٣)
+  ──────────────────────────────────────────────────────────────
+  📌 النمط في المشروع: النصوص الساكنة (عناوين · شرح) بأرقام عربية،
+  ⛌ والأرقام الحية (أسعار · درجات) بأرقام لاتينية عشان القراءة
+  ⛌   السريعة للرقم Viva. السطر ده بيطبّق **العكس** على العدّادات
+  ⛌   الكبيرة (عدد النتائج · الدرجة) — لأنها بتتقارن بالنص.
+  ⛌ ⛌ ملاحظة: الأرقام اللاتينية جوّه جملة عربية لازم تفضل
+  ⛌   <bdi> عشان ما تكسّرش ترتيب السطر.
+  ══════════════════════════════════════════════════════════════ */
+  const AR_D = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+  function ar(v) {
+  if (v == null || v === '') return '—';
+  const s = String(v);
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+  const c = s.charCodeAt(i);
+  out += (c >= 48 && c <= 57) ? AR_D[c - 48] : s[i];
+  }
+  return out;
+  }
+  /* عدد + كلمة — زي «٧٨ سهم مطابق» */
+  function arN(v, unit) { return '<bdi>' + ar(v) + '</bdi> ' + unit; }
+
   const f2 = v => N(v) != null ? Number(v).toFixed(2) : null;
   const f1 = v => N(v) != null ? Number(v).toFixed(1) : null;
   const f0 = v => N(v) != null ? Math.round(v) : null;
@@ -430,7 +455,6 @@
   const out = document.getElementById('scBody');
   if (!out) return;
 
-  if (head) head.innerHTML = headHTML();
   const rows = sortRows(filter());
   const total = db().length;
 
@@ -438,22 +462,41 @@
   const cE = document.getElementById('scCount'); if (cE) cE.textContent = rows.length;
   renderLiveDot();
 
+  /* ⭐ السطر الأول: البحث + عدّاد النتيجة + الأمثلة السريعة */
+  if (head) head.innerHTML = topBarHTML();
+  /* ⭐ الفلاتر السريعة + الملخص + الفرز — كلهم فوق النتيجة */
+  const mid = document.getElementById('scMid');
+  if (mid) mid.innerHTML = (!total) ? '' : midHTML(rows);
+
   if (!total) { out.innerHTML = '<div class="sv-empty">⏳ بنحمّل البيانات...<br><small>ثانيتين بس</small></div>'; return; }
-  if (!rows.length) { out.innerHTML = '<div class="sv-empty">🚫 مفيش أسهم مطابقة<br><small>وسّع الشروط</small></div>' + aboutBox(); return; }
+  if (!rows.length) { out.innerHTML = noResultHTML() + aboutBox(); return; }
 
   const shown = rows.slice(0, S.shown);
   out.innerHTML = tbl(shown) +
   (rows.length > S.shown
-  ? '<button class="sv-more" onclick="scMore()">عرض ' + Math.min(40, rows.length - S.shown) +
-  ' كمان — (' + rows.length + ' متبقي)</button>' : '') + aboutBox();
+  ? '<button class="sv-more" onclick="scMore()">عرض ' + ar(Math.min(40, rows.length - S.shown)) +
+  ' كمان — (' + ar(rows.length - S.shown) + ' متبقي)</button>' : '') + aboutBox();
   }
 
-  function headHTML() {
+  /* ══════════════════════════════════════════════════════════════
+  ⭐ الطبقة الأولى — البحث + الأمثلة السريعة
+  ──────────────────────────────────────────────────────────────
+  📌 «كم نتيجة؟» لازم تكون في **أول عين** — مش في الترويسة
+  ⛌   فوق شريط البحث كده، ولا مخبيّة جوه زرار.
+  ══════════════════════════════════════════════════════════════ */
+  function topBarHTML() {
+  const rows = sortRows(filter());
+  const n = rows.length;
+  const total = db().length;
   const sec = sectors();
-  return '<div class="sv-marks">' + MARKS.map(m =>
+  return '<div class="sc2-top">' +
+
+  /* ① السوق */
+  '<div class="sv-marks">' + MARKS.map(m =>
   '<button class="sv-mk' + (m.id === M.id ? ' on' : '') + '" onclick="scSetMarket(\'' + m.id + '\')">' +
   '<span>' + m.i + '</span>' + esc(m.n) + '</button>').join('') + '</div>' +
 
+  /* ② الوضع (TV / OCTA) */
   '<div class="sv-mode">' +
   '<button class="sv-mb' + (S.mode === 'tv' ? ' on' : '') +
   '" onclick="scMode(\'tv\')">📊 فلاتر TradingView</button>' +
@@ -461,25 +504,223 @@
   '" onclick="scMode(\'octa\')">🐙 فلاتر OCTA</button>' +
   '</div>' +
 
+  /* ③ البحث */
   '<div class="sv-row">' +
   '<div class="sv-search">' +
   '<input id="scQ" type="search" placeholder="ابحث بالاسم أو الرمز…" value="' + esc(S.q) + '" oninput="scQInput(this)" autocomplete="off" spellcheck="false">' +
-  (S.q ? '<button onclick="scQ(\'\')">✕</button>' : '') +
+  (S.q ? '<button onclick="scQ(\'\')" aria-label="مسح البحث">✕</button>' : '') +
   '</div>' +
   '<button class="sv-adv' + (S.advOpen ? ' on' : '') + '" onclick="scAdv()">' +
-  (S.advOpen ? '✕ إخفاء' : '⚙ الفلاتر') + (advCount() ? ' <b>' + advCount() + '</b>' : '') + '</button>' +
+  (S.advOpen ? '✕ إخفاء' : '⚙ فلاتر متقدمة') + (advCount() ? ' <b>' + ar(advCount()) + '</b>' : '') + '</button>' +
   '<button class="sv-about-btn" onclick="scAbout()">❓ المعايير</button>' +
   '</div>' +
 
-  (S.advOpen ? advPanel() : '') +
+  /* ④ عدّاد النتيجة — بارز */
+  '<div class="sc2-count' + (n ? '' : ' zero') + '">' +
+  '<span class="sc2-count-n">' + ar(n) + '</span>' +
+  '<span class="sc2-count-l">سهم مطابق</span>' +
+  '<span class="sc2-count-t">من ' + ar(total) + ' سهم في ' + esc(M.n) + '</span>' +
+  '</div>' +
 
-  (S.advOpen ? grpBar() : '') +
+  /* ⑤ الأمثلة السريعة */
+  '<div class="sc2-presets">' +
+  '<span class="sc2-presets-l">أمثلة سريعة</span>' +
+  PRESETS.map(function (p) {
+  return '<button class="sc2-preset' + (S.preset === p.id ? ' on' : '') + '" onclick="scPreset(\'' + p.id + '\')" title="' + esc(p.d) + '">' +
+  p.n + '</button>';
+  }).join('') +
+  (S.preset ? '<button class="sc2-preset-x" onclick="scPreset(null)">✕ إلغاء</button>' : '') +
+  '</div>' +
 
+  /* ⑥ القطاعات */
   '<div class="sv-sects">' +
   '<button class="sv-sect' + (S.sect === 'all' ? ' on' : '') + '" onclick="scSect(\'all\')">الكل</button>' +
   sec.map(k => '<button class="sv-sect' + (S.sect === k ? ' on' : '') +
   '" onclick="scSect(\'' + esc(k) + '\')">' + esc(k) + '</button>').join('') +
+  '</div>' +
+
   '</div>';
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+  ⭐ الطبقة الثانية — الفلاتر السريعة + الملخص + الفرز
+  ──────────────────────────────────────────────────────────────
+  📌 الترتيب: فلاتر (فوق النتيجة) ← ملخص ← فرز ← جدول.
+  ⛌   الملخص والفرز **بين** الفلاتر والجدول — عشان لما
+  ⛌   المستخدم يغيّر فلتر يشوف النتيجة تتحدث تحته على طول.
+  ══════════════════════════════════════════════════════════════ */
+  function midHTML(rows) {
+  return quickPanelHTML() + summaryHTML(rows) + sortBarHTML();
+  }
+
+  /* ── الفلاتر السريعة (أسئلة فوق النتيجة) ── */
+  function quickPanelHTML() {
+  const list = quickList();
+  return '<div class="sc2-qpanel">' +
+  '<div class="sc2-qpanel-h">' +
+  '<span class="sc2-qpanel-t">🎯 صفّي بالأسئلة دي</span>' +
+  '<span class="sc2-qpanel-s">اكتب الرقم وهتلاقي النتيجة تتحدث فوراً</span>' +
+  '</div>' +
+  '<div class="sc2-qgrid">' +
+  list.map(function (f) {
+  const v = S[f.k];
+  return '<label class="sc2-q">' +
+  '<span class="sc2-q-l">' + esc(f.q) + '</span>' +
+  '<span class="sc2-q-inp">' +
+  '<input type="number" inputmode="decimal" id="q_' + f.k + '"' +
+  ' min="' + f.mn + '" max="' + f.mx + '" step="' + f.st + '"' +
+  ' value="' + (v == null ? '' : v) + '" placeholder="الكل"' +
+  ' oninput="scQuick(\'' + f.k + '\',this,' + f.mn + ',' + f.mx + ')"' +
+  ' onchange="scNum(\'' + f.k + '\',this.value,' + f.mn + ',' + f.mx + ')">' +
+  '<span class="sc2-q-u">' + esc(f.u) + '</span>' +
+  '</span>' +
+  '</label>';
+  }).join('') +
+  '</div>' +
+  (advCount() ? '<div class="sc2-qmore">🔧 في <b>' + ar(advCount()) + '</b> فلتر متقدم مفعّل — <button onclick="scAdv()">شوفهم</button></div>' : '') +
+  '</div>';
+  }
+
+  /* ── شريط الملخص ── */
+  function summaryHTML(rows) {
+  if (!rows.length) return '';
+  const s = summarize(rows);
+  return '<div class="sc2-sum">' +
+  '<div class="sc2-sum-i"><span class="sc2-sum-l">النتيجة</span><span class="sc2-sum-v">' + ar(s.count) + '</span></div>' +
+  '<div class="sc2-sum-i"><span class="sc2-sum-l">أقوى درجة</span><span class="sc2-sum-v gold">' + (s.best == null ? '—' : ar(s.best)) + '</span></div>' +
+  '<div class="sc2-sum-i"><span class="sc2-sum-l">متوسط الأمان</span><span class="sc2-sum-v ' + (s.safety == null ? '' : (s.safety >= 60 ? 'up' : s.safety >= 40 ? 'gold' : 'dn')) + '">' + (s.safety == null ? '—' : ar(s.safety)) + '</span></div>' +
+  '<div class="sc2-sum-i wide"><span class="sc2-sum-l">أكتر محور متكرر</span><span class="sc2-sum-v">' + esc(s.topSector) + '</span></div>' +
+  '</div>';
+  }
+
+  /* ⭐ حساب الملخص من النتيجة نفسها — مش من أرقام مخترعة */
+  function summarize(rows) {
+  let best = null, sum = 0, cnt = 0;
+  const sec = {};
+  rows.forEach(function (r) {
+  const sc = N(r.total);
+  if (sc != null) { if (best == null || sc > best) best = sc; }
+  const sf = safetyOf(r);
+  if (sf != null) { sum += sf; cnt++; }
+  const k = sectorAr(r); sec[k] = (sec[k] || 0) + 1;
+  });
+  let topSector = '—', topN = 0;
+  Object.keys(sec).forEach(function (k) { if (sec[k] > topN) { topN = sec[k]; topSector = k; } });
+  return {
+  count: rows.length,
+  best: best == null ? null : Math.round(best),
+  safety: cnt ? Math.round(sum / cnt) : null,
+  topSector: topN ? topSector + ' (' + ar(topN) + ')' : '—'
+  };
+  }
+
+  /* ⭐ «متوسط الأمان» — محور واحد، مش رقم مخترع.
+  📌 بنحسبه من الأرقام الموجودة فعلاً:
+  ⛌   دين منخفض + سيولة كويسة + هبوط صغير + شارب موجب.
+  ⛌   لو مفيش ولا رقم متاح ⇒ null ⇒ «—» (مش صفر — الصفر كذب). */
+  function safetyOf(r) {
+  const parts = [];
+  if (N(r.de) != null) parts.push(Math.max(0, Math.min(100, (1.5 - r.de) / 1.5 * 100)));
+  if (N(r.mdd1y) != null) parts.push(Math.max(0, Math.min(100, 100 - r.mdd1y * 1.4)));
+  if (N(r.sharpe3y) != null) parts.push(Math.max(0, Math.min(100, 50 + r.sharpe3y * 25)));
+  if (N(r.cr) != null) parts.push(Math.max(0, Math.min(100, r.cr / 2 * 100)));
+  if (N(r.vol1y) != null) parts.push(Math.max(0, Math.min(100, 100 - r.vol1y * 1.6)));
+  if (!parts.length) return null;
+  return parts.reduce(function (a, b) { return a + b; }, 0) / parts.length;
+  }
+
+  /* ── شريط الفرز (ظاهر · سهل) ── */
+  const SORTS = [
+  { k: 'mc', n: '💰 الأكبر قيمة' },
+  { k: 'score', n: '⭐ أقوى تقييم' },
+  { k: 'p1m', n: '📈 أحسن أداء' },
+  { k: 'p1y', n: '📅 أداء السنة' },
+  { k: 'dy', n: '💵 أعلى توزيع' },
+  { k: 'roe', n: '🏆 أعلى ربحية' },
+  { k: 'pe', n: '💎 الأرخص' },
+  { k: 'rsi', n: '🌡️ القوة النسبية' },
+  { k: 'vol', n: '🔊 أعلى تداول' }
+  ];
+  function sortBarHTML() {
+  return '<div class="sc2-sort">' +
+  '<span class="sc2-sort-l">رتّب بـ</span>' +
+  '<div class="sc2-sort-b">' +
+  SORTS.map(function (s) {
+  const on = S.sort === s.k;
+  return '<button class="sc2-sort-b1' + (on ? ' on' : '') + '" onclick="scSort(\'' + s.k + '\')">' +
+  s.n + (on ? '<i>' + (S.dir < 0 ? '▼' : '▲') + '</i>' : '') + '</button>';
+  }).join('') +
+  '</div></div>';
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+  🚫 «لا نتائج» — مش شاشة فاضية
+  ──────────────────────────────────────────────────────────────
+  📌 القاعدة: لو مفيش نتيجة، **قول للمستخدم إيه يعمل**.
+  ⛌   «مفيش أسهم مطابقة» لوحدها = المستخدم قاعد يتفرج على
+  ⛌   شاشة فاضية ومش عارف هو غلط في إيه.
+  ⛌ ✅ الحل: (١) عدّ الفلاتر المفعّلة (٢) اقترح تخفيف الأضيق
+  ⛌   (٣) اعرض أزرار «امسح كل الفلاتر» و«خفّف فلتر واحد».
+  ══════════════════════════════════════════════════════════════ */
+  function noResultHTML() {
+  /* الفلاتر المفعّلة — مرتّبة: الأضيق (أكتر نتيجة) الأول */
+  const active = [];
+  QUICK.forEach(function (f) { if (S[f.k] != null) active.push({ k: f.k, q: f.q, v: S[f.k] }); });
+  const extraKeys = ['peMin', 'pbMax', 'roeMin', 'roaMin', 'roicMin', 'nmMin', 'omMin', 'gmMin',
+  'deMax', 'crMin', 'qrMin', 'dyMin', 'payoutMax', 'rsiMin', 'rsiMax',
+  'p1wMin', 'p1mMin', 'p3mMin', 'p6mMin', 'p1yMin', 'pYtdMin',
+  'volMin', 'mcMin', 'valMin', 'oScoreMin', 'oConfMin', 'oMddMax', 'oVolMax',
+  'oSharpeMin', 'oCagrMin', 'oRoicMin', 'oFcfMin'];
+  extraKeys.forEach(function (k) { if (S[k] != null) active.push({ k: k, q: k, v: S[k] }); });
+  if (S.ma200) active.push({ k: 'ma200', q: 'المتوسط السنوي', v: S.ma200 });
+  if (S.macd) active.push({ k: 'macd', q: 'إشارة الزخم', v: S.macd });
+  if (S.tv) active.push({ k: 'tv', q: 'توصية فنية', v: S.tv });
+  if (S.oVerdict) active.push({ k: 'oVerdict', q: 'قرار OCTA', v: S.oVerdict });
+
+  /* ⭐ suggestion ذكي: جرّب نشيل كل فلتر واحد بال轮流
+  ⛌   — شوف هل في فلتر واحد هو اللي قفل النتيجة. */
+  const suggestions = [];
+  active.forEach(function (a) {
+  const saved = S[a.k];
+  S[a.k] = null;
+  const n = filter().length;
+  S[a.k] = saved;
+  if (n > 0) suggestions.push({ k: a.k, q: a.q, v: a.v, n: n });
+  });
+  suggestions.sort(function (x, y) { return y.n - x.n; });
+
+  let h = '<div class="sc2-none">' +
+  '<div class="sc2-none-ico">🚫</div>' +
+  '<div class="sc2-none-t">مفيش سهم واحد مطابق</div>' +
+  '<div class="sc2-none-s">فلاترك أضيق من اللازم. جرّب واحد من دول:</div>';
+
+  if (suggestions.length) {
+  h += '<div class="sc2-none-fix">' +
+  suggestions.slice(0, 3).map(function (sg) {
+  return '<button class="sc2-fix" onclick="scRelax(\'' + sg.k + '\')">' +
+  '🔓 خفّفت «' + esc(sg.q) + '» ← يطلع <b>' + ar(sg.n) + '</b> سهم</button>';
+  }).join('') +
+  '</div>';
+  } else {
+  h += '<div class="sc2-none-fix">' +
+  '<button class="sc2-fix" onclick="scReset()">🔄 امسح كل الفلاتر</button>' +
+  '</div>';
+  }
+
+  if (active.length) {
+  h += '<div class="sc2-none-act">' +
+  '<span>الفلاتر المفعّلة (' + ar(active.length) + '):</span>' +
+  active.map(function (a) {
+  return '<button class="sc2-chip" onclick="scRelax(\'' + a.k + '\')" title="شيل الفلتر ده">' +
+  esc(a.q) + ' <i>' + esc(String(a.v)) + '</i> ✕</button>';
+  }).join('') +
+  '</div>' +
+  '<button class="sc2-none-reset" onclick="scReset()">🔄 امسح كل الفلاتر وابدأ من جديد</button>';
+  } else {
+  h += '<div class="sc2-none-act"><span>مفيش فلاتر مفعّلة — يعني المشكلة في البحث أو السوق.</span></div>';
+  }
+  h += '</div>';
+  return h;
   }
 
   /* ══════════════ مجموعات الفلاتر ══════════════ */
@@ -532,6 +773,68 @@
   ['oVerdict', 'إشارة إيجابية', 'إشارة إيجابية'], ['oVerdict', 'إشارة محايدة', 'إشارة محايدة'],
   ['oVerdict', 'غير كافٍ', 'غير كافٍ'], ['oVerdict', 'إشارة سلبية', 'إشارة سلبية'] ] }
   ];
+
+  /* ══════════════════════════════════════════════════════════════
+  ⭐ الأمثلة السريعة (presets) — زرار واحد = شروط جاهزة
+  ──────────────────────────────────────────────────────────────
+  📌 الفكرة: المستخدم الجديد مش عارف الفلتر بيشتغل إزاي.
+  ⛌ فبنديه ٣ زرار بيقول كل واحد فيهم: «دوس وده هيعملك فلترة كده».
+  ⛌ كل preset بيمسح الفلاتر القديمة الأول (مش بيراكم) — عشان
+  ⛌   المستخدم يفهم النتيجة بتيجي من إيه بالظبط.
+  ══════════════════════════════════════════════════════════════ */
+  const PRESETS = [
+  {
+  id: 'buy', n: '🚀 فرص شراء', d: 'شركات بتكسب وبتستثمر كويس — بسعر معقول',
+  apply: function () {
+  S.mode = 'octa';
+  S.oScoreMin = 60; S.oRoicMin = 8; S.peMax = 25; S.rsiMax = 70;
+  S.oMddMax = 50;
+  S.tv = null; S.sect = 'all'; S.sort = 'score'; S.dir = -1;
+  }
+  },
+  {
+  id: 'div', n: '💰 آمنة التوزيع', d: 'بتديك كاش كل سنة — وهادية',
+  apply: function () {
+  S.mode = 'tv';
+  S.dyMin = 3; S.payoutMax = 80; S.deMax = 1.5; S.volMax = 40;
+  S.peMax = 25; S.rsiMax = 70;
+  S.tv = null; S.sect = 'all'; S.sort = 'dy'; S.dir = -1;
+  }
+  },
+  {
+  id: 'growth', n: '📈 نمو سريع', d: 'بتنمو بسرعة — والعائد بعد سنة قوية',
+  apply: function () {
+  S.mode = 'tv';
+  S.p3mMin = 15; S.p6mMin = 25; S.p1yMin = 20; S.mcMin = 500;
+  S.roeMin = 8; S.peMax = 35;
+  S.tv = null; S.sect = 'all'; S.sort = 'p6m'; S.dir = -1;
+  }
+  }
+  ];
+
+  /* ══════════════════════════════════════════════════════════════
+  🎯 الفلاتر السريعة — **دايماً فوق النتيجة مباشرة**
+  ──────────────────────────────────────────────────────────────
+  📌 كل فلتر = **سؤال بالعربي** مش اسم تقني.
+  ⛌ مثال: «الدرجة أعلى من؟» بدل «minScore».
+  ⛌ الترتيب: من الأهم للأقل — زي ترتيب القراءة.
+  ⛌ ٤ فلاتر بس فوق النتيجة — الباقي في «فلاتر متقدمة».
+  ⛌   (كتير فلاتر فوق = المستخدم بيتوه وبيفتح المتقدم بالغلط)
+  ══════════════════════════════════════════════════════════════ */
+  const QUICK = [
+  { k: 'oScoreMin', q: 'الدرجة أعلى من؟', u: 'من ١٠٠', mn: 0, mx: 100, st: 5, octa: 1 },
+  { k: 'peMax', q: 'السعر مضاعف الربح أقل من؟', u: 'مرة', mn: 0, mx: 200, st: 1 },
+  { k: 'roeMin', q: 'العائد على حقوق الملكية أعلى من؟', u: '٪', mn: -50, mx: 90, st: 1 },
+  { k: 'dyMin', q: 'التوزيع السنوي أعلى من؟', u: '٪', mn: 0, mx: 30, st: 0.5 },
+  { k: 'oMddMax', q: 'أكبر هبوط في السنة أقل من؟', u: '٪', mn: 5, mx: 100, st: 5, octa: 1 },
+  { k: 'p1yMin', q: 'أداء السنة أعلى من؟', u: '٪', mn: -50, mx: 500, st: 5 }
+  ];
+
+  /* ⭐ الفلاتر السريعة بتتغيّر حسب الوضع (TV / OCTA) */
+  function quickList() {
+  if (S.mode === 'octa') return QUICK.filter(function (f) { return f.octa; });
+  return QUICK.filter(function (f) { return !f.octa; });
+  }
 
   function grpBar() {
   if (S.mode === 'octa') {
@@ -1359,9 +1662,12 @@
   window.scGrp = g => { S.grp = g; render(); };
   window.scGrpO = function (g) { S.grpO = g; render(); };
   window.scMode = function (m) {
+  if (S.mode === m) return;
   S.mode = m;
   S.shown = 40;
   if (m === 'octa' && S.grp === 'all') S.grp = 'qual';
+  /* ⛌ تغيير الوضع يدوياً يلغي الـpreset — Conditions بتتغيّر */
+  S.preset = null;
   render();
   };
   window.scSel = (k, v) => { S[k] = v || null; S.shown = 40; render(); };
@@ -1392,6 +1698,8 @@
   الأسماء: أول ضغطة = تصاعدي (أ-ي) */
   S.dir = (k === 'code' || k === 'name' || k === 'sector') ? 1 : -1;
   }
+  /* ⛌ ترتيب يدوي يلغي الـpreset — الترتيب جزء من شروط الـpreset */
+  if (S.preset) S.preset = null;
   render();
   };
   window.scMore = () => { S.shown += 40; render(); };
@@ -1399,9 +1707,66 @@
   Object.keys(S).forEach(function (k) {
   if (k !== 'q' && k !== 'sect' && k !== 'sort' && k !== 'dir' &&
   k !== 'shown' && k !== 'advOpen' && k !== 'aboutOpen' &&
-  k !== 'grp' && k !== 'grpO' && k !== 'mode' && k !== 'lvl') S[k] = null;
+  k !== 'grp' && k !== 'grpO' && k !== 'mode' && k !== 'lvl' &&
+  k !== 'preset') S[k] = null;
   });
+  S.q = ''; S.sect = 'all'; S.shown = 40; S.preset = null;
+  render();
+  };
+
+  /* ══════════════════════════════════════════════════════════════
+  🎯 الفلاتر السريعة — الكتابة بتحدّث النتيجة فوراً
+  ──────────────────────────────────────────────────────────────
+  📌 زي السيرش: بنحافظ على التركيز والـcursor بعد الرندر،
+  ⛌   عشان المستخدم يقدر يكتب رقم ويفضّله.
+  ⛌ ⛌ ⛌ مهم: الرندر بيعيد بناء الـDOM ⇒ لو رجعنا التركيز
+  ⛌   بس من غير الـselectionStart، المؤشر بيروح لأول الخانة.
+  ══════════════════════════════════════════════════════════════ */
+  window.scQuick = function (k, el, mn, mx) {
+  const pos = el.selectionStart;
+  let n = parseFloat(el.value);
+  if (!isNaN(n)) n = Math.max(mn, Math.min(mx, n));
+  S[k] = isNaN(n) ? null : n;
+  S.shown = 40;
+  S.preset = null;   /* ⛌ تعديل يدوي يلغي الـpreset */
+  render();
+  const again = document.getElementById('q_' + k);
+  if (again) {
+  again.focus();
+  try { again.setSelectionRange(pos, pos); } catch (e) { }
+  }
+  };
+
+  /* ══════════════════════════════════════════════════════════════
+  ⭐ الأمثلة السريعة — زرار واحد يعمّي كل الفلترة
+  ──────────────────────────────────────────────────────────────
+  📌 الـpreset بيمسح كل الفلاتر الأول — عشان النتيجة تبقى
+  ⛌   واضحة («دي نتيجة條件 دا بالظبط» مش «دة نتيجة条件和 stacked»).
+  ══════════════════════════════════════════════════════════════ */
+  window.scPreset = function (id) {
+  /* ⛔ مسح كل الفلاتر (من غير البحث والوضع) */
+  const keep = { q: 1, sect: 1, sort: 1, dir: 1, shown: 1, advOpen: 1,
+  aboutOpen: 1, grp: 1, grpO: 1, mode: 1, lvl: 1, preset: 1 };
+  Object.keys(S).forEach(function (k) { if (!keep[k]) S[k] = null; });
   S.q = ''; S.sect = 'all'; S.shown = 40;
+  if (!id) { S.preset = null; render(); return; }
+  const p = PRESETS.find(function (x) { return x.id === id; });
+  if (!p) { S.preset = null; render(); return; }
+  S.preset = id;
+  p.apply();
+  S.shown = 40;
+  render();
+  };
+
+  /* ══════════════════════════════════════════════════════════════
+  🔓 تخفيف فلتر واحد (من رسالة «لا نتائج» أو من الشيب)
+  ──────────────────────────────────────────────────────────────
+  📌 بيشيل الفلتر ده بس — والباقي زي ما هو.
+  ══════════════════════════════════════════════════════════════ */
+  window.scRelax = function (k) {
+  S[k] = null;
+  S.preset = null;
+  S.shown = 40;
   render();
   };
   let MK_DONE = false;

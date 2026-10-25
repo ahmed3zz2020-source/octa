@@ -1361,6 +1361,15 @@ function vDeriveValuation(f){
   if(f.sector_peers && f.sector_peers['عدد المقارنة']===0) v -= 6;
   return Math.max(5, Math.min(95, v));
 }
+/* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — vWeighted بترجّع null لما مافيش ولا محور متاح.
+   ⛌ الكارت كان بيعمل usScore.toFixed(1) ⇒ «Cannot read properties of null
+   ⛌   (reading 'toFixed')» ⇒ **الكرت كله بيموت** والصفحة بتعرض error.
+   ⛌ ✅ الحل: null ⇒ «—» (مش صفر — الصفر كذب).
+   📌 نفس القيمة بتتعرض في كمان في السطر التاني (egxScore). */
+function vFmtScore(v){
+  if (v==null || isNaN(v)) return '—';
+  return Number(v).toFixed(1);
+}
 function vWeighted(scores,w){
   /* المحاور الناقصة بتتشال والباقي بيتطبّع — زي المحرك بالظبط.
   ⚠ كانت بترجّع 0 لو مفيش ولا محور متاح.
@@ -1407,13 +1416,20 @@ function vBuildLevels(tech,price,f){
 }
 
 function vRing(pct,color){
-  const R=56,C=2*Math.PI*R,off=C*(1-pct/100);
+  /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — pct ممكن يبقى null (مافيش محاور عنده بيانات).
+   ⛌ was: C*(1-pct/100) ⇒ NaN ⇒ stroke-dashoffset="NaN" ⇒ المتصفح
+   ⛌   بيرسم الدايرة كلها (يعني الشكل بيكذب: بيقول 0% وهو مش عارف).
+   ⛌ ✅ الحل: null ⇒ 0 + علامة «لا توجد بيانات» بدل رقم مخترع. */
+  const has = (pct!=null && !isNaN(pct));
+  const p = has ? Number(pct) : 0;
+  const R=56,C=2*Math.PI*R,off=C*(1-p/100);
   return '<div class="vring"><svg width="132" height="132">'+
   '<circle cx="66" cy="66" r="'+R+'" fill="none" stroke="var(--vring-track)" stroke-width="11"/>'+
   '<circle cx="66" cy="66" r="'+R+'" fill="none" stroke="'+color+'" stroke-width="11" '+
   'stroke-linecap="round" stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" '+
   'style="transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)"/></svg>'+
-  '<div class="vval"><b>'+Math.round(pct)+'</b><span>OCTA /100</span></div></div>';
+  '<div class="vval"><b>'+(has ? Math.round(p) : '—')+'</b><span>'+
+  (has ? 'OCTA /100' : 'لا توجد بيانات')+'</span></div></div>';
 }
 
 /* 🆕 المؤشرات الحقيقية من startamarkets (data_egx.json) */
@@ -1559,7 +1575,7 @@ function vRenderCard(d,exRaw,tech){
   '<span class="vab-c '+((W_EGX()[k]||0)>(W_US()[k]||0)?'win':'')+'">'+Math.round(vx2)+'</span></div>';
   }
   ab+='<div class="vab-row vab-tot"><span class="vab-n">النتيجة</span><span></span>'+
-  '<span class="vab-c win">'+usScore.toFixed(1)+'</span><span class="vab-c win">'+egxScore.toFixed(1)+'</span></div>';
+  '<span class="vab-c win">'+vFmtScore(usScore)+'</span><span class="vab-c win">'+vFmtScore(egxScore)+'</span></div>';
 
   /* 🆕 قسم المؤشرات الحقيقية */
   const sig = vTechSignals(d.code, price);

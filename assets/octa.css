@@ -7293,3 +7293,331 @@ body.light .octa-why-btn { background: #fffbeb; border-color: rgba(154,123,24,.4
 .oc-disc-toggle u{ text-decoration-color:rgba(212,175,55,.5); text-underline-offset:3px; }
 
 .oc-disc[hidden]{ display:none !important; }
+
+/* ══════════════════════════════════════════════════════════════
+ 🔍 الفلتر الفني (screener) — الطبقة الجديدة · سلمى · ٢٥ أكتوبر ٢٠٢٦
+ ══════════════════════════════════════════════════════════════
+ 📌 الهدف: المستخدم يفتح الصفحة ويعرف يعمل إيه من غير شرح.
+ 📌 ⛌ كل الألوان من octa-tokens.css — ممنوع hex هنا.
+ 📌 ⛌ البادئة `sc2-` عشان ما يتعارضش مع css-screener.css
+ 📌   (اللي بيتحمّل **بعد** octa.css في index.html).
+ ══════════════════════════════════════════════════════════════ */
+
+/* ── ① الحاوية ── */
+#scMid { margin-bottom: 12px; }
+.sc2-top { margin-bottom: 12px; }
+
+/* ══════════════════════════════════════════════════════════════
+ 📊 عدّاد النتيجة — أهم عنصر في الصفحة
+ ──────────────────────────────────────────────────────────────
+ 📌 «٧٨ سهم مطابق» — لازم تكون **في أول عين** ومن غير دوسة.
+ ⛌ قبل: كانت مخبيّة في الترويسة فوق شريط البحث.
+ ══════════════════════════════════════════════════════════════ */
+.sc2-count {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 13px 16px; margin-bottom: 10px;
+  background: var(--goldBg);
+  border: 1px solid var(--goldLine);
+  border-radius: 12px;
+}
+.sc2-count.zero {
+  background: var(--dnSoft);
+  border-color: var(--dc-bad-bd);
+}
+.sc2-count-n {
+  font: 900 1.9rem/1 system-ui, sans-serif;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+.sc2-count.zero .sc2-count-n { color: var(--dn); }
+.sc2-count-l {
+  font: 800 .92rem system-ui, sans-serif; color: var(--txt);
+}
+.sc2-count-t {
+  font: 500 .74rem system-ui, sans-serif; color: var(--muted);
+  margin-inline-start: auto;
+}
+
+/* ══════════════════════════════════════════════════════════════
+ ⭐ الأمثلة السريعة — زرار واحد = شروط جاهزة
+ ══════════════════════════════════════════════════════════════ */
+.sc2-presets {
+  display: flex; align-items: center; gap: 7px;
+  flex-wrap: wrap; margin-bottom: 10px;
+}
+.sc2-presets-l {
+  font: 700 .74rem system-ui, sans-serif; color: var(--muted);
+  margin-inline-end: 3px;
+}
+.sc2-preset {
+  padding: 10px 15px; border-radius: 10px; cursor: pointer;
+  background: var(--card); border: 1px solid var(--line);
+  color: var(--txt); font: 700 .8rem system-ui, sans-serif;
+  transition: border-color .16s, background .16s, transform .1s;
+  white-space: nowrap;
+}
+.sc2-preset:hover { border-color: var(--gold); background: var(--pri3); }
+.sc2-preset:active { transform: translateY(1px); }
+.sc2-preset.on {
+  background: var(--gold); border-color: var(--gold);
+  color: var(--pri4); font-weight: 900;
+}
+.sc2-preset-x {
+  padding: 9px 13px; border-radius: 10px; cursor: pointer;
+  background: transparent; border: 1px dashed var(--line2);
+  color: var(--muted); font: 700 .76rem system-ui, sans-serif;
+}
+.sc2-preset-x:hover { border-color: var(--dn); color: var(--dn); }
+
+/* ══════════════════════════════════════════════════════════════
+ 🎯 الفلاتر السريعة — أسئلة فوق النتيجة
+ ──────────────────────────────────────────────────────────────
+ 📌 كل فلتر سؤال بالعربي: «الدرجة أعلى من؟» مش «minScore».
+ 📌 ٤ أسئلة بس فوق النتيجة — الباقي في «فلاتر متقدمة».
+ ══════════════════════════════════════════════════════════════ */
+.sc2-qpanel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 13px 14px 14px;
+  margin-bottom: 10px;
+}
+.sc2-qpanel-h {
+  display: flex; align-items: baseline; gap: 9px;
+  flex-wrap: wrap; margin-bottom: 11px;
+}
+.sc2-qpanel-t {
+  font: 800 .88rem system-ui, sans-serif; color: var(--txt);
+}
+.sc2-qpanel-s {
+  font: 500 .72rem system-ui, sans-serif; color: var(--muted);
+}
+.sc2-qgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 10px;
+}
+.sc2-q { display: flex; flex-direction: column; gap: 5px; }
+.sc2-q-l {
+  font: 700 .76rem/1.45 system-ui, sans-serif; color: var(--muted);
+}
+.sc2-q-inp { position: relative; display: block; }
+.sc2-q-inp input {
+  width: 100%;
+  padding: 11px 52px 11px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line2);
+  background: var(--bg);
+  color: var(--txt);
+  font: 800 .92rem system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.sc2-q-inp input::placeholder { color: var(--dim); font-weight: 600; }
+.sc2-q-inp input:focus {
+  outline: none; border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--goldBg);
+}
+.sc2-q-u {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  font: 700 .7rem system-ui, sans-serif; color: var(--dim);
+  pointer-events: none;
+}
+.sc2-qmore {
+  margin-top: 11px; padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font: 600 .76rem system-ui, sans-serif; color: var(--muted);
+}
+.sc2-qmore b { color: var(--gold); font-weight: 900; }
+.sc2-qmore button {
+  background: none; border: 0; color: var(--gold);
+  font: 800 .76rem system-ui, sans-serif; cursor: pointer;
+  text-decoration: underline; padding: 0 3px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+ 📈 شريط الملخص — ٤ أرقام فوق النتيجة
+ ══════════════════════════════════════════════════════════════ */
+.sc2-sum {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.sc2-sum-i {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 10px 13px;
+  background: var(--wash);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+}
+.sc2-sum-l {
+  font: 600 .7rem system-ui, sans-serif; color: var(--muted);
+}
+.sc2-sum-v {
+  font: 900 1.12rem/1.1 system-ui, sans-serif; color: var(--txt);
+  font-variant-numeric: tabular-nums;
+}
+.sc2-sum-v.gold { color: var(--gold); }
+.sc2-sum-v.up { color: var(--up); }
+.sc2-sum-v.dn { color: var(--dn); }
+.sc2-sum-i.wide .sc2-sum-v { font-size: .92rem; line-height: 1.35; }
+
+/* ══════════════════════════════════════════════════════════════
+ 🔀 شريط الفرز — ظاهر وسهل
+ ══════════════════════════════════════════════════════════════ */
+.sc2-sort {
+  display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap; margin-bottom: 10px;
+}
+.sc2-sort-l {
+  font: 700 .76rem system-ui, sans-serif; color: var(--muted);
+}
+.sc2-sort-b {
+  display: flex; gap: 6px; overflow-x: auto;
+  padding-bottom: 3px;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  flex: 1; min-width: 0;
+}
+.sc2-sort-b::-webkit-scrollbar { display: none; }
+.sc2-sort-b1 {
+  flex: 0 0 auto;
+  padding: 8px 13px; border-radius: 9px; cursor: pointer;
+  background: transparent; border: 1px solid var(--line);
+  color: var(--muted); font: 700 .76rem system-ui, sans-serif;
+  white-space: nowrap; transition: .16s;
+}
+.sc2-sort-b1:hover { border-color: var(--gold); color: var(--txt); }
+.sc2-sort-b1.on {
+  background: var(--goldBg); border-color: var(--gold);
+  color: var(--gold); font-weight: 900;
+}
+.sc2-sort-b1 i { font-style: normal; margin-inline-start: 4px; font-size: .66rem; }
+
+/* ══════════════════════════════════════════════════════════════
+ 🚫 «لا نتائج» — مش شاشة فاضية
+ ──────────────────────────────────────────────────────────────
+ 📌 القاعدة: لو مفيش نتيجة، قول للمستخدم إيه يعمل.
+ ══════════════════════════════════════════════════════════════ */
+.sc2-none {
+  background: var(--card);
+  border: 1px solid var(--dc-bad-bd);
+  border-radius: 14px;
+  padding: 22px 18px;
+  text-align: center;
+}
+.sc2-none-ico { font-size: 2.1rem; line-height: 1; margin-bottom: 8px; }
+.sc2-none-t {
+  font: 900 1.08rem system-ui, sans-serif; color: var(--txt);
+  margin-bottom: 5px;
+}
+.sc2-none-s {
+  font: 500 .84rem system-ui, sans-serif; color: var(--muted);
+  margin-bottom: 14px;
+}
+.sc2-none-fix {
+  display: flex; gap: 8px; justify-content: center;
+  flex-wrap: wrap; margin-bottom: 14px;
+}
+.sc2-fix {
+  padding: 11px 16px; border-radius: 10px; cursor: pointer;
+  background: var(--goldBg); border: 1px solid var(--goldLine);
+  color: var(--gold); font: 800 .8rem system-ui, sans-serif;
+  transition: .16s;
+}
+.sc2-fix:hover { background: var(--gold); border-color: var(--gold); color: var(--pri4); }
+.sc2-fix b { font-weight: 900; }
+.sc2-none-act {
+  display: flex; gap: 7px; justify-content: center;
+  flex-wrap: wrap; align-items: center;
+  padding-top: 13px; border-top: 1px solid var(--line);
+  font: 600 .76rem system-ui, sans-serif; color: var(--muted);
+}
+.sc2-chip {
+  padding: 6px 11px; border-radius: 8px; cursor: pointer;
+  background: var(--wash); border: 1px solid var(--line2);
+  color: var(--muted); font: 600 .72rem system-ui, sans-serif;
+}
+.sc2-chip:hover { border-color: var(--dn); color: var(--dn); }
+.sc2-chip i { font-style: normal; color: var(--gold); font-weight: 800; }
+.sc2-none-reset {
+  margin-top: 13px;
+  padding: 11px 18px; border-radius: 10px; cursor: pointer;
+  background: transparent; border: 1px dashed var(--line2);
+  color: var(--muted); font: 700 .8rem system-ui, sans-serif;
+}
+.sc2-none-reset:hover { border-color: var(--dn); color: var(--dn); }
+
+/* ══════════════════════════════════════════════════════════════
+ 📱 الموبايل (٣٩٠px) — أول=device
+ ══════════════════════════════════════════════════════════════ */
+@media (max-width: 680px) {
+  .sc2-count {
+    padding: 11px 13px;
+    border-radius: 11px;
+  }
+  .sc2-count-n { font-size: 1.6rem; }
+  .sc2-count-l { font-size: .85rem; }
+  .sc2-count-t {
+    margin-inline-start: 0; width: 100%;
+    font-size: .7rem;
+  }
+  /* ⭐ الفلاتر: عمود واحد — السؤال يبقى واضح、可مس */
+  .sc2-qgrid { grid-template-columns: 1fr; gap: 9px; }
+  .sc2-q-l { font-size: .8rem; }
+  .sc2-q-inp input {
+    padding: 13px 52px 13px 13px;   /* ⭐ ارتفاع كبير للّمس */
+    font-size: 1rem;
+  }
+  /* ⭐ الأمثلة: كل واحد في سطر — Easier to hit */
+  .sc2-presets { gap: 6px; }
+  .sc2-preset {
+    flex: 1 1 calc(50% - 3px);
+    text-align: center;
+    padding: 12px 8px;
+    font-size: .78rem;
+  }
+  .sc2-preset-x { flex: 1 1 100%; }
+  /* ⭐ الملخص: عمودين */
+  .sc2-sum { grid-template-columns: repeat(2, 1fr); gap: 7px; }
+  .sc2-sum-i { padding: 9px 11px; }
+  .sc2-sum-v { font-size: 1.02rem; }
+  .sc2-sum-i.wide { grid-column: 1 / -1; }
+  /* ⭐ الفرز: كل زرار ياخد نص السطر */
+  .sc2-sort-b1 { padding: 10px 12px; font-size: .78rem; }
+  /* ⭐ «لا نتائج» */
+  .sc2-none { padding: 18px 14px; }
+  .sc2-fix { width: 100%; text-align: center; padding: 13px 14px; }
+  .sc2-chip { font-size: .74rem; padding: 8px 11px; }
+  .sc2-none-reset { width: 100%; padding: 13px 14px; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+ ☀️ الوضع النهاري — تباين واااضح
+ ══════════════════════════════════════════════════════════════
+ 📌 كل الألوان من الـtokens ⇒ النهاري بياخد القيم الغامقة
+ ⛌   (--gold بيبقى غامق، --dn بيبقى غامق… إلخ) ⇒ تباين كويس.
+ 📌 ⛌ بس الكارت الذهبي (--goldBg) في النهاري = rgba داكن شفاف
+ ⛌   ⇒ لازم نتأكد إن النص فوقه مقروء.
+ ══════════════════════════════════════════════════════════════ */
+:root[data-theme="light"] .sc2-count,
+body.light .sc2-count {
+  border-color: var(--goldLine2);
+}
+:root[data-theme="light"] .sc2-qpanel,
+body.light .sc2-qpanel {
+  border-color: var(--line2);
+}
+:root[data-theme="light"] .sc2-q-inp input,
+body.light .sc2-q-inp input {
+  background: var(--pri);
+  border-color: var(--line2);
+}
+:root[data-theme="light"] .sc2-preset.on,
+body.light .sc2-preset.on {
+  color: var(--pri4);
+}
+:root[data-theme="light"] .sc2-fix:hover,
+body.light .sc2-fix:hover {
+  color: var(--pri4);
+}
