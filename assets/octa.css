@@ -3580,7 +3580,7 @@ body{margin:0;padding:0 10px 50px;
   overscroll-behavior-x: contain;}
 .mktbar::-webkit-scrollbar{display:none}
 .mbar{flex:1 1 0;min-width:150px;background:var(--wash);border:1px solid var(--line);
-  border-radius:13px;padding:9px 11px}
+  border-radius:13px;padding:9px 11px;color:var(--txt)}
 .mbar .nm{font-size:.68rem;color:var(--muted);font-weight:700;margin-bottom:3px}
 .mbar .vl{font-size:1.02rem;font-weight:900;line-height:1}
 .mbar .ch{font-size:.7rem;font-weight:800;margin-top:3px;display:block}
@@ -3673,10 +3673,13 @@ body{margin:0;padding:0 10px 50px;
 .mlay.on{display:block}
 .mbox{max-width:760px;margin:0 auto;min-height:100%;padding:0 10px 40px;
   background:radial-gradient(900px 500px at 50% 0,#12283f 0%,transparent 70%)}
-.mbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:9px;
-  padding:12px 4px;background:rgba(10,25,41,.96);backdrop-filter:blur(8px);
+/* ⛔ ⭐ ٢٥ أكتوبر ٢٠٢٦ — كان `.mbar` (ترويسة مودال الشارت) بيغلب على
+   ⛔ `.mbar` (كارت مؤشر السوق) ⇒ الكروت بتبقى غامقة في الوضع الأبيض.
+   ✅ الحل: ترويسة المودال بقت `.chbar` — والكارت بقى `.mbar` زي ما هو. */
+.chbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:9px;
+  padding:12px 4px;background:var(--pri);backdrop-filter:blur(8px);
   border-bottom:1px solid var(--line)}
-.mbar .ttl{flex:1;font-size:.88rem;font-weight:900;color:var(--gold);
+.chbar .ttl{flex:1;font-size:.88rem;font-weight:900;color:var(--gold);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mbtn{padding:8px 13px;border-radius:9px;border:1px solid var(--line);
   background:var(--wash);color:var(--muted);font-family:inherit;
