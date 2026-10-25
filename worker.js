@@ -330,7 +330,18 @@ async function assetsFresh(env, request) {
   if (bust === '/' || bust === '') bust = '/index.html';
   bust = bust + (_url.search || '');
   try {
-  return await env.ASSETS.fetch(new Request(bust, { method: 'GET', headers: h }));
+  /* ════════════════════════════════════════════════════════════════
+  ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ عنوان مطلق (مش نسبي) — إصلاح 404 فاضي
+  ────────────────────────────────────────────────────────────────
+  📌 السبب: `new Request('/index.html')` في رَن-times الـWorker
+  📌 ⛌⛌⛔ بيرمي استثناء (عنوان نسبي من غير base) ⇒ الـcatch
+  📌 ⛌⛌⛔ بيرجّع الطلب الأصلي ⇒ '/' بيرجّع 404 فاضي (0 بايت)
+  📌 ⛌⛌⛔ ⇒ المعاينة (البوابة مقفولة هناك) مش بتفتح خالص!
+  📌 ✅ الحل: نحَلّ المسار مقابل عنوان الطلب قبل الـfetch.
+  📌 (الإنتاج ما تأثّرش: '/' بيروح لصفحة البوابة قبل النقطة دي)
+  ════════════════════════════════════════════════════════════════ */
+  const bustUrl = new URL(bust, request.url);
+  return await env.ASSETS.fetch(new Request(bustUrl.toString(), { method: 'GET', headers: h }));
   } catch (e) {
   return env.ASSETS.fetch(new Request(r, { headers: h }));
   }
@@ -426,11 +437,18 @@ async function handle(request, env, ctx) {
         });
       }
       /* ⛌⛌⛌ صفحات الـHTML — تفضل متاحة (اللوحة لازم تفتح) */
+      /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ '/admin' ⇒ '/admin/index.html'
+      📌 السبب: الأصول بتشتغل بـhtml_handling="none" ⇒ مفيش "/admin"
+      📌 ⛌⛌⛔ ⇒ 404 فاضي ⇒ لوحة الإدارة مش بتفتح (كانت ٢٠٠ قبل).
+      📌 ✅ الحل: نوجّه '/admin' لـ'/admin/index.html' قبل الـfetch. */
+      const adminTarget = (url.pathname === '/admin')
+        ? new URL('/admin/index.html', url).toString()
+        : url.toString();
       const h2 = new Headers();
       h2.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
       h2.set('X-Robots-Tag', 'noindex, nofollow');
       h2.set('Content-Type', 'text/html; charset=utf-8');
-      return env.ASSETS.fetch(new Request(url.toString(), request)).then(
+      return env.ASSETS.fetch(new Request(adminTarget, request)).then(
         (r) => {
           try {
             const hh = new Headers(r.headers);
