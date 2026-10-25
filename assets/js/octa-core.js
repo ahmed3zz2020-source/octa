@@ -3120,6 +3120,10 @@ function injectEngineWidget(elementId, scriptFile, config, dataKey) {
         return;
       } catch (e) { }
     }
+    /* ⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — guard: لو الحاوية اتشالت (تبديل صفحة قبل
+    📌 تحميل سكربت TradingView) ⇒ null error في الكونسول. */
+    try {
+    if (!el.isConnected) return;
     el.innerHTML = '';
     const script = document.createElement('script');
     script.src = 'https://s3.tradingview.com/external-embedding/' + scriptFile;
@@ -3127,6 +3131,9 @@ function injectEngineWidget(elementId, scriptFile, config, dataKey) {
     script.setAttribute('data-engine-tv', dataKey);
     script.innerHTML = JSON.stringify(config);
     el.appendChild(script);
+    } catch (e) {
+    try { console.warn('[OCTA] TV widget skipped'); } catch (x) { }
+    }
   };
   if (window.OCTA_TV && window.OCTA_TV.whenSized) {
     window.OCTA_TV.whenSized(el, doInject, { timeout: 30000, force: false });

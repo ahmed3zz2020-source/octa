@@ -746,18 +746,18 @@ export default {
            ⛌ بنضغط بس الردود الكبيرة (فوق ٢٠ ك.ب) — الردود الصغيرة
              بتاخد CPU من غير فايدة.
            ⛌ ومفيش Content-Length (الرد بيطلع chunked) — صح. */
-        try {
-          const acceptEnc = String(request.headers.get('Accept-Encoding') || '');
-          if (body.length > 20000 && acceptEnc.indexOf('gzip') >= 0) {
-            const cs = new CompressionStream('gzip');
-            const stream = new Blob([body]).stream().pipeThrough(cs);
-            out.set('Content-Encoding', 'gzip');
-            out.delete('Content-Length');
-            return new Response(stream, { status: upstream.status, headers: out });
-          }
-        } catch (e) {
-          /* ⛔ الضغط فاشل ⇒ نرجع للرد العادي (مفيش كسر) */
-        }
+        /* ════════════════════════════════════════════════════════════════
+        ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ إيقاف الضغط المزدوج (gzip×٢) — قاتل!
+        ────────────────────────────────────────────────────────────────
+        📌 المشكلة: الـworker كان بيضغط الردود الكبيرة بـgzip،
+        📌 والـCloudflare edge بيضغط كمان ⇒ gzip×٢.
+        📌 ⇒ المتصفح بيفكّ مرة واحدة ⇒ يفضل gzip خام ⇒ res.json() بيفشل
+        📌 ⇒ OS_DB فاضي ⇒ **كل الأدوات والفلاتر بتقول «جاري التحميل»!**
+        📌 ✅ الحل: مافيش ضغط في الـworker — Cloudflare بيضغط صح لوحده
+        📌 (وكمان بيسرّع التحميل — مفيش CPU ضاغطة على الرادار).
+        ════════════════════════════════════════════════════════════════ */
+        out.delete('Content-Encoding');
+        out.delete('Content-Length');
         return new Response(body, { status: upstream.status, headers: out });
       } catch (e) {
         return new Response(JSON.stringify({ error: 'api-proxy-failed', message: String(e && e.message || e) }), {
