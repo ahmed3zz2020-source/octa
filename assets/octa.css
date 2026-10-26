@@ -1577,6 +1577,8 @@
   }
   .entry-sum b.pos { color: var(--sec); }
   .entry-sum b.neg { color: var(--red2); }
+  .dash-tbl-wrap .mini-table.track-tbl { min-width: 460px; }
+  .mini-table .td-sub { display: block; font-size: .6rem; color: var(--muted); font-weight: 600; }
   .mini-table td.pos, .mini-table td.pos b { color: var(--sec); }
   .mini-table td.neg, .mini-table td.neg b { color: var(--red2); }
 

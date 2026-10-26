@@ -1061,9 +1061,9 @@ async function octaLoadBench(d) {
         if (track.length > 1) {
           html += '<div class="dash-h" style="margin-top:14px">📋 سجل التوصيات <small>كل لقطة يومية مقابل المؤشر في نفس الفترة</small></div>';
           html += '<div class="dash-tbl-hint"><span>←</span> اسحب الجدول جنباً <span>←</span></div>';
-          html += '<div class="dash-tbl-wrap"><table class="mini-table"><thead><tr><th>لقطة التوصية</th><th>العمر</th><th>توصياتنا</th><th>المؤشر</th><th>الفرق</th></tr></thead><tbody>';
+          html += '<div class="dash-tbl-wrap"><table class="mini-table track-tbl"><thead><tr><th>لقطة التوصية</th><th>توصياتنا</th><th>المؤشر</th><th>الفرق</th></tr></thead><tbody>';
           track.forEach(function (t) {
-            html += '<tr><td><b>' + t.d + '</b></td><td>' + t.age + ' يوم</td>' +
+            html += '<tr><td><b>' + t.d + '</b><small class="td-sub">' + t.age + ' يوم</small></td>' +
               '<td class="' + (t.ours >= 0 ? 'pos' : 'neg') + '"><b>' + octaPct(t.ours) + '</b></td>' +
               '<td class="' + (t.mkt >= 0 ? 'pos' : 'neg') + '">' + octaPct(t.mkt) + '</td>' +
               '<td class="' + (t.gap >= 0 ? 'pos' : 'neg') + '"><b>' + octaPct(t.gap) + '</b></td></tr>';
