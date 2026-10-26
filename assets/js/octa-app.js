@@ -1300,7 +1300,7 @@ window.openChart = function (code, name, market) {
       });
     } catch (err) {
       var g = chartHost(m);
-      if (g) g.innerHTML = '<div class="gempty">الشارت مش متاح دلوقتي.</div>';
+      if (g) g.innerHTML = '<div class="gempty">الرسم البياني مش متاح دلوقتي.</div>';
     }
   }, 60);
 };
@@ -1391,7 +1391,7 @@ async function openStockModal(code) {
   '</div>' : '') +
   '<button onclick="goFullAnalysis()" style="margin-top:18px;width:<span class="flt-ltr">100%</span>;padding:13px;background:var(--gold);' +
   'color:#0a1929;border:none;border-radius:12px;font-weight:900;font-size:.92rem;cursor:pointer">' +
-  '📊 افتح التحليل الكامل (شارت TradingView + كل التفاصيل)</button>';
+  '📊 افتح التحليل الكامل (الرسم البياني + كل التفاصيل)</button>';
   } catch (e) {
   body.innerHTML = '<div class="dc-loading" style="padding:40px;text-align:center;color:#ff5252">❌ ' + (e.message||'') + '</div>';
   }

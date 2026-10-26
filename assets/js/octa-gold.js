@@ -873,7 +873,7 @@
           وزر ⛶ اتنقل فوق في ترويسة المودال (جنب ×). */
     h2 += '<div class="gsec">' +
       '<div id="gmv-chart" class="gchart"></div>' +
-      '<div class="gnote">الشارت من TradingView — نفس مصدر بيانات الموقع.</div></div>';
+      '<div class="gnote">الرسم البياني من TradingView — نفس مصدر بيانات الموقع.</div></div>';
 
     /* ── الفريمات ── */
     h2 += '<div class="gsec"><div class="gsec-h"><span class="gsec-i">🔬</span>' +

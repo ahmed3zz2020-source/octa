@@ -1512,10 +1512,15 @@ function buildEgyCard(ticker, gold) {
   const t = map[w.id];
   if (!t) return '<div class="mini"><div class="mini-n">' + w.n + '</div><div class="mini-v">—</div></div>';
 
-  let c = Number(t.change||0);
-  let v = Number(t.value||0).toLocaleString('en-US',{maximumFractionDigits:2});
+  /* ⛔⛔⛔ ٢٦ أكتوبر ٢٠٢٦ — ⭐ صفر مش يعني «مفيش رقم»
+     📌 كنا بنعمل Number(t.value||0) ⇒ رقم ناقص كان بيظهر 0.00% (كأنه رقم حقيقي).
+     📌 ✅ دلوقتي: لو مفيش قيمة ⇒ «غير متاح» + «—». */
+  const hasVal = t.value != null && !isNaN(Number(t.value));
+  const hasChg = t.change != null && !isNaN(Number(t.change));
+  let c = hasChg ? Number(t.change) : 0;
+  let v = hasVal ? Number(t.value).toLocaleString('en-US',{maximumFractionDigits:2}) : 'غير متاح';
 
-  if (w.id === 'tk-gold') {
+  if (w.id === 'tk-gold' && hasVal) {
   // الأونصة بالدولار × الدولار بالجنيه ÷ 31.1035 = سعر الجرام
   if (gold && gold.gram_egp) {
   v = Number(gold.gram_egp).toLocaleString('en-US',{maximumFractionDigits:0});
@@ -1529,16 +1534,22 @@ function buildEgyCard(ticker, gold) {
   /* ⛔⛔⛔ ٢٦ أكتوبر ٢٠٢٦ — ⭐⭐ كروت المؤشرات بقت قابلة للنقر
   📌 الهدف: «ذكاء المؤشرات» — تحليل كامل للمؤشر لما المستخدم يدوس عليه.
   📌 مؤشر الشريعة لسه ليها مودالها الخاص (مكوناته + نتيجة OCTA لكل سهم). */
-  var IX_MAP = { 'tk-egx':'EGX30', 'tk-egx70':'EGX70', 'tk-egx100':'EGX100' };
+  /* ⭐ Ahmed: مؤشر الشريعة لازم يبقى بنفس الطابع بالظبط زي باقي المؤشرات
+     ⇒ كل الكروت الأربعة بتفتح «ذكاء المؤشرات» (نفس المودال + نفس الأقسام)
+     ⇒ والجدول القديم بمكوناته ونتائجه بيفضل متاح من جوّه المودال. */
+  var IX_MAP = { 'tk-egx':'EGX30', 'tk-egx70':'EGX70', 'tk-egx100':'EGX100', 'tk-egx33':'EGX33' };
   var ixId = IX_MAP[w.id] || null;
-  var clickable = (w.id === 'tk-egx33')
-  ? ' onclick="openShariahIndex()" style="cursor:pointer" title="اضغط لعرض مكونات مؤشر الشريعة"'
-  : (ixId ? ' onclick="openIndexIntel(\'' + ixId + '\')" style="cursor:pointer" title="اضغط لتحليل المؤشر"' : '');
-  var sub = (w.id === 'tk-egx33')
-  ? '<div class="mini-sub">اضغط لعرض الـ' + (t.count||33) + ' سهم</div>'
-  : (ixId ? '<div class="mini-sub">اضغط للتحليل</div>' : '');
+  var clickable = ixId
+  ? ' onclick="openIndexIntel(\'' + ixId + '\')" style="cursor:pointer" title="اضغط لتحليل المؤشر"'
+  : '';
+  var sub = ixId
+  ? '<div class="mini-sub">اضغط للتحليل</div>'
+  : '';
+  const chgHtml = hasChg
+    ? '<div class="mini-c ' + (c>=0?'up':'down') + '">' + (c>=0?'▲ +':'▼ ') + Math.abs(c).toFixed(2) + '%</div>'
+    : '<div class="mini-c">—</div>';
   return '<div class="mini"' + clickable + '><div class="mini-n">' + w.n + '</div><div class="mini-v">' + v + '</div>' +
-  '<div class="mini-c ' + (c>=0?'up':'down') + '">' + (c>=0?'▲ +':'▼ ') + Math.abs(c).toFixed(2) + '%</div>' + sub + '</div>';
+  chgHtml + sub + '</div>';
   }).join('') + '</div>' +
   '<div class="mini-note">💡 الجرام = أونصة الذهب (دولار) × الدولار/الجنيه ÷ 31.1035 — بيتحسب لحظياً</div>' +
   '<div class="mini-note">🕌 مؤشر الشريعة (EGX 33 Shariah): اضغط عليه تشوف الـ' + '33' + ' سهم اللي داخلين فيه، مع نتيجة OCTA لكل سهم.</div>';

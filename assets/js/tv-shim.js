@@ -269,7 +269,7 @@
     /* ⏱ تايم-آوت ١٢ ثانية — لو الشبكة قطعت أو TradingView مردّش. */
     var loadTimer = setTimeout(function () {
       if (skel && skel.parentNode) {
-        skel.innerHTML = '<div class="octa-tv-skel-err">⚠️ الشارت مش متاح دلوقتي.</div>' +
+        skel.innerHTML = '<div class="octa-tv-skel-err">⚠️ الرسم البياني مش متاح دلوقتي.</div>' +
           '<button type="button" class="octa-tv-skel-retry">حاول تاني</button>';
         var btn = skel.querySelector('.octa-tv-skel-retry');
         if (btn) btn.onclick = function () { mount(host, o); };
@@ -279,7 +279,7 @@
     var f = document.createElement('iframe');
     f.className = 'octa-tv-frame';
     f.src = buildUrl(Object.assign({}, o, { symbol: sym }));
-    f.title = 'شارت TradingView — ' + sym;
+    f.title = 'الرسم البياني (TradingView) — ' + sym;
     f.setAttribute('allowtransparency', 'true');
     f.setAttribute('scrolling', 'no');
     /* ⛔ touch-action:none — ده إصلاح أدوات الرسم (19 أكتوبر ٢٠٢٦).
@@ -308,7 +308,7 @@
     f.addEventListener('error', function () {
       clearTimeout(loadTimer);
       if (skel && skel.parentNode) {
-        skel.innerHTML = '<div class="octa-tv-skel-err">⚠️ فشل تحميل الشارت.</div>' +
+        skel.innerHTML = '<div class="octa-tv-skel-err">⚠️ فشل تحميل الرسم البياني.</div>' +
           '<button type="button" class="octa-tv-skel-retry">حاول تاني</button>';
         var btn = skel.querySelector('.octa-tv-skel-retry');
         if (btn) btn.onclick = function () { mount(host, o); };
@@ -397,7 +397,7 @@
     var url = buildUrl(Object.assign({}, o, { symbol: sym }));
     if (f.src === url) return { frame: f, url: url, symbol: sym };
     f.src = url;
-    f.title = 'شارت TradingView — ' + sym;
+    f.title = 'الرسم البياني (TradingView) — ' + sym;
     f.dataset.tvSymbol = sym;
     f.dataset.tvInterval = normIv(o.interval);
     return { frame: f, url: url, symbol: sym };
@@ -709,8 +709,8 @@
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'ocm-shot';
-    b.setAttribute('aria-label', 'افتح الشارت في TradingView عشان تاخد صورة');
-    b.title = 'افتح في TradingView — من هناك تاخد صورة للشارت';
+    b.setAttribute('aria-label', 'افتح الرسم البياني في TradingView عشان تاخد صورة');
+    b.title = 'افتح في TradingView — من هناك تاخد صورة للرسم البياني';
     b.innerHTML = '<span aria-hidden="true">📷</span>';
     b.addEventListener('click', function () {
       window.open(shotUrl(sym), '_blank', 'noopener');

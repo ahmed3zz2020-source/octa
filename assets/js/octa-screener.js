@@ -1695,7 +1695,7 @@
 
   return '<tr class="sv-tr">' +
   '<td class="c sv-idw">' +
-  '<button class="sv-id" onclick="event.stopPropagation();openChart(\'' + s.code + '\',\'' + esc(nm) + '\',\'' + window.__scMarket + '\',\'' + (s.tvSymbol || '') + '\')" title="افتح الشارت">' +
+  '<button class="sv-id" onclick="event.stopPropagation();openChart(\'' + s.code + '\',\'' + esc(nm) + '\',\'' + window.__scMarket + '\',\'' + (s.tvSymbol || '') + '\')" title="افتح الرسم البياني">' +
   logoHTML(s.code) +
   '<span class="sv-txt"><b>' + esc(s.code) + '</b>' + (nm ? '<i>' + esc(nm) + '</i>' : '') + '</span>' +
   '</button></td>' +
@@ -1747,7 +1747,7 @@
 
   return '<tr class="sv-tr">' +
   '<td class="c sv-idw">' +
-  '<button class="sv-id" onclick="event.stopPropagation();openChart(\'' + s.code + '\',\'' + esc(nm) + '\',\'' + window.__scMarket + '\',\'' + (s.tvSymbol || '') + '\')" title="افتح الشارت">' +
+  '<button class="sv-id" onclick="event.stopPropagation();openChart(\'' + s.code + '\',\'' + esc(nm) + '\',\'' + window.__scMarket + '\',\'' + (s.tvSymbol || '') + '\')" title="افتح الرسم البياني">' +
   logoHTML(s.code) +
   '<span class="sv-txt"><b>' + esc(s.code) + '</b>' + (nm ? '<i>' + esc(nm) + '</i>' : '') + '</span>' +
   '</button>' +

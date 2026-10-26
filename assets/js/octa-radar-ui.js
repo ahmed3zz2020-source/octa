@@ -1121,10 +1121,10 @@
         chart.timeScale().fitContent();
         window.addEventListener('resize', () => { try { chart.applyOptions({ width: box.clientWidth }); } catch (e) { } });
       } catch (e) {
-        box.innerHTML = '<div class="rd-txt">⛔ تعذّر رسم الشارت — البيانات في النص تحت.</div>';
+        box.innerHTML = '<div class="rd-txt">⛔ تعذّر رسم الرسم البياني — البيانات في النص تحت.</div>';
       }
     }).catch(() => {
-      box.innerHTML = '<div class="rd-txt">⛔ مكتبة الشارت مش متاحة — البيانات في النص تحت.</div>';
+      box.innerHTML = '<div class="rd-txt">⛔ مكتبة الرسم مش متاحة — البيانات في النص تحت.</div>';
     });
   }
 

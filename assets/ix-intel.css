@@ -255,3 +255,39 @@
 
 /* 📅 تاريخ LTR جوّه نص عربي */
 .ix-date { direction: ltr; unicode-bidi: isolate; display: inline-block; white-space: nowrap; }
+
+/* 📌 صندوق النسبة المكتوب على الرسم نفسه */
+.ix-dot-label-bg { fill: var(--card, #0d2137); stroke: var(--gold, #c9a227); stroke-width: 1; opacity: .95; }
+.ix-dot-label-tx { fill: var(--txt, #e8f1fb); font-size: 11px; font-weight: 700; direction: ltr; unicode-bidi: isolate; }
+.ix-dot-label-tx.pos { fill: #34d399; }
+.ix-dot-label-tx.neg { fill: #f87171; }
+
+/* 📌 سطر شرح وضع العرض */
+.ix-mode-help {
+  font-size: 12px; line-height: 1.65; color: var(--muted, #9fb3c8);
+  background: var(--card-2, rgba(255,255,255,.04));
+  border: 1px solid var(--line, rgba(255,255,255,.1));
+  border-radius: 10px; padding: 9px 11px; margin: 8px 0 4px;
+}
+
+/* 🔎 أدوات جدول المكونات: بحث + فلتر */
+.ix-cons-tools { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 8px; }
+.ix-cons-q {
+  width: 100%; min-height: 42px; border-radius: 10px; padding: 9px 12px;
+  border: 1px solid var(--line, rgba(255,255,255,.14)); background: var(--card-2, rgba(255,255,255,.04));
+  color: var(--txt, #e8f1fb); font-size: 14px; font-family: inherit;
+}
+.ix-cons-q:focus { outline: 2px solid var(--gold, #c9a227); outline-offset: 1px; }
+.ix-cons-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.ix-cons-f {
+  flex: 1 1 auto; min-height: 38px; padding: 7px 10px; border-radius: 9px; cursor: pointer;
+  border: 1px solid var(--line, rgba(255,255,255,.14)); background: var(--card-2, rgba(255,255,255,.04));
+  color: var(--txt, #e8f1fb); font-size: 12.5px; font-weight: 700; font-family: inherit;
+}
+.ix-cons-f.on { background: var(--gold, #c9a227); color: #0b1220; border-color: var(--gold, #c9a227); }
+.ix-cons-f:focus-visible { outline: 2px solid var(--gold, #c9a227); outline-offset: 2px; }
+
+/* 🧹 زر المسح بتاع المتصفح في مربع البحث — نصغّره ونخليه هادي */
+.ix-cons-q::-webkit-search-cancel-button { -webkit-appearance: none; height: 16px; width: 16px; cursor: pointer; opacity: .55; }
+.ix-cons-q::-webkit-search-cancel-button:hover { opacity: .95; }
+.ix-cons-q::-webkit-search-decoration { -webkit-appearance: none; }
