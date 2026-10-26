@@ -490,10 +490,15 @@
   }
   @keyframes tvFade { from { opacity: 0; } to { opacity: 1; } }
   .tv-modal-box {
-  background: #0a1929; border: 1px solid rgba(212,175,55,0.35);
+  /* ⛔⛔⛔ ٢٦ أكتوبر ٢٠٢٦ — ⭐ المودال لازم يتبع المظهر
+  📌 كان مكتوب `background: #0a1929` (غامق ثابت) ⇒ في النمط
+  📌 ⛌⛌⛌ الفاتح كان النص غامق على غامق = مستخبي!
+  📌 ✅ الحل: نستخدم --card/--pri2 اللي بيتبدّل مع المظهر. */
+  background: var(--card, #0d2137); border: 1px solid rgba(212,175,55,0.35);
   border-radius: 16px; width: 100%; max-width: 1000px;
   max-height: 92vh; overflow: hidden; display: flex; flex-direction: column;
   box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  color: var(--txt);
   }
   .tv-modal-head {
   display: flex; justify-content: space-between; align-items: center;
@@ -1584,19 +1589,28 @@
 
   /* ═══ 🕌 مؤشر الشريعة — المودال + البحث والفلتر (٢٦ أكتوبر ٢٠٢٦) ═══ */
   .mini-sub { font-size: .6rem; color: var(--gold); font-weight: 700; margin-top: 3px; }
-  .sh-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 12px; }
+  .sh-summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
   .sh-summary > div { background: var(--wash); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; }
   .sh-k { display: block; font-size: .66rem; color: var(--muted); font-weight: 700; }
   .sh-v { display: block; font-size: 1rem; font-weight: 900; color: var(--txt); margin-top: 2px; }
   .sh-v.pos { color: var(--sec); } .sh-v.neg { color: var(--red2); }
-  .sh-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
-  .sh-input { flex: 1 1 180px; min-width: 140px; background: var(--wash); border: 1px solid var(--line);
-    border-radius: 10px; padding: 9px 11px; color: var(--txt); font-size: .85rem; font-family: inherit; }
+  .sh-v small { font-size: .58rem; color: var(--muted); font-weight: 700; }
+  /* ⛔⛔⛔ البحث والفلتر لازم كل واحد في سطر لوحده على الموبايل
+     ⛌ ⛌ ⛌ كانوا في سطر واحد (flex-wrap) ⇒ قصّوا وبانوا نص مقطوع. */
+  .sh-controls { display: flex; flex-direction: column; gap: 8px; align-items: stretch; margin-bottom: 10px; }
+  .sh-input { width: 100%; background: var(--wash); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; color: var(--txt); font-size: .85rem; font-family: inherit; }
   .sh-input:focus { outline: none; border-color: var(--gold); }
-  .sh-select { flex: 0 0 auto; min-width: 120px; }
-  .sh-count { font-size: .72rem; color: var(--muted); font-weight: 700; white-space: nowrap; }
+  .sh-select { width: 100%; }
+  .sh-count { font-size: .72rem; color: var(--muted); font-weight: 700; text-align: center; }
   .sh-table { min-width: 560px; }
   .sh-note { font-size: .7rem; color: var(--muted); line-height: 1.7; margin-top: 12px; }
+  @media (min-width: 560px) {
+    .sh-summary { grid-template-columns: repeat(4, 1fr); }
+    .sh-controls { flex-direction: row; align-items: center; }
+    .sh-input { flex: 1 1 auto; width: auto; }
+    .sh-select { flex: 0 0 150px; width: auto; }
+  }
 
   .dash-loading { padding: 40px; text-align: center; color: var(--muted); }
 

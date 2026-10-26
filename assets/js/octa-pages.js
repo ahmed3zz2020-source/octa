@@ -1433,13 +1433,16 @@ function renderShariah(wrap) {
   const cls = (quote.change || 0) >= 0 ? 'pos' : 'neg';
 
   const body = wrap.querySelector('#shariah-body');
+  const sub = wrap.querySelector('.tv-modal-sub');
+  if (sub) sub.textContent = '٣٣ شركة · ٣٤ ورقة · المكونات من البورصة المصرية الرسمية';
   let html = '<div class="sh-summary">' +
     '<div><span class="sh-k">قيمة المؤشر</span><span class="sh-v">' +
     (quote.value != null ? Number(quote.value).toLocaleString('en-US', { maximumFractionDigits: 2 }) : '\u2014') + '</span></div>' +
     '<div><span class="sh-k">اليوم</span><span class="sh-v ' + cls + '">' + pct + '</span></div>' +
     '<div><span class="sh-k">آخر سنة</span><span class="sh-v">' +
     (quote.perf_y != null ? (quote.perf_y >= 0 ? '+' : '') + Number(quote.perf_y).toFixed(2) + '%' : '\u2014') + '</span></div>' +
-    '<div><span class="sh-k">عدد الأسهم</span><span class="sh-v">' + rows.length + '</span></div>' +
+    '<div><span class="sh-k">عدد الأسهم</span><span class="sh-v">' +
+    (idx.companies || rows.length) + ' <span style="font-size:.62rem;color:var(--muted);font-weight:700">شركة / ' + rows.length + ' ورقة</span></span></div>' +
     '</div>' +
     '<div class="sh-controls">' +
     '<input id="sh-search" class="sh-input" type="search" placeholder="\u0627\u0628\u062d\u062b \u0628\u0627\u0633\u0645 \u0627\u0648 \u0627\u0633\u0645 \u0627\u0644\u0634\u0631\u0643\u0629 \u0623\u0648 \u0627\u0644\u0642\u0637\u0627\u0639" value="' + q.replace(/"/g, '&quot;') + '">' +
@@ -1470,6 +1473,7 @@ function renderShariah(wrap) {
     html += '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:18px">\u2014 مفيش نتائج بالفلتر ده \u2014</td></tr>';
   }
   html += '</tbody></table></div>' +
+    '<div class="dash-tbl-hint"><span>←</span> اسحب الجدول جنباً عشان تشوف باقي الأعمدة <span>←</span></div>' +
     '<div class="sh-note">\u{1F4D6} المكونات من موقع البورصة المصرية الرسمي: ' +
     '<a href="' + (idx.source || '#') + '" target="_blank" rel="noopener" style="color:var(--gold)">' + (idx.source || '') + '</a>' +
     '<br>\u2139\uFE0F ' + (idx.source_note || '') + '</div>';
@@ -1477,6 +1481,11 @@ function renderShariah(wrap) {
 
   const si = body.querySelector('#sh-search');
   const sm = body.querySelector('#sh-min');
+  /* ⛔⛔⛔ ٢٦ أكتوبر ٢٠٢٦ — ⭐ الجدول RTL ⇒ بيبدأ من اليمين
+  📌 فعمود «الاسم» (آخر عمود) كان بيظهر مقصوص وانت فتحت المودال.
+  📌 ✅ الحل: نرجّع التمرير لأقصى اليمين (= بداية الجدول في RTL). */
+  const _wrap = body.querySelector('.dash-tbl-wrap');
+  if (_wrap) { try { _wrap.scrollLeft = 0; _wrap.scrollTo({ left: 0 }); } catch (e) { } }
   const apply = function () {
     SHARIAH_DATA._q = si.value;
     SHARIAH_DATA._min = parseInt(sm.value || '0', 10);
