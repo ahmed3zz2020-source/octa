@@ -1524,12 +1524,17 @@ function buildEgyCard(ticker, gold) {
   }
   }
 
+  /* ⛔⛔⛔ ٢٦ أكتوبر ٢٠٢٦ — ⭐⭐ كروت المؤشرات بقت قابلة للنقر
+  📌 الهدف: «ذكاء المؤشرات» — تحليل كامل للمؤشر لما المستخدم يدوس عليه.
+  📌 مؤشر الشريعة لسه ليها مودالها الخاص (مكوناته + نتيجة OCTA لكل سهم). */
+  var IX_MAP = { 'tk-egx':'EGX30', 'tk-egx70':'EGX70', 'tk-egx100':'EGX100' };
+  var ixId = IX_MAP[w.id] || null;
   var clickable = (w.id === 'tk-egx33')
   ? ' onclick="openShariahIndex()" style="cursor:pointer" title="اضغط لعرض مكونات مؤشر الشريعة"'
-  : '';
+  : (ixId ? ' onclick="openIndexIntel(\'' + ixId + '\')" style="cursor:pointer" title="اضغط لتحليل المؤشر"' : '');
   var sub = (w.id === 'tk-egx33')
   ? '<div class="mini-sub">اضغط لعرض الـ' + (t.count||33) + ' سهم</div>'
-  : '';
+  : (ixId ? '<div class="mini-sub">اضغط للتحليل</div>' : '');
   return '<div class="mini"' + clickable + '><div class="mini-n">' + w.n + '</div><div class="mini-v">' + v + '</div>' +
   '<div class="mini-c ' + (c>=0?'up':'down') + '">' + (c>=0?'▲ +':'▼ ') + Math.abs(c).toFixed(2) + '%</div>' + sub + '</div>';
   }).join('') + '</div>' +

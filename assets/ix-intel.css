@@ -1,0 +1,217 @@
+
+  /* ════════════════════════════════════════════════════════════════════════
+     🕌 ذكاء المؤشرات — OCTA INDEX INTELLIGENCE (٢٦ أكتوبر ٢٠٢٦)
+     ════════════════════════════════════════════════════════════════════════
+     📌 كل الألوان من التوكنز ⇒ بيشتغل في النمط الفاتح والغامق.
+     📌 الموبايل: المودال بياخد الشاشة كلها. */
+  .ix-overlay {
+    position: fixed; inset: 0; z-index: 10050;
+    background: rgba(0,0,0,.82); backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center; padding: 0;
+    animation: ixFade .18s ease;
+  }
+  @keyframes ixFade { from { opacity: 0; } to { opacity: 1; } }
+  .ix-box {
+    background: var(--card); color: var(--txt);
+    border: 1px solid var(--line); border-radius: 0;
+    width: 100%; max-width: 980px; height: 100%;
+    max-height: 100dvh; overflow: hidden; display: flex; flex-direction: column;
+  }
+  .ix-head {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    padding: 13px 15px; border-bottom: 1px solid var(--line);
+    background: var(--pri2); flex-shrink: 0;
+  }
+  .ix-title { font-size: 1rem; font-weight: 900; color: var(--gold); display: flex; align-items: center; gap: 8px; }
+  .ix-title .ix-en { font-size: .74rem; color: var(--muted); font-weight: 700; }
+  .ix-dotc { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .ix-sub { font-size: .7rem; color: var(--muted); margin-top: 3px; }
+  .ix-close {
+    width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+    background: var(--wash); color: var(--muted); border: 1px solid var(--line);
+    font-size: .9rem; line-height: 1; cursor: pointer;
+  }
+  .ix-close:hover { background: var(--wash); color: var(--txt); border-color: var(--gold); }
+  .ix-body { overflow: auto; padding: 14px 15px 40px; -webkit-overflow-scrolling: touch; }
+  .ix-loading { padding: 40px; text-align: center; color: var(--muted); }
+  .ix-loading.sm { padding: 8px; font-size: .74rem; }
+  .ix-empty { padding: 30px; text-align: center; color: var(--muted); font-size: .9rem; }
+
+  /* ── الهيرو ── */
+  .ix-hero {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: stretch; margin-bottom: 12px;
+  }
+  .ix-hero-val {
+    background: var(--wash); border: 1px solid var(--line); border-radius: 14px; padding: 14px;
+    border-right: 3px solid var(--gold);
+  }
+  .ix-k { font-size: .68rem; color: var(--muted); font-weight: 700; }
+  .ix-v { font-size: 1.6rem; font-weight: 900; color: var(--txt); margin-top: 3px; letter-spacing: -.5px; }
+  .ix-c { font-size: .82rem; font-weight: 800; margin-top: 3px; }
+  .ix-c.pos, .ix-v.pos { color: var(--sec); }
+  .ix-c.neg, .ix-v.neg { color: var(--red2); }
+  .ix-hero-side { display: grid; grid-template-columns: 1fr; gap: 6px; }
+  .ix-mini { background: var(--wash); border: 1px solid var(--line); border-radius: 11px; padding: 7px 10px; }
+  .ix-mini .ix-v { font-size: .92rem; margin-top: 1px; }
+
+  /* ── شارات حالة البيانات ── */
+  .ix-datastat { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .ix-badge {
+    font-size: .68rem; font-weight: 700; padding: 4px 9px; border-radius: 100px;
+    background: var(--wash); border: 1px solid var(--line); color: var(--muted);
+  }
+  .ix-badge.live { color: var(--sec); border-color: var(--sec); }
+  .ix-badge.warn { color: var(--gold); border-color: var(--goldLine); }
+
+  /* ── الأزرار ── */
+  .ix-periods, .ix-modes { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+  .ix-per, .ix-mode, .ix-cmp-chip {
+    padding: 6px 11px; border-radius: 100px; font-size: .74rem; font-weight: 700;
+    background: var(--wash); border: 1px solid var(--line); color: var(--muted);
+    cursor: pointer; font-family: inherit;
+  }
+  .ix-per.on, .ix-mode.on, .ix-cmp-chip.on {
+    background: var(--goldBg); border-color: var(--gold); color: var(--gold);
+  }
+  .ix-per:focus-visible, .ix-mode:focus-visible, .ix-cmp-chip:focus-visible,
+  .ix-close:focus-visible, .ix-phase:focus-visible, .ix-ev-mark:focus-visible {
+    outline: 2px solid var(--gold); outline-offset: 2px;
+  }
+
+  /* ── الرسم ── */
+  .ix-chart-wrap { position: relative; background: var(--wash); border: 1px solid var(--line); border-radius: 13px; padding: 6px 4px 2px; }
+  .ix-chart { width: 100%; height: 230px; display: block; touch-action: pan-y; }
+  .ix-axis { font-size: 9px; fill: var(--muted); font-weight: 700; }
+  .ix-line { stroke-linejoin: round; stroke-linecap: round; }
+  .ix-cross { stroke: var(--gold); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+  .ix-dot { fill: var(--gold); pointer-events: none; }
+  .ix-ev-mark { fill: var(--gold2); cursor: pointer; opacity: .9; }
+  .ix-ev-mark:hover, .ix-ev-mark:focus { fill: var(--txt); opacity: 1; }
+  .ix-tip {
+    position: absolute; pointer-events: none; z-index: 5;
+    background: var(--pri2); border: 1px solid var(--goldLine); border-radius: 10px;
+    padding: 7px 10px; font-size: .72rem; line-height: 1.7; color: var(--txt);
+    box-shadow: 0 6px 20px rgba(0,0,0,.3); min-width: 132px;
+  }
+  .ix-tip-ph { color: var(--gold); font-weight: 700; }
+  .ix-axis-note { font-size: .64rem; color: var(--muted); padding: 2px 8px 4px; }
+  .ix-chart-legend { display: flex; align-items: center; gap: 14px; font-size: .68rem; color: var(--muted); margin-top: 7px; }
+  .ix-lg-line { width: 16px; height: 2px; background: var(--gold); display: inline-block; vertical-align: middle; }
+  .ix-lg-ev { width: 8px; height: 8px; border-radius: 50%; background: var(--gold2); display: inline-block; vertical-align: middle; }
+
+  /* ── الأقسام ── */
+  .ix-sec { margin-bottom: 24px; }
+  .ix-h {
+    font-size: .92rem; font-weight: 900; color: var(--txt);
+    margin: 0 0 10px; padding-bottom: 7px; border-bottom: 1px solid var(--line);
+  }
+  .ix-note {
+    font-size: .7rem; color: var(--muted); line-height: 1.8;
+    background: var(--wash); border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px 11px; margin: 8px 0;
+  }
+  .ix-list { margin: 0; padding-right: 18px; }
+  .ix-list li { font-size: .78rem; line-height: 1.9; color: var(--txt); margin-bottom: 5px; }
+
+  /* ── الإحصائيات ── */
+  .ix-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .ix-stat { background: var(--wash); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .ix-stat-t { font-size: .68rem; color: var(--muted); font-weight: 700; }
+  .ix-stat-v { font-size: 1.08rem; font-weight: 900; color: var(--txt); margin-top: 2px; }
+  .ix-stat-v.pos { color: var(--sec); } .ix-stat-v.neg { color: var(--red2); }
+  .ix-stat-x { font-size: .63rem; color: var(--muted); line-height: 1.65; margin-top: 4px; }
+
+  /* ── حالة السوق ── */
+  .ix-regime { background: var(--wash); border: 1px solid var(--line); border-radius: 14px; padding: 13px; }
+  .ix-regime-head { display: flex; gap: 11px; align-items: center; margin-bottom: 9px; }
+  .ix-regime-ico { font-size: 1.6rem; }
+  .ix-regime-t { font-size: .95rem; font-weight: 900; color: var(--txt); }
+  .ix-regime-c { font-size: .68rem; color: var(--muted); margin-top: 2px; }
+  .ix-reg-uptrend, .ix-reg-strong_uptrend { border-right: 3px solid var(--sec); }
+  .ix-reg-downtrend, .ix-reg-strong_downtrend { border-right: 3px solid var(--red2); }
+  .ix-reg-uncertain, .ix-reg-sideways { border-right: 3px solid var(--gold); }
+  .ix-reg-high_volatility { border-right: 3px solid var(--gold2); }
+  .ix-reasons { margin: 0; padding-right: 18px; }
+  .ix-reasons li { font-size: .78rem; line-height: 1.85; color: var(--txt); }
+
+  /* ── التعليم ── */
+  .ix-edu { display: grid; gap: 8px; }
+  .ix-edu-b { background: var(--wash); border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; }
+  .ix-edu-b.warn { border-right: 3px solid var(--gold); }
+  .ix-edu-t { font-size: .74rem; font-weight: 900; color: var(--gold); margin-bottom: 4px; }
+  .ix-edu-x { font-size: .8rem; line-height: 1.9; color: var(--txt); }
+
+  /* ── المعلومات الرسمية ── */
+  .ix-offgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+  .ix-off { background: var(--wash); border: 1px solid var(--line); border-radius: 11px; padding: 9px 11px; }
+  .ix-off .ix-v { font-size: .8rem; font-weight: 700; line-height: 1.75; margin-top: 3px; }
+
+  /* ── المراحل ── */
+  .ix-phases { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 8px; }
+  .ix-phase { background: var(--wash); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer; }
+  .ix-phase:hover { border-color: var(--gold); }
+  .ix-phase.pos { border-right: 3px solid var(--sec); }
+  .ix-phase.neg { border-right: 3px solid var(--red2); }
+  .ix-phase-t { font-size: .78rem; font-weight: 900; color: var(--txt); }
+  .ix-phase-d { font-size: .66rem; color: var(--muted); margin-top: 2px; }
+  .ix-phase-r { font-size: .84rem; font-weight: 900; margin-top: 4px; }
+  .ix-phase-r.pos { color: var(--sec); } .ix-phase-r.neg { color: var(--red2); }
+  .ix-phase-x { font-size: .63rem; color: var(--muted); margin-top: 3px; line-height: 1.7; }
+
+  /* ── الأحداث ── */
+  .ix-events { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+  .ix-event { background: var(--wash); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .ix-event-t { font-size: .8rem; font-weight: 900; color: var(--txt); }
+  .ix-event-d { font-size: .65rem; color: var(--muted); margin-top: 2px; }
+  .ix-event-i { font-size: .76rem; font-weight: 800; margin-top: 4px; }
+  .ix-event-i.pos { color: var(--sec); } .ix-event-i.neg { color: var(--red2); }
+  .ix-event-x { font-size: .72rem; line-height: 1.8; color: var(--muted); margin-top: 4px; }
+  .ix-event-s { display: inline-block; font-size: .66rem; color: var(--gold); margin-top: 5px; text-decoration: none; }
+  .ix-evcard {
+    position: relative; background: var(--pri2); border: 1px solid var(--goldLine);
+    border-radius: 13px; padding: 13px; margin: 10px 0;
+  }
+  .ix-evcard-x { position: absolute; top: 7px; left: 9px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: .85rem; }
+  .ix-evcard-t { font-size: .88rem; font-weight: 900; color: var(--gold); }
+  .ix-evcard-d { font-size: .68rem; color: var(--muted); margin-top: 2px; }
+  .ix-evcard-i { font-size: .8rem; font-weight: 800; margin-top: 5px; }
+  .ix-evcard-i.pos { color: var(--sec); } .ix-evcard-i.neg { color: var(--red2); }
+  .ix-evcard-x2 { font-size: .76rem; line-height: 1.85; color: var(--txt); margin-top: 6px; }
+  .ix-evcard-s { display: inline-block; font-size: .68rem; color: var(--gold); margin-top: 6px; }
+
+  /* ── الدروس ── */
+  .ix-lessons { display: grid; gap: 8px; }
+  .ix-lesson { background: var(--wash); border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; border-right: 3px solid var(--gold); }
+  .ix-lesson-t { font-size: .8rem; font-weight: 900; color: var(--txt); margin-bottom: 4px; }
+  .ix-lesson-x { font-size: .78rem; line-height: 1.9; color: var(--muted); }
+
+  /* ── الجداول ── */
+  .ix-table { min-width: 560px; }
+  .ix-table td { font-size: .76rem; }
+
+  /* ── المقارنة ── */
+  .ix-cmp-ctl { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; align-items: center; }
+  .ix-cmp-sep { width: 1px; height: 20px; background: var(--line); margin: 0 5px; }
+  .ix-cmp-chart { background: var(--wash); border: 1px solid var(--line); border-radius: 13px; padding: 6px 4px; margin-bottom: 12px; }
+  .ix-cmp-sum { display: grid; gap: 6px; font-size: .8rem; line-height: 1.8; color: var(--txt); }
+  .ix-cmp-sum b { color: var(--gold); }
+
+  /* ── الموبايل ── */
+  @media (max-width: 640px) {
+    .ix-overlay { padding: 0; }
+    .ix-box { border-radius: 0; max-width: 100%; }
+    .ix-body { padding: 12px 12px 50px; }
+    .ix-hero { grid-template-columns: 1fr; }
+    .ix-hero-side { grid-template-columns: repeat(3, 1fr); }
+    .ix-mini .ix-v { font-size: .82rem; }
+    .ix-stats { grid-template-columns: repeat(2, 1fr); }
+    .ix-v { font-size: 1.4rem; }
+    .ix-phases, .ix-events, .ix-offgrid { grid-template-columns: 1fr; }
+    .ix-chart { height: 190px; }
+    .ix-title { font-size: .88rem; }
+    .ix-title .ix-en { display: block; font-size: .66rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ix-overlay { animation: none; }
+    .ix-phase, .ix-ev-mark { transition: none; }
+  }
