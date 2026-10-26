@@ -1556,7 +1556,7 @@ function buildEgyCard(ticker, gold) {
   chgHtml + offNote + sub + '</div>';
   }).join('') + '</div>' +
   '<div class="mini-note">💡 الجرام = أونصة الذهب (دولار) × الدولار/الجنيه ÷ 31.1035 — بيتحسب لحظياً</div>' +
-  '<div class="mini-note">🕌 مؤشر الشريعة (EGX 33 Shariah): اضغط عليه تشوف الـ' + '33' + ' سهم اللي داخلين فيه، مع نتيجة OCTA لكل سهم.</div>';
+  '<div class="mini-note">🕌 مؤشر الشريعة (EGX 33 Shariah): اضغط عليه تشوف تحليل كامل —المنهجية والمكونات ونتيجة OCTA لكل سهم.</div>';
   return uniCard('egyCard', '🇪🇬', 'مؤشرات السوق المصري', 'الأسهم والمؤشرات والعملات والذهب', body, true);
 }
 
