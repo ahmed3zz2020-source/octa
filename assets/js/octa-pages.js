@@ -917,21 +917,23 @@ async function octaLoadBench(d) {
     var ref1 = octaCloseAt(rows, d1), ref2 = octaCloseAt(rows, d2), ref3 = octaCloseAt(rows, d3);
     if (!ref1 || !ref2 || !ref3) throw new Error('no ref closes');
 
-    /* السعر الحالي للمؤشر: من الملف لو محدث، وإلا من السعر الحي */
+    /* السعر الحالي للمؤشر: من الملف (آخر جلسة) — ولو الملف قدير
+       فبنجيب السعر الحي. تاريخ آخر جلسة = آخر صف في السلسلة. */
     var nowIso = new Date().toISOString().slice(0, 10);
-    var idxNow = (hist.as_of === nowIso) ? Number(hist.last_close) : null;
-    var idxAsOf = hist.as_of;
-    if (idxNow == null) {
+    var mktDate = rows[rows.length - 1][0];
+    var fileAge = Math.round((Date.parse(nowIso) - Date.parse(mktDate)) / 86400000);
+    var idxNow = Number(hist.last_close);
+    var idxAsOf = mktDate;
+    if (fileAge > 3) {
       try {
         var q = await octaFetch(OCTA_API + '/api/tvquote?symbol=EGX%3AEGX30&_=' + Date.now())
           .then(function (r) { return r.ok ? r.json() : null; });
         if (q) {
           var c = (q.close != null) ? q.close : ((q.price != null) ? q.price : ((q.c != null) ? q.c : null));
-          if (c) { idxNow = Number(c); idxAsOf = nowIso; }
+          if (c) { idxNow = Number(c); idxAsOf = q.date || nowIso; }
         }
       } catch (e) { }
     }
-    if (idxNow == null) { idxNow = Number(hist.last_close); idxAsOf = hist.as_of; }
 
     /* ② أعلى ٢٠ سهم + سعرهم الحي الحالي */
     var rank = await octaFetch(OCTA_API + '/api/rank?_=' + Date.now())
@@ -962,7 +964,7 @@ async function octaLoadBench(d) {
         var live = livePrice[r.code];
         if (!live) continue;
         sum += (live / r[key].close - 1) * 100; n++;
-        if (r.now && r.now.date !== nowIso && staleList.indexOf(r.code) < 0) staleList.push(r.code);
+        if (r.now && r.now.date !== mktDate && staleList.indexOf(r.code) < 0) staleList.push(r.code);
       }
       return n ? { avg: sum / n, n: n } : null;
     }
@@ -1018,6 +1020,19 @@ async function octaLoadBench(d) {
         html += '<div class="entry-sum">📌 لقطة ' + old.snapshot_date + ' (' + old.age_days + ' يوم) · ' + old.count +
           ' توصية · متوسط <b class="' + (old.avg_return >= 0 ? 'pos' : 'neg') + '">' + octaPct(old.avg_return) + '</b>' +
           ' · ' + old.wins + ' ربح · ' + old.flat + ' محايد · ' + old.losses + ' خسارة</div>';
+        /* 📌 المقارنة الأصدق: المؤشر في نفس الفترة بالظبط
+           (من نفس يوم التوصية لحد النهارده) — دي المقارنة اللي
+           بتقولك التوصيات أحسن من السوق ولا أقل منه فعلاً. */
+        var snapClose = octaCloseAt(rows, old.snapshot_date);
+        if (snapClose && idxNow) {
+          var idxSame = (idxNow / snapClose - 1) * 100;
+          var gapSame = old.avg_return - idxSame;
+          html += '<div class="entry-sum">📊 في <b>نفس الفترة بالظبط</b> (' + old.snapshot_date + ' → ' + idxAsOf +
+            '): مؤشر البورصة <b class="' + (idxSame >= 0 ? 'pos' : 'neg') + '">' + octaPct(idxSame) + '</b>' +
+            ' · توصياتنا <b class="' + (old.avg_return >= 0 ? 'pos' : 'neg') + '">' + octaPct(old.avg_return) + '</b>' +
+            ' ⇒ <b class="' + (gapSame >= 0 ? 'pos' : 'neg') + '">' +
+            (gapSame >= 0 ? 'قدام المؤشر بـ' : 'ورا المؤشر بـ') + ' ' + Math.abs(gapSame).toFixed(2) + ' نقطة</b></div>';
+        }
         html += '<div class="dash-tbl-hint"><span>←</span> اسحب الجدول جنباً عشان تشوف باقي الأعمدة <span>←</span></div>';
         html += '<div class="dash-tbl-wrap"><table class="mini-table"><thead><tr><th>الرمز</th><th>العائد من الدخول</th><th>سعر الدخول</th><th>السعر دلوقتي</th><th>الاسم</th><th>القرار يوم الاختيار</th></tr></thead><tbody>';
         (old.picks || []).slice().sort(function (x, y2) { return (x.actual_return || 0) - (y2.actual_return || 0); })
