@@ -1548,13 +1548,9 @@ function buildEgyCard(ticker, gold) {
   const chgHtml = hasChg
     ? '<div class="mini-c ' + (c>=0?'up':'down') + '">' + (c>=0?'▲ +':'▼ ') + Math.abs(c).toFixed(2) + '%</div>'
     : '<div class="mini-c">—</div>';
-  /* 📌 لو الرقم من آخر إغلاق رسمي (مش لحظي) ⇒ نقول بوضوح */
-  /* 📌 «إغلاق رسمي» بس لو السوق قفل فعلاً — أثناء الجلسة الرقم لقطة لا أكثر */
-  const offNote = t._official_close
-    ? '<div class="mini-sub">' + (t._official_final
-      ? 'إغلاق رسمي ' : 'لقطة أثناء الجلسة ') +
-      esc(String(t._official_date || '').slice(8, 10) + '/' + String(t._official_date || '').slice(5, 7)) + '</div>'
-    : '';
+  /* 📌 أحمد طلب شيل ملاحظة «إغلاق رسمي/لقطة» من كارت مؤشر الشريعة — بس الرقم.
+     📌 الرقم نفسه صحيح (إغلاق رسمي اتقرا من البورصة بعد القفل) فمفيش داعي للملاحظة. */
+  const offNote = '';
   return '<div class="mini"' + clickable + '><div class="mini-n">' + w.n + '</div><div class="mini-v">' + v + '</div>' +
   chgHtml + offNote + sub + '</div>';
   }).join('') + '</div>' +
