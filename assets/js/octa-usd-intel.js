@@ -15,7 +15,9 @@
   /* ── أدوات ─────────────────────────────────────────────────────── */
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const LRI = '\u2066', PDI = '\u2069';
+  const LRI = '\u2066', PDI = '\u2069', RLI = '\u2067';
+  /* 📌 نص عربي جوّه SVG اتجاهه ltr ⇒ لازم عزل RTL (وإلا الحروف والسنة بتتقلب) */
+  const ar = (t) => RLI + String(t) + PDI;
   const num = (v, d) => {
     if (v == null || isNaN(v)) return '—';
     d = (d === undefined) ? 2 : d;
@@ -211,7 +213,10 @@
     }
 
     /* ── ③ محور الزمن ── */
-    const nLab = W < 420 ? 3 : (W < 700 ? 4 : 6);
+    /* 📌 النافذة القصيرة: لو أكتر من سنة ⇒ تسمية واحدة بس في الأول والآخر
+       (وإلا التسميات بتتكدّس على الموبايل) */
+    const multiYearWin = (t1 - t0) > 300 * 86400;
+    const nLab = W < 420 ? (multiYearWin ? 2 : 3) : (W < 700 ? (multiYearWin ? 3 : 4) : 6);
     let xlab = '';
     for (let i = 0; i <= nLab; i++) {
       const t = t0 + (dt * i) / nLab;
@@ -219,10 +224,10 @@
       let lx = cx, anch = 'middle';
       if (i === 0) { lx = G.PAD_L; anch = 'start'; }
       else if (i === nLab) { lx = W - G.PAD_R; anch = 'end'; }
-      const multiYear = (t1 - t0) > 300 * 86400;   /* 📌 نافذة أكتر من سنة ⇒ نبيّن السنة */
+      const multiYear = multiYearWin;   /* 📌 نافذة أكتر من سنة ⇒ نبيّن السنة */
+      const lbl = multiYear ? (dShort(t) + ' ' + new Date(t * 1000).getFullYear()) : (W < 420 ? dShort(t) : dLabel(t));
       xlab += '<text class="usd-axis" x="' + lx.toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + anch + '">' +
-        (W < 420 ? (multiYear ? dShort(t) + ' ' + new Date(t * 1000).getFullYear() : dShort(t))
-                 : (multiYear ? dShort(t) + ' ' + new Date(t * 1000).getFullYear() : dLabel(t))) + '</text>';
+        ar(lbl) + '</text>';
       if (i > 0 && i < nLab) {
         grid += '<line class="usd-vgrid" x1="' + cx.toFixed(1) + '" y1="' + G.PLOT_T + '" x2="' +
           cx.toFixed(1) + '" y2="' + G.VOL_B + '"></line>';
@@ -259,8 +264,10 @@
         (W - G.PAD_R) + '" y2="' + yc.toFixed(1) + '"></line>';
       /* اسم المنطقة على الشريط — الأقوى بس */
       if (z.is_strongest) {
+        /* 📌 الاسم فوق الشريط (مش جوه) ⇒ ما يتغطّاش بالخط المنقّط */
+        const ny = Math.max(G.PLOT_T + 10, Math.min(y1, y2) - 5);
         zsvg += '<text class="usd-zname" x="' + (G.PAD_L + 6) + '" y="' +
-          (Math.min(y1, y2) + 13).toFixed(1) + '">' + (isSup ? 'أقوى دعم' : 'أقوى مقاومة') + ' ⭐</text>';
+          ny.toFixed(1) + '">' + (isSup ? 'أقوى دعم' : 'أقوى مقاومة') + ' ⭐</text>';
       }
       zsvg += '</g>';
     });
