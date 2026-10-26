@@ -1,0 +1,264 @@
+
+/* ════════════════════════════════════════════════════════════════════════
+   💵 ذكاء الدولار — OCTA USD INTELLIGENCE (٢٦ أكتوبر ٢٠٢٦)
+   ════════════════════════════════════════════════════════════════════════
+   📌 كل الألوان من التوكنز ⇒ بيشتغل في النمط الفاتح والغامق.
+   📌 الموبايل: المودال بياخد الشاشة كلها. */
+  .usd-overlay {
+    position: fixed; inset: 0; z-index: 10060;
+    background: rgba(0,0,0,.82); backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center; padding: 0;
+    animation: usdFade .18s ease;
+  }
+  @keyframes usdFade { from { opacity: 0; } to { opacity: 1; } }
+  .usd-box {
+    background: var(--card); color: var(--txt);
+    border: 1px solid var(--line); border-radius: 0;
+    width: 100%; max-width: 980px; height: 100%;
+    max-height: 100dvh; overflow: hidden; display: flex; flex-direction: column;
+  }
+  .usd-head {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    padding: 13px 15px; border-bottom: 1px solid var(--line);
+    background: var(--pri2); flex-shrink: 0;
+  }
+  .usd-title { font-size: 1rem; font-weight: 900; color: var(--gold); }
+  .usd-sub { font-size: .7rem; color: var(--muted); margin-top: 3px; }
+  .usd-close {
+    width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+    background: var(--wash); color: var(--muted); border: 1px solid var(--line);
+    font-size: .9rem; line-height: 1; cursor: pointer;
+  }
+  .usd-close:hover { color: var(--txt); border-color: var(--gold); }
+  .usd-body { overflow: auto; padding: 0 14px 46px; -webkit-overflow-scrolling: touch; }
+  .usd-loading { padding: 40px; text-align: center; color: var(--muted); }
+  .usd-loading.sm { padding: 10px; text-align: center; color: var(--muted); font-size: .74rem; }
+  .usd-empty { padding: 26px; text-align: center; color: var(--muted); font-size: .88rem; }
+  .usd-sm { color: var(--muted); font-size: .76rem; padding: 4px 0; }
+
+  /* ── التبويبات ── */
+  .usd-tabs {
+    display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 12px;
+    position: sticky; top: 0; z-index: 5; background: var(--card);
+    border-bottom: 1px solid var(--line); margin-bottom: 12px;
+    scrollbar-width: none;
+  }
+  .usd-tabs::-webkit-scrollbar { display: none; }
+  .usd-tab {
+    white-space: nowrap; padding: 7px 12px; font-size: .76rem; font-weight: 800;
+    background: var(--wash); color: var(--muted); border: 1px solid var(--line);
+    border-radius: 100px; cursor: pointer; font-family: inherit;
+  }
+  .usd-tab.on { background: var(--goldBg); color: var(--gold); border-color: var(--goldLine); }
+
+  /* ── الهيرو ── */
+  .usd-hero {
+    background: var(--wash); border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px; margin-bottom: 12px; border-right: 3px solid var(--gold);
+  }
+  .usd-hero-main { margin-bottom: 10px; }
+  .usd-k { font-size: .68rem; color: var(--muted); font-weight: 700; }
+  .usd-price { font-size: 2rem; font-weight: 900; margin-top: 2px; letter-spacing: -1px; color: var(--txt); }
+  .usd-chg { font-size: .84rem; font-weight: 800; margin-top: 2px; }
+  .usd-chg.pos, .usd-f-v.pos, .usd-verdict-bias.pos { color: var(--up); }
+  .usd-chg.neg, .usd-f-v.neg, .usd-verdict-bias.neg { color: var(--dn2); }
+  .usd-src { font-size: .66rem; color: var(--dim); margin-top: 5px; }
+  .usd-hero-side { display: grid; grid-template-columns: 1fr; gap: 6px; }
+  .usd-mini {
+    background: var(--slot); border: 1px solid var(--line); border-radius: 11px;
+    padding: 7px 10px; display: flex; flex-direction: column; gap: 1px;
+  }
+  .usd-mini span { font-size: .66rem; color: var(--muted); }
+  .usd-mini b { font-size: .95rem; font-weight: 800; }
+  .usd-mini i { font-size: .64rem; color: var(--dim); font-style: normal; }
+  .usd-mini i.pos { color: var(--up); }
+  .usd-mini i.neg { color: var(--dn2); }
+  .usd-note {
+    font-size: .7rem; color: var(--muted); line-height: 1.65; margin-top: 10px;
+    padding-top: 8px; border-top: 1px dashed var(--line);
+  }
+
+  /* ── الأقسام ── */
+  .usd-sec { margin-bottom: 12px; }
+  .usd-h { font-size: .92rem; font-weight: 900; color: var(--txt); margin: 0 0 9px; }
+  .usd-list { margin: 6px 0 0; padding-right: 18px; }
+  .usd-list li { font-size: .78rem; line-height: 1.7; color: var(--txt); margin-bottom: 3px; }
+  .usd-kv {
+    display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;
+    font-size: .76rem; padding: 6px 0; border-bottom: 1px solid var(--line);
+  }
+  .usd-kv span { color: var(--muted); }
+  .usd-kv b { color: var(--txt); font-weight: 800; }
+
+  /* ── القراءة النهائية ── */
+  .usd-verdict { background: var(--wash); border: 1px solid var(--line); border-radius: 14px; padding: 13px; }
+  .usd-verdict-main { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .usd-verdict-bias { font-size: 1.22rem; font-weight: 900; color: var(--gold); }
+  .usd-verdict-str { font-size: .72rem; color: var(--muted); font-weight: 700; }
+  .usd-verdict-sum { font-size: .82rem; line-height: 1.75; margin: 8px 0 0; color: var(--txt); }
+
+  /* ── الاتجاه ── */
+  .usd-tfrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 6px; }
+  .usd-tf {
+    background: var(--wash); border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px; text-align: center;
+  }
+  .usd-tf span { display: block; font-size: .66rem; color: var(--muted); }
+  .usd-tf b { font-size: .9rem; font-weight: 900; }
+  .usd-tf b.pos { color: var(--up); }
+  .usd-tf b.neg { color: var(--dn2); }
+
+  /* ── المقارنة ── */
+  .usd-cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
+  .usd-cmp-col {
+    background: var(--wash); border: 1px solid var(--line); border-radius: 11px; padding: 9px; text-align: center;
+  }
+  .usd-cmp-col span { display: block; font-size: .66rem; color: var(--muted); }
+  .usd-cmp-col b { display: block; font-size: 1.05rem; font-weight: 900; margin: 2px 0; }
+  .usd-cmp-col b.pos { color: var(--up); }
+  .usd-cmp-col b.neg { color: var(--dn2); }
+  .usd-cmp-col i { font-size: .64rem; color: var(--dim); font-style: normal; }
+
+  /* ── السيناريوهات ── */
+  .usd-scns { display: grid; grid-template-columns: 1fr; gap: 9px; margin-top: 9px; }
+  .usd-scn {
+    background: var(--wash); border: 1px solid var(--line); border-radius: 12px; padding: 11px;
+  }
+  .usd-scn.lead { border-color: var(--goldLine); background: var(--goldBg); }
+  .usd-scn-h { font-size: .88rem; font-weight: 900; }
+  .usd-lead {
+    font-size: .62rem; background: var(--gold); color: var(--pri); padding: 2px 7px;
+    border-radius: 100px; font-weight: 800; vertical-align: middle;
+  }
+  .usd-scn-s { font-size: .72rem; color: var(--gold); font-weight: 800; margin-top: 3px; }
+  .usd-scn-c { font-size: .76rem; color: var(--txt); line-height: 1.7; margin-top: 4px; }
+
+  /* ── العوامل ── */
+  .usd-fcat { margin-bottom: 11px; }
+  .usd-fcat-h { font-size: .76rem; font-weight: 800; color: var(--muted); margin-bottom: 5px; }
+  .usd-flist { display: grid; grid-template-columns: 1fr; gap: 5px; }
+  .usd-f {
+    display: grid; grid-template-columns: 1fr auto; grid-template-areas: "n v" "s s";
+    gap: 2px 8px; text-align: right; background: var(--wash); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 10px; cursor: pointer; font-family: inherit; color: var(--txt);
+  }
+  .usd-f:hover { border-color: var(--goldLine); }
+  .usd-f.miss { opacity: .72; }
+  .usd-f-n { grid-area: n; font-size: .8rem; font-weight: 700; }
+  .usd-f-v { grid-area: v; font-size: .84rem; font-weight: 900; }
+  .usd-f-s { grid-area: s; font-size: .64rem; color: var(--dim); }
+
+  /* ── التقويم ── */
+  .usd-evs { display: grid; gap: 6px; }
+  .usd-ev { background: var(--wash); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .usd-ev-d { font-size: .64rem; color: var(--gold); font-weight: 800; }
+  .usd-ev-t { font-size: .8rem; font-weight: 700; margin-top: 2px; }
+  .usd-ev-m { font-size: .66rem; color: var(--muted); margin-top: 2px; }
+
+  /* ── الأخبار ── */
+  .usd-news { display: grid; gap: 6px; }
+  .usd-nw {
+    display: block; text-decoration: none; color: var(--txt);
+    background: var(--wash); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px;
+  }
+  .usd-nw:hover { border-color: var(--goldLine); }
+  .usd-nw-t { font-size: .8rem; font-weight: 700; line-height: 1.6; }
+  .usd-nw-m { font-size: .64rem; color: var(--muted); margin-top: 3px; }
+
+  /* ── التحليل الفني ── */
+  .usd-modes { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 9px; }
+  .usd-m, .usd-tfbtn {
+    padding: 6px 11px; font-size: .74rem; font-weight: 800; font-family: inherit;
+    background: var(--wash); color: var(--muted); border: 1px solid var(--line);
+    border-radius: 100px; cursor: pointer;
+  }
+  .usd-m.on, .usd-tfbtn.on { background: var(--goldBg); color: var(--gold); border-color: var(--goldLine); }
+  .usd-chart-box {
+    background: var(--wash); border: 1px solid var(--line); border-radius: 12px; padding: 8px 4px 4px;
+  }
+  .usd-chart-wrap { position: relative; width: 100%; }
+  .usd-chart { width: 100%; height: auto; display: block; touch-action: pan-y; }
+  .usd-axis { font-size: 9px; fill: var(--muted); font-family: inherit; }
+  .usd-zone { opacity: .16; }
+  .usd-zone.sup { fill: var(--up); }
+  .usd-zone.res { fill: var(--dn); }
+  .usd-cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+  .usd-dot { fill: var(--gold); stroke: var(--pri2); stroke-width: 1.5; }
+  /* 📌 شريط القراءة الأفقي (فوق الرسم) — Ahmed: مفيش حاجة على الشارت */
+  .usd-readout {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+    background: var(--line); border: 1px solid var(--line);
+    border-radius: 12px; overflow: hidden; margin-bottom: 9px;
+  }
+  .usd-ro-cell {
+    background: var(--card); padding: 8px 9px; display: flex; flex-direction: column;
+    align-items: center; gap: 2px; text-align: center; min-width: 0;
+  }
+  .usd-ro-l { font-size: .64rem; color: var(--muted); }
+  .usd-ro-v { font-size: .86rem; font-weight: 800; }
+  .usd-ro-v.pos { color: var(--up); }
+  .usd-ro-v.neg { color: var(--dn2); }
+  .usd-ivs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 9px; }
+  .usd-iv {
+    background: var(--wash); border: 1px solid var(--line); border-radius: 9px; padding: 6px 9px;
+    display: flex; justify-content: space-between; align-items: baseline; gap: 6px;
+  }
+  .usd-iv span { font-size: .68rem; color: var(--muted); }
+  .usd-iv b { font-size: .82rem; font-weight: 800; }
+  .usd-zones { margin-top: 9px; }
+  .usd-zh { font-size: .78rem; font-weight: 800; margin: 8px 0 5px; }
+  .usd-zone-row {
+    background: var(--wash); border: 1px solid var(--line); border-radius: 9px;
+    padding: 7px 10px; margin-bottom: 5px;
+  }
+  .usd-zr-p { font-size: .82rem; font-weight: 900; }
+  .usd-zr-m { font-size: .68rem; color: var(--muted); margin-top: 2px; }
+  .usd-zr-s { font-size: .64rem; color: var(--dim); margin-top: 2px; }
+
+  /* ── المصادر ── */
+  .usd-srcs { display: grid; gap: 6px; }
+  .usd-src { background: var(--wash); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .usd-src a { font-size: .8rem; font-weight: 800; color: var(--gold); text-decoration: none; }
+  .usd-src-m { font-size: .66rem; color: var(--muted); margin-top: 2px; }
+  .usd-src-n { font-size: .64rem; color: var(--dim); margin-top: 2px; }
+
+  /* ── كارت العامل ── */
+  .usd-fact-card {
+    position: fixed; inset: auto 12px 12px; z-index: 10070; max-width: 520px; margin: 0 auto;
+    background: var(--card); color: var(--txt); border: 1px solid var(--goldLine);
+    border-radius: 14px; padding: 13px; box-shadow: var(--sh3);
+    animation: usdFade .16s ease;
+  }
+  .usd-fact-h {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    font-size: .9rem; font-weight: 900;
+  }
+  .usd-fact-x {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--wash); color: var(--muted);
+    border: 1px solid var(--line); cursor: pointer; font-size: .8rem; flex-shrink: 0;
+  }
+  .usd-fact-v { font-size: 1.3rem; font-weight: 900; color: var(--gold); margin-top: 6px; }
+  .usd-fact-v i { font-size: .72rem; color: var(--muted); font-style: normal; font-weight: 600; }
+  .usd-fact-m { font-size: .68rem; color: var(--muted); margin-top: 3px; }
+  .usd-fact-w { font-size: .76rem; line-height: 1.7; margin-top: 7px; }
+  .usd-fact-w b { color: var(--gold); }
+  .usd-fact-w a { color: var(--sec2); }
+  .usd-fact-n {
+    font-size: .7rem; color: var(--warn); background: var(--warnSoft);
+    border-radius: 8px; padding: 6px 9px; margin-top: 7px;
+  }
+
+  @media (min-width: 700px) {
+    .usd-hero { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; align-items: start; }
+    .usd-hero-main { margin-bottom: 0; }
+    .usd-hero-side { grid-template-columns: 1fr; }
+    .usd-hero .usd-note { grid-column: 1 / -1; }
+    .usd-scns { grid-template-columns: 1fr 1fr 1fr; }
+    .usd-ivs { grid-template-columns: repeat(4, 1fr); }
+    .usd-flist { grid-template-columns: 1fr 1fr; }
+    .usd-evs { grid-template-columns: 1fr 1fr; }
+    .usd-news { grid-template-columns: 1fr 1fr; }
+  }
+  @media (min-width: 1000px) {
+    .usd-body { padding: 0 22px 50px; }
+  }

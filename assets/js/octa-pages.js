@@ -1539,10 +1539,13 @@ function buildEgyCard(ticker, gold) {
      ⇒ والجدول القديم بمكوناته ونتائجه بيفضل متاح من جوّه المودال. */
   var IX_MAP = { 'tk-egx':'EGX30', 'tk-egx70':'EGX70', 'tk-egx100':'EGX100', 'tk-egx33':'EGX33' };
   var ixId = IX_MAP[w.id] || null;
+  /* ⭐ ٢٦ أكتوبر ٢٠٢٦ — كارت «دولار/جنيه» بقى قابل للنقر ⇒ «ذكاء الدولار»
+     (نفس الطابع بتاع «ذكاء المؤشرات»). */
+  var isUsd = w.id === 'tk-usd';
   var clickable = ixId
   ? ' onclick="openIndexIntel(\'' + ixId + '\')" style="cursor:pointer" title="اضغط لتحليل المؤشر"'
-  : '';
-  var sub = ixId
+  : (isUsd ? ' onclick="openUSDIntel()" style="cursor:pointer" title="اضغط لتحليل الدولار"' : '');
+  var sub = (ixId || isUsd)
   ? '<div class="mini-sub">اضغط للتحليل</div>'
   : '';
   const chgHtml = hasChg
@@ -1555,6 +1558,7 @@ function buildEgyCard(ticker, gold) {
   chgHtml + offNote + sub + '</div>';
   }).join('') + '</div>' +
   '<div class="mini-note">💡 الجرام = أونصة الذهب (دولار) × الدولار/الجنيه ÷ 31.1035 — بيتحسب لحظياً</div>' +
+  '<div class="mini-note">💵 الدولار/الجنيه: اضغط عليه تشوف «ذكاء الدولار» — السعر الرسمي، التحليل الفني، الدعم والمقاومة، العوامل الاقتصادية والسيناريوهات.</div>' +
   '<div class="mini-note">🕌 مؤشر الشريعة (EGX 33 Shariah): اضغط عليه تشوف تحليل كامل —المنهجية والمكونات ونتيجة OCTA لكل سهم.</div>';
   return uniCard('egyCard', '🇪🇬', 'مؤشرات السوق المصري', 'الأسهم والمؤشرات والعملات والذهب', body, true);
 }
