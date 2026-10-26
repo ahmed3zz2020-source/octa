@@ -830,12 +830,12 @@ function renderDashboard(d) {
 
   /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ تمرير أفقي للجدولين (٧ أعمدة)
      📌 على الموبايل الأعمدة الأخيرة كانت بتختفي من غير سبب. */
-  '<div class="dash-section"><div class="dash-h">🏆 أفضل ١٠ أسهم</div>' +
+  '<div class="dash-section"><div class="dash-h">🏆 أفضل ١٠ أسهم <small>الأعلى نتيجة (0-100)</small></div>' +
   '<div class="dash-tbl-hint"><span>←</span> اسحب الجدول جنباً عشان تشوف باقي الأعمدة <span>←</span></div>' +
   '<div class="dash-tbl-wrap"><table class="mini-table"><thead><tr><th>الرمز</th><th>الاسم</th><th>القطاع</th><th>السعر</th><th>النتيجة</th><th>القرار</th><th>فرصة</th></tr></thead>' +
   '<tbody>' + rows(d.top10 || []) + '</tbody></table></div></div>' +
 
-  '<div class="dash-section"><div class="dash-h">📉 أسوأ ١٠ أسهم <small>تحتاج انتباه</small></div>' +
+  '<div class="dash-section"><div class="dash-h">📉 أسوأ ١٠ أسهم <small>الأدنى نتيجة — محتاجة انتباه</small></div>' +
   '<div class="dash-tbl-hint"><span>←</span> اسحب الجدول جنباً عشان تشوف باقي الأعمدة <span>←</span></div>' +
   '<div class="dash-tbl-wrap"><table class="mini-table"><thead><tr><th>الرمز</th><th>الاسم</th><th>القطاع</th><th>السعر</th><th>النتيجة</th><th>القرار</th><th>فرصة</th></tr></thead>' +
   '<tbody>' + rows(d.bottom10 || []) + '</tbody></table></div></div>' +
@@ -853,6 +853,8 @@ function renderDashboard(d) {
   '<div class="bench-note">💡 الأرقام دي بتوصف فترة فاتت بس، ومش ضمان إن نفس الفرق هيتكرر في الفترة الجاية.</div>' +
   '<div class="bench-note warn">⚠️ مقارنة على أسعار النهارده بس، مش اختبار على بيانات قديمة — الاختبار الحقيقي محتاج لقطة يومية (صورة أسعار كل يوم) وبيتراكم مع الوقت.</div>' +
   '</div>' : '') + '</div>' +
+
+  '<div class="bench-note">📌 القائمتين فوق مبنيتين على <b>نتيجة محرك OCTA</b> (من 100 = جودة + أمان + سيولة)، <b>مش</b> على ربح اليوم. أعلى نتيجة = أفضل بنية وأمان · أدنى نتيجة = أضعف وأخطر. والقائمة بتتحدث مع تحديث البيانات.</div>' +
 
   (stress ?
   '<div class="dash-section"><div class="dash-h">🛡️ اختبار الضغط <small>النظام تحت سيناريوهات صعبة</small></div>' +
