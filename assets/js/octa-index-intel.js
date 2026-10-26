@@ -272,9 +272,14 @@
       xlab += '<text class="ix-axis" x="' + lx + '" y="' + (H - 8) + '" text-anchor="' + anch + '">' + axLabel(t) + '</text>';
     }
 
+    /* ⛔⛔⛔ كان بنكتب الـvmax بعد الـpadding ⇒ الرقم كان أعلى من القمة الحقيقية
+       📌 مثال: قمة EGX100 الحقيقية 28,292.60 والمحور كان بيقول 30,361 ⇒ المستخدم
+          فكّر إن ده القمة. الحل: نكتب القيم الحقيقية على المحور. */
+    /* 📌 التسمية تقف عند موضع القيمة نفسها على الرسم (مش عند طرف المحور) */
+    const yOf = (v) => PAD_T + (1 - (v - vmin) / (vmax - vmin)) * (H - PAD_T - PAD_B);
     const ylabels =
-      '<text class="ix-axis" x="' + (W - PAD_R + 6) + '" y="' + (PAD_T + 6) + '" text-anchor="start">' + num(vmax, 0) + '</text>' +
-      '<text class="ix-axis" x="' + (W - PAD_R + 6) + '" y="' + (H - PAD_B) + '" text-anchor="start">' + num(vmin, 0) + '</text>';
+      '<text class="ix-axis" x="' + (W - PAD_R + 6) + '" y="' + (yOf(dmax) + 4).toFixed(1) + '" text-anchor="start">' + num(dmax, 0) + '</text>' +
+      '<text class="ix-axis" x="' + (W - PAD_R + 6) + '" y="' + (yOf(dmin) + 4).toFixed(1) + '" text-anchor="start">' + num(dmin, 0) + '</text>';
 
     return '<div class="ix-chart-wrap" id="ix-chart-wrap" data-ix="' + esc(ixId) + '">' +
       '<svg class="ix-chart" id="ix-chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" direction="ltr" ' +
