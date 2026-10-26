@@ -4577,7 +4577,7 @@ async function ssSearch(q) {
      ⛌⛌⛌ قبل: `${s.code}` و `${s.name}` خام ⬇️
      ⛌⛌⛌ ⇒ لو الـAPI رجّع اسم فيه HTML ⇒ XSS.
      ⛌⛌⛌ دلوقتي: ssEsc() على كل قيمة نصية.
-     ⛌⛌⛌ (الأرقام والـindex آمنين — p是真 رقم). */
+     ⛌⛌⛌ (الأرقام والـindex آمنين — p يعني رقم). */
   return `<div class="ss-row" data-i="${i}" onclick="event.stopPropagation(); ssPick(${i})">
   <div class="ss-badge">${ssEsc((s.code||'').slice(0,2))}</div>
   <div class="ss-info">

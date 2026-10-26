@@ -516,7 +516,11 @@
     const dataStatus = '<div class="ix-datastat">' + liveNote +
       '<span class="ix-badge ' + (ms.status === 'Open' ? 'live' : 'closed') + '">' +
       (ms.status === 'Open' ? '🟢 السوق مفتوح' : '⚪ السوق مغلق') + '</span>' +
-      '<span class="ix-badge">📅 تغطية البيانات (كل المدة): ' + esc(cov.from || '—') + ' → ' + esc(cov.to || '—') + '</span>' +
+      /* ⛔⛔⛔ المدى لازم يكون في كتلة LTR واحدة (.ix-date = direction:ltr + isolate)
+         📌 بدونها: في السياق العربي (RTL) السهم بيقلب الترتيب ⇒ يظهر
+         📌 «2026-10-26 → 2026-04-28» (النهاية قبل البداية) — والسبب في الكود.
+         📌 نفس الباج كان في مودال الدولار (usd-intel) — اتصلح بنفس الطريقة. */
+      '<span class="ix-badge">📅 تغطية البيانات (كل المدة): <span class="ix-date">' + esc(cov.from || '—') + ' → ' + esc(cov.to || '—') + '</span></span>' +
       '<span class="ix-badge">📊 أيام التداول في البيانات كلها: ' + num(cov.count, 0) + '</span>' +
       (cov.note ? '<span class="ix-badge warn">ℹ️ ' + esc(cov.note) + '</span>' : '') +
       '</div>';

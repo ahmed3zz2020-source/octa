@@ -78,6 +78,10 @@
     padding-top: 8px; border-top: 1px dashed var(--line);
   }
 
+  /* ⛔ المدى (من → إلى) جوّه نص عربي (RTL) ⇒ السهم بيقلب الترتيب.
+     📌 الحل: كتلة LTR معزولة — زي .ix-date في مودال المؤشرات. */
+  .usd-date { direction: ltr; unicode-bidi: isolate; display: inline-block; white-space: nowrap; }
+
   /* ── الأقسام ── */
   .usd-sec { margin-bottom: 12px; }
   .usd-h { font-size: .92rem; font-weight: 900; color: var(--txt); margin: 0 0 9px; }

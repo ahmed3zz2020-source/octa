@@ -7640,7 +7640,7 @@ body.light .octa-why-btn { background: #fffbeb; border-color: rgba(154,123,24,.4
     margin-inline-start: 0; width: 100%;
     font-size: .7rem;
   }
-  /* ⭐ الفلاتر: عمود واحد — السؤال يبقى واضح、可مس */
+  /* ⭐ الفلاتر: عمود واحد — السؤال يبقى واضح ومفهوم */
   .sc2-qgrid { grid-template-columns: 1fr; gap: 9px; }
   .sc2-q-l { font-size: .8rem; }
   .sc2-q-inp input {

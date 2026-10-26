@@ -634,7 +634,7 @@
       ((sr.resistances || []).length ? sr.resistances.map((z) => zoneRow(z)).join('') : '<div class="usd-sm">مفيش مقاومة محسولة فوق السعر (السعر عند قمة الفترة).</div>') +
       '</div>' +
       '<div class="usd-note">📌 طريقة الحساب: ' + esc(sr.method || '') + '. ' + esc(sr.note || '') +
-      ' البيانات ' + esc(t.from || '') + ' → ' + esc(t.to || '') + ' (' + (t.bars || 0) + ' شمعة) · المصدر: ' + esc(t.source || '') + '</div>' +
+      ' البيانات <span class="usd-date">' + esc(t.from || '') + ' → ' + esc(t.to || '') + '</span> (' + (t.bars || 0) + ' شمعة) · المصدر: ' + esc(t.source || '') + '</div>' +
       '</div>';
   }
 
