@@ -1261,7 +1261,7 @@ const TICKER_WANT = [
   { id:'tk-egx',  n:'📊 EGX30',  c:'#38bdf8' },
   { id:'tk-egx70',  n:'📈 EGX70',  c:'#22c55e' },
   { id:'tk-egx100', n:'📉 EGX100',  c:'#a855f7' },
-  { id:'tk-egx33',  n:'🕌 EGX33 شرعي', c:'#16c79a' },
+  { id:'tk-egx33',  n:'🕌 مؤشر الشريعة', c:'#16c79a' },
   { id:'tk-usd',  n:'💵 دولار/جنيه', c:'#f59e0b' },
   { id:'tk-gold24', n:'🥇 ذهب/الجرام', c:'#eab308', gold:true },
 ];
@@ -1278,7 +1278,7 @@ const ASSET_META = {
   'tk-egx':  { n:'📊 EGX30',  g:'مؤشر البورصة',  inv:['tk-usd'] },
   'tk-egx70':  { n:'📈 EGX70',  g:'مؤشر واسع',  inv:['tk-egx'] },
   'tk-egx100': { n:'📉 EGX100',  g:'مؤشر صغير',  inv:['tk-egx70'] },
-  'tk-egx33':  { n:'🕌 EGX33 شرعي',  g:'مؤشر شرعي',  inv:['tk-egx'] },
+  'tk-egx33':  { n:'🕌 مؤشر الشريعة',  g:'مؤشر شرعي',  inv:['tk-egx'] },
   'tk-spx':  { n:'🇺🇸 S&P 500',  g:'مؤشر عالمي',  inv:['tk-oil'] },
 };
 
@@ -1383,7 +1383,7 @@ function buildEgyCard(ticker, gold) {
   for (const t of (ticker||[])) { if (!seen.has(t.id)) { seen.add(t.id); map[t.id] = t; } }
   const WANT = [
   { id:'tk-egx', n:'📊 EGX30' }, { id:'tk-egx70', n:'📈 EGX70' },
-  { id:'tk-egx100', n:'📉 EGX100' }, { id:'tk-egx33', n:'🕌 EGX33 شرعي' },
+  { id:'tk-egx100', n:'📉 EGX100' }, { id:'tk-egx33', n:'🕌 مؤشر الشريعة' },
   { id:'tk-usd', n:'💵 دولار/جنيه' }, { id:'tk-gold', n:'🥇 ذهب/الجرام' },
   ];
   const body = '<div class="mini-row c6">' + WANT.map(w => {
