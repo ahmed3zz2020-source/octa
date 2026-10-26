@@ -143,7 +143,7 @@ window.OCTA_RADAR_REF = {
   "GTHE": {"n":"جلوبال تيلكوم","s":"تكنولوجيا","i":"Specialty Telecommunications"},
   "GTWL": {"n":"جولدن تكس للأصواف","s":"صناعة","i":"Textiles"},
   "HBCO": {"n":"هيبكو","s":"مواد أساسية","i":"Engineering & Construction"},
-  "HDBK": {"n":"بنك الإسكندرية","s":"بنوك","i":"Regional Banks"},
+  "HDBK": {"n":"بنك التعمير والإسكان","s":"بنوك","i":"Regional Banks"},
   "HDST": {"n":"HEDGESTONE INVESTMENT","s":"غير مصنّف","i":""},
   "HELI": {"n":"مصر الجديدة للإسكان","s":"عقارات","i":"Homebuilding"},
   "HRHO": {"n":"مجموعة أي إف جي القابضة","s":"خدمات مالية","i":"Investment Banks/Brokers"},
