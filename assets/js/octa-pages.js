@@ -1047,6 +1047,32 @@ async function octaLoadBench(d) {
           });
         html += '</tbody></table></div>';
         html += '<div class="bench-note">📌 سعر الدخول = السعر وقت ما المحرك رشح السهم · السعر الحالي = السعر دلوقتي. ده قياس حقيقي، مش تقدير.</div>';
+        /* 📌 سجل التوصيات: كل لقطة يومية مقابل المؤشر في نفس الفترة
+           بالظبط — ده السجل الحقيقي للمحرك (مش رقم واحد). */
+        var track = [];
+        (bt.windows || []).forEach(function (w) {
+          if (!w || !w.snapshot_date) return;
+          var c = octaCloseAt(rows, w.snapshot_date);
+          if (!c || idxNow == null) return;
+          var ix = (idxNow / c - 1) * 100;
+          track.push({ d: w.snapshot_date, age: w.age_days, ours: w.avg_return, mkt: ix, gap: w.avg_return - ix, n: w.count, w: w.wins, l: w.losses });
+        });
+        track.sort(function (a, b) { return (a.d < b.d) ? 1 : -1; });
+        if (track.length > 1) {
+          html += '<div class="dash-h" style="margin-top:14px">📋 سجل التوصيات <small>كل لقطة يومية مقابل المؤشر في نفس الفترة</small></div>';
+          html += '<div class="dash-tbl-hint"><span>←</span> اسحب الجدول جنباً <span>←</span></div>';
+          html += '<div class="dash-tbl-wrap"><table class="mini-table"><thead><tr><th>لقطة التوصية</th><th>العمر</th><th>توصياتنا</th><th>المؤشر</th><th>الفرق</th></tr></thead><tbody>';
+          track.forEach(function (t) {
+            html += '<tr><td><b>' + t.d + '</b></td><td>' + t.age + ' يوم</td>' +
+              '<td class="' + (t.ours >= 0 ? 'pos' : 'neg') + '"><b>' + octaPct(t.ours) + '</b></td>' +
+              '<td class="' + (t.mkt >= 0 ? 'pos' : 'neg') + '">' + octaPct(t.mkt) + '</td>' +
+              '<td class="' + (t.gap >= 0 ? 'pos' : 'neg') + '"><b>' + octaPct(t.gap) + '</b></td></tr>';
+          });
+          html += '</tbody></table></div>';
+          var behindN = track.filter(function (t) { return t.gap < 0; }).length;
+          html += '<div class="bench-note">' + (behindN ? '⚠️ في ' + behindN + ' من ' + track.length + ' لقطة، التوصيات كانت ورا المؤشر في نفس الفترة.' : '✅ في كل اللقطات، التوصيات كانت قدام المؤشر في نفس الفترة.') + '</div>';
+          html += '<div class="bench-note">📌 كل لقطة = 20 توصية مختلفة (ترتيب المحرك في اليوم ده) متقاسة من ساعتها لحد النهارده.</div>';
+        }
         html += '<div class="bench-note warn">⚠️ المدة ' + old.age_days + ' يوم بس، فالمشكلة لسه صغيرة الأجل. بنسجل لقطة كل يوم، وكل ما المدة زادت الرقم بيبقى أصدق.</div>';
         html += '<div class="bench-note">📌 عدد اللقطات المسجلة: ' + (bt.snapshots_count || 0) + '.</div>';
         html += '</div>';
