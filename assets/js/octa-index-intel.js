@@ -286,13 +286,7 @@
       '<path class="ix-line" d="' + path + '" fill="none" stroke="var(--gold)" stroke-width="1.6" vector-effect="non-scaling-stroke"/>' +
       '<line class="ix-cross" id="ix-cross" x1="0" y1="' + PAD_T + '" x2="0" y2="' + (H - PAD_B) + '" style="opacity:0"/>' +
       '<circle class="ix-dot" id="ix-dot" cx="0" cy="0" r="4" style="opacity:0"/>' +
-      /* 📌 النسبة مكتوبة على الشارت نفسه جنب النقطة */
-      '<g id="ix-dot-label" style="opacity:0">' +
-        '<rect id="ix-dot-label-bg" x="0" y="0" width="0" height="0" rx="7" ry="7" class="ix-dot-label-bg"/>' +
-        '<text id="ix-dot-label-tx" x="0" y="0" class="ix-dot-label-tx"></text>' +
-      '</g>' +
       marks + xlab + ylabels + '</svg>' +
-      '<div class="ix-tip" id="ix-tip" style="opacity:0" aria-hidden="true" role="status" aria-live="polite"></div>' +
       '<div class="ix-axis-note">' + (mode === 'drawdown'
         ? 'أكبر تراجع في الفترة: ' + num(dmin, 1) + '%'
         : (mode === 'normalized'
@@ -302,6 +296,45 @@
   }
 
   /* تحريك المؤشر على الرسم (ماوس + لمس) */
+  /* 📌 تهيئة الشريط على آخر نقطة */
+  function resetReadout(ixId) {
+    const st = IX[ixId];
+    if (!st || !st.view) return;
+    const series = st.view.series || [];
+    if (!series.length) return;
+    const last = series[series.length - 1];
+    const base = series[0] ? series[0][1] : null;
+    const d = document.getElementById('ix-ro-date');
+    const v = document.getElementById('ix-ro-val');
+    const pc = document.getElementById('ix-ro-pct');
+    const vl = document.getElementById('ix-ro-vlabel');
+    const pl = document.getElementById('ix-ro-plabel');
+    if (!d || !v || !pc) return;
+    const mode = st.mode || 'value';
+    d.textContent = axLabel(last[0]);
+    if (mode === 'drawdown') {
+      v.textContent = num(last[1], 1) + '%';
+      pc.textContent = '—';
+      pc.className = 'ix-ro-v';
+      if (vl) vl.textContent = 'التراجع عن القمة';
+      if (pl) pl.textContent = 'تغيّر التراجع عن النقطة السابقة';
+    } else if (mode === 'normalized') {
+      v.textContent = num(last[1], 1);
+      const fs = last[1] - 100;
+      pc.textContent = pct(fs, 1);
+      pc.className = 'ix-ro-v ' + signClass(fs);
+      if (vl) vl.textContent = 'النسبة (خط الأساس = 100)';
+      if (pl) pl.textContent = 'من بداية الفترة';
+    } else {
+      v.textContent = num(last[1], 2);
+      const fs = base ? (last[1] / base - 1) * 100 : null;
+      pc.textContent = (fs == null ? '—' : pct(fs, 1));
+      pc.className = 'ix-ro-v ' + (fs == null ? '' : signClass(fs));
+      if (vl) vl.textContent = 'رقم المؤشر';
+      if (pl) pl.textContent = 'من بداية الفترة';
+    }
+  }
+
   function bindChart(ixId) {
     const wrap = document.getElementById('ix-chart-wrap');
     const svg = document.getElementById('ix-chart');
@@ -313,10 +346,13 @@
 
     const cross = document.getElementById('ix-cross');
     const dot = document.getElementById('ix-dot');
-    const tip = document.getElementById('ix-tip');
-    const dotLabel = document.getElementById('ix-dot-label');
-    const dotLabelBg = document.getElementById('ix-dot-label-bg');
-    const dotLabelTx = document.getElementById('ix-dot-label-tx');
+    /* 📌 الشريط الأفقي فوق الرسم — هنا الأرقام بتتحرك مع التحرك على المنحنى
+       📌 Ahmed: مفيش حاجة ظاهرة على الشارت (شالنا الـtooltip وال-box المعلّق). */
+    const roDate = document.getElementById('ix-ro-date');
+    const roVal = document.getElementById('ix-ro-val');
+    const roPct = document.getElementById('ix-ro-pct');
+    const roVLbl = document.getElementById('ix-ro-vlabel');
+    const roPLbl = document.getElementById('ix-ro-plabel');
     /* ⛔⛔⛔ كنا بنستخدم أرقام ثابتة (720/8/46/260) هنا — والبناء بيستخدم أرقام تانية
        ⇒ ReferenceError: H is not defined + الماوس بيشاور على مكان غلط.
        📌 ✅ الحل: الهندسة بتتشرك من buildChart. */
@@ -361,52 +397,49 @@
       else if (mode === 'drawdown') fromStart = v;
       const ph = (st.view.phases || []).find(pp => t >= pp.start && t <= pp.end);
 
-      /* 📌 الصندوق مكتوب على الشارت نفسه (مش برّه) */
-      let labelRight = true;
-      if (dotLabel && dotLabelTx) {
-        const txt = (mode === 'drawdown')
-          ? ('التراجع: ' + num(v, 1) + '%')
-          : (fromStart == null ? '' : ('من بداية الفترة: ' + pct(fromStart, 1)));
-        if (txt) {
-          dotLabelTx.textContent = txt;
-          const tw = txt.length * 6.2 + 16;
-          let lx = cx + 10;
-          labelRight = true;
-          if (lx + tw > W - 4) { lx = cx - 10 - tw; labelRight = false; }
-          if (lx < 4) { lx = 4; labelRight = false; }
-          const ly = Math.max(PAD_T + 2, Math.min(H - PAD_B - 24, y - 12));
-          dotLabelBg.setAttribute('x', lx); dotLabelBg.setAttribute('y', ly);
-          dotLabelBg.setAttribute('width', tw); dotLabelBg.setAttribute('height', 22);
-          dotLabelTx.setAttribute('x', lx + 8); dotLabelTx.setAttribute('y', ly + 15);
-          dotLabelTx.setAttribute('class', 'ix-dot-label-tx ' + (fromStart == null ? '' : signClass(fromStart)));
-          dotLabel.style.opacity = '1';
-        } else dotLabel.style.opacity = '0';
-      }
-
-      const valLine = (mode === 'drawdown')
-        ? 'التراجع عن القمة: ' + pctN(v, 1)
-        : (mode === 'normalized' ? 'النسبة (خط الأساس = 100): ' + num(v, 1) : 'رقم المؤشر: ' + num(v, 2));
+      /* 📌 Ahmed: مفيش حاجة ظاهرة على الشارت أثناء التحرك
+         ⇒ الأرقام كلها في الشريط الأفقي فوق الرسم فوق الرسم. */
       /* ⛔⛔⛔ السلسلة المختصرة معناها كل نقطة ≈ عدة أيام
          📌 فالتسمية «تغير اليوم» كانت كاذبة ⇒ «التغير عن النقطة السابقة». */
-      const chgLine = (mode === 'drawdown') ? 'تغيّر التراجع عن النقطة السابقة' : 'التغير عن النقطة السابقة';
-      tip.innerHTML = '<b>' + axLabel(t) + '</b><br>' + valLine +
-        (fromStart == null || mode === 'drawdown' ? '' : '<br>من بداية الفترة: <span class="' + signClass(fromStart) + '">' +
-          pct(fromStart, 1) + '</span>') +
-        (chg == null ? '' : '<br>' + chgLine + ': <span class="' + signClass(chg) + '">' + pct(chg) + '</span>') +
-        (ph ? '<br><span class="ix-tip-ph">' + esc(PHASE_LABEL[ph.kind] || ph.kind) + '</span>' : '');
-      tip.style.opacity = '1'; tip.setAttribute('aria-hidden', 'false');
-      /* 📌 الـtooltip في الجهة المقابلة لصندوق النسبة ⇒ ما يتغطّوش */
-      const TIPW = 158;
-      const left = labelRight
-        ? Math.max(4, px - TIPW - 14)
-        : Math.min(Math.max(4, r.width - TIPW - 4), px + 14);
-      tip.style.left = left + 'px';
-      tip.style.top = Math.max(2, py - 74) + 'px';
+      /* 📌 الشريط الأفقي فوق الرسم: التاريخ + رقم المؤشر + النسبة */
+      if (roDate) roDate.textContent = axLabel(t);
+      if (roVal) {
+        roVal.textContent = (mode === 'drawdown') ? num(v, 1) + '%'
+          : (mode === 'normalized' ? num(v, 1) : num(v, 2));
+        roVal.className = 'ix-ro-v ' + (mode === 'drawdown' ? signClass(v) : '');
+      }
+      if (roPct) {
+        if (mode === 'drawdown') {
+          roPct.textContent = (chg == null ? '—' : pct(chg, 1));
+          roPct.className = 'ix-ro-v ' + (chg == null ? '' : signClass(chg));
+        } else {
+          roPct.textContent = (fromStart == null ? '—' : pct(fromStart, 1));
+          roPct.className = 'ix-ro-v ' + (fromStart == null ? '' : signClass(fromStart));
+        }
+      }
+      if (roVLbl) roVLbl.textContent = (mode === 'drawdown') ? 'التراجع عن القمة'
+        : (mode === 'normalized' ? 'النسبة (خط الأساس = 100)' : 'رقم المؤشر');
+      if (roPLbl) roPLbl.textContent = (mode === 'drawdown') ? 'تغيّر التراجع عن النقطة السابقة'
+        : 'من بداية الفترة';
     }
     function hide() {
-      cross.style.opacity = '0'; dot.style.opacity = '0'; tip.style.opacity = '0';
-      tip.setAttribute('aria-hidden', 'true');
-      if (dotLabel) dotLabel.style.opacity = '0';
+      cross.style.opacity = '0'; dot.style.opacity = '0';
+      /* 📌 لما يسيب الرسم ⇒ الشريط يرجع لآخر نقطة (الحالة الطبيعية) */
+      const last = series[series.length - 1];
+      if (last && roDate) {
+        roDate.textContent = axLabel(last[0]);
+        if (roVal) roVal.textContent = (mode === 'drawdown') ? num(last[1], 1) + '%'
+          : (mode === 'normalized' ? num(last[1], 1) : num(last[1], 2));
+        if (roPct) {
+          if (mode === 'drawdown') { roPct.textContent = '—'; roPct.className = 'ix-ro-v'; }
+          else {
+            const fs = (mode === 'normalized') ? last[1] - 100
+              : (baseVal ? (last[1] / baseVal - 1) * 100 : null);
+            roPct.textContent = (fs == null ? '—' : pct(fs, 1));
+            roPct.className = 'ix-ro-v ' + (fs == null ? '' : signClass(fs));
+          }
+        }
+      }
     }
     /* 📌 pointer events: ماوس + لمس + قلم في حدث واحد */
     svg.addEventListener('pointermove', show);
@@ -500,6 +533,13 @@
         'aria-pressed="' + (st.mode === m[0] ? 'true' : 'false') + '">' + m[1] + '</button>';
     });
     modeBtns += '</div>';
+
+    /* 📌 شريط القراءة الأفقي فوق الرسم (مرة واحدة — مش مع كل إعادة رسم) */
+    const readoutHtml = '<div class="ix-readout" id="ix-readout">' +
+      '<div class="ix-ro-cell"><span class="ix-ro-l">التاريخ</span><span class="ix-ro-v" id="ix-ro-date">—</span></div>' +
+      '<div class="ix-ro-cell"><span class="ix-ro-l" id="ix-ro-vlabel">رقم المؤشر</span><span class="ix-ro-v" id="ix-ro-val">—</span></div>' +
+      '<div class="ix-ro-cell"><span class="ix-ro-l" id="ix-ro-plabel">من بداية الفترة</span><span class="ix-ro-v" id="ix-ro-pct">—</span></div>' +
+      '</div>';
 
     /* الرسم */
     const view = buildView(ixId);
@@ -698,7 +738,7 @@
     document.getElementById('ix-body').innerHTML =
       hero + dataStatus +
       '<div class="ix-sec ix-chartsec">' +
-      perBtns + modeBtns + chart +
+      perBtns + modeBtns + readoutHtml + chart +
       '<div class="ix-chart-legend"><span class="ix-lg-line"></span> ' + esc(MODE_LEGEND[st.mode] || 'رقم المؤشر') +
       '<span class="ix-lg-ev"></span> حدث موثّق</div>' +
       '<div class="ix-mode-help">' + esc(MODE_HELP[st.mode] || '') + '</div>' +
@@ -708,6 +748,7 @@
       eduHtml + offHtml + phasesHtml + evHtml + persHtml + consHtml + lessonHtml + srcHtml;
 
     bindChart(ixId);
+    resetReadout(ixId);
     bindIndexActions(ixId);
     bindConsRows(ixId);
     syncChartWidth(ixId);
@@ -1007,6 +1048,7 @@
         const hp = sec.querySelector('.ix-mode-help');
         if (hp) hp.textContent = MODE_HELP[st.mode] || '';
         bindChart(ixId);
+        resetReadout(ixId);
       };
     });
 

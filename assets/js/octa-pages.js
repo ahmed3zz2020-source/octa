@@ -1548,8 +1548,12 @@ function buildEgyCard(ticker, gold) {
   const chgHtml = hasChg
     ? '<div class="mini-c ' + (c>=0?'up':'down') + '">' + (c>=0?'▲ +':'▼ ') + Math.abs(c).toFixed(2) + '%</div>'
     : '<div class="mini-c">—</div>';
+  /* 📌 لو الرقم من آخر إغلاق رسمي (مش لحظي) ⇒ نقول بوضوح */
+  const offNote = t._official_close
+    ? '<div class="mini-sub">إغلاق رسمي ' + esc(String(t._official_date || '').slice(8, 10) + '/' + String(t._official_date || '').slice(5, 7)) + '</div>'
+    : '';
   return '<div class="mini"' + clickable + '><div class="mini-n">' + w.n + '</div><div class="mini-v">' + v + '</div>' +
-  chgHtml + sub + '</div>';
+  chgHtml + offNote + sub + '</div>';
   }).join('') + '</div>' +
   '<div class="mini-note">💡 الجرام = أونصة الذهب (دولار) × الدولار/الجنيه ÷ 31.1035 — بيتحسب لحظياً</div>' +
   '<div class="mini-note">🕌 مؤشر الشريعة (EGX 33 Shariah): اضغط عليه تشوف الـ' + '33' + ' سهم اللي داخلين فيه، مع نتيجة OCTA لكل سهم.</div>';

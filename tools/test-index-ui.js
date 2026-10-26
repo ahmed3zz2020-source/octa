@@ -111,19 +111,18 @@ function latinWords(text) {
       await p.waitForTimeout(600);
       await p.mouse.move(box.x + box.width * 0.62, box.y + box.height * 0.4);
       await p.waitForTimeout(900);
-      const tip = await p.evaluate(() => {
-        const t = document.getElementById('ix-tip');
-        const lbl = document.getElementById('ix-dot-label');
-        return {
-          tip: t ? t.textContent.replace(/\s+/g, ' ').trim() : '',
-          tipOn: t ? getComputedStyle(t).opacity : '0',
-          label: lbl ? (lbl.textContent || '').trim() : '',
-          labelOn: lbl ? getComputedStyle(lbl).opacity : '0',
-        };
-      });
-      check(/من بداية الفترة/.test(tip.tip), `التoltip فيه نسبة الفترة: ${tip.tip.slice(0, 70)}`);
-      check(tip.tipOn !== '0', 'التoltip ظاهر');
-      check(/%/.test(tip.label) && tip.labelOn !== '0', `النسبة مكتوبة على الرسم: ${tip.label}`);
+      /* 📌 الشريط الأفقي فوق الرسم (مفيش حاجة على الشارت) */
+      const ro = await p.evaluate(() => ({
+        date: (document.getElementById('ix-ro-date') || {}).textContent || '',
+        val: (document.getElementById('ix-ro-val') || {}).textContent || '',
+        pct: (document.getElementById('ix-ro-pct') || {}).textContent || '',
+        bars: document.querySelectorAll('#ix-modal .ix-readout').length,
+        overlay: document.querySelectorAll('#ix-modal .ix-tip, #ix-modal .ix-dot-label').length,
+      }));
+      check(ro.bars === 1, `شريط قراءة واحد بس (${ro.bars})`);
+      check(ro.overlay === 0, `مفيش حاجة معلّقة فوق الشارت (${ro.overlay})`);
+      check(/\d{4}/.test(ro.date), `الشريط فيه تاريخ: ${ro.date}`);
+      check(/\d/.test(ro.val) && /%/.test(ro.pct), `الشريط فيه الرقم والنسبة: ${ro.val} · ${ro.pct}`);
     } else { check(false, 'الرسم موجود'); }
 
     /* ② كلمات غريبة في النص الظاهر */
