@@ -1396,7 +1396,9 @@ async function openShariahIndex() {
   wrap.innerHTML = '<div class="tv-modal-box"><div class="tv-modal-head"><div>' +
     '<div class="tv-modal-title">\u{1F54C} مؤشر الشريعة — EGX 33 Shariah</div>' +
     '<div class="tv-modal-sub">جارِ تحميل المكونات من البورصة المصرية \u2026</div>' +
-    '</div><div class="tv-modal-actions"><button class="tv-btn ghost" onclick="document.getElementById(\'shariah-modal\').remove()">\u2715</button></div>' +
+    '</div><div class="tv-modal-actions">' +
+    '<button class="tv-btn" onclick="document.getElementById(\'shariah-modal\').remove(); openIndexIntel(\'EGX33\')" title="تحليل مؤشر الشريعة زي باقي المؤشرات">\u{1F4CA} تحليل المؤشر</button>' +
+    '<button class="tv-btn ghost" onclick="document.getElementById(\'shariah-modal\').remove()">\u2715</button></div>' +
     '</div><div class="tv-modal-body" id="shariah-body"><div class="si-empty">\u23F3 جاري التحميل\u2026</div></div></div>';
   document.body.appendChild(wrap);
 

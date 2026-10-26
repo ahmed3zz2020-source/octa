@@ -52,19 +52,35 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
+  /* ⛔⛔⛔ إشارات الأرقام جوّه نص عربي (RTL) بتتقلب: «-71.6%» بتظهر «71.6%-»
+     📌 السبب: الشرطة قبل الرقم بتتعتبر محرف محايد ⇒ بتاخد اتجاه الفقرة.
+     📌 الحل: نعزل الرقم بعلامات العزل (LRI/PDI) — Unicode U+2066 / U+2069.
+     📌 ده بيشتغل سواء النص اتهرّب (escaped) أو اتحط HTML — بخلاف الـspan. */
+  const LRI = '\u2066', PDI = '\u2069';
+  function lnum(v) { return LRI + v + PDI; }
   function num(v, d) {
     if (v == null || isNaN(v)) return '—';
     d = (d === undefined) ? 2 : d;
-    return Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+    return lnum(Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }));
   }
   function pct(v, d) {
     if (v == null || isNaN(v)) return '—';
     d = (d === undefined) ? 2 : d;
-    return (v >= 0 ? '+' : '') + Number(v).toFixed(d) + '%';
+    return lnum((v >= 0 ? '+' : '') + Number(v).toFixed(d) + '%');
   }
   function dayTs(ts) {
     const d = new Date(ts * 1000);
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  /* ⛔⛔⛔ التاريخ في سطر عربي (RTL) بيتكسّر: الرقم الأول بيطير لآخر السطر
+     📌 الحل: نلفّ التاريخ في span اتجاهه LTR ومفيش كسر (§unicode-bidi). */
+  function dtxt(ts) {
+    return '<span class="ix-date">' + dayTs(ts) + '</span>';
+  }
+  /* ⛔ المدى كله لازم يكون في كتلة LTR واحدة — وإلا السهم ورتّبوا مع بعض غلط */
+  function drange(a, b) {
+    const t = dayTs(a) + (b && b !== a ? ' \u2192 ' + dayTs(b) : '');
+    return '<span class="ix-date">' + t + '</span>';
   }
   function shortDay(ts) {
     const d = new Date(ts * 1000);
@@ -107,6 +123,7 @@
       '<div class="ix-head">' +
       '<div><div class="ix-title" id="ix-title">جارِ التحميل…</div>' +
       '<div class="ix-sub" id="ix-sub"></div></div>' +
+      '<button class="ix-cmp-btn" onclick="openIndexCompare()" title="مقارنة المؤشرات" aria-label="مقارنة المؤشرات">⚖️<span class="ix-cmp-txt"> مقارنة</span></button>' +
       '<button class="ix-close" onclick="closeIndexIntel()" aria-label="إغلاق">✕</button>' +
       '</div>' +
       '<div class="ix-body" id="ix-body"><div class="ix-loading">⏳ جاري تحميل بيانات المؤشر…</div></div>' +
@@ -140,13 +157,20 @@
    ② الرسم — مرسم بنفسي (SVG) خفيف: خط/مساحة + محور + tooltip + سحب
    ══════════════════════════════════════════════════════════════════════ */
   function buildChart(ixId, series, mode, events) {
-    const W = 720, H = 260, PAD_L = 8, PAD_R = 46, PAD_T = 12, PAD_B = 26;
+    /* ⛔⛔⛔ العرض لازم يبقى بنفس نسبة الـviewBox عشان الأرقام متت distortions
+    📌 كنا بنستخدم 720 ثابت + preserveAspectRatio=none ⇒ النص كان بيتشوّه.
+    📌 ✅ الحل: نحسب العرض من عرض الشاشة ⇒ 1 وحدة = 1 بكسل. */
+    const W = Math.max(320, Math.min(1100, Math.round((window.innerWidth || 390) - 46)));
+    const H = 250, PAD_L = 8, PAD_R = 54, PAD_T = 12, PAD_B = 34;
     if (!series || series.length < 2) return '<div class="ix-empty">📉 مفيش بيانات للرسم</div>';
 
     const vals = series.map(p => p[1]);
     const t0 = series[0][0], t1 = series[series.length - 1][0];
     let vmin = Math.min.apply(null, vals), vmax = Math.max.apply(null, vals);
     if (vmin === vmax) { vmin -= 1; vmax += 1; }
+    /* ⛔⛔⛔ قبل ما نوسّع المحور: نحفظ القيم الحقيقية
+       📌 كنا بنعرض «vmax - padv» ⇒ رقم تقريبي مختلف عن الإحصاء. */
+    const dmin = vmin, dmax = vmax;
     const padv = (vmax - vmin) * 0.08;
     vmin -= padv; vmax += padv;
 
@@ -177,7 +201,10 @@
     for (let i = 0; i <= nLab; i++) {
       const t = t0 + ((t1 - t0) * i) / nLab;
       const cx = x(t).toFixed(1);
-      xlab += '<text class="ix-axis" x="' + cx + '" y="' + (H - 8) + '" text-anchor="middle">' + shortDay(t) + '</text>';
+      /* ⛔ أول/آخر تسمية كانت بتتقص — نثبّت المحاذاة */
+      const anch = cx < 34 ? 'start' : (cx > W - PAD_R - 34 ? 'end' : 'middle');
+      const lx = cx < 34 ? 2 : (cx > W - PAD_R - 34 ? cx + 28 : cx);
+      xlab += '<text class="ix-axis" x="' + lx + '" y="' + (H - 6) + '" text-anchor="' + anch + '">' + shortDay(t) + '</text>';
     }
 
     const ylabels =
@@ -185,7 +212,7 @@
       '<text class="ix-axis" x="' + (W - PAD_R + 6) + '" y="' + (H - PAD_B) + '" text-anchor="start">' + num(vmin, 0) + '</text>';
 
     return '<div class="ix-chart-wrap" id="ix-chart-wrap" data-ix="' + esc(ixId) + '">' +
-      '<svg class="ix-chart" id="ix-chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" ' +
+      '<svg class="ix-chart" id="ix-chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" ' +
       'role="img" aria-label="رسم بياني تاريخي لقيمة المؤشر">' +
       '<defs><linearGradient id="ixg' + esc(ixId) + '" x1="0" y1="0" x2="0" y2="1">' +
       '<stop offset="0%" stop-color="var(--gold)" stop-opacity=".38"/>' +
@@ -196,7 +223,11 @@
       '<circle class="ix-dot" id="ix-dot" cx="0" cy="0" r="4" style="opacity:0"/>' +
       marks + xlab + ylabels + '</svg>' +
       '<div class="ix-tip" id="ix-tip" style="opacity:0"></div>' +
-      '<div class="ix-axis-note">أعلى: ' + num(vmax - padv, 0) + ' · أدنى: ' + num(vmin + padv, 0) + '</div>' +
+      '<div class="ix-axis-note">' + (mode === 'drawdown'
+        ? 'أعمق تراجع في الفترة: ' + num(dmin, 1) + '%'
+        : (mode === 'normalized'
+          ? 'أعلى نسبة: ' + num(dmax, 1) + ' · أدنى نسبة: ' + num(dmin, 1) + ' (المتبنّي = 100)'
+          : 'أعلى: ' + num(dmax, 2) + ' · أدنى: ' + num(dmin, 2))) + '</div>' +
       '</div>';
   }
 
@@ -233,9 +264,9 @@
       const p = nearest(ev.clientX);
       const t = p[0], v = p[1];
       const r = svg.getBoundingClientRect();
-      const W2 = W, PAD_T = 12, PAD_B = 26;
+      const W2 = W, PAD_T = 12, PAD_B = 34;
       const vmin = st.view.vmin, vmax = st.view.vmax;
-      const y = PAD_T + (1 - (v - vmin) / (vmax - vmin)) * (260 - PAD_T - PAD_B);
+      const y = PAD_T + (1 - (v - vmin) / (vmax - vmin)) * (H - PAD_T - PAD_B);
       const cx = PAD_L + ((t - series[0][0]) / (series[series.length - 1][0] - series[0][0])) * (W2 - PAD_L - PAD_R);
       const px = (cx / W2) * r.width, py = (y / 260) * r.height;
       cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.style.opacity = '1';
@@ -243,7 +274,7 @@
       const prev = st.view.prev[t];
       const chg = prev ? ((v / prev - 1) * 100) : null;
       const ph = (st.view.phases || []).find(pp => t >= pp.start && t <= pp.end);
-      tip.innerHTML = '<b>' + dayTs(t) + '</b><br>القيمة: ' + num(v, 2) +
+      tip.innerHTML = '<b>' + dtxt(t) + '</b><br>القيمة: ' + num(v, 2) +
         (chg == null ? '' : '<br>التغير: <span class="' + signClass(chg) + '">' + pct(chg) + '</span>') +
         (ph ? '<br><span class="ix-tip-ph">' + esc(PHASE_LABEL[ph.kind] || ph.kind) + '</span>' : '');
       tip.style.opacity = '1';
@@ -416,7 +447,7 @@
         const cls = k === 'uptrend' ? 'pos' : (k === 'major_drawdown' ? 'neg' : (k === 'correction' ? 'neg' : ''));
         phasesHtml += '<div class="ix-phase ' + cls + '" data-phase="' + i + '" tabindex="0" role="button">' +
           '<div class="ix-phase-t">' + esc(PHASE_LABEL[k] || k) + '</div>' +
-          '<div class="ix-phase-d">' + dayTs(p.start) + ' → ' + dayTs(p.end) + '</div>' +
+          '<div class="ix-phase-d">' + drange(p.start, p.end) + '</div>' +
           '<div class="ix-phase-r ' + signClass(p.return_pct) + '">' + dirIcon(p.return_pct) + ' ' + pct(p.return_pct) + '</div>' +
           '<div class="ix-phase-x">' + num(p.start_value, 0) + ' → ' + num(p.end_value, 0) +
           ' · أقصى هبوط ' + pct(p.max_drawdown_pct, 1) + ' · ' + num(p.days, 0) + ' يوم</div>' +
@@ -433,7 +464,7 @@
       d.events.forEach(function (e, i) {
         evHtml += '<div class="ix-event" data-evi="' + i + '">' +
           '<div class="ix-event-t">' + esc(e.title_ar || '') + '</div>' +
-          '<div class="ix-event-d">' + dayTs(e.start_ts) + (e.end_ts && e.end_ts !== e.start_ts ? ' → ' + dayTs(e.end_ts) : '') + '</div>' +
+          '<div class="ix-event-d">' + drange(e.start_ts, e.end_ts) + '</div>' +
           (e.impact_pct != null ? '<div class="ix-event-i ' + signClass(e.impact_pct) + '">أداء المؤشر خلال الفترة: ' + pct(e.impact_pct) + '</div>' : '') +
           (e.description_ar ? '<div class="ix-event-x">' + esc(e.description_ar) + '</div>' : '') +
           (e.source_name ? '<a class="ix-event-s" href="' + esc(e.source_url || '#') + '" target="_blank" rel="noopener">' + esc(e.source_name) + ' ↗</a>' : '') +
@@ -461,7 +492,10 @@
         '<div class="dash-tbl-wrap"><table class="mini-table ix-table"><thead><tr>' +
         '<th>الرمز</th><th>الاسم</th><th>الوزن</th><th>السعر</th><th>النتيجة</th><th>القرار</th>' +
         '</tr></thead><tbody>';
-      cons.slice(0, 40).forEach(function (c) {
+      const CONS_SHOW = 40;
+      const hasWeights = cons.some(c => c.weight != null);
+      const shown = (IX[ixId].consAll ? cons : cons.slice(0, CONS_SHOW));
+      shown.forEach(function (c) {
         consHtml += '<tr' + (c.code ? ' onclick="openIntel(\'' + esc(c.code) + '\')" style="cursor:pointer"' : '') + '>' +
           '<td><b>' + esc(c.code) + '</b></td>' +
           '<td>' + esc(c.name_ar || '') + '</td>' +
@@ -471,7 +505,15 @@
           '<td class="' + (/إيجابية/.test(c.decision || '') ? 'pos' : (/سلبية/.test(c.decision || '') ? 'neg' : '')) + '">' +
           esc(c.decision || '—') + '</td></tr>';
       });
-      consHtml += '</tbody></table></div><div class="dash-tbl-hint"><span>←</span> اسحب الجدول جنباً <span>←</span></div></div>';
+      consHtml += '</tbody></table></div><div class="dash-tbl-hint"><span>←</span> اسحب الجدول جنباً <span>←</span></div>';
+      if (cons.length > CONS_SHOW) {
+        consHtml += '<button class="ix-more" data-ix-cons="1">' +
+          (IX[ixId].consAll ? 'إخفاء الباقي' : 'عرض كل الـ ' + num(cons.length, 0) + ' مكون') + '</button>';
+      }
+      if (!hasWeights) {
+        consHtml += '<div class="ix-note">ℹ️ الأوزان الرسمية متاحة لمؤشر EGX30 فقط — البورصة بتنشرها للمؤشر الرئيسي، والباقي بالتساوي.</div>';
+      }
+      consHtml += '</div>';
     }
 
     /* الدروس */
@@ -631,7 +673,7 @@
     }
     box.innerHTML = '<button class="ix-evcard-x" onclick="document.getElementById(\'ix-evcard\').remove()" aria-label="إغلاق">✕</button>' +
       '<div class="ix-evcard-t">' + esc(e.title_ar || '') + '</div>' +
-      '<div class="ix-evcard-d">' + dayTs(e.start_ts) + (e.end_ts && e.end_ts !== e.start_ts ? ' → ' + dayTs(e.end_ts) : '') + '</div>' +
+      '<div class="ix-evcard-d">' + drange(e.start_ts, e.end_ts) + '</div>' +
       (e.impact_pct != null ? '<div class="ix-evcard-i ' + signClass(e.impact_pct) + '">أداء المؤشر خلال الفترة: ' + pct(e.impact_pct) + '</div>' : '') +
       (e.description_ar ? '<div class="ix-evcard-x2">' + esc(e.description_ar) + '</div>' : '') +
       (e.source_url ? '<a class="ix-evcard-s" href="' + esc(e.source_url) + '" target="_blank" rel="noopener">' + esc(e.source_name || 'المصدر') + ' ↗</a>' : '') +
@@ -644,6 +686,15 @@
     const st = IX[ixId];
     const body = document.getElementById('ix-body');
 
+    body.querySelectorAll('[data-ix-cons]').forEach(function (b) {
+      b.onclick = function () {
+        IX[ixId].consAll = !IX[ixId].consAll;
+        const top = document.getElementById('ix-body').scrollTop;
+        renderIndexIntel(ixId);
+        const body2 = document.getElementById('ix-body');
+        if (body2) body2.scrollTop = top;
+      };
+    });
     body.querySelectorAll('.ix-per').forEach(function (b) {
       b.onclick = async function () {
         const per = b.getAttribute('data-per');
@@ -753,7 +804,7 @@
       ctl += '</div>';
 
       /* الرسم المقارن */
-      let chart = '<div class="ix-cmp-chart"><svg viewBox="0 0 720 260" preserveAspectRatio="none" class="ix-chart" id="ix-cmp-svg"></svg></div>';
+      let chart = '<div class="ix-cmp-chart"><svg class="ix-chart" id="ix-cmp-svg"></svg></div>';
       let table = '<div class="dash-tbl-wrap"><table class="mini-table ix-table"><thead><tr>' +
         '<th>المؤشر</th><th>العائد</th><th>أقصى هبوط</th><th>التقلب</th><th>أعلى</th><th>أدنى</th><th>أيام التعافي</th>' +
         '</tr></thead><tbody>';
@@ -793,7 +844,12 @@
     function drawCmp(d) {
       const svg = document.getElementById('ix-cmp-svg');
       if (!svg) return;
-      const W = 720, H = 260, PL = 8, PR = 46, PT = 12, PB = 26;
+      const W = Math.max(320, Math.min(1100, Math.round((window.innerWidth || 390) - 46)));
+      const H = 250, PL = 8, PR = 54, PT = 12, PB = 34;
+      /* ⛔⛔⛔ الـviewBox لازم يبقى بنفس أبعاد الإحداثيات
+      📌 كنا بنستخدم viewBox ثابت 720 والحداثيات W≈330 ⇒ الرسم كان بيقف عند 46%. */
+      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
       const series = d.indices.map(i => ({ id: i.id, color: i.accent || 'var(--gold)', pts: i.normalized || [] }))
         .filter(s => s.pts.length > 1);
       if (!series.length) return;
@@ -814,7 +870,9 @@
       let lab = '';
       for (let i = 0; i <= 4; i++) {
         const t = t0 + ((t1 - t0) * i) / 4;
-        lab += '<text class="ix-axis" x="' + X(t).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle">' + shortDay(t) + '</text>';
+        const cx2 = X(t), anch2 = cx2 < 34 ? 'start' : (cx2 > W - PR - 34 ? 'end' : 'middle');
+        const lx2 = cx2 < 34 ? 2 : (cx2 > W - PR - 34 ? cx2 + 28 : cx2);
+        lab += '<text class="ix-axis" x="' + lx2.toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + anch2 + '">' + shortDay(t) + '</text>';
       }
       lab += '<line x1="' + PL + '" y1="' + Y(100).toFixed(1) + '" x2="' + (W - PR) + '" y2="' + Y(100).toFixed(1) + '" stroke="var(--line)" stroke-dasharray="3 3"/>';
       lab += '<text class="ix-axis" x="' + (W - PR + 6) + '" y="' + (Y(vmax)).toFixed(1) + '" text-anchor="start">' + num(vmax, 0) + '</text>';

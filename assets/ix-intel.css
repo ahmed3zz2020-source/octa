@@ -80,7 +80,8 @@
 
   /* ── الرسم ── */
   .ix-chart-wrap { position: relative; background: var(--wash); border: 1px solid var(--line); border-radius: 13px; padding: 6px 4px 2px; }
-  .ix-chart { width: 100%; height: 230px; display: block; touch-action: pan-y; }
+  /* 📊 الرسم كله LTR — وإلا نصوص المحاور بتتقلب («21 Mar» بتظهر «Mar 21») */
+.ix-chart { width: 100%; height: auto; display: block; touch-action: pan-y; direction: ltr; }
   .ix-axis { font-size: 9px; fill: var(--muted); font-weight: 700; }
   .ix-line { stroke-linejoin: round; stroke-linecap: round; }
   .ix-cross { stroke: var(--gold); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
@@ -207,7 +208,7 @@
     .ix-stats { grid-template-columns: repeat(2, 1fr); }
     .ix-v { font-size: 1.4rem; }
     .ix-phases, .ix-events, .ix-offgrid { grid-template-columns: 1fr; }
-    .ix-chart { height: 190px; }
+    .ix-chart { max-height: none; }
     .ix-title { font-size: .88rem; }
     .ix-title .ix-en { display: block; font-size: .66rem; }
   }
@@ -215,3 +216,42 @@
     .ix-overlay { animation: none; }
     .ix-phase, .ix-ev-mark { transition: none; }
   }
+
+/* ⚖️ زر المقارنة في الهيدر */
+.ix-cmp-btn {
+  background: var(--gold-soft, rgba(201,162,39,.12));
+  border: 1px solid var(--gold, #c9a227);
+  color: var(--gold, #c9a227);
+  border-radius: 10px; padding: 7px 12px; font-size: 13px; font-weight: 700;
+  cursor: pointer; white-space: nowrap; min-height: 40px;
+}
+.ix-cmp-btn:active { transform: scale(.97); }
+.ix-cmp-btn:focus-visible { outline: 2px solid var(--gold, #c9a227); outline-offset: 2px; }
+@media (max-width: 420px) { .ix-cmp-btn { font-size: 12px; padding: 7px 9px; } }
+
+/* 📱 هيدر المودال على الموبايل: زر المقارنة أيقونة بس + العنوان ياخد المساحة */
+@media (max-width: 560px) {
+  .ix-cmp-txt { display: none; }
+  .ix-cmp-btn { padding: 7px 10px; }
+  .ix-title { font-size: 15px !important; line-height: 1.35; }
+  .ix-en { font-size: 11px; }
+}
+
+/* 📋 زر «عرض كل المكونات» */
+.ix-more {
+  background: var(--card-2, rgba(255,255,255,.05));
+  border: 1px solid var(--line, rgba(255,255,255,.14));
+  color: var(--txt, #e8f1fb);
+  border-radius: 10px; padding: 9px 14px; font-size: 13px; font-weight: 700;
+  cursor: pointer; width: 100%; margin-top: 10px; min-height: 42px;
+}
+.ix-more:active { transform: scale(.99); }
+.ix-more:focus-visible { outline: 2px solid var(--gold, #c9a227); outline-offset: 2px; }
+
+/* 📱 الاسم الإنجليزي يبقى في سطر لوحده تحت العربي */
+@media (max-width: 560px) {
+  .ix-en { display: block; margin-top: 2px; }
+}
+
+/* 📅 تاريخ LTR جوّه نص عربي */
+.ix-date { direction: ltr; unicode-bidi: isolate; display: inline-block; white-space: nowrap; }
