@@ -124,9 +124,18 @@ window.CFG = CFG;
   var CFG = window.CFG;
   if (!CFG) return;
 
+  /* ⛔⛔⛔ ٢٦ أكتوبر ٢٠٢٦ — ⭐ منع تكرار نفس الطلب
+  📌 الكود كان بيعمل ٦ نداءات /api/engine-weights (DOMContentLoaded
+  📌 + ٥٠٠ + ٢٥٠٠ + ٦٠٠٠ + الحدث + الـinterval) ⇒ كل نداء كان
+  📌 ⛌⛌⛌ بيلفّي «octa:weights» ⇒ إعادة رسم كارت القرار ⇒ ٣ نداءات
+  📌 ⛌⛌⛌ غالية × ٦ = ١٨ ⇒ فوق حد الـrate limit ⇒ 429 للمستخدم.
+  📌 ✅ الحل: نطلب مرة واحدة، ونتجاهل لو الحد اتخزّن أصلاً. */
+  var _req = false, _got = false;
+
   function apply(d) {
     if (!d || !d.ok) return;
-    if (d.engine && Object.keys(d.engine).length) {
+    var _hasEngine = !!(d.engine && Object.keys(d.engine).length);
+    if (_hasEngine) {
       CFG.engineWeights = d.engine;
       /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ السيرفر بيبعت الأوزان في d.engine
       📌 السبب: CFG.weights.egx / .intel كانوا فاضيين ⇒ كل الأوزان «0%».
@@ -141,9 +150,14 @@ window.CFG = CFG;
       });
     }
     /* 🎯 إعادة الرسم: الصفحات اللي اتحسبت بأوزان فاضية
-       لازم تتحدّث بعد ما الأوزان توصل. */
+       لازم تتحدّث بعد ما الأوزان توصل.
+       ⛔⛔⛔ ٢٦ أكتوبر ٢٠٢٦ — ⭐ بس **مرة واحدة**!
+       📌 كل نداء لـload() كان بيعمل dispatch ⇒ إعادة رسم مكرّرة
+       📌 ⛌⛌⛌ ⇒ نداءات مكرّرة للـAPI الغالية ⇒ 429. */
     try { if (typeof window.octaWeightsReady === 'function') window.octaWeightsReady(); }
     catch (e) { }
+    if (_got || !_hasEngine) return;  /* ⛔ الأوزان وصلت قبل كده ⇒ متكرّرش */
+    _got = true;
     document.dispatchEvent(new CustomEvent('octa:weights'));
   }
 
@@ -151,6 +165,8 @@ window.CFG = CFG;
   ⛌ لو البوابة أسرع من تحميل السكربت، الـauthed ممكن يفوتنا. */
   function load() {
     if (window.OCTA_API === undefined) return;
+    if (_req) return;        /* ⛔⛔⛔ طلب جاري ⇒ متكرّرش (٦ نداءات → ١) */
+    _req = true;
     try {
       /* ════════════════════════════════════════════════════════════════
       ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ إرسال التوكن مع طلب الأوزان
@@ -173,8 +189,9 @@ window.CFG = CFG;
         credentials: 'include'
       })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(apply).catch(function () { });
-    } catch (e) { }
+      .then(apply).catch(function () { })
+      .then(function () { _req = false; });   /* ⛔ نسمح بمحاولة تانية بعد الفشل */
+    } catch (e) { _req = false; }
   }
 
   document.addEventListener('octa:authed', function () { setTimeout(load, 60); });

@@ -219,10 +219,48 @@
  📌 ⛌ ⛌ المسارات المحمية (intelligence · ranking · strategies).
  📌 ✅ الحل: helper مشترك — كل الـfetch تمر عليه.
  ════════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════
+ 🗂️ ⭐⭐⭐ ٢٦ أكتوبر ٢٠٢٦ — ⭐⭐⭐ كاش بسيط للطلبات الغالية
+ ────────────────────────────────────────────────────────────────
+ 📌 المشكلة: الصفحة كانت بتطلب /api/intelligence و /api/explain
+ 📌 و /api/technical **٦ مرات لنفس السهم** (كل نداء ← ٣ مسارات)
+ 📌 ⛌ ⛌⛌ ⛌⛌⛌ ١٨ نداء غالي = فوق حد الـrate limit (١٥/دقيقة)
+ 📌 ⛌ ⛌⛌ ⛌⛌⛌ ⇒ 429 ⇒ «تعذر تحميل التحليل» للمستخدم.
+ 📌 📌 السبب: /api/engine-weights بيتطلب ٦ مرات (لما البوابة تجهز
+ 📌 📌 الت��كن) وكل نداء بيلفّي حدث octa:weights ⇒ إعادة رسم الكارت.
+ 📌 ✅ الحل: كاش في المتصفح للطلبات الغالية (TTL قصير).
+ 📌 ⛌⛌⛌ الـcache busting (?_=Date.now) بيخلي الرابط مختلف كل مرة
+ 📌 ⛌⛌⛌ ⇒ بنمسح الـquery من الـkey عشان نلاقي التكرار.
+ ════════════════════════════════════════════════════════════════ */
+var OCTA_CACHE = {};        /* url(من غير query) → {t, body, ct} */
+var OCTA_CACHE_TTL = 20000; /* ٢٠ ثانية — كفاية للتجربة، ومنع للتكرار */
+var OCTA_CACHE_PATHS = ['/api/intelligence/', '/api/explain/', '/api/technical/'];
+
+function _octaCacheKey(s) {
+  try {
+    var u = String(s || '');
+    var i = u.indexOf('?');
+    if (i >= 0) u = u.slice(0, i);
+    return u;
+  } catch (e) { return String(s || ''); }
+}
+
+function _octaIsCacheable(s, method) {
+  try {
+    if (method && String(method).toUpperCase() !== 'GET') return false;
+    var u = String(s || '');
+    for (var i = 0; i < OCTA_CACHE_PATHS.length; i++) {
+      if (u.indexOf(OCTA_CACHE_PATHS[i]) >= 0) return true;
+    }
+  } catch (e) { }
+  return false;
+}
+
 window.octaFetch = function (url, opts) {
   var o = opts || {};
+  var s = '';
   try {
-    var s = String(url || '');
+    s = String(url || '');
     if (s.indexOf('/api/') >= 0) {
       var h = new Headers(o.headers || {});
       var t = '';
@@ -232,6 +270,37 @@ window.octaFetch = function (url, opts) {
       if (!o.credentials) o.credentials = 'include';
     }
   } catch (e) { }
+
+  /* ⛔⛔⛔ الكاش — المسارات الغالية بس (مش الأسعار، عشان تبقى حيّة) */
+  if (_octaIsCacheable(s, o && o.method)) {
+    var key = _octaCacheKey(s);
+    var hit = OCTA_CACHE[key];
+    var now = Date.now();
+    if (hit && (now - hit.t) < OCTA_CACHE_TTL) {
+      try {
+        /* ⚠️ بنعيد Response جديد من النص المحفوظ — مش clone.
+        📌 الـclone ممكن يفشل لو المستهلك قرا الـbody قبلين. */
+        return Promise.resolve(new Response(hit.body, {
+          status: 200,
+          headers: { 'Content-Type': hit.ct || 'application/json' }
+        }));
+      } catch (e) { }
+    }
+    return window.fetch(url, o).then(function (resp) {
+      try {
+        if (resp && resp.ok) {
+          /* ⚠️ لازم الاستنساخ يتعمل **قبل** ما نرجع الرد للمستهلك */
+          var clone = resp.clone();
+          var ct = '';
+          try { ct = resp.headers.get('Content-Type') || ''; } catch (e) { }
+          clone.text().then(function (body) {
+            OCTA_CACHE[key] = { t: Date.now(), body: body, ct: ct };
+          }).catch(function () { });
+        }
+      } catch (e) { }
+      return resp;
+    });
+  }
   return window.fetch(url, o);
 };
 

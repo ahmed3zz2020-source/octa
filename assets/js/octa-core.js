@@ -2903,9 +2903,13 @@ function loadBestPickWidgets(symbol) {
 
   (async () => {
     try {
+      /* ⛔⛔⛔ ٢٦ أكتوبر ٢٠٢٦ — ⭐ نداءات مكرّرة كانت بت coke الـrate limit
+      📌 كاش ٢٠ ثانية + نفس السهم بيتطلب ٦ مرات ⇒ ١٨ نداء غالي ⇒ 429.
+      📌 ✅ الحل: octaFetch (فيه كاش) + نداء واحد بس لكل مسار. */
+      const F = (typeof window.octaFetch === 'function') ? window.octaFetch : fetch;
       const [ri, rt] = await Promise.all([
-        fetch(OCTA_API + '/api/intelligence/' + code).then(r => r.ok ? r.json() : {}).catch(() => ({})),
-        fetch(OCTA_API + '/api/technical/' + code).then(r => r.ok ? r.json() : {}).catch(() => ({})),
+        F(OCTA_API + '/api/intelligence/' + code).then(r => r.ok ? r.json() : {}).catch(() => ({})),
+        F(OCTA_API + '/api/technical/' + code).then(r => r.ok ? r.json() : {}).catch(() => ({})),
       ]);
       if (info) info.innerHTML = bpInfoHTML(ri);
       if (tech) tech.innerHTML = bpTechHTML(rt, ri);
