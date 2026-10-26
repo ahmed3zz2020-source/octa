@@ -1377,6 +1377,117 @@ function buildMoversCard() {
   return uniCard('glCard', '📊', 'أعلى ١٠ صعوداً وهبوطاً', 'اضغط للفلترة حسب الفترة', tabs + '<div id="glBody"></div>');
 }
 
+/* ════════════════════════════════════════════════════════════════
+  🕌 مؤشر الشريعة (EGX 33 Shariah) — مكوناته + نتيجة OCTA
+  ════════════════════════════════════════════════════════════════
+  📌 المكونات من موقع البورصة المصرية الرسمي.
+  📌 السعر والأداء من TradingView (المؤشر مش في الـscanner ⇒ websocket في الباك).
+  📌 البحث + فلتر بنتيجة OCTA (المستخدم طلباهم صراحةً).
+  ════════════════════════════════════════════════════════════════ */
+let SHARIAH_DATA = null;
+
+async function openShariahIndex() {
+  const old = document.getElementById('shariah-modal');
+  if (old) old.remove();
+  const wrap = document.createElement('div');
+  wrap.id = 'shariah-modal';
+  wrap.className = 'tv-modal-overlay';
+  wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
+  wrap.innerHTML = '<div class="tv-modal-box"><div class="tv-modal-head"><div>' +
+    '<div class="tv-modal-title">\u{1F54C} مؤشر الشريعة — EGX 33 Shariah</div>' +
+    '<div class="tv-modal-sub">جارِ تحميل المكونات من البورصة المصرية \u2026</div>' +
+    '</div><div class="tv-modal-actions"><button class="tv-btn ghost" onclick="document.getElementById(\'shariah-modal\').remove()">\u2715</button></div>' +
+    '</div><div class="tv-modal-body" id="shariah-body"><div class="si-empty">\u23F3 جاري التحميل\u2026</div></div></div>';
+  document.body.appendChild(wrap);
+
+  try {
+    if (!SHARIAH_DATA) {
+      const r = await octaFetch(OCTA_API + '/api/shariah?_=' + Date.now());
+      SHARIAH_DATA = await r.json();
+    }
+    renderShariah(wrap);
+  } catch (e) {
+    const b = wrap.querySelector('#shariah-body');
+    if (b) b.innerHTML = '<div class="si-empty">\u274C تعذر تحميل المكونات (' + (e.message || 'خطأ') + ')</div>';
+  }
+}
+
+function shariahFilterRows(rows, q, minScore) {
+  const term = (q || '').trim().toUpperCase();
+  return rows.filter(function (r) {
+    if (minScore && (r.score == null || r.score < minScore)) return false;
+    if (!term) return true;
+    return ((r.code || '') + ' ' + (r.name || '') + ' ' + (r.name_en || '') + ' ' + (r.sector || '')).toUpperCase().indexOf(term) >= 0;
+  });
+}
+
+function renderShariah(wrap) {
+  const d = SHARIAH_DATA || {};
+  const rows = d.rows || [];
+  const q = (d._q || '');
+  const minScore = d._min || 0;
+  const shown = shariahFilterRows(rows, q, minScore);
+  const idx = d.index || {};
+  const quote = d.quote || {};
+  const pct = quote.change != null ? (quote.change >= 0 ? '+' : '') + Number(quote.change).toFixed(2) + '%' : '\u2014';
+  const cls = (quote.change || 0) >= 0 ? 'pos' : 'neg';
+
+  const body = wrap.querySelector('#shariah-body');
+  let html = '<div class="sh-summary">' +
+    '<div><span class="sh-k">قيمة المؤشر</span><span class="sh-v">' +
+    (quote.value != null ? Number(quote.value).toLocaleString('en-US', { maximumFractionDigits: 2 }) : '\u2014') + '</span></div>' +
+    '<div><span class="sh-k">اليوم</span><span class="sh-v ' + cls + '">' + pct + '</span></div>' +
+    '<div><span class="sh-k">آخر سنة</span><span class="sh-v">' +
+    (quote.perf_y != null ? (quote.perf_y >= 0 ? '+' : '') + Number(quote.perf_y).toFixed(2) + '%' : '\u2014') + '</span></div>' +
+    '<div><span class="sh-k">عدد الأسهم</span><span class="sh-v">' + rows.length + '</span></div>' +
+    '</div>' +
+    '<div class="sh-controls">' +
+    '<input id="sh-search" class="sh-input" type="search" placeholder="\u0627\u0628\u062d\u062b \u0628\u0627\u0633\u0645 \u0627\u0648 \u0627\u0633\u0645 \u0627\u0644\u0634\u0631\u0643\u0629 \u0623\u0648 \u0627\u0644\u0642\u0637\u0627\u0639" value="' + q.replace(/"/g, '&quot;') + '">' +
+    '<select id="sh-min" class="sh-input sh-select">' +
+    '<option value="0"' + (minScore === 0 ? ' selected' : '') + '>كل النتائج</option>' +
+    '<option value="50"' + (minScore === 50 ? ' selected' : '') + '>النتيجة \u2265 50</option>' +
+    '<option value="60"' + (minScore === 60 ? ' selected' : '') + '>النتيجة \u2265 60</option>' +
+    '<option value="65"' + (minScore === 65 ? ' selected' : '') + '>النتيجة \u2265 65</option>' +
+    '</select>' +
+    '<span class="sh-count">' + shown.length + ' / ' + rows.length + '</span>' +
+    '</div>' +
+    '<div class="dash-tbl-wrap"><table class="mini-table sh-table"><thead><tr>' +
+    '<th>الرمز</th><th>النتيجة</th><th>السعر</th><th>القرار</th><th>الاسم</th><th>القطاع</th>' +
+    '</tr></thead><tbody>';
+  shown.forEach(function (r) {
+    const sc = (r.score != null) ? Number(r.score).toFixed(1) : '\u2014';
+    const scls = r.score == null ? '' : (r.score >= 65 ? 'pos' : (r.score >= 52 ? '' : 'neg'));
+    const dcls = /إيجابية/.test(r.decision || '') ? 'pos' : (/سلبية/.test(r.decision || '') ? 'neg' : '');
+    html += '<tr onclick="openIntel(\'' + r.code + '\')" style="cursor:pointer">' +
+      '<td><b>' + r.code + '</b></td>' +
+      '<td class="' + scls + '"><b>' + sc + '</b></td>' +
+      '<td>' + (r.price != null ? Number(r.price).toFixed(2) : '\u2014') + '</td>' +
+      '<td class="' + dcls + '">' + (r.decision || '\u2014') + '</td>' +
+      '<td>' + (r.name || r.name_en || '\u2014') + '</td>' +
+      '<td>' + (r.sector || '\u2014') + '</td></tr>';
+  });
+  if (!shown.length) {
+    html += '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:18px">\u2014 مفيش نتائج بالفلتر ده \u2014</td></tr>';
+  }
+  html += '</tbody></table></div>' +
+    '<div class="sh-note">\u{1F4D6} المكونات من موقع البورصة المصرية الرسمي: ' +
+    '<a href="' + (idx.source || '#') + '" target="_blank" rel="noopener" style="color:var(--gold)">' + (idx.source || '') + '</a>' +
+    '<br>\u2139\uFE0F ' + (idx.source_note || '') + '</div>';
+  body.innerHTML = html;
+
+  const si = body.querySelector('#sh-search');
+  const sm = body.querySelector('#sh-min');
+  const apply = function () {
+    SHARIAH_DATA._q = si.value;
+    SHARIAH_DATA._min = parseInt(sm.value || '0', 10);
+    renderShariah(wrap);
+    const nsi = wrap.querySelector('#sh-search');
+    if (nsi) { nsi.focus(); try { nsi.setSelectionRange(nsi.value.length, nsi.value.length); } catch (e) {} }
+  };
+  if (si) si.oninput = function () { clearTimeout(window._shT); window._shT = setTimeout(apply, 220); };
+  if (sm) sm.onchange = apply;
+}
+
 /* ═══ المؤشرات المصرية ═══ */
 function buildEgyCard(ticker, gold) {
   const map = {}; const seen = new Set();
@@ -1404,10 +1515,17 @@ function buildEgyCard(ticker, gold) {
   }
   }
 
-  return '<div class="mini"><div class="mini-n">' + w.n + '</div><div class="mini-v">' + v + '</div>' +
-  '<div class="mini-c ' + (c>=0?'up':'down') + '">' + (c>=0?'▲ +':'▼ ') + Math.abs(c).toFixed(2) + '%</div></div>';
+  var clickable = (w.id === 'tk-egx33')
+  ? ' onclick="openShariahIndex()" style="cursor:pointer" title="اضغط لعرض مكونات مؤشر الشريعة"'
+  : '';
+  var sub = (w.id === 'tk-egx33')
+  ? '<div class="mini-sub">اضغط لعرض الـ' + (t.count||33) + ' سهم</div>'
+  : '';
+  return '<div class="mini"' + clickable + '><div class="mini-n">' + w.n + '</div><div class="mini-v">' + v + '</div>' +
+  '<div class="mini-c ' + (c>=0?'up':'down') + '">' + (c>=0?'▲ +':'▼ ') + Math.abs(c).toFixed(2) + '%</div>' + sub + '</div>';
   }).join('') + '</div>' +
-  '<div class="mini-note">💡 الجرام = أونصة الذهب (دولار) × الدولار/الجنيه ÷ 31.1035 — بيتحسب لحظياً</div>';
+  '<div class="mini-note">💡 الجرام = أونصة الذهب (دولار) × الدولار/الجنيه ÷ 31.1035 — بيتحسب لحظياً</div>' +
+  '<div class="mini-note">🕌 مؤشر الشريعة (EGX 33 Shariah): اضغط عليه تشوف الـ' + '33' + ' سهم اللي داخلين فيه، مع نتيجة OCTA لكل سهم.</div>';
   return uniCard('egyCard', '🇪🇬', 'مؤشرات السوق المصري', 'الأسهم والمؤشرات والعملات والذهب', body, true);
 }
 
