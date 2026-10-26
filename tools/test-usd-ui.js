@@ -184,6 +184,62 @@ function latinWords(text) {
     if (t === 'sources') check(info.srcs >= 5, `المصادر: ${info.srcs}`);
   }
 
+  /* ③ب الأطر الزمنية + ترتيب البيانات + المناطق */
+  console.log('\n=== الأطر الزمنية (أسبوعي/شهري) + المناطق ===');
+  /* 📌 نرجع لتبويب التحليل الفني الأول */
+  await p.evaluate(() => { const b = document.querySelector('.usd-tab[data-tab="technical"]'); if (b) b.click(); });
+  await p.waitForTimeout(1500);
+  await p.waitForSelector('#usd-chart', { timeout: 40000 }).catch(() => { });
+  for (const [tf, label] of [['1W', 'أسبوعي'], ['1M', 'شهري']]) {
+    await p.evaluate((t) => { const b = document.querySelector('[data-tf="' + t + '"]'); if (b) b.click(); }, tf);
+    await p.waitForTimeout(1000);
+    await p.waitForSelector('#usd-chart', { timeout: 40000 }).catch(() => { });
+    await p.waitForTimeout(2500);
+    const info = await p.evaluate(() => {
+      const ser = (window.__usdSeries || []);
+      const svg = document.getElementById('usd-chart');
+      const bodies = document.querySelectorAll('.usd-cdl').length;
+      const zones = document.querySelectorAll('.usd-zg').length;
+      const tags = Array.from(document.querySelectorAll('.usd-ztag')).map((t) => t.textContent);
+      /* ⛔⛔⛔ لازم السلسلة تكون مرتبة زمنياً (الباج كان: ترتيب معجمي ⇒ قفزات) */
+      const paths = Array.from(document.querySelectorAll('#usd-chart .usd-body'));
+      return { bodies, zones, tags, tagCount: tags.length, hasChart: !!svg };
+    });
+    check(info.hasChart && info.bodies > 5, `${label}: الشموع مرسومة (${info.bodies})`);
+    check(info.zones >= 2, `${label}: مناطق الدعم/المقاومة على الشارت (${info.zones})`);
+    check(info.tagCount >= 1, `${label}: بطاقات الأسعار على المحور (${info.tags.join(' | ')})`);
+    /* الترقيم الزمني من الـAPI */
+    const ser = await p.evaluate(async (tfx) => {
+      const r = await fetch(window.OCTA_API + '/api/usd/technical?symbol=USDEGP&tf=' + tfx + '&bars=60');
+      const j = await r.json();
+      const ts = (j.series || []).map((x) => x.t);
+      return { n: ts.length, sorted: ts.every((v, i) => i === 0 || ts[i - 1] <= v), from: j.from, to: j.to };
+    }, tf).catch(() => null);
+    if (ser) check(ser.sorted, `${label}: السلسلة مرتبة بالزمن (${ser.n} شمعة · ${ser.from} → ${ser.to})`);
+  }
+
+  /* ③ج تبديل نافذة العرض */
+  const win = await p.evaluate(async () => {
+    const b = document.querySelector('[data-win="2"]');
+    if (!b) return 'no-btn';
+    b.click();
+    await new Promise((r) => setTimeout(r, 8000));
+    return document.querySelectorAll('.usd-cdl').length;
+  });
+  check(win !== 'no-btn' && win > 5, `نافذة العرض اتغيّرت (${win} شمعة)`);
+
+  /* ③د شكل الرسم: شموع / خط */
+  const lineMode = await p.evaluate(async () => {
+    const b = document.querySelector('[data-chart="line"]');
+    if (!b) return 'no-btn';
+    b.click();
+    await new Promise((r) => setTimeout(r, 2500));
+    return { lines: document.querySelectorAll('.usd-line').length, bodies: document.querySelectorAll('.usd-cdl').length };
+  });
+  check(lineMode !== 'no-btn' && lineMode.lines === 1 && lineMode.bodies === 0, `وضع الخط شغال (${JSON.stringify(lineMode)})`);
+  await p.evaluate(() => { const b = document.querySelector('[data-chart="candle"]'); if (b) b.click(); });
+  await p.waitForTimeout(2000);
+
   /* ④ تبديل الإطار الزمني */
   console.log('\n=== تبديل الإطار الزمني ===');
   await p.evaluate(() => { const b = document.querySelector('.usd-tab[data-tab="technical"]'); if (b) b.click(); });

@@ -166,7 +166,9 @@
   .usd-nw-m { font-size: .64rem; color: var(--muted); margin-top: 3px; }
 
   /* ── التحليل الفني ── */
-  .usd-modes { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 9px; }
+  .usd-modes { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 7px; }
+  .usd-ranges { border-top: 1px dashed var(--line); padding-top: 7px; }
+  .usd-ranges .usd-tfbtn { font-size: .7rem; padding: 5px 10px; }
   .usd-m, .usd-tfbtn {
     padding: 6px 11px; font-size: .74rem; font-weight: 800; font-family: inherit;
     background: var(--wash); color: var(--muted); border: 1px solid var(--line);
@@ -177,11 +179,52 @@
     background: var(--wash); border: 1px solid var(--line); border-radius: 12px; padding: 8px 4px 4px;
   }
   .usd-chart-wrap { position: relative; width: 100%; }
-  .usd-chart { width: 100%; height: auto; display: block; touch-action: pan-y; }
+  .usd-chart { width: 100%; height: auto; display: block; touch-action: pan-y; overflow: visible; }
   .usd-axis { font-size: 9px; fill: var(--muted); font-family: inherit; }
-  .usd-zone { opacity: .16; }
-  .usd-zone.sup { fill: var(--up); }
-  .usd-zone.res { fill: var(--dn); }
+  .usd-vollbl { font-size: 8px; fill: var(--dim); }
+
+  /* ── الشبكة ── */
+  .usd-grid { stroke: var(--line); stroke-width: 1; }
+  .usd-vgrid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 4; opacity: .5; }
+
+  /* ── مناطق الدعم والمقاومة ── */
+  .usd-zone { opacity: .13; }
+  .usd-zg.sup .usd-zone { fill: var(--up); }
+  .usd-zg.res .usd-zone { fill: var(--dn); }
+  .usd-zline { stroke-width: 1; stroke-dasharray: 3 3; opacity: .55; }
+  .usd-zg.sup .usd-zline { stroke: var(--up); }
+  .usd-zg.res .usd-zline { stroke: var(--dn); }
+  .usd-zg.strong .usd-zone { opacity: .22; }
+  .usd-zg.strong .usd-zline { opacity: .95; stroke-width: 1.6; stroke-dasharray: 5 3; }
+  .usd-ztag-bg { fill: var(--pri3); stroke: var(--line); stroke-width: 1; }
+  .usd-zg.sup .usd-ztag-bg { fill: var(--upSoft); stroke: var(--up); }
+  .usd-zg.res .usd-ztag-bg { fill: var(--dnSoft); stroke: var(--dn); }
+  .usd-ztag { font-size: 8.5px; font-weight: 800; fill: var(--txt); font-family: inherit; }
+  .usd-zname { font-size: 8.5px; font-weight: 800; fill: var(--muted); font-family: inherit; opacity: .9; }
+  .usd-zg.sup .usd-zname { fill: var(--up); }
+  .usd-zg.res .usd-zname { fill: var(--dn2); }
+  .usd-zg.strong .usd-zname { fill: var(--gold); }
+
+  /* ── السعر الحالي ── */
+  .usd-lastline { stroke: var(--gold); stroke-width: 1; stroke-dasharray: 4 3; opacity: .8; }
+  .usd-lasttag-bg { fill: var(--gold); }
+  .usd-lasttag { font-size: 9px; font-weight: 900; fill: var(--pri); font-family: inherit; }
+
+  /* ── الشموع ── */
+  .usd-wick { stroke-width: 1; }
+  .usd-wick.up { stroke: var(--up); }
+  .usd-wick.dn { stroke: var(--dn); }
+  .usd-cdl.up { fill: var(--up); }
+  .usd-cdl.dn { fill: var(--dn); }
+  .usd-line { stroke: var(--gold); stroke-width: 1.8; }
+  .usd-area { stroke: none; }
+
+  /* ── الحجم ── */
+  .usd-vol { opacity: .38; }
+  .usd-vol.up { fill: var(--up); }
+  .usd-vol.dn { fill: var(--dn); }
+
+  /* ── مؤشر التحرك ── */
   .usd-cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
   .usd-dot { fill: var(--gold); stroke: var(--pri2); stroke-width: 1.5; }
   /* 📌 شريط القراءة الأفقي (فوق الرسم) — Ahmed: مفيش حاجة على الشارت */
@@ -207,13 +250,49 @@
   .usd-iv b { font-size: .82rem; font-weight: 800; }
   .usd-zones { margin-top: 9px; }
   .usd-zh { font-size: .78rem; font-weight: 800; margin: 8px 0 5px; }
-  .usd-zone-row {
-    background: var(--wash); border: 1px solid var(--line); border-radius: 9px;
-    padding: 7px 10px; margin-bottom: 5px;
+
+  /* ── لوحة سريعة (تحت الرسم) ── */
+  .usd-dash {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 9px;
   }
-  .usd-zr-p { font-size: .82rem; font-weight: 900; }
-  .usd-zr-m { font-size: .68rem; color: var(--muted); margin-top: 2px; }
-  .usd-zr-s { font-size: .64rem; color: var(--dim); margin-top: 2px; }
+  .usd-dc {
+    background: var(--wash); border: 1px solid var(--line); border-radius: 10px;
+    padding: 7px 9px; display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  }
+  .usd-dc span { font-size: .64rem; color: var(--muted); }
+  .usd-dc b { font-size: .8rem; font-weight: 800; }
+  .usd-dc b.pos { color: var(--up); }
+  .usd-dc b.neg { color: var(--dn2); }
+  .usd-dc b i { font-size: .64rem; color: var(--dim); font-style: normal; font-weight: 600; }
+
+  /* ── صف المنطقة ── */
+  .usd-zone-row {
+    background: var(--wash); border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px 10px; margin-bottom: 5px; border-right-width: 3px;
+  }
+  .usd-zone-row.sup { border-right-color: var(--up); }
+  .usd-zone-row.res { border-right-color: var(--dn); }
+  .usd-zone-row.strong { background: var(--goldBg); border-color: var(--goldLine); }
+  .usd-zr-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .usd-zr-top b { font-size: .86rem; font-weight: 900; }
+  .usd-dotc { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .usd-dotc.sup { background: var(--up); }
+  .usd-dotc.res { background: var(--dn); }
+  .usd-badge {
+    font-size: .6rem; font-weight: 800; padding: 2px 7px; border-radius: 100px;
+    border: 1px solid var(--line); color: var(--muted);
+  }
+  .usd-badge.sup { color: var(--up); border-color: var(--up); background: var(--upSoft); }
+  .usd-badge.res { color: var(--dn2); border-color: var(--dn); background: var(--dnSoft); }
+  .usd-badge.gold { color: var(--pri); background: var(--gold); border-color: var(--gold); }
+  .usd-zr-m { font-size: .68rem; color: var(--muted); margin-top: 3px; }
+  .usd-zr-bar {
+    height: 4px; background: var(--slot); border-radius: 3px; margin-top: 5px; overflow: hidden;
+  }
+  .usd-zr-bar i { display: block; height: 100%; border-radius: 3px; background: var(--gold); }
+  .usd-zone-row.sup .usd-zr-bar i { background: var(--up); }
+  .usd-zone-row.res .usd-zr-bar i { background: var(--dn); }
+  .usd-zr-s { font-size: .64rem; color: var(--dim); margin-top: 3px; }
 
   /* ── المصادر ── */
   .usd-srcs { display: grid; gap: 6px; }
@@ -249,6 +328,7 @@
   }
 
   @media (min-width: 700px) {
+    .usd-dash { grid-template-columns: repeat(4, 1fr); }
     .usd-hero { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; align-items: start; }
     .usd-hero-main { margin-bottom: 0; }
     .usd-hero-side { grid-template-columns: 1fr; }
