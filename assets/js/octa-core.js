@@ -2907,9 +2907,16 @@ function loadBestPickWidgets(symbol) {
       📌 كاش ٢٠ ثانية + نفس السهم بيتطلب ٦ مرات ⇒ ١٨ نداء غالي ⇒ 429.
       📌 ✅ الحل: octaFetch (فيه كاش) + نداء واحد بس لكل مسار. */
       const F = (typeof window.octaFetch === 'function') ? window.octaFetch : fetch;
+      /* ⛔⛔⛔ ٢٧ أكتوبر ٢٠٢٦ — ⭐ بنفرق بين «الطلب فشل» و«مفيش بيانات»
+      📌 كان الـcatch بيرجع {} ⇒ الواجهة بتقول «لا توجد بيانات لهذا السهم»
+      📌 والطلب في الحقيقة رجّع 502/401/timeout ⇒ المستخدم بيتعامل مع
+      📌 «مفيش بيانات» وهي في الحقيقة مشكلة شبكة ⇒ بيبحث في كل مكان.
+      ✅ الحل: نوسم الفشل بعلامة صريحة ( __fail ) والواجهة تفرّق. */
+      const grab = (u) => F(u).then(r => (r.ok ? r.json() : { __fail: true, status: r.status }))
+        .catch(e => ({ __fail: true, status: 0, err: String((e && e.message) || e) }));
       const [ri, rt] = await Promise.all([
-        F(OCTA_API + '/api/intelligence/' + code).then(r => r.ok ? r.json() : {}).catch(() => ({})),
-        F(OCTA_API + '/api/technical/' + code).then(r => r.ok ? r.json() : {}).catch(() => ({})),
+        grab(OCTA_API + '/api/intelligence/' + code),
+        grab(OCTA_API + '/api/technical/' + code),
       ]);
       if (info) info.innerHTML = bpInfoHTML(ri);
       if (tech) tech.innerHTML = bpTechHTML(rt, ri);
@@ -2922,6 +2929,14 @@ function loadBestPickWidgets(symbol) {
 
 /* 💰 كارت السعر والمعلومات — من محرك OCTA */
 function bpInfoHTML(d) {
+  /* ⛔⛔⛔ ٢٧ أكتوبر ٢٠٢٦ — «فشل الطلب» مش «مفيش بيانات» (٢٧ أكتوبر).
+     📌 الـ502/401/time-out لازم يتقول صراحةً — غير إن المستخدم بيفتكر
+     📌 إن السهم مالهوش بيانات وبيquit. */
+  if (d && d.__fail) {
+    const why = d.status ? ('HTTP ' + d.status) : 'مشكلة شبكة';
+    return '<div class="opps-loading">⛔ تعذر تحميل بيانات السهم (' + why +
+      ') — المشكلة في الاتصال مش في بيانات السهم. جرّب تحديث الصفحة.</div>';
+  }
   if (!d || !d.code) return '<div class="opps-loading">لا توجد بيانات لهذا السهم</div>';
   const ch = Number(d.change || 0);
   const cls = ch >= 0 ? 'pos' : 'neg';
@@ -2942,6 +2957,10 @@ function bpInfoHTML(d) {
 
 /* 🧠 كارت التحليل الفني + التوصية */
 function bpTechHTML(t, intel) {
+  if (t && t.__fail) {
+    const why = t.status ? ('HTTP ' + t.status) : 'مشكلة شبكة';
+    return '<div class="opps-loading">⛔ تعذر تحميل التحليل الفني (' + why + ') — جرّب تحديث الصفحة.</div>';
+  }
   if (!t || !t.code) return '<div class="opps-loading">لا توجد بيانات فنية</div>';
   const ind = t.indicators || {};
   const tec = t.technical || {};

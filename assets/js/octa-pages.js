@@ -2067,7 +2067,7 @@ function vRenderCard(d,exRaw,tech){
   (f.valuation_status?(' · '+vEsc(f.valuation_status)):'')+
   (f.upside_pct!=null?(' · التقدير '+(f.upside_pct>0?'+':'')+f.upside_pct+'%'):'')+'</div></div>'+
   '<div class="vcard"><div class="vsec-h">⚖️ وزنك مقابل محرك التحليل</div>'+ab+
-  '<div class="vnote">الفرق الأساسي: إنت مديت المخاطرة <span class="flt-ltr">10%</span> والمحلرك بيخليها <span class="flt-ltr">24%</span>، والمعنويات <span class="flt-ltr">10%</span> عندك و4% عنده. '+
+  '<div class="vnote">الفرق الأساسي: إنت مديت المخاطرة <span class="flt-ltr">10%</span> والمحلرك بيخليها <span class="flt-ltr">'+(typeof window.OCTA_AXIS_W==='function'?window.OCTA_AXIS_W().risk:27)+'%</span>، والمعنويات <span class="flt-ltr">10%</span> عندك و4% عنده. '+
   'لو الفرق في القرار كبير، يبقى وزنك محتاج معايرة على بيانات حقيقية — مش كلام.</div></div>'+
   invalHtml;
 
