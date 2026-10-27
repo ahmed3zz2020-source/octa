@@ -4830,25 +4830,172 @@ function renderGlobalAssets(ticker) {
 
 
 /* ══════ BULL vs BEAR — مضغوط بنفس حجم التيكر ══════ */
+/* ══════════════════════════════════════════════════════════════════
+   🐂 ٢٧ أكتوبر ٢٠٢٦ — مودال «مؤشر السوق العام»
+   📌 الهدف: المستخدم يدوس على الكارت ⇒ يفهم بالظبط الرقم والمقاييس
+     والأساس والمكوّنات وسلّم القراءة — كله بنفس أرقامه الحقيقية.
+   ⛔ مفيش أي رقم مخترع — كل الأرقام من /api/dashboard.
+   ══════════════════════════════════════════════════════════════════ */
+function openMarketGauge(){
+  var B = window.__BB;
+  if (!B) return;
+  var old = document.getElementById('mg-modal');
+  if (old) old.remove();
+  var esc = function(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  var f1 = function(v){ return (v==null||isNaN(v)) ? '—' : (Math.round(v*10)/10).toLocaleString('en-US',{maximumFractionDigits:1}); };
+  var f2 = function(v){ return (v==null||isNaN(v)) ? '—' : (Math.round(v*100)/100).toLocaleString('en-US',{maximumFractionDigits:2}); };
+  /* ⛔⛔ الإشارات بتتقلب في RTL («29.6%-») ⇒ dir="ltr" إجباري */
+  var pct = function(v){
+    if (v==null||isNaN(v)) return '—';
+    var a = Math.abs(v);
+    return '<span dir="ltr">' + (v>0?'+':(v<0?'\u2212':'')) +
+      a.toLocaleString('en-US',{maximumFractionDigits:1}) + '%</span>';
+  };
+
+  var stName = B.state==='bull' ? 'صاعد 🐂' : (B.state==='bear' ? 'هابط 🐻' : 'محايد ⚖️');
+  var stSub  = B.state==='bull' ? 'شهية مخاطرة أعلى' : (B.state==='bear' ? 'الحذر يغلب' : 'السوق متردد');
+  var stWhy  = B.state==='bull'
+    ? 'عدد الأسهم اللي قرارها إيجابي أكبر من السلبي ⇒ المؤشر عالي.'
+    : (B.state==='bear'
+      ? 'عدد الأسهم اللي قرارها سلبي أكبر من الإيجابي ⇒ المؤشر منخفض.'
+      : 'الفرق بين الإيجابي والسلبي صغير ⇒ المؤشر في النطاق المحايد.');
+
+  /* ⛔ المكوّنات الثلاثة — بنفس أوزان الكود (٥٠/٣٠/٢٠) */
+  var comps = [
+    { n:'مزاج السوق (قرارات الأسهم)', w:50, v:(B.sentimentPart*48),
+      d:'من توزيع قرارات الـ' + B.judged + ' سهم اللي ليهم قرار: إيجابي +1 · محايدة +0.5 · سلبي −1.' },
+    { n:'متوسط النتيجة (السعر/الجودة)', w:30, v:(B.pricePart*48),
+      d:'متوسط نتيجة OCTA لكل الأسهم ÷ 50 − 1. فوق 50 ⇒ أعلى من المتوسط.' },
+    { n:'الأمان (Risk-adjusted)', w:20, v:(B.safetyPart*48),
+      d:'محور الأمان نفسه: قوة المركز المالي مقابل المخاطر. فوق 50 ⇒ أمان أعلى.' }
+  ];
+  var compsHtml = comps.map(function(c){
+    return '<div class="mg-comp"><div class="mg-comp-h"><span class="mg-comp-n">'+esc(c.n)+
+      '</span><span class="mg-comp-w">'+c.w+'%</span></div>'+
+      '<div class="mg-comp-bar"><div class="mg-comp-mid"></div>'+
+      '<div class="mg-comp-mark" style="left:'+Math.max(2,Math.min(98,50+c.v*1.6))+'%"></div></div>'+
+      '<div class="mg-comp-v">مساهمة في المؤشر: <b>'+pct(c.v)+'</b> من ٥٠ نقطة</div>'+
+      '<div class="mg-comp-d">'+esc(c.d)+'</div></div>';
+  }).join('');
+
+  /* ⛔ توزيع القرارات (بالأوزان) */
+  var decRows = [
+    { k:'إشارة إيجابية', n:B.nPos, w:'+1.0', cls:'pos',
+      d:'السهم عداه التقييم وطلع إيجابي.' },
+    { k:'إشارة محايدة', n:B.nNeu, w:'+0.5', cls:'neu',
+      d:'مش إيجابي ومش سلبي — بيتحسب نصف.' },
+    { k:'إشارة سلبية', n:B.nNeg, w:'−1.0', cls:'neg',
+      d:'السهم عداه التقييم وطلع سلبي.' },
+    { k:'بيانات غير كافية', n:B.nIns, w:'0', cls:'ins',
+      d:'⇦ مش محسوب خالص: «مش كفاية بيانات» مش معناها «ضعيف».' }
+  ];
+  var decHtml = decRows.map(function(r){
+    return '<tr><td class="mg-td">'+esc(r.k)+'</td><td class="mg-td mg-td--n">'+r.n+
+      '</td><td class="mg-td mg-td--w">'+r.w+'</td><td class="mg-td mg-td--d">'+esc(r.d)+'</td></tr>';
+  }).join('');
+
+  /* ⛔ سلّم القراءة (من نفس حدود الكود: ٤٢ و ٥٨) */
+  var bands = [
+    { r:'٠ – ٢٠', t:'خوف شديد', d:'بيع عشوائي وغموض —线和 غير بتبان.' },
+    { r:'٢١ – ٤٢', t:'الحذر يغلب 🐻', d:'أسهم أكثرها سلبية. (وضعك دلوقتي: '+B.gauge+')' },
+    { r:'٤٣ – ٥٧', t:'متردد ⚖️', d:'مفيش اتجاه واضح — القرار فردي.' },
+    { r:'٥٨ – ٨٠', t:'شهية مخاطرة أعلى 🐂', d:'أسهم أكثرها إيجابية.' },
+    { r:'٨١ – ١٠٠', t:'طموح شديد', d:'نفس الكلام بس أشد — احذر إنك تفتح позиونات كبيرة.' }
+  ];
+  var bandHtml = bands.map(function(b){
+    var cur = (B.state==='bear' && b.r.indexOf('٢١')===0) ? ' is-cur' :
+      (B.state==='neutral' && b.r.indexOf('٤٣')===0 ? ' is-cur' :
+      (B.state==='bull' && b.r.indexOf('٥٨')===0 ? ' is-cur' : ''));
+    return '<div class="mg-band'+cur+'"><div class="mg-band-r">'+esc(b.r)+'</div>'+
+      '<div class="mg-band-t">'+esc(b.t)+'</div><div class="mg-band-d">'+esc(b.d)+'</div></div>';
+  }).join('');
+
+  var h = B.health || {};
+  var html = '<div class="mg-box" role="dialog" aria-modal="true" aria-label="مؤشر السوق العام">' +
+    '<div class="mg-head"><div><div class="mg-title">🐂 مؤشر السوق العام</div>'+
+    '<div class="mg-sub">إزاي الرقم ده بيتحسب؟</div></div>'+
+    '<button class="mg-close" type="button" aria-label="اقفل">✕</button></div>'+
+    '<div class="mg-body">' +
+    /* ① الرقم */
+    '<div class="mg-hero"><div class="mg-hero-n ' + B.state + '">' + B.gauge + '</div>' +
+    '<div class="mg-hero-t"><div class="mg-hero-v ' + B.state + '">' + stName + '</div>' +
+    '<div class="mg-hero-s">' + stSub + '</div>' +
+    '<div class="mg-hero-d">' + esc(stWhy) + '</div></div></div>' +
+    '<div class="mg-note">الرقم مؤشّر <b>تفسيري</b> على مقياس ٠–١٠٠ (مقصود ٢–٩٨) — مش توقّع لحركة السوق، ومش نصيحة شراء أو بيع.</div>' +
+    /* ② المكوّنات */
+    '<div class="mg-sec-h">⚖️ المكوّنات الثلاثة (المجموع ١٠٠٪)</div>' + compsHtml +
+    '<div class="mg-formula">النتيجة = ٥٠ + (مزاج السوق × ٥٠٪ + متوسط النتيجة × ٣٠٪ + الأمان × ٢٠٪) × ٤٨</div>' +
+    /* ③ القرارات */
+    '<div class="mg-sec-h">🗳️ قرارات الأسهم (المزاج مبني عليها)</div>' +
+    '<table class="mg-tbl"><thead><tr><th>القرار</th><th>العدد</th><th>الوزن</th><th>المعنى</th></tr></thead>' +
+    '<tbody>' + decHtml + '</tbody></table>' +
+    '<div class="mg-note">الأسهم غير المتأكدة من بياناتها (' + B.nIns + ') <b>مش محسوبة</b> — والمقام = ' + B.judged + ' سهم (اللي ليهم قرار فقط).</div>' +
+    /* ④ السلّم */
+    '<div class="mg-sec-h">📏 سلّم القراءة (كل درجة معناها إيه)</div>' + bandHtml +
+    /* ⑤ الحدود */
+    '<div class="mg-sec-h">⚠️ حدود المؤشر</div>' +
+    '<ul class="mg-ul"><li>الرقم من ٣ أجزاء بس: مزاج · نتيجة · أمان — أي جزء ناقص بيتقدّر بـ٥٠ (محيط).</li>' +
+    '<li>متوسط النتيجة والأمان = متوسط كل الأسهم (٢٨٥) — مش محسوب لكل سهم على حدة.</li>' +
+    '<li>مؤشر لحالة السوق مش لكل سهم: لو عايز قرار سهم واحد، شوف صفحه السهم نفسه.</li>' +
+    '<li>الرقم بيتحدّث مع كل لقطة جديدة (السوق مقفول دلوقتي ⇒ آخر لقطة: ' +
+    (h.data_age_minutes!=null ? f1(h.data_age_minutes) + ' دقيقة' : '—') + ').</li></ul>' +
+    '<div class="mg-src">المصدر: /api/dashboard — ' + (h.stocks||'—') + ' سهم · ' +
+    'جودة البيانات ' + (h.avg_data_confidence!=null ? f1(h.avg_data_confidence)+'%' : '—') +
+    ' · ' + esc(h.freshness||'') + '</div>' +
+    '</div></div>';
+
+  var w = document.createElement('div');
+  w.id = 'mg-modal';
+  w.className = 'mg-overlay';
+  w.innerHTML = html;
+  document.body.appendChild(w);
+  document.body.style.overflow = 'hidden';
+  function close(){ if (w.parentNode) w.parentNode.removeChild(w); document.body.style.overflow=''; document.removeEventListener('keydown', k); }
+  function k(e){ if (e.key==='Escape') close(); }
+  document.addEventListener('keydown', k);
+  w.addEventListener('click', function(e){
+    if (e.target === w || (e.target.closest && e.target.closest('.mg-close'))) close();
+  });
+  try { var b=w.querySelector('.mg-box'); if(b){ b.setAttribute('tabindex','-1'); b.focus({preventScroll:true}); } } catch(e){}
+}
+window.openMarketGauge = openMarketGauge;
+
 function renderBullBear(dash, ticker) {
   const map = {}; const seen = new Set();
   for (const t of (ticker||[])) { if (!seen.has(t.id)) { seen.add(t.id); map[t.id] = t; } }
   const dec = dash.decisions || {};
   const aa = dash.axis_average || {};
-  const total = Object.values(dec).reduce((a,b)=>a+b,0) || 1;
-  const bulls = (dec['إشارة إيجابية']||0) + (dec['إشارة محايدة']||0) * 0.5;
-  const bears = (dec['إشارة سلبية']||0) + (dec['غير كافٍ']||0) * 0.3 + (dec['إشارة سلبية']||0) * 0.7;
-  const sentimentPart = (bulls - bears) / total;
+  /* ⛔⛔⛔ ٢٧ أكتوبر ٢٠٢٦ — إصلاح منطق المؤشر (باج + مراجعة):
+     📌 كان: Bears = سلبية + (غير كافٍ×0.3) + (سلبية×0.7)
+     ⛔ ① الإشارة السلبية كانت بتتحسب **مرتين** (١ + ٠٫٧) ⇒ عقوبة مزدوجة.
+     ⛔ ② المفتاح 'غير كافٍ' **مش موجود** في الداتا (الصح 'بيانات غير كافية')
+        ⇒ الـ82 سهم ناقصين ما بيحسبوش خالص (فرق صامت).
+     ⛔ ③ «بيانات غير كافية» ≠ «ضعيفة» (قاعدة المنتج) ⇒ ما تتحسبش سلبية.
+     📌 الصح: إيجابية +1 · محايدة +0.5 · سلبية −1 · غير كافية 0 (مستبعدة من المقام) */
+  const nPos = dec['إشارة إيجابية'] || 0;
+  const nNeu = dec['إشارة محايدة'] || 0;
+  const nNeg = dec['إشارة سلبية'] || 0;
+  const nIns = dec['بيانات غير كافية'] || dec['غير كافٍ'] || 0;
+  const judged = (nPos + nNeu + nNeg) || 1;          // ⛔ اللي ليهم قرار فقط
+  const bulls = nPos + nNeu * 0.5;
+  const bears = nNeg;                                  // ⛔ سلبية = ١ (من غير مضاعفة)
+  const sentimentPart = (bulls - bears) / judged;
   const pricePart = ((aa.final || 50) - 50) / 50;
   const safetyPart = ((aa.safety || 50) - 50) / 50;
   const composite = sentimentPart * .50 + pricePart * .30 + safetyPart * .20;
   const gauge = Math.round(Math.max(2, Math.min(98, 50 + composite * 48)));
   const state = gauge >= 58 ? 'bull' : (gauge <= 42 ? 'bear' : 'neutral');
+  /* 📌 بنحفظ الأرقام ⇒ المودال يشرح بنفس الأرقام اللي معروضة */
+  window.__BB = { gauge: gauge, state: state, sentimentPart: sentimentPart,
+    pricePart: pricePart, safetyPart: safetyPart, composite: composite,
+    nPos: nPos, nNeu: nNeu, nNeg: nNeg, nIns: nIns, judged: judged,
+    aa: aa, decisions: dec, health: (dash.health || {}) };
   const label = state === 'bull' ? 'صاعد 🐂' : (state === 'bear' ? 'هابط 🐻' : 'محايد ⚖️');
   const sub = state === 'bull' ? 'شهية مخاطرة عالية' : (state === 'bear' ? 'الحذر يغلب' : 'السوق متردد');
 
   const markerPos = ((gauge - 2) / 96 * 100).toFixed(1);
-  return `<div class="bb-strip">
+  /* 🐂 ٢٧ أكتوبر ٢٠٢٦ — الكارت بقى قابل للنقر ⇒ مودال يشرح كل حاجة */
+  return `<div class="bb-strip" onclick="openMarketGauge()" style="cursor:pointer" title="اضغط لتفسير الرقم">
   <div class="bbs-side ${state==='bull'?'bull':(state==='bear'?'bear':'dim')}">
   <div class="bbs-animal">🐻</div><div class="bbs-txt">BEAR</div>
   </div>
@@ -4859,6 +5006,7 @@ function renderBullBear(dash, ticker) {
   <div class="bbs-v ${state}">${label}</div>
   <div class="bbs-s">${sub} — مؤشر السوق العام</div>
   <div class="bbs-scalebar"><div class="bbs-marker" style="left:${markerPos}%"></div></div>
+  <div class="bbs-hint">اضغط لتفسير الرقم والمقاييس</div>
   </div>
   </div>
   </div>
