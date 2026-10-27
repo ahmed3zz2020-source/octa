@@ -18,6 +18,7 @@
     volOnly: false,
     loaded: false,
     locked: false,
+    measured: null,
     chartLib: null
   };
 
@@ -89,6 +90,7 @@
     getJson('/api/setups', 120000).then(function (res) {
       var j = res.json || {};
       S.items = j.items || [];
+      S.measured = j.measured || null;
       S.loaded = true;
       S.locked = false;
       render();
@@ -145,15 +147,17 @@
 
   function lockHTML() {
     return '<div class="su-lock">' +
-      '<h3>🧩 باقة «نماذجي»</h3>' +
-      '<p>النماذج دي مقيسة على <b>أكثر من ٥ سنوات</b> من بيانات البورصة المصرية، ' +
-      'ومحسوبة بــ<b>محرك OCTA</b> نفسه — مش تحليل مكتوب بإيد.</p>' +
+      '<h3>🧩 باقة «نماذجي» — ٣٥٠ جنيه/شهر</h3>' +
+      '<p>النماذج دي <b>مقيسة على ٦ سنين</b> من البورصة المصرية (٣١٥٣ إشارة · ١٨٦ سهم) ' +
+      'بـ<b>محرك OCTA</b> نفسه — مش تحليل مكتوب بإيد. والنتيجة متقاسة ' +
+      'بـ<b>ضوابط</b>: مستوى عشوائي = −٠.٠٧R · كسر أعلى ٢٠ شمعة = +٠.١٦R ⇒ محرّكنا أحسن.</p>' +
       '<div class="su-locklist">' +
-      '• كل نمط بيتبني على <b>كسرAreas</b> مؤكد بـ٣ إغلاقات وحجم أعلى من المتوسط<br>' +
-      '• الأرقام دي بتتحدّث كل يوم بعد قفل السوق<br>' +
+      '• <b>نماذجي:</b> قائمة يومية بالأنماط + مدخل/وقف/هدف + إحصاء تاريخي شفاف<br>' +
+      '• <b>الاستوديو:</b> ارسم مستوياتك واحفظ ملاحظاتك على أي سهم<br>' +
+      '• <b>إنذار تيليجرام</b> كل يوم بعد القفل<br>' +
       '• <b>مش توصية</b> — المعلومة أداة، والقرار قرارك' +
       '</div>' +
-      '<p>الباقة غير مفعّلة على حسابك دلوقتي. لو محتاجها، كلّم الدعم.</p>' +
+      '<p>الباقة غير مفعّلة على حسابك دلوقتي. لو محتاجها، كلّم الدعم وهي تتفعّل في ثواني.</p>' +
       '</div>';
   }
 
@@ -185,16 +189,24 @@
     }
     var rows = S.filtered.map(function (it) {
       var ev = it.evidence || {};
+      var st = it.setup || {};
       var dirCls = it.direction === 'up' ? 'up' : 'down';
       var dirTxt = it.direction === 'up' ? '▲ صعود' : '▼ هبوط';
+      var lvl = (st.level != null) ? st.level : it.level;
+      var ent = (st.entry_ref != null) ? st.entry_ref : it.entry;
+      var stop = (st.stop != null) ? st.stop : it.stop;
+      var tgt = (st.target != null) ? st.target : it.target;
+      var rr = (st.rr != null) ? st.rr : it.rr;
+      var badge = (it.measured_fit === false)
+        ? '<span class="su-mini">مش مُقاس</span>' : '';
       return '<tr tabindex="0" data-code="' + esc(it.code) + '" data-i="' + S.items.indexOf(it) + '">' +
         '<td class="sticky-c"><b>' + esc(it.code) + '</b><span>' + esc(it.name || '') + '</span></td>' +
-        '<td><span class="su-dir ' + dirCls + '">' + dirTxt + '</span></td>' +
-        '<td class="num"><b>' + fmtPrice(it.level) + '</b></td>' +
-        '<td class="num">' + fmtPrice(it.entry) + '</td>' +
-        '<td class="num">' + fmtPrice(it.stop) + '</td>' +
-        '<td class="num">' + fmtPrice(it.target) + '</td>' +
-        '<td class="num"><b>' + num(it.rr, '—') + '</b></td>' +
+        '<td><span class="su-dir ' + dirCls + '">' + dirTxt + '</span>' + badge + '</td>' +
+        '<td class="num"><b>' + fmtPrice(lvl) + '</b><span class="su-mini">المستوى</span></td>' +
+        '<td class="num">' + fmtPrice(ent) + '</td>' +
+        '<td class="num">' + fmtPrice(stop) + '</td>' +
+        '<td class="num">' + fmtPrice(tgt) + '</td>' +
+        '<td class="num"><b>' + num(rr, '—') + '</b></td>' +
         '<td class="num">' + (ev.atr_pct != null ? Number(ev.atr_pct).toFixed(1) + '%' : '—') +
           '<span class="su-mini">' + (ev.vol_ratio != null ? 'حجم ×' + Number(ev.vol_ratio).toFixed(2) : '') + '</span></td>' +
         '<td class="num">' + fmtDate(it.detected_at) + '</td>' +
@@ -202,10 +214,11 @@
     }).join('');
 
     box.innerHTML = '<div class="su-tablewrap"><table class="su-table"><thead><tr>' +
-      '<th class="sticky-c">السهم</th><th>الاتجاه</th><th>السعر</th>' +
+      '<th class="sticky-c">السهم</th><th>الاتجاه</th><th>المستوى</th>' +
       '<th>الدخول</th><th>الوقف</th><th>الهدف</th>' +
       '<th>ع/م</th><th>التذبذب</th><th>التاريخ</th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      measuredNote() +
       '<div class="su-note">⛔ الأرقام دي من محرك OCTA على شموع يومية حقيقية. ' +
       'مفيش توصية شراء أو بيع — القرار قرارك.</div>';
 
@@ -235,6 +248,7 @@
     var it = findItem(code);
     if (!it) return;
     var ev = it.evidence || {};
+    var st = it.setup || {};
     var ov = document.createElement('div');
     ov.className = 'su-modal';
     ov.id = 'suModal';
@@ -244,17 +258,20 @@
       '<div><h3>' + esc(it.name || it.code) + ' · ' + esc(it.code) + '</h3>' +
       '<div class="su-mcode">' + esc(it.kind || '') + ' · ' +
       (it.direction === 'up' ? 'كسر صعودي' : 'كسر هبوطي') +
-      ' · بتاريخ ' + fmtDate(it.detected_at) + '</div></div>' +
+      ' · بتاريخ ' + fmtDate(it.detected_at) +
+      (it.days_ago ? (' · من ' + it.days_ago + ' يوم') : '') +
+      (it.measured_fit === false ? ' · <b>مش مُقاس بالشرط العام</b>' : '') +
+      '</div></div>' +
       '<button class="su-mclose" type="button" aria-label="اقفل">✕</button>' +
       '</div>' +
       '<div class="su-chart" id="suChart"></div>' +
       '<div class="su-why">' + esc(it.why || '') + '</div>' +
       '<div class="su-kv">' +
-      kv('الدخول', fmtPrice(it.entry)) +
-      kv('الوقف', fmtPrice(it.stop)) +
-      kv('الهدف', fmtPrice(it.target)) +
-      kv('عائد/مخاطرة', num(it.rr, '—')) +
-      kv('نطاق الكسر', fmtPrice(it.zone_low) + ' — ' + fmtPrice(it.zone_high)) +
+      kv('مستوى الكسر', fmtPrice((st && st.level) != null ? st.level : it.level)) +
+      kv('الدخول', fmtPrice((st && st.entry_ref) != null ? st.entry_ref : it.entry)) +
+      kv('الوقف', fmtPrice((st && st.stop) != null ? st.stop : it.stop)) +
+      kv('الهدف', fmtPrice((st && st.target) != null ? st.target : it.target)) +
+      kv('عائد/مخاطرة', num((st && st.rr) != null ? st.rr : it.rr, '—')) +
       kv('نسبة التذبذب', ev.atr_pct != null ? Number(ev.atr_pct).toFixed(2) + '%' : '—') +
       kv('لمسات النطاق', num(ev.touches, '—')) +
       kv('تأكيد الحجم', it.volume_confirmed ? 'نعم' : 'لا') +
@@ -294,6 +311,34 @@
     });
 
     drawChart(it, $('suChart'));
+  }
+
+  /* 📊 بلوك «الأداء المُقاس» — طبقة المصداقية (منيحة مع كل رقم) */
+  function measuredNote() {
+    var m = S.measured;
+    if (!m) return '';
+    var pct = function (v) { return (v == null) ? '—' : (Math.round(v * 1000) / 10) + '%'; };
+    var ci = (m.ci95 && m.ci95.length === 2)
+      ? (m.ci95[0] > 0 ? '+' : '') + m.ci95[0] + ' .. ' + (m.ci95[1] > 0 ? '+' : '') + m.ci95[1]
+      : '—';
+    return '<div class="su-measured">' +
+      '<h4>📊 الأداء المُقاس — ' + esc(m.window || '') + '</h4>' +
+      '<div class="su-mgrid">' +
+      '<div><span>إشارات مُقاسة</span><b>' + num(m.signals, '—') + '</b></div>' +
+      '<div><span>نسبة النجاح</span><b>' + pct(m.hit_rate) + '</b></div>' +
+      '<div><span>R لكل صفقة</span><b>' + (m.r_per_trade > 0 ? '+' : '') + num(m.r_per_trade, '—') + '</b></div>' +
+      '<div><span>٩٥٪ ثقة</span><b>' + ci + '</b></div>' +
+      '<div><span>سهم</span><b>' + num(m.stocks, '—') + '</b></div>' +
+      '<div><span>ضابط عشوائي</span><b>' + (m.control_random_level_r > 0 ? '+' : '') + num(m.control_random_level_r, '—') + '</b></div>' +
+      '</div>' +
+      '<p><b>الإعداد:</b> ' + esc(m.entry || '') + ' · وقف ' + esc(m.stop || '') +
+      ' · هدف ' + esc(m.target || '') + ' · أفق ' + num(m.horizon, '—') + ' شمعة · بعد التكلفة ' + num(m.cost_pct, '—') + '٪.</p>' +
+      '<p><b>الطريقة:</b> ' + esc(m.note || '') + '</p>' +
+      '<p><b>ضابط المقارنة:</b> كسر «فوق أعلى ٢٠ شمعة» (بدون محرك OCTA) = ' +
+      (m.control_benchmark_r > 0 ? '+' : '') + num(m.control_benchmark_r, '—') + 'R ⇒ محرّكنا أحسن.</p>' +
+      '<p class="su-disclaimer">⛔ كل الأرقام دي محسوبة على صفقات مُنفّذة فعلياً بتكلفة عمولة — ' +
+      'مش تقدير. ودي أداة تحليل — مش توصية شراء أو بيع. القرار قرارك.</p>' +
+      '</div>';
   }
 
   function kv(k, v) {

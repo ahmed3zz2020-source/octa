@@ -144,7 +144,10 @@
         renderList();
         draw();
       })
-      .catch(function () { renderList(); });
+      .catch(function (e) {
+        if (e && e.status === 403) { lockPanel(); return; }
+        renderList();
+      });
   }
 
   function loadPublic() {
@@ -153,7 +156,10 @@
         S.public = j.items || [];
         renderList();
       })
-      .catch(function () { S.public = []; renderList(); });
+      .catch(function (e) {
+        if (e && e.status === 403) { lockPanel(); return; }
+        S.public = []; renderList();
+      });
   }
 
   /* ══════════ العرض ══════════ */
@@ -267,6 +273,20 @@
     var a = $('stTabMine'), b = $('stTabPublic');
     if (a) a.classList.toggle('on', S.tab === 'mine');
     if (b) b.classList.toggle('on', S.tab === 'public');
+  }
+
+  /* 🔒 الباقة مقفولة (403) ⇒ لوحة «مدفوعة» بدل الاستوديو */
+  function lockPanel(msg) {
+    var body = $('stList');
+    if (body) {
+      body.innerHTML = '<div class="su-lock">' +
+        '<h3>🎨 الاستوديو — جزء من باقة «نماذجي»</h3>' +
+        '<p>' + esc(msg || 'الاستوديو مدفوع (٣٥٠ جنيه/شهر) — جزء من باقة «نماذجي».') + '</p>' +
+        '<p>الباقة غير مفعّلة على حسابك. كلّم الدعم وهي تتفعّل في ثواني.</p>' +
+        '</div>';
+    }
+    var tools = $('stTools');
+    if (tools) tools.style.display = 'none';
   }
 
   function init() {

@@ -235,3 +235,25 @@
 .st-ip { font-size: 13px; color: var(--gold); font-weight: 700; margin-top: 4px; }
 .st-in { font-size: 12.5px; color: var(--txt); line-height: 1.7; margin-top: 3px; }
 .st-id { font-size: 10.5px; color: var(--dim); margin-top: 4px; }
+
+/* ══════════════════════════════════════════════════════════════
+   📊 بلوك «الأداء المُقاس» — طبقة المصداقية
+   ══════════════════════════════════════════════════════════════ */
+.su-measured {
+  margin-top: 12px; padding: 14px 16px;
+  background: var(--pri2); border: 1px solid var(--goldLine, var(--line));
+  border-radius: 14px;
+}
+.su-measured h4 { margin: 0 0 10px; font-size: 14px; color: var(--gold); }
+.su-mgrid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 8px; margin-bottom: 10px;
+}
+.su-mgrid > div {
+  background: var(--pri3); border: 1px solid var(--line);
+  border-radius: 9px; padding: 7px 10px;
+}
+.su-mgrid span { display: block; font-size: 10.5px; color: var(--muted); margin-bottom: 2px; }
+.su-mgrid b { font-size: 14px; color: var(--txt); font-weight: 800; }
+.su-measured p { margin: 0 0 6px; font-size: 12px; color: var(--muted); line-height: 1.75; }
+.su-measured .su-disclaimer { color: var(--gold); margin-top: 8px; }
