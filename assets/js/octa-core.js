@@ -2479,7 +2479,7 @@ function openWatchlistAdd() { alert('Watchlist - هيتم تطويره قريب�
 // ============ TICKER (TradingView Live) ============
 const TICKER_SYMBOLS = {
   'tk-gold': 'OANDA:XAUUSD',  // ذهب عالمي
-  'tk-usd': 'EGP=X',  // دولار/جنيه
+  'tk-usd': 'EGP=X',  // جنيه/دولار
   'tk-egx': 'EGX:EGX30',  // EGX30
   'tk-oil': 'TVC:UKOIL',  // برنت
   'tk-goldoz': 'OANDA:XAUUSD',  // أونصة ذهب

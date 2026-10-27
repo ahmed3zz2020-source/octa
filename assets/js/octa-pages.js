@@ -1267,7 +1267,7 @@ const TICKER_WANT = [
   { id:'tk-egx70',  n:'📈 EGX70',  c:'#22c55e' },
   { id:'tk-egx100', n:'📉 EGX100',  c:'#a855f7' },
   { id:'tk-egx33',  n:'🕌 مؤشر الشريعة', c:'#16c79a' },
-  { id:'tk-usd',  n:'💵 دولار/جنيه', c:'#f59e0b' },
+  { id:'tk-usd',  n:'💵 دولار/الجنيه', c:'#f59e0b' },
   { id:'tk-gold24', n:'🥇 ذهب/الجرام', c:'#eab308', gold:true },
 ];
 
@@ -1276,7 +1276,7 @@ const TICKER_WANT = [
 const ASSET_META = {
   'tk-gold':  { n:'🥇 الذهب',  g:'سلاح أمان',  inv:['tk-egx','tk-usd','tk-egx70'] },
   'tk-silver': { n:'🥈 الفضة',  g:'معدن ثمين',  inv:['tk-gold'] },
-  'tk-usd':  { n:'💵 دولار/جنيه',  g:'عملة مصرية',  inv:['tk-gold'] },
+  'tk-usd':  { n:'💵 دولار/الجنيه',  g:'عملة مصرية',  inv:['tk-gold'] },
   'tk-eur':  { n:'💶 يورو/جنيه',  g:'عملة أوروبية',  inv:['tk-usd'] },
   'tk-oil':  { n:'🛢️ نفط (WTI)',  g:'سلعة طاقة',  inv:['tk-spx','tk-egx'] },
   'tk-ukoil':  { n:'🛢️ نفط برنت',  g:'سلعة طاقة',  inv:['tk-oil'] },
@@ -1518,7 +1518,7 @@ function buildEgyCard(ticker, gold) {
   const WANT = [
   { id:'tk-egx', n:'📊 EGX30' }, { id:'tk-egx70', n:'📈 EGX70' },
   { id:'tk-egx100', n:'📉 EGX100' }, { id:'tk-egx33', n:'🕌 مؤشر الشريعة' },
-  { id:'tk-usd', n:'💵 دولار/جنيه' }, { id:'tk-gold', n:'🥇 ذهب/الجرام' },
+  { id:'tk-usd', n:'💵 دولار/الجنيه' }, { id:'tk-gold', n:'🥇 ذهب/الجرام' },
   ];
   const body = '<div class="mini-row c6">' + WANT.map(w => {
   const t = map[w.id];
@@ -1551,7 +1551,7 @@ function buildEgyCard(ticker, gold) {
      ⇒ والجدول القديم بمكوناته ونتائجه بيفضل متاح من جوّه المودال. */
   var IX_MAP = { 'tk-egx':'EGX30', 'tk-egx70':'EGX70', 'tk-egx100':'EGX100', 'tk-egx33':'EGX33' };
   var ixId = IX_MAP[w.id] || null;
-  /* ⭐ ٢٦ أكتوبر ٢٠٢٦ — كارت «دولار/جنيه» بقى قابل للنقر ⇒ «ذكاء الدولار»
+  /* ⭐ ٢٦ أكتوبر ٢٠٢٦ — كارت «دولار/الجنيه» بقى قابل للنقر ⇒ «ذكاء الدولار»
      (نفس الطابع بتاع «ذكاء المؤشرات»). */
   var isUsd = w.id === 'tk-usd';
   /* 🏦 ٢٧ أكتوبر ٢٠٢٦ — كارت «ذهب/الجرام» بقى قابل للنقر ⇒ يفتح مودال
