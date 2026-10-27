@@ -998,6 +998,11 @@
       '<span class="ocm-slot ocm-slot-shot" id="gshot"></span>' +
       '<button class="gclose ocm-close" data-close aria-label="اقفل">✕</button>' +
       '</div></div>' +
+      /* 🏦 ٢٧ أكتوبر ٢٠٢٦ — تبويب «الادخار» (قطعة ذكاء الذهب) */
+      '<div class="gtabs" id="gtabs" role="tablist">' +
+      '<button class="gtab is-on" type="button" role="tab" data-tab="deep" aria-selected="true">السرد</button>' +
+      '<button class="gtab" type="button" role="tab" data-tab="save" aria-selected="false">الادخار</button>' +
+      '</div>' +
       '<div class="gbody"><div class="gload">🔄 بنجيب التحليل…</div></div>' +
       '</div>';
     document.body.appendChild(w);
@@ -1046,6 +1051,48 @@
     }
     /* ⛔ قفل تمرير الصفحة */
     try { if (window.OCTA_TV) window.OCTA_TV.lockPage(true); } catch (e) {}
+
+    /* 🏦 التبويبات — «السرد» (التحليل القديم) و«الادخار» (ذكاء الادخار) */
+    var TAB = 'deep';
+    function paintTabs() {
+      var bs = w.querySelectorAll('#gtabs .gtab');
+      for (var i = 0; i < bs.length; i++) {
+        var on = bs[i].getAttribute('data-tab') === TAB;
+        bs[i].classList.toggle('is-on', on);
+        bs[i].setAttribute('aria-selected', on ? 'true' : 'false');
+      }
+    }
+    function showTab(t) {
+      TAB = t;
+      paintTabs();
+      var b = w.querySelector('.gbody');
+      if (!b) return;
+      if (t === 'save') {
+        /* ⛔ الشارت (TradingView) لازم يتشال قبل تبديل المحتوى */
+        killChart();
+        if (window.OCTA_GOLD_SAVINGS && window.OCTA_GOLD_SAVINGS.render) {
+          window.OCTA_GOLD_SAVINGS.render(b);
+        } else {
+          b.innerHTML = '<div class="gempty">تعذّر تحميل تبويب الادخار.</div>';
+        }
+        try { if (window.OCTA_TV) window.OCTA_TV.lockPage(true); } catch (e2) {}
+        return;
+      }
+      getDeep(true).then(function (d) {
+        b.innerHTML = renderDeep(d);
+        drawChart('15');
+      }).catch(function (err) {
+        b.innerHTML = '<div class="gempty">فشل تحميل التقرير: ' + esc(err.message || err) + '</div>';
+      });
+    }
+    w.addEventListener('click', function (e) {
+      var t = e.target;
+      if (t && t.classList && t.classList.contains('gtab')) {
+        e.preventDefault();
+        e.stopPropagation();
+        showTab(t.getAttribute('data-tab'));
+      }
+    });
 
     getDeep(true).then(function (d) {
       var b = w.querySelector('.gbody');
