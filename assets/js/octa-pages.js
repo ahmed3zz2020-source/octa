@@ -1542,10 +1542,14 @@ function buildEgyCard(ticker, gold) {
   /* ⭐ ٢٦ أكتوبر ٢٠٢٦ — كارت «دولار/جنيه» بقى قابل للنقر ⇒ «ذكاء الدولار»
      (نفس الطابع بتاع «ذكاء المؤشرات»). */
   var isUsd = w.id === 'tk-usd';
+  /* 🏦 ٢٧ أكتوبر ٢٠٢٦ — كارت «ذهب/الجرام» بقى قابل للنقر ⇒ يفتح مودال
+     الذهب على تبويب «الادخار» (ده كارت الادخار مش الذهب العالمي). */
+  var isGold = w.id === 'tk-gold';
   var clickable = ixId
   ? ' onclick="openIndexIntel(\'' + ixId + '\')" style="cursor:pointer" title="اضغط لتحليل المؤشر"'
-  : (isUsd ? ' onclick="openUSDIntel()" style="cursor:pointer" title="اضغط لتحليل الدولار"' : '');
-  var sub = (ixId || isUsd)
+  : (isUsd ? ' onclick="openUSDIntel()" style="cursor:pointer" title="اضغط لتحليل الدولار"'
+  : (isGold ? ' onclick="openGoldSavings()" style="cursor:pointer" title="اضغط لذكاء الادخار"' : ''));
+  var sub = (ixId || isUsd || isGold)
   ? '<div class="mini-sub">اضغط للتحليل</div>'
   : '';
   const chgHtml = hasChg

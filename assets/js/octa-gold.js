@@ -976,7 +976,9 @@
   }
   window.goldFullscreen = goldFullscreen;
 
-  function openGold() {
+  /* 🏦 ٢٧ أكتوبر ٢٠٢٦ — openGold(tab): يفتح المودال على تبويب معيّن
+     («deep» = السرد · «save» = الادخار) — كارت «ذهب/الجرام» بيفتح الادخار. */
+  function openGold(startTab) {
     if (OPEN) return;
     OPEN = true;
     var old = document.getElementById(ID);
@@ -1053,7 +1055,7 @@
     try { if (window.OCTA_TV) window.OCTA_TV.lockPage(true); } catch (e) {}
 
     /* 🏦 التبويبات — «السرد» (التحليل القديم) و«الادخار» (ذكاء الادخار) */
-    var TAB = 'deep';
+    var TAB = (startTab === 'save') ? 'save' : 'deep';
     function paintTabs() {
       var bs = w.querySelectorAll('#gtabs .gtab');
       for (var i = 0; i < bs.length; i++) {
@@ -1094,15 +1096,20 @@
       }
     });
 
-    getDeep(true).then(function (d) {
-      var b = w.querySelector('.gbody');
-      if (!b) return;
-      b.innerHTML = renderDeep(d);
-      drawChart('15');
-    }).catch(function (err) {
-      var b = w.querySelector('.gbody');
-      if (b) b.innerHTML = '<div class="gempty">فشل تحميل التقرير: ' + esc(err.message || err) + '</div>';
-    });
+    if (TAB === 'save') {
+      /* ⛔ طلب المستخدم تبويب الادخار مباشرة ⇒ منغير ما نحمّل السرد */
+      showTab('save');
+    } else {
+      getDeep(true).then(function (d) {
+        var b = w.querySelector('.gbody');
+        if (!b) return;
+        b.innerHTML = renderDeep(d);
+        drawChart('15');
+      }).catch(function (err) {
+        var b = w.querySelector('.gbody');
+        if (b) b.innerHTML = '<div class="gempty">فشل تحميل التقرير: ' + esc(err.message || err) + '</div>';
+      });
+    }
   }
   function escClose(e) {
     /* ⛔ لو ملء الشاشة مفتوح — الـEscape يخرج منه بس (مش يقفل المودال).
@@ -1198,6 +1205,8 @@
       mo.observe(document.body, { childList: true, subtree: true });
     } catch (e) {}
     window.openGoldIntel = openGold;
+    /* 🏦 فتح المودال على تبويب الادخار (كارت «ذهب/الجرام») */
+    window.openGoldSavings = function () { openGold('save'); };
   }
 
   /* ══════════════════════════════════════════════════════════════════

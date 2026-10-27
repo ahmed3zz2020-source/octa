@@ -388,15 +388,15 @@
       var levels = [];
       try {
         var sr = (tech && tech.sr) || {};
-        var sup = sr.support || [];
-        var res = sr.resistance || [];
-        levels = sup.concat(res).map(function (z) {
-          return { kind: z.kind, level: z.center != null ? z.center : z.mid,
-                   touches: z.touches };
-        });
+        /* ⛔⛔ أقرب دعم + أقرب مقاومة بس — لو رسمنا كل المستويات
+           (١٣ خط) الشارت بيبقى مزحوم ومش مقروء. */
         var ns = sr.nearest_support, nr = sr.nearest_resistance;
-        if (ns && ns.center != null) levels.push({ kind: 'support', level: ns.center });
-        if (nr && nr.center != null) levels.push({ kind: 'resistance', level: nr.center });
+        if (ns && ns.center != null) {
+          levels.push({ kind: 'support', level: ns.center, touches: ns.touches });
+        }
+        if (nr && nr.center != null) {
+          levels.push({ kind: 'resistance', level: nr.center, touches: nr.touches });
+        }
       } catch (e) { }
 
       var html = '<div class="gsave-chart"><div class="gsave-chart-h">📉 سعر الجرام — آخر ٥٠٠ جلسة</div>' +
