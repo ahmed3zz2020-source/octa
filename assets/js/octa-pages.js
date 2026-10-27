@@ -271,14 +271,19 @@ function renderTicker() {
 }
 
 async function loadTicker() {
+  /* ⛔⛔ ٢٧ أكتوبر ٢٠٢٦ — إعادة محاولة (الصفحة الرئيسية كانت بتفضل فاضية
+     لو الطلب اتأخر ⇒ كل الكروت «—» و مفيش أي محاولة تانية).
+     📌 fetchRetry defined في octa-app.js — لو مش موجود نرجع للسلوك القديم. */
   try {
-  const res = await octaFetch(OCTA_API + '/api/ticker?_=' + Date.now());
+  const _f = (typeof window !== 'undefined' && window.fetchRetry) ? window.fetchRetry : octaFetch;
+  const res = await _f(OCTA_API + '/api/ticker?_=' + Date.now());
   const data = await res.json();
   if (data.ticker && data.ticker.length) {
   TICKER_DATA = data.ticker;
   renderTicker();
+  try { if (window.octaNetHint) window.octaNetHint(''); } catch (e) {}
   }
-  } catch (e) { /* silent */ }
+  } catch (e) { /* silent — fetchRetry جوه بيحاول لوحده */ }
 }
 
 
@@ -1301,8 +1306,15 @@ function sectorColor(avg) {
 /* ══════ ① السوق ══════ */
 
 /* ═══ fetch آمن ═══ */
-async function apiGet(path, timeout) {
+async function apiGet(path, timeout, retry) {
   const t = timeout || 15000;
+  /* ⛔⛔ ٢٧ أكتوبر ٢٠٢٦ — وضع إعادة المحاولة (fetchRetry موجود في octa-app.js)
+     📌 السبب: لو الطلب اتأخر، الصفحة الرئيسية كانت بتتبني **فاضية**
+     (كل الكروت «—») ومفيش أي محاولة تانية ⇒ المستخدم ميت.
+     📌 الحل: نحاول تاني بتباعد متزايد لحد ~٩٠ ثانية. */
+  if (retry && typeof window !== 'undefined' && window.fetchRetry) {
+  return await window.fetchRetry(OCTA_API + path);
+  }
   const ctl = new AbortController();
   const tm = setTimeout(() => ctl.abort(), t);
   try {
@@ -2219,11 +2231,28 @@ function buildOctaVerdictCard(d, results) {
   );
 }
 
-async function armMarket(box) {  const [d, tk, rank] = await Promise.all([
+/* ⛔⛔ ٢٧ أكتوبر ٢٠٢٦ — ⭐ الكارت لو الداتا موصلتش ⇒ **يعيد بناء نفسه**
+   📌 السبب: لو التيكر فشل (أو خلص قبل ما الشبكة ترجع) ⇒ الكارت يفضل
+     «—» للأبد حتى لو الداتا رجعت بعدين.
+   📌 ✅ الحل: لو التيكر خلص فاشل ⇒ نعيد armMarket بعد ٨ ثواني
+     (لحد ٨ محاولات) ⇒ أول ما الداتا توصل الكارت يتحدّث لوحده. */
+let _armMarketRetry = 0;
+let _armMarketBusy = false;
+async function armMarket(box) {
+  if (_armMarketBusy) return;
+  _armMarketBusy = true;
+  try { await _armMarketRun(box); }
+  finally { _armMarketBusy = false; }
+}
+async function _armMarketRun(box) {  const [d, tk, rank] = await Promise.all([
+  /* ⛔⛔ مفيش «وضع إعادة المحاولة» هنا — لأن الانتظار الطويل بيأخّر
+     بناء الكارت نفسه. الحل: نبني الكارت فوراً (حتى بـ«—») وبعدين
+     حلقة إعادة البناء (كل ٨ ثواني) هي اللي بتكمّل-liما الشبكة ترجع. */
   apiGet('/api/dashboard', 12000).catch(() => ({decisions:{},sectors:[],top10:[],bottom10:[],health:{},axis_average:{}})),
   apiGet('/api/ticker', 10000).catch(() => ({ticker:[]})),
   apiGet('/api/rank?limit=252', 20000).catch(() => ({results:[]})),
   ]);
+  if (tk && tk.ticker && tk.ticker.length) _armMarketRetry = 0;
   const gold = (() => {
   try {
   const m = {}; for (const t of (tk.ticker||[])) m[t.id] = t;
@@ -2234,6 +2263,13 @@ async function armMarket(box) {  const [d, tk, rank] = await Promise.all([
   return null;
   })();
 
+  /* ⛔⛔ إعادة البناء الذاتي — **poller مستقل** (مش timer جوّه armMarket)
+     📌 السبب: المؤقّت جوّه armMarket بيتلخبط مع الـawait ⇒ الحلقات
+     بتتأخر أو بتتلغى ⇒ الصفحة بتفضل «—» بعد ما الشبكة ترجع.
+     📌 ✅ الحل: poller كل ٦ ثواني يجيب التيكر لوحده؛ أول ما يوصل
+     ⇒ يعيد بناء الكارت مرة واحدة ويقف. */
+  /* ⛔ الاستعادة بيتمها مراقب واحد بس (في octa-app.js) — مش هنا،
+     عشان ما يحصلش تنازع بين أكتر من بناء على نفس الكارت. */
   box.innerHTML =
   /* ═══ الترتيب الجديد ═══ */
 

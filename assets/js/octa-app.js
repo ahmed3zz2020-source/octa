@@ -90,11 +90,107 @@ function phaseOf(mk){
 }
 
 /* ══════════ جلب البيانات ══════════ */
+/* ⛔⛔⛔ ٢٧ أكتوبر ٢٠٢٦ — ⭐ إعادة المحاولة (المشكلة: «السيرفر بطيء»)
+   📌 سؤالك: «السيرفر بطيء — ايه السبب؟» ⇒ الجواب: الطلب اتأخر أكتر
+     من ٨ ثواني أو الشبكة اتقطعت (مش السيرفر — هو ردّ في ٠٫١ ثانية).
+   📌 بس المشكلة الحقيقية كانت إن الصفحة بعد كده بتفضل **فاضية**
+     (كل الكروت «—») ومفيش أي محاولة تانية ⇒ المستخدم واقف على صفحة ميتة.
+   📌 ✅ الحل: نعيد المحاولة ٣ مرات بتباعد متزايد (١٫٥ ← ٤ ← ٩ ثواني)
+     والصفحة بتتحدّث لوحدها أول ما الشبكة ترجع. */
+/* ⛔ ٦ محاولات بتباعد متزايد ⇒ ~٩٥ ثانية تغطية (أكتر من أي انقطاع شبكة قصير) */
+const OCTA_RETRY_DELAYS = [1200, 3000, 7000, 12000, 20000, 35000];
+async function fetchRetry(url, opts, tries){
+  const n = Math.max(1, tries || OCTA_RETRY_DELAYS.length + 1);
+  let lastErr = null;
+  for (let i = 0; i < n; i++){
+    try{
+      /* ⛔⛔ مهلة لكل محاولة (٧ ثواني) — من غيرها الطلب المعلّق
+         بيقعد ٢٤ ثانية جوه البروبكاي والصفحة بتفضل ميتة. */
+      let ctrl = null;
+      if (typeof AbortController !== 'undefined'){
+        ctrl = new AbortController();
+        var _to = setTimeout(function(){ try { ctrl.abort(); } catch(e){} }, 7000);
+      }
+      let o2 = Object.assign({}, opts || {});
+      if (ctrl) o2.signal = ctrl.signal;
+      const r = await octaFetch(url, o2);
+      if (ctrl) clearTimeout(_to);
+      if (r && r.ok) { try { octaNetHint(''); } catch(x){} return r; }
+      /* ⛔ ٤٢٩ (طلبات كتير) ⇒ نستنى ونتجرب تاني — مش غلط permanent */
+      if (r && r.status === 429){ lastErr = new Error('طلبات كتير — بنستنى'); }
+      else { lastErr = new Error('HTTP ' + (r ? r.status : '؟')); }
+    }catch(e){ lastErr = e; }
+    if (i < n - 1){
+      const d = OCTA_RETRY_DELAYS[Math.min(i, OCTA_RETRY_DELAYS.length - 1)];
+      try { octaNetHint('⟳ الشبكة بطيئة — بنحاول تاني…'); } catch(x){}
+      await new Promise(function(r){ setTimeout(r, d); });
+    }
+  }
+  throw lastErr || new Error('فشل الاتصال');
+}
+/* ⛔⛔⛔ ٢٧ أكتوبر ٢٠٢٦ — ⭐⭐⭐ منقذ الصفحة الفاضية (آلية واحدة بس)
+   📌 المشكلة: لو الطلبات فشلت (شبكة/سيرفر) ⇒ كروت السوق بتضل «—»
+     ومفيش حاجة ترجّعهاFilled لما الشبكة ترجع ⇒ المستخدم واقف على
+     صفحة ميتة (ده بالظبط اللي شفاه أحمد: «السيرفر بطيء» + كل «—»).
+   📌 ✅ الحل: مراقب واحد كل ٨ ثواني: لو كارت السوق لسه فاضي ⇒
+     أعد بناء ذراع السوق. (آلية واحدة بس — أي آلية تانية بتتنازع
+     معاها وآخر كتابة بتفوز ⇒ الكارت بيرجع فاضي تاني!) */
+if (typeof window !== 'undefined'){
+  setInterval(function () {
+  try {
+  var el = document.querySelector('#armBody .mini-v');
+  if (!el) return;
+  if ((el.innerText || '').trim() !== '—') return;
+  var _now = Date.now();
+  if (window.__octaMktLast && (_now - window.__octaMktLast) < 12000) return;
+  window.__octaMktLast = _now;
+  if (typeof armMarket === 'function') {
+  Promise.resolve(armMarket(document.getElementById('armBody'))).catch(function () { });
+  }
+  } catch (e) { }
+  }, 8000);
+}
+
+/* ⛔⛔ ٢٧ أكتوبر ٢٠٢٦ — ⭐ لما المتصفح يكتشف إن الشبكة رجعت
+   ⇒ نعيد تحميل البيانات فوراً بدل ما تستنى الـtimer (٥ دقايق!). */
+if (typeof window !== 'undefined'){
+  window.addEventListener('online', function(){
+    try { octaNetHint('⟳ الشبكة رجعت — بنحدّث…'); } catch(e){}
+    setTimeout(function(){
+      try { if (typeof load === 'function') load(); } catch(e){}
+    }, 400);
+  });
+}
+
+/* ⛔⛔ عرّضهم على window — octa-pages.js بيحتاج fetchRetry كمان
+   (هو اللي بيجيب بيانات كروت الصفحة الرئيسية). */
+if (typeof window !== 'undefined'){
+  window.fetchRetry = fetchRetry;
+  window.octaNetHint = octaNetHint;
+}
+
+/* ⛔ لوج صغير بيبان فوق الشاشة أثناء إعادة المحاولة (JR3) */
+let _netHintTimer = null;
+function octaNetHint(msg){
+  var el = document.getElementById('octa-nethint');
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'octa-nethint';
+    el.setAttribute('role', 'status');
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+  clearTimeout(_netHintTimer);
+  /* ⛔ الشريط يفضل ظاهر طول وقت إعادة المحاولة (مش ٤ ثواني) */
+  if (msg) _netHintTimer = setTimeout(function(){ el.style.display = 'none'; }, 12000);
+}
+
 async function loadEgypt(){
   const B=OCTA_API, bus='?_='+Date.now();
   const [prices,ticker]=await Promise.all([
-  octaFetch(B+'/api/prices'+bus).then(r=>r.ok?r.json():null).catch(()=>null),
-  octaFetch(B+'/api/ticker'+bus).then(r=>r.ok?r.json():null).catch(()=>null)
+  fetchRetry(B+'/api/prices'+bus).then(r=>r.json()).catch(()=>null),
+  fetchRetry(B+'/api/ticker'+bus).then(r=>r.json()).catch(()=>null)
   ]);
   if(!prices||!prices.egx30) throw new Error('ما قدرتش أوصل لسيرفر السوق المصري');
   const idx=(ticker&&ticker.ticker||[]).find(t=>t.id==='tk-egx');
@@ -153,7 +249,7 @@ async function loadEgypt(){
 async function loadUS(){
   const syms=MARKETS.us.stocks.concat([MARKETS.us.index]);
   const body=JSON.stringify({symbols:{tickers:syms,query:{types:[]}},columns:US_COLS});
-  const r=await fetch(TV_SCAN(),{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body});
+  const r=await fetchRetry(TV_SCAN(),{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body});
   const j=await r.json();
   if(!j.data||!j.data.length) throw new Error('ما قدرتش أوصل لمصدر البيانات الأمريكي');
   const idxRow=j.data.find(d=>d.s===MARKETS.us.index);

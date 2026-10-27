@@ -208,10 +208,16 @@ const GATE_PAGES = ['/', '/index.html', '/chart', '/chart.html'];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/* ⛔⛔ ٢٧ أكتوبر ٢٠٢٦ — مهلة البروبكاي (كانت ٨ ثواني × ٣ = ٢٤ ثانية!)
+   📌 الغرض: لو الـRailway بطيء/ واقع، الطلب يرجع بسرعة والواجهة
+   📌   تعيد المحاولة بنفسها ⇒ المستخدم بيشوف «بنحاول تاني» بدل صفحة ميتة. */
+const PROXY_TIMEOUT_MS = 6000;
+const PROXY_TRIES = 2;
+
 /* 🔁 جلب من الـAPI مع إعادة محاولة — الخطأ البسيط بيتراجع لوحده */
 async function fetchApi(target, init) {
   let lastErr = null;
-  for (let i = 0; i < TRIES; i++) {
+  for (let i = 0; i < PROXY_TRIES; i++) {
     try {
       /* ⛔⛔ ٢٢ أكتوبر ٢٠٢٦ — مهلة ٨ ثواني لكل محاولة.
       ⛌ الباك (Railway) واقع ⇒ الطلب كان بيقعد دقيقة لحد ما
@@ -219,10 +225,16 @@ async function fetchApi(target, init) {
       ⛌ دلوقتي بنقطعه بسرعة ونرجّع 502 — الواجهة بتعرف تتعامل. */
       const o = Object.assign({}, init || {});
       if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
-        o.signal = AbortSignal.timeout(8000);
+        /* ⛔⛔ ٢٧ أكتوبر ٢٠٢٦ — ٨ ثواني × ٣ محاولات = ٢٤ ثانية!
+           📌 الطلب كان بيقعد نص دقيقة والواجهة كانت بتقطع بعد ٨ ثواني
+           ⇒ المستخدم بيشوف «السيرفر بطيء» وصفحة فاضية.
+           📌 ✅ الحل: ٦ ثواني × محاولتين = ~١٢ ثانية كحد أقصى.
+           📌 (المسارات الكبيرة زي /api/gold/history بترد في أقل من ثانيتين
+           📌  من السيرفر — فالمهلة دي أمان مش حدّ للصفحات الكبيرة). */
+        o.signal = AbortSignal.timeout(PROXY_TIMEOUT_MS);
       }
       const r = await fetch(target, o);
-      if (r.status >= 500 && i < TRIES - 1) {
+      if (r.status >= 500 && i < PROXY_TRIES - 1) {
         lastErr = new Error('upstream ' + r.status);
         await sleep(180 * (i + 1));
         continue;
@@ -230,7 +242,7 @@ async function fetchApi(target, init) {
       return r;
     } catch (e) {
       lastErr = e;
-      if (i < TRIES - 1) await sleep(180 * (i + 1));
+      if (i < PROXY_TRIES - 1) await sleep(180 * (i + 1));
     }
   }
   throw lastErr || new Error('api-proxy-failed');
