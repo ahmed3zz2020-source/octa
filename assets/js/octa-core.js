@@ -583,6 +583,9 @@ function octaPageInit(id) {
   /* 🛰️ الرادار الذكي — المسح + كروت المؤشرات + الشارت
      ⛔ الـinit مرتين (فتح الصفحة + بعد البوابة) زي باقي الصفحات. */
   if (id === 'radar' && typeof radarInit === 'function') setTimeout(()=>{ try { radarInit(); } catch(e){ console.warn('radar:', e.message); } }, 180);
+  /* 🧩 «نماذجي» — أنماط الكسر (٢٨ أكتوبر ٢٠٢٦)
+     ⛔ الـinit مرتين (فتح الصفحة + بعد البوابة) — زي باقي الصفحات. */
+  if (id === 'setups' && typeof OCTASetups === 'object') setTimeout(()=>{ try { OCTASetups.load(); } catch(e){ console.warn('setups:', e.message); } }, 180);
   if (id === 'compare') setTimeout(()=>{ if (typeof cmpInit==='function') cmpInit(); }, 150);
   /* 🔴⛔⛔ إصلاح 2026-10-15 — الباج اللي Ahmed صوّره.
      كان: `setTimeout(fzInit, 180)` — يعني بنستنى ١٨٠ مللي ثم نرسم.
@@ -739,7 +742,7 @@ function switchPage(id) {
    📌 رابط مباشر `#/stocks` أو `#/markets` يفتح لوحة الأسواق.
    📌 + URL كامل (octashares.com/markets) — الـworker بيقدّم index.html.
    ⚠️ 'stocks' و 'markets' نقطة واحدة — كلهم بيفتحوا نفس الصفحة. */
-const TOOL_PAGES = ['filter','best','screener','dividends','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms','money','radar','radar-stock','stocks','markets'];
+const TOOL_PAGES = ['filter','best','screener','dividends','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms','money','radar','radar-stock','setups','stocks','markets'];
 /* ══════════════════════════════════════════════════════════════
  *  🧰 شريط الأدوات — 8 أدوات بس، والباتاقي في الـsidebar
  *  ──────────────────────────────────────────────────────────
@@ -761,6 +764,7 @@ const TOOLS = [
   { id:'screener',  i:'🔍', n:'OCTAView',  d:'الفلاتر المباشرة' },
   { id:'money',   i:'💰', n:'Smart Money', d:'قوة الفلوس · ٤ محاور' },
   { id:'radar',   i:'🛰️', n:'الرادار الذكي', d:'مسح السوق · ٤ مؤشرات · مخاطرة' },
+  { id:'setups',  i:'🧩', n:'نماذجي', d:'أنماط كسر مُقاسة بمدخل ووقف وهدف' },
   { id:'dash',      i:'📊', n:'لوحة التحكم', d:'حالة النظام · أفضل ١٠ أسهم · اختبار الضغط' }
 ];
 

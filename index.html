@@ -430,6 +430,7 @@ window.addEventListener('error', function (e) {
 <!-- 💰 Smart Money (22 أكتوبر 2026) — صفحة الفلتر والكروت -->
 <link rel="stylesheet" href="assets/css-money.css?v=202610271657">
 <link rel="stylesheet" href="assets/css-radar.css?v=202610271657">
+<link rel="stylesheet" href="assets/css-setups.css?v=202610281900">
   <!-- 🔒 سياسة الأمان — بتتقرأ وتتركّب من octa-csp.js (report-only) -->
   <meta name="octa-csp-report" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com https://s.tradingview.com https://www.tradingview.com; frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com; form-action 'self'; img-src 'self' data: blob: https://*.tradingview.com https://*.tradingview-widget.com; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' https://s3.tradingview.com; connect-src 'self' https://octa-prices-production-4ccb.up.railway.app https://scanner.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://www.tradingview-widget.com https://*.tradingview.com https://news.google.com https://api.rss2json.com https://foudalens.com https://api.cors.lol; frame-src https://s3.tradingview.com https://www.tradingview.com https://*.tradingview-widget.com https://*.tradingview.com; media-src 'self' blob:; worker-src 'self' blob:">
 </head>
@@ -1821,6 +1822,49 @@ window.addEventListener('error', function (e) {
 
 
 
+  <!-- ══════ صفحة «نماذجي» — أنماط الكسر المُقاسة ══════ -->
+  <div class="page" id="page-setups">
+  <div class="su-wrap">
+
+  <div class="su-top">
+    <div style="flex:1;min-width:230px">
+      <div class="su-title">🧩 نماذجي</div>
+      <div class="su-sub">أنماط كسر مرصودة من محرك OCTA — كل نمط بمدخل ووقف وهدف وعائد/مخاطرة محسوبة على شموع يومية حقيقية.</div>
+      <div class="su-status" id="suStatus"><span class="su-dot"></span> بنجهّز الأنماط…</div>
+    </div>
+    <div class="su-stats">
+      <div class="su-stat a"><span>نمط</span><b id="suTotal">—</b></div>
+      <div class="su-stat"><span>صعودي</span><b id="suUp">—</b></div>
+      <div class="su-stat b"><span>أعلى ع/م</span><b id="suRR">—</b></div>
+      <div class="su-stat"><span>آخر إشارة</span><b id="suWhen">—</b></div>
+    </div>
+  </div>
+
+  <div class="su-tools">
+    <input id="suQ" class="su-in" type="search" placeholder="دوّر بالاسم أو الرمز…" autocomplete="off">
+    <select id="suDir" class="su-sel" aria-label="الاتجاه">
+      <option value="all">الاتجاه: الكل</option>
+      <option value="up">كسر صعودي</option>
+      <option value="down">كسر هبوطي</option>
+    </select>
+    <select id="suRRMin" class="su-sel" aria-label="أقل عائد/مخاطرة">
+      <option value="0">العائد/المخاطرة: أي</option>
+      <option value="1.5">ع/م ≥ ١.٥</option>
+      <option value="2">ع/م ≥ ٢</option>
+      <option value="3">ع/م ≥ ٣</option>
+    </select>
+    <button id="suVol" class="su-chip" type="button">تأكيد الحجم فقط</button>
+    <button id="suRefresh" class="su-chip primary" type="button">⟳ تحديث</button>
+  </div>
+
+  <div id="suBody">
+  <div id="suTableBox"></div>
+  </div>
+
+  </div>
+  </div>
+
+
   <!-- ══════════ 🎯 نافذة قرار اليوم ══════════ -->
   <div id="decideModal" class="dc-modal" onclick="if(event.target===this) closeDecide()">
   <div class="dc-modal-box">
@@ -1893,6 +1937,8 @@ window.addEventListener('error', function (e) {
 <script src="assets/js/octa-radar-ui.js?v=202610271657"></script>
 <script src="assets/js/octa-smartmoney.js?v=202610271657"></script>
 <script src="assets/js/octa-money.js?v=202610271657"></script>
+<!-- 🧩 «نماذجي» — صفحة أنماط الكسر (٢٨ أكتوبر ٢٠٢٦) -->
+<script src="assets/js/octa-setups.js?v=202610281900"></script>
 
 <!-- 🛠️ أدوات المطوّر — بتظهر بالمصادفة ولا ما فيش زرار عادي -->
 <div class="octa-devbar">

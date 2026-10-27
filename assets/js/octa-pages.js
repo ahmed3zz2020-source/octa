@@ -4745,7 +4745,7 @@ function icRows(list, valKey) {
   ════════════════════════════════════════════════════════════ */
 (function killLegacyHome() {
   /* ═══ صفحات الأدوات/الفلاتر — لازم نجيبها من الموت مع المحتوى القديم ═══ */
-  const KEEP = ['filter','best','screener','dividends','compare','calc','academy','bestpick','news','search','engine','arms','markets','stocks','intel','dash','octasearch','verdict','pick','money','radar','radar-stock'];
+  const KEEP = ['filter','best','screener','dividends','compare','calc','academy','bestpick','news','search','engine','arms','markets','stocks','intel','dash','octasearch','verdict','pick','money','radar','radar-stock','setups'];
   function rescueToolPages(old) {
   let host = document.getElementById('toolPagesHost');
   if (!host) {
@@ -4907,7 +4907,7 @@ function openMarketGauge(){
 
   /* ⛔ سلّم القراءة (من نفس حدود الكود: ٤٢ و ٥٨) */
   var bands = [
-    { r:'٠ – ٢٠', t:'خوف شديد', d:'بيع عشوائي وغموض —线和 غير بتبان.' },
+    { r:'٠ – ٢٠', t:'خوف شديد', d:'بيع عشوائي وغموض — خطوط غير بتبان.' },
     { r:'٢١ – ٤٢', t:'الحذر يغلب 🐻', d:'أسهم أكثرها سلبية. (وضعك دلوقتي: '+B.gauge+')' },
     { r:'٤٣ – ٥٧', t:'متردد ⚖️', d:'مفيش اتجاه واضح — القرار فردي.' },
     { r:'٥٨ – ٨٠', t:'شهية مخاطرة أعلى 🐂', d:'أسهم أكثرها إيجابية.' },
