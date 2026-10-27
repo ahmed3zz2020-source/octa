@@ -112,13 +112,13 @@
     var fx = (hist.fx || {});
     var body = '<div class="gsave-hero">' +
       '<div class="gsave-hero-p">' + num(c.gram, 0) + ' <span class="gsave-hero-u">ج.م / جرام عيار ٢٤</span></div>' +
-      '<div class="gsave-hero-d">السلسلة النظرية — ' + esc(dtxt(c.date || '')) +
-      (c.effective_date_cairo ? ' (إقفال ' + esc(dtxt(c.effective_date_cairo)) + ')' : '') + '</div>' +
+      '<div class="gsave-hero-d">السلسلة النظرية — <span dir="ltr">' + dtxt(c.date || '') +
+      (c.effective_date_cairo ? ' (إقفال ' + dtxt(c.effective_date_cairo) + ')' : '') + '</span></div>' +
       '</div>' +
       kv('سعر الدولار', num(c.egp_per_usd, 3) + ' جنيه/دولار',
         fx.symbol ? 'المصدر: ' + esc(fx.symbol) : '') +
       kv('نقاط السلسلة', num(hist.count, 0) + ' نقطة',
-        hist.from ? 'من ' + esc(dtxt(hist.from)) + ' → ' + esc(dtxt(hist.to)) : '') +
+        hist.from ? 'من <span dir="ltr">' + dtxt(hist.from) + ' → ' + dtxt(hist.to) + '</span>' : '') +
       (hist.gaps && hist.gaps.count ?
         kv('فجوات', num(hist.gaps.count, 0) + ' يوم',
           'أيام مفيش فيها سعر صرف — الرسم بيقطع الخط عندها (مفيش داتا متخيّلة)') : '');
