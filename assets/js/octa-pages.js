@@ -308,6 +308,16 @@ function axisColorClass(v) {
 }
 
 async function openIntel(code) {
+  /* ⛔⛔⛔ ٢٧ أكتوبر ٢٠٢٦ — باج UX كبير اتكشّف بالمراجعة:
+     📌 المسار القديم (intelPage) بيعرض التحليل **٦٥,٠٠٠px تحت** الشاشة:
+     📌   السبب: CSS فيه `.page { display:none !important }` ⇒ الـinline
+     📌   `style.display='none'` في openIntel **مابيكسرش** الـ!important
+     📌   ⇒ صفحة الأسهم فضل�� ظاهرة والتحليل اتفتح تحت ٦٥ ألف بكسل.
+     📌 ✅ الحل: نوجّه كل المسارات للصفحة الحديثة (stockPage) — صفحة واحدة.
+     📌   fallback للقديم بس لو openStock فشل. */
+  if (typeof openStock === 'function') {
+    try { await openStock(code); return; } catch (e) { console.warn('openStock fallback', e); }
+  }
   const dashPage = document.getElementById('dashPage');
   if (dashPage) dashPage.style.display = 'none';
   const page = document.getElementById('intelPage');
@@ -353,6 +363,182 @@ function closeIntel() {
   if (active && typeof switchPage === 'function') switchPage(active.dataset.page);
 }
 
+
+/* ══════════════════════════════════════════════════════════════
+   🧭 ٣ أقسام جديدة في مودال السهم (٢٧ أكتوبر ٢٠٢٦)
+   📌 ① «الدرجة موثوقة» ② «قاعدة المستويات» ③ «تنبيه التعارض»
+   📌 الكلام كله متجمّع هنا ⇒ تغيير الكلام = تعديل سطر واحد
+   ⛔ ممنوع: توصية شراء/بيع · «مضمون» · ادعاء دقة · اسم أداة ذكاء
+   ══════════════════════════════════════════════════════════════ */
+const INTEL_COPY = {
+  /* 📌 الكلام ده من ياسر-المحتوى (٢٧ أكتوبر ٢٠٢٦) — file:
+     content/stock_modal_copy.md ⇒ أي تعديل هنا لازم يتحدّث في الملف كمان. */
+  guideTitle: '📊 الدرجة موثوقة — إزاي تقرأ الرقم ده',
+  guideL1: 'الدرجة من 0 إلى 100 هي خلاصة المحاور الستة بعد أوزانها: الأمان، والتحليل الفني، والأساسيات، والسيولة، والأخبار، والمعنويات.',
+  guideL2: 'الدرجة بتقيس قوة السهم دلوقتي من ناحية البيانات — مش احتمال ربحك منه.',
+  guideL3: 'الدرجة لوحدها مش كفاية. اقرأ القرار جنبها: إشارة إيجابية، أو إشارة محايدة، أو إشارة سلبية، أو بيانات غير كافية.',
+  guideL4: 'الدرجة بتتغيّر مع كل تحديث للبيانات، لأن المحاور نفسها بتتغيّر.',
+  guideLimit: '⛔ الدرجة مش توقّع سعر، ومش بتقولك السهم هيرتفع بكرة ولا بكام. مش ضمان ربح. مش نصيحة شراء ولا بيع — القرار قرارك أنت.',
+  ruleTitle: '🎯 قاعدة المستويات — سيناريو مش توصية',
+  ruleIntro: 'الأرقام دي محسوبة من مدى التذبذب الحقيقي للسهم: الدخول عند السعر الحالي، ووقف الخسارة تحت، والهدف فوق.',
+  ruleLimits: '⛔ المستويات دي مش توصية شراء ولا بيع، ومش بتقولك السهم هيوصل الهدف. لو السعر عدّى وقف الخسارة، السيناريو بطل.',
+  ruleLimits2: '⛔ حدود المستويات: دايمًا سيناريو شراء (الوقف تحت والهدف فوق)، ومش سيناريو بيع.',
+  conflictTitle: '⚠️ تنبيه التعارض',
+  conflictLimit: '⛔ حدود التنبيه: التعارض بيحصل لما درجة محور تكون عالية ودرجة محور تاني منخفضة. لما الأمان مش متاح، مفيش تنبيه. التعارض مش حكم على السهم — هو إشعار إن القراءة محتاجة قرارك.'
+};
+
+/* ⚠️ تنبيه التعارض — نص ياسر · ٤ حالات
+   ⛔ «بيانات غير كافية» مش تعارض — وده قرار مش قراءة.
+   ⛔ لو الأمان مش متاح ⇒ مفيش تنبيه (مش نقول «الأمان ضعيف» من غير رقم). */
+function intelConflictNote(score, dec, ax) {
+  if (score == null || !isFinite(score)) return '';
+  const risk = (ax && ax.risk != null) ? Number(ax.risk) : null;
+  const tech = (ax && ax.technical != null) ? Number(ax.technical) : null;
+  const liq  = (ax && ax.liquidity != null) ? Number(ax.liquidity) : null;
+  const cls = octaDecCls(dec);
+  const rows = [];
+  /* ⛔ لازم مصفوفة [نص، شرح] — rows.push(a, b) بتخلي r نص
+     ⛔   و r[0] بيطلع حرف واحد بس ⛔ (ات enferع الكلام كله). */
+  if (score >= 60 && risk != null && risk <= 40) {
+    rows.push(['الدرجة <b>' + score + '</b> عالية، بس الأمان <b>' + risk + '</b> ضعيف.',
+              'القراءة دي مش متناسقة — الغموض كله في المخاطرة مش في الأساس.']);
+  }
+  if (score >= 60 && tech != null && tech <= 40) {
+    rows.push(['الدرجة <b>' + score + '</b> عالية، بس التحليل الفني <b>' + tech + '</b> ضعيف.',
+              'القراءة دي مش متناسقة — قوة الدرجة مش من اتجاه السعر.']);
+  }
+  if (cls === 'sell' && risk != null && risk >= 60) {
+    rows.push(['الدرجة <b>' + score + '</b> منخفضة، بس الأمان <b>' + risk + '</b> مرتفع.',
+              'القراءة دي مش متناسقة — السهم شكله آمن، بس الدرجة مش موافقة عليه. سبب القرار مش المخاطرة — الأساس أو الزخم هو اللي ضعيف.']);
+  }
+  if (cls === 'buy' && liq != null && liq <= 35) {
+    rows.push(['القرار إيجابي، بس السيولة ضعيفة (<b>' + liq + '</b>).',
+              'السهم ضعيف السيولة — الدخول والخروج ممكن يزحلقوا السعر.']);
+  }
+  if (!rows.length) return '';
+  let html = '<div class="si-sect" style="border-right:3px solid var(--red2)">' +
+    '<div class="si-sect-h">' + INTEL_COPY.conflictTitle + '</div>';
+  rows.forEach(function (r) {
+    html += '<p>' + r[0] + '</p><p style="color:var(--muted);font-size:.84rem">' + r[1] + '</p>';
+  });
+  html += '<p class="flt-h-note">' + INTEL_COPY.conflictLimit + '</p></div>';
+  return html;
+}
+
+/* 📖 الدرجة موثوقة — إزاي تقرأ الرقم (نص ياسر) */
+function intelScoreGuide(score, dec) {
+  const cls = octaDecCls(dec);
+  const decTxt = (dec && dec !== '—') ? dec : '—';
+  /* 📌 سطر مقارنة السوق — اختياري: لو المؤشر مش متاح السطر يتشال */
+  let mkt = '';
+  try {
+    const bb = window.__BB;
+    if (bb && bb.gauge != null) {
+      const st = (bb.state === 'bull') ? 'صاعد' : (bb.state === 'bear') ? 'هابط' : 'محايد';
+      mkt = '<p>وللمقارنة: مؤشر السوق العام دلوقتي <b>' + bb.gauge + '</b> من <b>100</b> وحالته ' +
+        st + '. الدرجة بتقيّم السهم لوحده، مش السوق كله.</p>';
+    }
+  } catch (e) { }
+  return '<div class="si-sect">' +
+    '<div class="si-sect-h">' + INTEL_COPY.guideTitle + '</div>' +
+    '<p>' + INTEL_COPY.guideL1 + '</p>' +
+    '<p>' + INTEL_COPY.guideL2 + '</p>' +
+    '<p>' + INTEL_COPY.guideL3 + '</p>' +
+    '<p>' + INTEL_COPY.guideL4 + '</p>' +
+    mkt +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.78rem;margin:10px 0">' +
+    '<span class="si-score dec ' + cls + '" style="padding:6px 12px;border-radius:8px">' + decTxt + '</span>' +
+    (score != null ? '<span style="padding:6px 12px;border-radius:8px;background:var(--slot);color:var(--gold)">النتيجة <b>' + score + '</b>/100</span>' : '') +
+    '</div>' +
+    '<p class="flt-h-note">' + INTEL_COPY.guideLimit + '</p>' +
+    '</div>';
+}
+
+/* 🎯 قاعدة المستويات — بتجيب الشموع وتحسب المستويات بنفس محرك أداة المؤشرات الذكية */
+async function loadIntelRule(code, name, price, lv) {
+  const box = document.getElementById('siRuleBox') || document.getElementById('intelRuleBox');
+  if (!box) return;
+  const SM = window.OCTA_SM;
+  if (!SM || typeof SM.fromCandles !== 'function') { box.innerHTML = ''; return; }
+  let j = null;
+  try {
+    j = await octaFetch(OCTA_API + '/api/candles/' + encodeURIComponent(code) + '?n=320');
+    j = j && j.ok ? await j.json() : null;
+  } catch (e) { j = null; }
+  if (!j || !j.ok || !j.candles || j.candles.length < 25) {
+    try {
+      j = await octaFetch(OCTA_API + '/api/tvcandles?code=' + encodeURIComponent(code) + '&n=320');
+      j = j && j.ok ? await j.json() : null;
+    } catch (e) { j = null; }
+  }
+  if (!j || !j.ok || !j.candles || j.candles.length < 25) {
+    box.innerHTML = '<div class="si-sect">' +
+      '<div class="si-sect-h">' + INTEL_COPY.ruleTitle + '</div>' +
+      '<div style="font-size:.85rem;color:var(--muted);line-height:1.8">' + INTEL_COPY.ruleUnavailable + '</div></div>';
+    return;
+  }
+  /* ⛔ شموع قديمة ⇒ المتوسطات بتبقى مضلّلة */
+  const age = (typeof SM.candleAgeDays === 'function') ? SM.candleAgeDays(j.candles) : null;
+  const maxAge = (typeof SM.MAX_CANDLE_AGE_DAYS === 'function') ? SM.MAX_CANDLE_AGE_DAYS : 10;
+  if (age != null && age > maxAge) {
+    box.innerHTML = '<div class="si-sect">' +
+      '<div class="si-sect-h">' + INTEL_COPY.ruleTitle + '</div>' +
+      '<div style="font-size:.85rem;color:var(--muted);line-height:1.8">⚠️ بيانات السهم دي قديمة (آخر تحديث ' +
+      age + ' يوم) — المستويات مش محسوبة عشان ما تبقاش مضلّلة.</div></div>';
+    return;
+  }
+  const d = SM.fromCandles(j.candles, { code: code, name: name, price: price });
+  if (!d || !d.levels) {
+    box.innerHTML = '<div class="si-sect">' +
+      '<div class="si-sect-h">' + INTEL_COPY.ruleTitle + '</div>' +
+      '<div style="font-size:.85rem;color:var(--muted);line-height:1.8">⚠️ الشموع المتاحة مش كفاية لحساب المستويات (محتاجة ٢٥ شمعة على الأقل).</div></div>';
+    return;
+  }
+  const L = d.levels;
+  const lastT = (j.candles && j.candles.length) ? String(j.candles[j.candles.length - 1].t || '') : '';
+  let html = '<div class="si-sect">' +
+    '<div class="si-sect-h">' + INTEL_COPY.ruleTitle + '</div>' +
+    '<div style="font-size:.85rem;color:var(--muted);line-height:1.8;margin-bottom:10px">' + INTEL_COPY.ruleIntro + '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
+  const cell = function(lbl, val, pct, col) {
+    return '<div style="flex:1 1 30%;min-width:104px;padding:9px 10px;border-radius:10px;background:var(--slot);border:1px solid var(--g-line)">' +
+      '<div style="font-size:.72rem;color:var(--muted)">' + lbl + '</div>' +
+      '<div style="font-size:1rem;font-weight:800;color:' + col + '" dir="ltr">' + val + '</div>' +
+      (pct ? '<div style="font-size:.72rem;color:var(--muted)" dir="ltr">' + pct + '</div>' : '') +
+      '</div>';
+  };
+  html += cell('الدخول (السعر)', Number(L.entry).toFixed(2), null, 'var(--txt)');
+  html += cell('الوقف تحت', Number(L.stop).toFixed(2), (L.stopPct != null ? (L.stopPct > 0 ? '+' : '') + L.stopPct + '%' : ''), 'var(--red2)');
+  html += cell('الهدف', Number(L.target).toFixed(2), (L.targetPct != null ? (L.targetPct > 0 ? '+' : '') + L.targetPct + '%' : ''), 'var(--sec)');
+  html += '</div>';
+  /* 📌 الجملة الأساسية — نص ياسر */
+  html += '<p style="font-size:.88rem;line-height:1.9;color:var(--txt)"><b>لو دخلت فوق ' +
+    Number(L.entry).toFixed(2) + ' ج.م</b>، فالوقف تحت ' + Number(L.stop).toFixed(2) +
+    ' ج.م، والهدف ' + Number(L.target).toFixed(2) + ' ج.م.</p>';
+  /* 📌 أقرب منطقة — لو متاحة؛ غير متاح مش صفر */
+  const sup = (lv && lv['دعم_1'] != null) ? Number(lv['دعم_1']) : null;
+  const res = (lv && lv['مقاومة_1'] != null) ? Number(lv['مقاومة_1']) : null;
+  html += '<p style="font-size:.88rem;line-height:1.9;color:var(--txt)">والمنطقة الأقرب: دعم ' +
+    (sup != null ? '<b>' + sup.toFixed(2) + '</b> ج.م' : 'غير متاح') + '، ومقاومة ' +
+    (res != null ? '<b>' + res.toFixed(2) + '</b> ج.م' : 'غير متاح') + '.</p>';
+  if (L.bearNote) {
+    html += '<p style="font-size:.85rem;color:#ff9800;line-height:1.8;margin:8px 0">' + L.bearNote + '</p>';
+  }
+  html += '<p class="flt-h-note">' + INTEL_COPY.ruleLimits + '</p>';
+  html += '<p style="font-size:.8rem;color:var(--muted);line-height:1.7;margin-top:4px">' + INTEL_COPY.ruleLimits2 + '</p>';
+  /* ⛔ سطر مختلط (عربي + أرقام) بيتلخبط في RTL ⇒ سطور + dir=ltr للأرقام
+     ⛔   وguard على نسبة الـATR (0..100) عشان رقم غريب ما يظهرش. */
+  const _n = j.count || (j.candles ? j.candles.length : 0);
+  const _atrPct = (d.atrPct != null && d.atrPct > 0 && d.atrPct < 100) ? d.atrPct : null;
+  html += '<div style="font-size:.74rem;color:var(--muted);margin-top:8px;line-height:1.9">' +
+    'المؤشرات محسوبة من <span dir="ltr">' + _n + '</span> شمعة يومية حقيقية من startamarkets' +
+    (lastT ? '<br>آخر إغلاق <span dir="ltr">' + lastT + '</span>' : '') +
+    (d.atr != null ? '<br>مدى التذبذب اليومي <span dir="ltr">' + d.atr + '</span>' +
+      (_atrPct != null ? ' (<span dir="ltr">' + _atrPct + '%</span>)' : '') : '') +
+    '</div></div>';
+  box.innerHTML = html;
+}
+
 function renderIntel(d) {
   const ax = d.axes || {};
   /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ الدرجة والقرار من مصدر واحد (OS_DB)
@@ -375,13 +561,16 @@ function renderIntel(d) {
   const W = (CFG.weights && CFG.weights.intel && Object.keys(CFG.weights.intel).length)
   ? CFG.weights.intel : (CFG.engineWeights || {});
   for (const k of Object.keys(AXIS_LABELS)) {
+  /* ⛔ محور وزنه 0 (ملاءمة المحفظة) مستبعد من المحرك ⇒ متعرضش
+     ⛔   (العنوان بيقول «المحاور الستة» والصفوف كانت ٧). */
+  if (!(Number((W[k] || 0)) > 0)) continue;
   const v = ax[k];
   const val = (v === undefined || v === null) ? 0 : Math.round(v);
   axisHtml +=
   '<div class="axis-row-2">' +
   '<span class="axis-name-2">' + AXIS_LABELS[k] + '</span>' +
   '<div class="axis-track-2"><div class="axis-fill-2 ' + axisColorClass(val) + '" style="width:' + val + '%"></div></div>' +
-  '<span class="axis-num-2">' + (v === undefined ? '—' : v) + '</span>' +
+  '<span class="axis-num-2">' + ((v === undefined || v === null) ? '—' : v) + '</span>' +
   '<span class="axis-weight-2">' + (W[k] || 0) + '%</span>' +
   '</div>';
   }
@@ -518,6 +707,8 @@ function renderIntel(d) {
      كان بينادي قبل سطر الـinnerHTML، فكان #stratBox لسه مش موجود
      وrenderStrategies كان يعمل return على طول → التبويبات مش بتظهر. */
   if (typeof renderStrategies === 'function') renderStrategies(d.code);
+  /* 🎯 قاعدة المستويات — بتجيب الشموع وتحسب بنفس محرك أداة المؤشرات الذكية */
+  try { loadIntelRule(d.code, d.name, d.price); } catch (e) { }
 }
 
 
@@ -4072,6 +4263,15 @@ async function dvLoad(){
 function renderStockPage() {
   const { intel, explain, news } = SI_DATA;
   const exRaw = (explain && (explain.explanation || explain)) || {};
+  /* 📌 الدرجة على هذه الصفحة = **المحرك الحي** (/api/intelligence)
+     📌   لأن كل حاجة تانية في الصفحة (المحاور · المساهمات · التفسير)
+     📌   جاية من نفس المصدر — لازم تكون من مصدر واحد.
+     ⛔ قبل كده: octaScore() كانت بتجيب من OS_DB (data_full.json — ملف
+     ⛔   ثابت بتاريخ ٩ أكتوبر) ⇒ الدرجة بتتناقض مع محاور الصفحة نفسها.
+     📌 لو المحرك مالوش درجة ⇒ fallback للجدول مع توضيح. */
+  const SI_SCORE = (intel.final_score != null && isFinite(intel.final_score))
+    ? Math.round(intel.final_score)
+    : (octaScore(SI_CODE, null) ?? '—');
   const ax = intel.axes || {};
   const dec = intel.decision || '—';
   const decCls = octaDecCls(dec);
@@ -4080,6 +4280,9 @@ function renderStockPage() {
   // المحاور
   let axesHtml = '';
   for (const [k, meta] of Object.entries(SI_AXES)) {
+  /* ⛔ محور وزنه 0 (ملاءمة المحفظة) مستبعد من المحرك ⇒ متعرضش */
+  const _w = Number(((CFG.engineWeights || {})[k]) || 0);
+  if (!(_w > 0)) continue;
   const v = ax[k];
   const has = v !== undefined && v !== null;
   const val = has ? Math.round(v) : null;
@@ -4148,7 +4351,7 @@ function renderStockPage() {
 
   <div class="si-scores">
   <div class="si-score final">
-  <div class="sv">${octaScore(code, intel.final_score) ?? '—'}</div>
+  <div class="sv">${SI_SCORE}</div>
   <div class="sl">النتيجة النهائية (من 100)</div>
   </div>
   <div class="si-score conf">
@@ -4170,6 +4373,7 @@ function renderStockPage() {
   <!-- TABS -->
   <div class="si-tabs">
   <button class="si-tab active" onclick="siTab(this,'chart')">📊 الرسم البياني</button>
+  <button class="si-tab" onclick="siTab(this,'levels')">🎯 القاعدة والمستويات</button>
   <button class="si-tab" onclick="siTab(this,'axes')">🎯 المحاور</button>
   <button class="si-tab" onclick="siTab(this,'why')">💡 ليه التقييم كده؟</button>
   <button class="si-tab" onclick="siTab(this,'news')">📰 أخبار السهم ${stockNews.length ? '('+stockNews.length+')' : ''}</button>
@@ -4213,8 +4417,16 @@ function renderStockPage() {
   </div>` : ''}
   </div>
 
+  <!-- PANEL: LEVELS (القاعدة والمستويات) -->
+  <div class="si-panel" id="si-p-levels">
+  <div id="siRuleBox"><div class="si-sect"><div class="si-sect-h">🎯 القاعدة والمستويات</div>
+  <div style="font-size:.86rem;color:var(--muted)">⏳ جاري حساب المستويات من الشموع اليومية…</div></div></div>
+  </div>
+
   <!-- PANEL: WHY -->
   <div class="si-panel" id="si-p-why">
+  ${intelScoreGuide(SI_SCORE, dec)}
+  ${intelConflictNote(SI_SCORE, dec, ax)}
   ${exRaw && exRaw.formula ? `
   <div class="si-sect">
   <div class="si-sect-h">🧮 إزاي اتحسبت النتيجة</div>
@@ -4353,6 +4565,8 @@ function renderStockPage() {
 
   // شارت TradingView
   renderSiChart();
+  /* 🎯 قاعدة المستويات — بتجيب الشموع وتحسب بنفس محرك أداة المؤشرات الذكية */
+  try { loadIntelRule(SI_CODE, intel.name, intel.price, (intel.technical || {}).levels || null); } catch (e) { }
 }
 
 function siTab(btn, name) {
