@@ -511,9 +511,9 @@
       '<div class="usd-note">⚖️ هل حركة الدولار في مصر مرتبطة بقوة الدولار عالميًا، أم بعوامل محلية؟</div>' +
       '<div class="usd-cmp">' +
       '<div class="usd-cmp-col"><span>مؤشر الدولار (DXY)</span><b class="' + sgn(c.dxy.ret) + '">' + pct(c.dxy.ret, 2) + '</b><i>' +
-      num(c.dxy.start, 2) + ' → ' + num(c.dxy.end, 2) + '</i></div>' +
+      '<span class="usd-ltr">' + num(c.dxy.start, 2) + ' → ' + num(c.dxy.end, 2) + '</span></i></div>' +
       '<div class="usd-cmp-col"><span>الدولار/الجنيه</span><b class="' + sgn(c.usdegp.ret) + '">' + pct(c.usdegp.ret, 2) + '</b><i>' +
-      num(c.usdegp.start, 4) + ' → ' + num(c.usdegp.end, 4) + '</i></div>' +
+      '<span class="usd-ltr">' + num(c.usdegp.start, 4) + ' → ' + num(c.usdegp.end, 4) + '</span></i></div>' +
       '</div>' +
       '<div class="usd-kv"><span>الفرق في العائد:</span><b class="' + sgn(c.diff) + '">' + pct(c.diff, 2) + '</b></div>' +
       '<div class="usd-kv"><span>العلاقة في الفترة:</span><b>' + esc(rel) + '</b></div>' +
@@ -634,7 +634,7 @@
       ((sr.resistances || []).length ? sr.resistances.map((z) => zoneRow(z)).join('') : '<div class="usd-sm">مفيش مقاومة محسولة فوق السعر (السعر عند قمة الفترة).</div>') +
       '</div>' +
       '<div class="usd-note">📌 طريقة الحساب: ' + esc(sr.method || '') + '. ' + esc(sr.note || '') +
-      ' البيانات <span class="usd-date">' + esc(t.from || '') + ' → ' + esc(t.to || '') + '</span> (' + (t.bars || 0) + ' شمعة) · المصدر: ' + esc(t.source || '') + '</div>' +
+      ' البيانات <span class="usd-ltr">' + esc(t.from || '') + ' → ' + esc(t.to || '') + '</span> (' + (t.bars || 0) + ' شمعة) · المصدر: ' + esc(t.source || '') + '</div>' +
       '</div>';
   }
 

@@ -633,7 +633,7 @@
           '<div class="ix-phase-t">' + esc(PHASE_LABEL[k] || k) + '</div>' +
           '<div class="ix-phase-d">' + drange(p.start, p.end) + '</div>' +
           '<div class="ix-phase-r ' + signClass(p.return_pct) + '">' + dirIcon(p.return_pct) + ' ' + pct(p.return_pct) + '</div>' +
-          '<div class="ix-phase-x">' + num(p.start_value, 0) + ' → ' + num(p.end_value, 0) +
+          '<div class="ix-phase-x"><span class="ix-date">' + num(p.start_value, 0) + ' → ' + num(p.end_value, 0) + '</span>' +
           ' · أقصى هبوط ' + pct(p.max_drawdown_pct, 1) + ' · ' + num(p.days, 0) + ' يوم</div>' +
           '</div>';
       });

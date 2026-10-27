@@ -79,8 +79,9 @@
   }
 
   /* ⛔ المدى (من → إلى) جوّه نص عربي (RTL) ⇒ السهم بيقلب الترتيب.
-     📌 الحل: كتلة LTR معزولة — زي .ix-date في مودال المؤشرات. */
-  .usd-date { direction: ltr; unicode-bidi: isolate; display: inline-block; white-space: nowrap; }
+     📌 الحل: كتلة LTR معزولة — زي .ix-date في مودال المؤشرات.
+     📌 اسمها usd-ltr (مش date) لأنها بتتستخدم لنطاقات الأرقام كمان. */
+  .usd-ltr { direction: ltr; unicode-bidi: isolate; display: inline-block; white-space: nowrap; }
 
   /* ── الأقسام ── */
   .usd-sec { margin-bottom: 12px; }
