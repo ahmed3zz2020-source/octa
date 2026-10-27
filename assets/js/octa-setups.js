@@ -259,6 +259,7 @@
       '</div>' +
       '<div class="su-mact">' +
       '<button class="su-btn primary" type="button" id="suOpenStock">افتح صفحة السهم</button>' +
+      '<button class="su-btn" type="button" id="suCalc">⚖️ احسب حجم مركزك</button>' +
       '<a class="su-btn" target="_blank" rel="noopener noreferrer" href="https://www.tradingview.com/chart/?symbol=EGX%3A' + encodeURIComponent(it.code) + '">افتح على TradingView</a>' +
       '<button class="su-btn" type="button" id="suClose2">اقفل</button>' +
       '</div>' +
@@ -271,6 +272,18 @@
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
     ov.querySelector('.su-mclose').addEventListener('click', close);
     var c2 = $('suClose2'); if (c2) c2.addEventListener('click', close);
+    var cb = $('suCalc');
+    if (cb) cb.addEventListener('click', function () {
+      close();
+      try {
+        window.OCTA_CALC_PREFILL = {
+          type: 'position',
+          values: { entry: it.entry, stop: it.stop, capital: 100000, risk: 2 }
+        };
+        if (typeof switchPage === 'function') switchPage('calc');
+        if (typeof renderCalc === 'function') renderCalc('position');
+      } catch (e) { }
+    });
     var ob = $('suOpenStock');
     if (ob) ob.addEventListener('click', function () {
       close();
@@ -285,17 +298,12 @@
     return '<div><span>' + esc(k) + '</span><b>' + esc(v) + '</b></div>';
   }
 
-  /* ══════════ الرسم البياني ══════════ */
+  /* ══════════ الرسم البياني (مشترك مع الاستوديو) ══════════ */
   function loadChartLib() {
+    if (window.OCTAChartKit) return window.OCTAChartKit.load();
     if (S.chartLib) return Promise.resolve(S.chartLib);
     if (window.LightweightCharts) { S.chartLib = window.LightweightCharts; return Promise.resolve(S.chartLib); }
-    return new Promise(function (res, rej) {
-      var s = document.createElement('script');
-      s.src = 'assets/js/vendor/lightweight-charts.standalone.production.js';
-      s.onload = function () { S.chartLib = window.LightweightCharts; res(S.chartLib); };
-      s.onerror = function () { rej(new Error('chart lib failed')); };
-      document.head.appendChild(s);
-    });
+    return Promise.reject(new Error('chart kit غير متاح'));
   }
 
   function drawChart(it, box) {
@@ -326,32 +334,14 @@
   }
 
   function mount(box, rows, it) {
-    loadChartLib().then(function (lib) {
-      try {
-        var chart = lib.createChart(box, {
-          layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#8b9eb0', fontSize: 10 },
-          grid: { vertLines: { color: 'rgba(255,255,255,.05)' }, horzLines: { color: 'rgba(255,255,255,.05)' } },
-          rightPriceScale: { borderColor: 'rgba(255,255,255,.12)' },
-          timeScale: { borderColor: 'rgba(255,255,255,.12)', timeVisible: false },
-          height: 300
-        });
-        var cs = chart.addSeries(lib.CandlestickSeries, {
-          upColor: '#22c55e', downColor: '#ef4444',
-          borderUpColor: '#22c55e', borderDownColor: '#ef4444',
-          wickUpColor: '#22c55e', wickDownColor: '#ef4444'
-        });
-        cs.setData(rows);
-        if (it.entry) cs.createPriceLine({ price: it.entry, color: '#d4af37', lineWidth: 1, lineStyle: 2, title: 'دخول' });
-        if (it.stop) cs.createPriceLine({ price: it.stop, color: '#ef4444', lineWidth: 1, lineStyle: 2, title: 'وقف' });
-        if (it.target) cs.createPriceLine({ price: it.target, color: '#22c55e', lineWidth: 1, lineStyle: 2, title: 'هدف' });
-        chart.timeScale().fitContent();
-        window.addEventListener('resize', function () {
-          try { chart.applyOptions({ width: box.clientWidth }); } catch (e) { }
-        });
-      } catch (e) {
-        box.innerHTML = '<div class="su-empty">تعذّر رسم الشارت</div>';
-      }
-    }).catch(function () {
+    var lines = [];
+    if (it.entry) lines.push({ price: it.entry, color: '#d4af37', title: 'دخول' });
+    if (it.stop) lines.push({ price: it.stop, color: '#ef4444', title: 'وقف' });
+    if (it.target) lines.push({ price: it.target, color: '#22c55e', title: 'هدف' });
+    var p = (window.OCTAChartKit)
+      ? window.OCTAChartKit.mount(box, rows, { lines: lines })
+      : loadChartLib().then(function (lib) { return null; });
+    Promise.resolve(p).catch(function () {
       box.innerHTML = '<div class="su-empty">مكتبة الرسم مش متاحة</div>';
     });
   }

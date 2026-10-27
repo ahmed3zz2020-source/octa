@@ -186,3 +186,52 @@
 .su-btn:hover { border-color: var(--gold); color: var(--gold); }
 .su-btn.primary { background: var(--gold); color: var(--pri4); border-color: var(--gold); }
 .su-btn.primary:hover { background: var(--gold2); color: var(--pri4); }
+
+/* ══════════════════════════════════════════════════════════════
+   🎨 الاستوديو — رسومات المستخدم
+   ══════════════════════════════════════════════════════════════ */
+.st-head {
+  font-size: 15px; font-weight: 800; color: var(--gold);
+  margin: 4px 0 8px;
+}
+.st-chart {
+  width: 100%; height: 320px;
+  background: var(--pri2); border: 1px solid var(--line);
+  border-radius: 14px; padding: 6px; margin-bottom: 12px;
+}
+.st-form {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end;
+  background: var(--pri2); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px; margin-bottom: 12px;
+}
+.st-form > div { display: flex; flex-direction: column; gap: 4px; }
+.st-form .st-wide { flex: 1 1 220px; }
+.st-form label { font-size: 11px; color: var(--muted); }
+.st-form input, .st-form select {
+  background: var(--pri3); color: var(--txt);
+  border: 1px solid var(--line2); border-radius: 9px;
+  padding: 8px 10px; font-size: 13px; font-family: inherit; min-height: 38px;
+}
+.st-form input:focus, .st-form select:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+.st-check { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); min-height: 38px; }
+.st-tabs { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.st-item {
+  background: var(--pri2); border: 1px solid var(--line);
+  border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
+}
+.st-item:hover { border-color: var(--goldLine, var(--line)); }
+.st-ih { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.st-ih b { color: var(--txt); font-weight: 800; }
+.st-ih span { color: var(--muted); font-size: 11.5px; }
+.st-pub {
+  font-style: normal; font-size: 10.5px; color: var(--up);
+  background: var(--upSoft); border-radius: 999px; padding: 2px 8px;
+}
+.st-del {
+  margin-inline-start: auto; background: transparent; border: 1px solid var(--line2);
+  color: var(--muted); width: 26px; height: 26px; border-radius: 8px; cursor: pointer; font-size: 13px;
+}
+.st-del:hover { color: var(--dn); border-color: var(--dn); }
+.st-ip { font-size: 13px; color: var(--gold); font-weight: 700; margin-top: 4px; }
+.st-in { font-size: 12.5px; color: var(--txt); line-height: 1.7; margin-top: 3px; }
+.st-id { font-size: 10.5px; color: var(--dim); margin-top: 4px; }

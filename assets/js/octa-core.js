@@ -308,6 +308,28 @@ const CALCS = {
   const sh = Math.floor(ra/rps), cost = sh*v.entry, loss = sh*rps;
   return [{ num: sh, lbl:'عدد الأسهم' },{ num: cost.toFixed(0), lbl:'تكلفة المركز' },{ num: loss.toFixed(0), lbl:'أقصى خسارة' }];
   }
+  },
+  rr: { title:'📐 العائد/المخاطرة (R:R)',
+  fields:[ {id:'entry',label:'سعر الدخول (EGP)',ph:'100'},{id:'stop',label:'وقف الخسارة (EGP)',ph:'95'},{id:'target',label:'السعر المستهدف (EGP)',ph:'110'} ],
+  calc:v => {
+  const risk = Math.abs(v.entry - v.stop), rew = Math.abs(v.target - v.entry);
+  const rr = risk > 0 ? rew / risk : 0;
+  const rp = (risk / v.entry) * 100, tp = (rew / v.entry) * 100;
+  return [{ num: rr.toFixed(2) + ' : 1', lbl:'نسبة العائد للمخاطرة' },
+  { num: rp.toFixed(2) + '%', lbl:'المخاطرة من سعر الدخول' },
+  { num: tp.toFixed(2) + '%', lbl:'العائد من سعر الدخول' },
+  { num: (rr >= 2 ? 'مقبولة' : 'ضعيفة'), lbl:'الحكم (٢:١ هو الحد المبدئي)' }];
+  }
+  },
+  atr: { title:'📏 مستويات ATR',
+  fields:[ {id:'price',label:'سعر السهم (EGP)',ph:'100'},{id:'atr',label:'قيمة ATR (EGP)',ph:'2.5'},{id:'mult',label:'مضاعف ATR',ph:'2'} ],
+  calc:v => {
+  const stop = v.price - 0.5 * v.atr, target = v.price + v.mult * v.atr;
+  return [{ num: stop.toFixed(2), lbl:'وقف مقترح (٠٫٥ ATR)' },
+  { num: target.toFixed(2), lbl:'هدف (' + v.mult + ' ATR)' },
+  { num: ((0.5 * v.atr / v.price) * 100).toFixed(2) + '%', lbl:'المخاطرة %' },
+  { num: ((v.mult * v.atr / v.price) * 100).toFixed(2) + '%', lbl:'العائد %' }];
+  }
   }
 };
 
@@ -586,6 +608,8 @@ function octaPageInit(id) {
   /* 🧩 «نماذجي» — أنماط الكسر (٢٨ أكتوبر ٢٠٢٦)
      ⛔ الـinit مرتين (فتح الصفحة + بعد البوابة) — زي باقي الصفحات. */
   if (id === 'setups' && typeof OCTASetups === 'object') setTimeout(()=>{ try { OCTASetups.load(); } catch(e){ console.warn('setups:', e.message); } }, 180);
+  /* 🎨 الاستوديو — الرسومات (٢٨ أكتوبر ٢٠٢٦) */
+  if (id === 'studio' && typeof OCTAStudio === 'object') setTimeout(()=>{ try { OCTAStudio._test && OCTAStudio._test.renderList(); } catch(e){ console.warn('studio:', e.message); } }, 180);
   if (id === 'compare') setTimeout(()=>{ if (typeof cmpInit==='function') cmpInit(); }, 150);
   /* 🔴⛔⛔ إصلاح 2026-10-15 — الباج اللي Ahmed صوّره.
      كان: `setTimeout(fzInit, 180)` — يعني بنستنى ١٨٠ مللي ثم نرسم.
@@ -742,7 +766,7 @@ function switchPage(id) {
    📌 رابط مباشر `#/stocks` أو `#/markets` يفتح لوحة الأسواق.
    📌 + URL كامل (octashares.com/markets) — الـworker بيقدّم index.html.
    ⚠️ 'stocks' و 'markets' نقطة واحدة — كلهم بيفتحوا نفس الصفحة. */
-const TOOL_PAGES = ['filter','best','screener','dividends','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms','money','radar','radar-stock','setups','stocks','markets'];
+const TOOL_PAGES = ['filter','best','screener','dividends','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms','money','radar','radar-stock','setups','studio','stocks','markets'];
 /* ══════════════════════════════════════════════════════════════
  *  🧰 شريط الأدوات — 8 أدوات بس، والباتاقي في الـsidebar
  *  ──────────────────────────────────────────────────────────
@@ -765,6 +789,7 @@ const TOOLS = [
   { id:'money',   i:'💰', n:'Smart Money', d:'قوة الفلوس · ٤ محاور' },
   { id:'radar',   i:'🛰️', n:'الرادار الذكي', d:'مسح السوق · ٤ مؤشرات · مخاطرة' },
   { id:'setups',  i:'🧩', n:'نماذجي', d:'أنماط كسر مُقاسة بمدخل ووقف وهدف' },
+  { id:'studio',  i:'🎨', n:'الاستوديو', d:'ارسم مستوياتك واحفظ ملاحظاتك' },
   { id:'dash',      i:'📊', n:'لوحة التحكم', d:'حالة النظام · أفضل ١٠ أسهم · اختبار الضغط' }
 ];
 
@@ -2143,6 +2168,9 @@ function updateCompareTVWidgets(stocks) {
   });
 }
 
+/* ⭐ prefill للحاسبة (من «نماذجي» أو أي صفحة) */
+window.OCTA_CALC_PREFILL = null;
+
 function renderCalc(type = 'profit') {
   const c = CALCS[type];
   document.getElementById('calcContainer').innerHTML = `
@@ -2155,6 +2183,19 @@ function renderCalc(type = 'profit') {
   `;
   document.querySelectorAll('.calc-tab').forEach(t => t.classList.remove('active'));
   document.querySelector(`.calc-tab[data-calc="${type}"]`)?.classList.add('active');
+  /* ⛔ لو فيه prefill (نوع + قيم) ⇒ نعبّي الحقول ونحسب على طول */
+  try {
+  const pf = window.OCTA_CALC_PREFILL;
+  if (pf && pf.type === type && pf.values) {
+    c.fields.forEach(f => {
+    const el = document.getElementById('cf-' + f.id);
+    const v = pf.values[f.id];
+    if (el && v !== undefined && v !== null && isFinite(v)) el.value = v;
+    });
+    window.OCTA_CALC_PREFILL = null;
+    try { runCalc(type); } catch (e) { }
+  }
+  } catch (e) { }
 }
 
 function runCalc(type) {

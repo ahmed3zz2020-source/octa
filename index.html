@@ -1018,12 +1018,14 @@ window.addEventListener('error', function (e) {
   <!-- ============ CALC ============ -->
   <div class="page" id="page-calc">
   <h1 class="page-title">🧮 الحاسبات</h1>
-  <p class="page-subtitle">4 حاسبات استثمارية مهمة</p>
+  <p class="page-subtitle">6 حاسبات استثمارية مهمة</p>
   <div class="calc-tabs">
   <button class="calc-tab active" data-calc="profit">💰 الربح</button>
   <button class="calc-tab" data-calc="dividend">💵 التوزيعات</button>
   <button class="calc-tab" data-calc="pe">📊 P/E</button>
   <button class="calc-tab" data-calc="position">⚖️ حجم المركز</button>
+  <button class="calc-tab" data-calc="rr">📐 ع/م</button>
+  <button class="calc-tab" data-calc="atr">📏 ATR</button>
   </div>
   <div class="section" id="calcContainer"></div>
   </div>
@@ -1822,6 +1824,51 @@ window.addEventListener('error', function (e) {
 
 
 
+  <!-- ══════ صفحة الاستوديو — رسومات المستخدم ══════ -->
+  <div class="page" id="page-studio">
+  <div class="su-wrap">
+
+  <div class="su-top">
+    <div style="flex:1;min-width:230px">
+      <div class="su-title">🎨 الاستوديو</div>
+      <div class="su-sub">ارسم مستوياته على أي سهم واحفظها مع ملاحظتك — ترجع لها في أي وقت من غير ما تعيد التحليل.</div>
+      <div class="su-status" id="stStatus"><span class="su-dot"></span> جاهز</div>
+    </div>
+  </div>
+
+  <div class="su-tools">
+    <input id="stSearch" class="su-in" type="search" placeholder="دوّر عن سهم (اسم أو رمز) واعغط Enter…" autocomplete="off">
+    <button id="stClear" class="su-chip" type="button">مسح</button>
+  </div>
+
+  <div class="st-head" id="stTitle">اختار سهم</div>
+  <div class="st-chart" id="stChart"><div class="su-empty">اختار سهم من فوق</div></div>
+
+  <div class="st-form">
+    <div><label>السعر</label><input id="stPrice" type="number" step="0.01" placeholder="122.50" inputmode="decimal"></div>
+    <div><label>النوع</label>
+      <select id="stKind">
+        <option value="level">مستوى</option>
+        <option value="zone">منطقة</option>
+      </select>
+    </div>
+    <div class="st-wide"><label>ملاحظتك</label><input id="stNote" type="text" placeholder="ليه هذا المستوى مهم؟" maxlength="400"></div>
+    <label class="st-check"><input id="stPub" type="checkbox"> شاركها علناً</label>
+    <button id="stSave" class="su-chip primary" type="button">احفظ</button>
+  </div>
+
+  <div class="st-tabs">
+    <button id="stTabMine" class="su-chip on" type="button">رسوماتي</button>
+    <button id="stTabPublic" class="su-chip" type="button">رسومات الناس</button>
+  </div>
+  <div id="stList"></div>
+
+  <div class="su-note">⛔ الرسومات أداة تنظيم — مش توصية شراء أو بيع. القرار قرارك.</div>
+
+  </div>
+  </div>
+
+
   <!-- ══════ صفحة «نماذجي» — أنماط الكسر المُقاسة ══════ -->
   <div class="page" id="page-setups">
   <div class="su-wrap">
@@ -1938,7 +1985,9 @@ window.addEventListener('error', function (e) {
 <script src="assets/js/octa-smartmoney.js?v=202610271657"></script>
 <script src="assets/js/octa-money.js?v=202610271657"></script>
 <!-- 🧩 «نماذجي» — صفحة أنماط الكسر (٢٨ أكتوبر ٢٠٢٦) -->
+<script src="assets/js/octa-chartkit.js?v=202610281900"></script>
 <script src="assets/js/octa-setups.js?v=202610281900"></script>
+<script src="assets/js/octa-studio.js?v=202610281900"></script>
 
 <!-- 🛠️ أدوات المطوّر — بتظهر بالمصادفة ولا ما فيش زرار عادي -->
 <div class="octa-devbar">
