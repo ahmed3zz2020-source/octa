@@ -1359,3 +1359,22 @@ button.ocm-shot:focus-visible { outline: 2px solid var(--gold, #d4af37); outline
   .mg-box { max-width: 100%; border-inline: 0; }
   .mg-band { grid-template-columns: 74px 1fr; }
 }
+
+/* 🧮 خطوات الحساب */
+.mg-steps { display: flex; flex-direction: column; gap: 8px; }
+.mg-step { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--g-line); }
+.mg-step--last { border-bottom: 0; }
+.mg-step-n {
+  width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%;
+  background: var(--goldBg); color: var(--g-gold-t); border: 1px solid var(--goldLine);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .76rem; font-weight: 900;
+}
+.mg-step-b { min-width: 0; flex: 1; }
+.mg-step-f { font-size: .8rem; font-weight: 800; color: var(--txt); }
+.mg-step-m {
+  font-size: .78rem; color: var(--g-gold-t); font-weight: 800;
+  font-variant-numeric: tabular-nums; margin: 3px 0; direction: ltr; text-align: left;
+}
+.mg-step-m b { color: var(--txt); font-size: .95rem; }
+.mg-step-d { font-size: .7rem; color: var(--dim); line-height: 1.6; }
