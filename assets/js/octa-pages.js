@@ -2307,6 +2307,16 @@ async function _armMarketRun(box) {  const [d, tk, rank] = await Promise.all([
   // ⑩ ⚖️ التنبيه التعليمي — متشيلش (نسخة وحدة في شاشة الذراع)
   '';
 
+  /* ⛔⛔ ممنوع onclick inline (CSP) ⇒ ربط كارت المؤشر بـaddEventListener */
+  var _gaugeCard = box.querySelector('[data-gauge-open]');
+  if (_gaugeCard && !_gaugeCard.__wired) {
+    _gaugeCard.__wired = true;
+    _gaugeCard.addEventListener('click', function(){ openMarketGauge(); });
+    _gaugeCard.addEventListener('keydown', function(ev){
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openMarketGauge(); }
+    });
+  }
+
   // الشريط المتحرك + الفترات
   initMarketTicker(gold);
   loadPeriodData('change');
@@ -4844,6 +4854,7 @@ function openMarketGauge(){
   var esc = function(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
   var f1 = function(v){ return (v==null||isNaN(v)) ? '—' : (Math.round(v*10)/10).toLocaleString('en-US',{maximumFractionDigits:1}); };
   var f2 = function(v){ return (v==null||isNaN(v)) ? '—' : (Math.round(v*100)/100).toLocaleString('en-US',{maximumFractionDigits:2}); };
+  var f3 = function(v){ return (v==null||isNaN(v)) ? '—' : (Math.round(v*1000)/1000).toLocaleString('en-US',{maximumFractionDigits:3}); };
   /* ⛔⛔ الإشارات بتتقلب في RTL («29.6%-») ⇒ dir="ltr" إجباري */
   var pct = function(v){
     if (v==null||isNaN(v)) return '—';
@@ -4932,6 +4943,33 @@ function openMarketGauge(){
     '<div class="mg-note">الأسهم غير المتأكدة من بياناتها (' + B.nIns + ') <b>مش محسوبة</b> — والمقام = ' + B.judged + ' سهم (اللي ليهم قرار فقط).</div>' +
     /* ④ السلّم */
     '<div class="mg-sec-h">📏 سلّم القراءة (كل درجة معناها إيه)</div>' + bandHtml +
+    /* ④٫ب الحساب خطوة بخطوة (بالأرقام الحقيقية) */
+    '<div class="mg-sec-h">🧮 الحساب خطوة بخطوة (بأرقام النهارده)</div>' +
+    '<div class="mg-steps">' +
+    '<div class="mg-step"><div class="mg-step-n">١</div><div class="mg-step-b">' +
+      '<div class="mg-step-f">مزاج السوق</div>' +
+      '<div class="mg-step-m">' + B.nPos + '×(+1) + ' + B.nNeu + '×(+0.5) − ' + B.nNeg + '×(1) = ' +
+      (B.sentSum>0?'+':'') + B.sentSum + ' ÷ ' + B.judged + ' = ' + f3(B.sentimentPart) + '</div>' +
+      '<div class="mg-step-d">يعني كل 100 سهم ليهم قرار: ' + B.nNeg + ' سلبي ضد ' + B.nPos +
+      ' إيجابي و' + B.nNeu + ' محايد.</div></div></div>' +
+    '<div class="mg-step"><div class="mg-step-n">٢</div><div class="mg-step-b">' +
+      '<div class="mg-step-f">متوسط نتيجة الأسهم</div>' +
+      '<div class="mg-step-m">(' + f1(B.finalAvg) + ' − 50) ÷ 50 = ' + f3(B.pricePart) + '</div>' +
+      '<div class="mg-step-d">متوسط الدرجة ' + f1(B.finalAvg) + ' من 100 — أقل من نص الدرجة.</div></div></div>' +
+    '<div class="mg-step"><div class="mg-step-n">٣</div><div class="mg-step-b">' +
+      '<div class="mg-step-f">مؤشر الأمان</div>' +
+      '<div class="mg-step-m">(' + f1(B.safetyAvg) + ' − 50) ÷ 50 = ' + f3(B.safetyPart) + '</div>' +
+      '<div class="mg-step-d">الجزء الإيجابي الوحيد — الأمان ' + f1(B.safetyAvg) + ' (فوق 50).</div></div></div>' +
+    '<div class="mg-step"><div class="mg-step-n">٤</div><div class="mg-step-b">' +
+      '<div class="mg-step-f">الخلط بالأوزان</div>' +
+      '<div class="mg-step-m">' + f3(B.sentimentPart) + '×50% + ' + f3(B.pricePart) + '×30% + ' +
+      f3(B.safetyPart) + '×20% = ' + f3(B.composite) + '</div>' +
+      '<div class="mg-step-d">النتيجة نزلت تحت المحايد (٥٠) بـ ' + f1(B.composite*48) + ' نقطة.</div></div></div>' +
+    '<div class="mg-step mg-step--last"><div class="mg-step-n">٥</div><div class="mg-step-b">' +
+      '<div class="mg-step-f">الدرجة النهائية</div>' +
+      '<div class="mg-step-m">50 + (' + f3(B.composite) + ' × 48) = ' + f2(B.gaugeRaw) + ' ⇒ <b>' + B.gauge + '</b></div>' +
+      '<div class="mg-step-d">٥٠ كانت «محايد» · الرقم ' + B.gauge + ' أقل من ٤٢ ⇒ «الحذر يغلب».</div></div></div>' +
+    '</div>' +
     /* ⑤ الحدود */
     '<div class="mg-sec-h">⚠️ حدود المؤشر</div>' +
     '<ul class="mg-ul"><li>الرقم من ٣ أجزاء بس: مزاج · نتيجة · أمان — أي جزء ناقص بيتقدّر بـ٥٠ (محيط).</li>' +
@@ -4989,13 +5027,17 @@ function renderBullBear(dash, ticker) {
   window.__BB = { gauge: gauge, state: state, sentimentPart: sentimentPart,
     pricePart: pricePart, safetyPart: safetyPart, composite: composite,
     nPos: nPos, nNeu: nNeu, nNeg: nNeg, nIns: nIns, judged: judged,
+    bulls: bulls, bears: bears, sentSum: (bulls - bears),
+    finalAvg: (aa.final || 50), safetyAvg: (aa.safety || 50),
+    gaugeRaw: (50 + composite * 48),
     aa: aa, decisions: dec, health: (dash.health || {}) };
   const label = state === 'bull' ? 'صاعد 🐂' : (state === 'bear' ? 'هابط 🐻' : 'محايد ⚖️');
   const sub = state === 'bull' ? 'شهية مخاطرة عالية' : (state === 'bear' ? 'الحذر يغلب' : 'السوق متردد');
 
   const markerPos = ((gauge - 2) / 96 * 100).toFixed(1);
   /* 🐂 ٢٧ أكتوبر ٢٠٢٦ — الكارت بقى قابل للنقر ⇒ مودال يشرح كل حاجة */
-  return `<div class="bb-strip" onclick="openMarketGauge()" style="cursor:pointer" title="اضغط لتفسير الرقم">
+  /* ⛔⛔ ممنوع onclick inline (CSP) ⇒ data-attribute + addEventListener */
+  return `<div class="bb-strip" data-gauge-open="1" role="button" tabindex="0" aria-label="تفسير مؤشر السوق العام" style="cursor:pointer" title="اضغط لتفسير الرقم">
   <div class="bbs-side ${state==='bull'?'bull':(state==='bear'?'bear':'dim')}">
   <div class="bbs-animal">🐻</div><div class="bbs-txt">BEAR</div>
   </div>
