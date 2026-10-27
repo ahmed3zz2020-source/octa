@@ -321,7 +321,7 @@
           grid: { vertLines: { color: 'rgba(255,255,255,.05)' }, horzLines: { color: 'rgba(255,255,255,.05)' } },
           rightPriceScale: { borderColor: 'rgba(255,255,255,.12)' },
           timeScale: { borderColor: 'rgba(255,255,255,.12)', timeVisible: false },
-          height: 260
+          height: Math.max(220, Math.min(340, Math.round(window.innerHeight * 0.34)))
         });
         /* ⛔⛔⛔ الفجوات: الخط لازم **يتقطع** عند الأيام الناقصة — من غير
            كده الرسم بيخترع حركة وهمية. ⇒ بنقسم السلسلة لمقاطع متصلة

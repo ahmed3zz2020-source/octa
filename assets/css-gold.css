@@ -127,20 +127,26 @@ body.light {
 .gopen:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* ═══ ②  المودال — سطح واحد مسطّح ═══ */
+/* 🏦 ٢٧ أكتوبر ٢٠٢٦ — المودال يملأ الشاشة زي «ذكاء المؤشرات» بالظبط
+   (كان كارت عايم في النص — دلوقتي الشاشة كلها) */
 .gmodal {
   position: fixed; inset: 0; z-index: 12000;
-  display: flex; align-items: center; justify-content: center;
-  padding: 14px;
+  display: flex; align-items: stretch; justify-content: center;
+  padding: 0;
+  animation: gFade .18s ease;
 }
+@keyframes gFade { from { opacity: 0; } to { opacity: 1; } }
 .gback { position: absolute; inset: 0; background: var(--g-scrim); backdrop-filter: blur(6px); }
 .gpanel {
   position: relative; z-index: 1;
-  width: min(1120px, 100%);
-  max-height: 94dvh; max-height: 94vh;
+  width: 100%; max-width: 1120px;
+  height: 100%;
+  max-height: 100dvh; max-height: 100vh;
   display: flex; flex-direction: column;
   background: var(--pri2);
-  border: 1px solid var(--goldLine);
-  border-radius: var(--r3);
+  border: 0;
+  border-inline: 1px solid var(--goldLine);
+  border-radius: 0;
   box-shadow: var(--sh3);
   overflow: hidden;
 }
@@ -302,7 +308,7 @@ body.light {
 .gtab:hover { color: var(--txt); }
 .gtab.on { background: var(--goldBg); border-color: var(--goldLine); color: var(--g-gold-t); }
 .gtab:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-.gchart { height: 560px; border-radius: var(--r2); overflow: hidden; border: 1px solid var(--g-line); background: var(--pri2); }
+.gchart { height: clamp(340px, 54vh, 620px); border-radius: var(--r2); overflow: hidden; border: 1px solid var(--g-line); background: var(--pri2); }
 .gchart .tradingview-widget-container { height: 100%; }
 
 /* ═══ ⑨  الفريمات — ٤ أعمدة، صفوف جوّهها شعري بس ═══ */
@@ -1191,4 +1197,14 @@ button.ocm-shot:focus-visible { outline: 2px solid var(--gold, #d4af37); outline
   .gsave-hero-p { font-size: 1.4rem; }
   .gsave-tbl { font-size: .76rem; min-width: 300px; }
   .gtab { padding: 12px 10px; font-size: .88rem; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+  🏦 ٢٧ أكتوبر ٢٠٢٦ — مودال الذهب يملأ الشاشة (زي ذكاء المؤشرات)
+  ══════════════════════════════════════════════════════════════════ */
+@media (max-width: 720px) {
+  .gpanel { border-inline: 0; }
+  .gchart { height: clamp(300px, 46vh, 520px); }
+  .gsave-chart-box { height: clamp(220px, 34vh, 340px); }
 }
