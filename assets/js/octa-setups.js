@@ -85,13 +85,15 @@
   /* ══════════ تحميل ══════════ */
   function load() {
     setStatus('busy', 'بنجيب الأنماط…');
-    getJson('/api/setups', 45000).then(function (res) {
+    /* ⛔ أول طلب بعد النشر ممكن يبني المسح من الصفر ⇒ مهلة طويلة */
+    getJson('/api/setups', 120000).then(function (res) {
       var j = res.json || {};
       S.items = j.items || [];
       S.loaded = true;
       S.locked = false;
       render();
-      setStatus('live', 'اتحمّل · ' + (j.items || []).length + ' نمط');
+      setStatus('live', 'اتحمّل · ' + (j.items || []).length + ' نمط' +
+        (j.stale ? ' · بنحدّث في الخلفية' : ''));
     }).catch(function (err) {
       var st = err && err.status;
       if (st === 403) {
