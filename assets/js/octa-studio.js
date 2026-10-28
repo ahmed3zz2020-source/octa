@@ -90,17 +90,11 @@
     if (st) st.textContent = S.code + ' · ' + nameOf(S.code);
     apiGet('/api/radar/history?list=' + encodeURIComponent(S.code) + '&n=240')
       .then(function (j) {
-        var arr = j.candles || j.data || (j[S.code] || []);
-        var rows = [];
-        for (var i = 0; i < arr.length; i++) {
-          var c = arr[i];
-          var t = c.t || c.time || c.d;
-          if (t == null) continue;
-          rows.push({
-            time: typeof t === 'string' ? t : String(t),
-            open: c.o, high: c.h, low: c.l, close: c.c, volume: c.v
-          });
-        }
+        /* ⛔ الباك بيرجّع الأعمدة (t/o/h/l/c/v) ⇒ التحويل في مكان واحد
+           (octa-chartkit.rowsFromHistory) — كان هنا بيحاول j.candles ⇒ فاضي. */
+        var rows = (window.OCTAChartKit && window.OCTAChartKit.rowsFromHistory)
+          ? window.OCTAChartKit.rowsFromHistory(j, S.code)
+          : [];
         S.rows = rows;
         if (!rows.length) {
           var box0 = $('stChart');

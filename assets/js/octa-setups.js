@@ -21,7 +21,8 @@
     measured: null,
     selected: null,
     subscription: null,
-    chartLib: null
+    chartLib: null,
+    tab: 'chart'
   };
 
   function $(id) { return document.getElementById(id); }
@@ -201,43 +202,123 @@
         kv('عائد/مخاطرة', num(st.rr != null ? st.rr : it.rr, '—')) +
         kv('نسبة التذبذب', ev.atr_pct != null ? Number(ev.atr_pct).toFixed(2) + '%' : '—') +
         kv('تأكيد الحجم', it.volume_confirmed ? 'نعم' : 'لا') +
-        kv('حجم السوق', ev.vol_ratio != null ? '×' + Number(ev.vol_ratio).toFixed(2) : '—');
+        kv('حجم السوق', ev.vol_ratio != null ? '×' + Number(ev.vol_ratio).toFixed(2) : '—') +
+        kv('يوم الكسر', fmtDate(it.detected_at)) +
+        kv('آخر اختبار للمنطقة', fmtDate(ev.last_test));
     }
     drawMainChart(it);
+    /* 📌 الـTradingView بيتحدّث مع السهم المختار */
+    var tbox = $('suTvBox');
+    if (tbox) { tbox.setAttribute('data-loaded', ''); tbox.innerHTML = ''; }
+    if (S.tab === 'tv') showTab('tv');
+  }
+
+  /* 📌 معلومات النمط اللي بنرسمها (كلها من الـAPI) */
+  function patternOf(it) {
+    var ev = (it && it.evidence) || {};
+    var st = (it && it.setup) || {};
+    return {
+      zone_low: (it && it.zone_low != null) ? it.zone_low : null,
+      zone_high: (it && it.zone_high != null) ? it.zone_high : null,
+      detect_at: (it && it.detected_at) || null,
+      age_days: (ev.age_days != null) ? ev.age_days : null,
+      last_test: ev.last_test || null,
+      entry: (st.entry_ref != null) ? st.entry_ref : (it ? it.entry : null),
+      stop: (st.stop != null) ? st.stop : (it ? it.stop : null),
+      target: (st.target != null) ? st.target : (it ? it.target : null)
+    };
+  }
+
+  /* 📌 خطوط السعر (التسميات العربية من الـlibrary ⇒ RTL صحيح) */
+  function priceLines(it) {
+    var st = (it && it.setup) || {};
+    var lines = [];
+    var lvl = (st.level != null) ? st.level : (it ? it.level : null);
+    var ent = (st.entry_ref != null) ? st.entry_ref : (it ? it.entry : null);
+    var stop = (st.stop != null) ? st.stop : (it ? it.stop : null);
+    var tgt = (st.target != null) ? st.target : (it ? it.target : null);
+    if (lvl != null) lines.push({ price: lvl, color: '#a855f7', style: 2, width: 1, title: 'مستوى الكسر' });
+    if (ent != null) lines.push({ price: ent, color: '#d4af37', style: 2, width: 2, title: 'الدخول' });
+    if (stop != null) lines.push({ price: stop, color: '#ef4444', style: 0, width: 2, title: 'الوقف' });
+    if (tgt != null) lines.push({ price: tgt, color: '#22c55e', style: 0, width: 2, title: 'الهدف' });
+    return lines;
+  }
+
+  /* 📌 جلب الشموع + الرسم الاحترافي */
+  function drawPattern(it, box, height) {
+    if (!box || !it) return;
+    var kit = window.OCTAChartKit;
+    if (!kit) { box.innerHTML = '<div class="su-empty">مكتبة الرسم مش متاحة</div>'; return; }
+    getJson('/api/radar/history?list=' + encodeURIComponent(it.code) + '&n=320', 60000)
+      .then(function (res) {
+        var rows = kit.rowsFromHistory(res.json, it.code);
+        if (!rows.length) {
+          box.innerHTML = '<div class="su-empty">مفيش شموع للعرض — الأرقام تحت كاملة</div>';
+          return;
+        }
+        return kit.mountPattern(box, rows, {
+          lines: priceLines(it),
+          volume: true,
+          height: height || 320,
+          pattern: patternOf(it)
+        });
+      })
+      .catch(function () {
+        box.innerHTML = '<div class="su-empty">تعذّر جلب الشموع — الأرقام تحت كاملة</div>';
+      });
+  }
+
+  /* ══════════ تبويب الشارت: رسم النمط / TradingView ══════════
+     📌 شارت TradingView الرسمي (widget) بجوار شارت النمط:
+        الأول للتداول والمراجعة، والتاني للرسم الاحترافي
+        للمنطقة والوقف والهدف (الأرقام الحقيقية من محرك OCTA). */
+  function tvBoxHtml(code) {
+    var kit = window.OCTAChartKit;
+    var sym = encodeURIComponent('EGX:' + String(code || ''));
+    /* ⛔ fallback محلي: لو مكتبة الرسم مش محمّلة ⇒ التبويب يفضل شغال */
+    var url = (kit && kit.tvWidgetUrl) ? kit.tvWidgetUrl(code) :
+      ('https://s.tradingview.com/widgetembed/?frameElementId=octa-tv-' +
+        encodeURIComponent(String(code || 'x')) +
+        '&symbol=' + sym +
+        '&interval=1D&range=180&timezone=Africa%2FCairo' +
+        '&theme=dark&style=1&locale=ar&hide_side_toolbar=0&allow_symbol_change=1' +
+        '&save_image=0&calendar=0&support_host=1');
+    var openUrl = (kit && kit.tvOpenUrl) ? kit.tvOpenUrl(code) :
+      ('https://www.tradingview.com/chart/?symbol=' + sym);
+    return '<div class="su-tvframe">' +
+      '<iframe src="' + esc(url) + '" title="TradingView ' + esc(code) + '" ' +
+      'allowtransparency="true" scrolling="no" frameborder="0" ' +
+      'style="width:100%;height:100%;border:0"></iframe>' +
+      '</div>' +
+      '<div class="su-tvfoot">' +
+      '<a class="su-chip" target="_blank" rel="noopener noreferrer" href="' + esc(openUrl) + '">افتح على TradingView ↗</a>' +
+      '<span class="su-mini">شارت TradingView الرسمي · اليومي</span>' +
+      '</div>';
+  }
+
+  function showTab(which) {
+    S.tab = which === 'tv' ? 'tv' : 'chart';
+    var cbox = $('suChartMain'), tbox = $('suTvBox');
+    var tabs = document.querySelectorAll ? document.querySelectorAll('.su-tab') : [];
+    for (var i = 0; i < tabs.length; i++) {
+      var on = tabs[i].getAttribute('data-tab') === S.tab;
+      tabs[i].classList.toggle('on', on);
+    }
+    if (cbox) cbox.style.display = (S.tab === 'chart') ? '' : 'none';
+    if (tbox) {
+      tbox.style.display = (S.tab === 'tv') ? '' : 'none';
+      if (S.tab === 'tv' && S.selected && !tbox.getAttribute('data-loaded')) {
+        tbox.setAttribute('data-loaded', '1');
+        tbox.innerHTML = tvBoxHtml(S.selected.code);
+      }
+    }
   }
 
   function drawMainChart(it) {
     var box = $('suChartMain');
     if (!box) return;
-    getJson('/api/radar/history?list=' + encodeURIComponent(it.code) + '&n=180', 60000)
-      .then(function (res) {
-        var j = res.json || {};
-        var arr = j.candles || j.data || (j[it.code] || []);
-        var rows = [];
-        for (var i = 0; i < arr.length; i++) {
-          var c = arr[i];
-          var t = c.t || c.time || c.d;
-          if (t == null) continue;
-          rows.push({ time: typeof t === 'string' ? t : String(t),
-                      open: c.o, high: c.h, low: c.l, close: c.c, volume: c.v });
-        }
-        if (!rows.length) { box.innerHTML = '<div class="su-empty">مفيش شموع للعرض</div>'; return; }
-        var st = it.setup || {};
-        var lines = [];
-        if (st.level != null) lines.push({ price: st.level, color: '#a855f7', title: 'مستوى الكسر' });
-        if (st.entry_ref != null) lines.push({ price: st.entry_ref, color: '#d4af37', title: 'دخول' });
-        if (st.stop != null) lines.push({ price: st.stop, color: '#ef4444', title: 'وقف' });
-        if (st.target != null) lines.push({ price: st.target, color: '#22c55e', title: 'هدف' });
-        var p = (window.OCTAChartKit)
-          ? window.OCTAChartKit.mount(box, rows, { lines: lines, volume: true, height: 320 })
-          : Promise.reject(new Error('no kit'));
-        Promise.resolve(p).catch(function () {
-          box.innerHTML = '<div class="su-empty">مكتبة الرسم مش متاحة</div>';
-        });
-      })
-      .catch(function () {
-        box.innerHTML = '<div class="su-empty">تعذّر جلب الشموع</div>';
-      });
+    box.innerHTML = '<div class="su-empty">بنجيب الشموع…</div>';
+    drawPattern(it, box, 320);
   }
 
   function render() {
@@ -305,6 +386,10 @@
     set('suWhen', S.items.length ? fmtDate(S.items[0].detected_at) : '—');
   }
 
+  /* ══════════ كروت الأسهم (بدل الجدول) ══════════
+     📌 السبب: الجدول كان بيحتاج سحب أفقي على الموبايل.
+     📌 الكارت بياخد كل المعلومات: المستوى/الدخول/الوقف/الهدف
+        والعائد/المخاطرة والتذبذب والحجم وتاريخ الكسر والسبب. */
   function renderTable() {
     var box = $('suTableBox');
     if (!box) return;
@@ -316,64 +401,103 @@
         '</div>';
       return;
     }
-    var rows = S.filtered.map(function (it) {
+
+    var cards = S.filtered.map(function (it, idx) {
       var ev = it.evidence || {};
       var st = it.setup || {};
       var dirCls = it.direction === 'up' ? 'up' : 'down';
-      var dirTxt = it.direction === 'up' ? '▲ صعود' : '▼ هبوط';
+      var dirTxt = it.direction === 'up' ? '▲ كسر صعودي' : '▼ كسر هبوطي';
       var lvl = (st.level != null) ? st.level : it.level;
       var ent = (st.entry_ref != null) ? st.entry_ref : it.entry;
       var stop = (st.stop != null) ? st.stop : it.stop;
       var tgt = (st.target != null) ? st.target : it.target;
       var rr = (st.rr != null) ? st.rr : it.rr;
       var badge = (it.measured_fit === false)
-        ? '<span class="su-mini">مش مُقاس</span>' : '';
-      return '<tr tabindex="0" data-code="' + esc(it.code) + '" data-i="' + S.items.indexOf(it) + '">' +
-        '<td class="sticky-c"><b>' + esc(it.code) + '</b><span>' + esc(it.name || '') + '</span></td>' +
-        '<td><span class="su-dir ' + dirCls + '">' + dirTxt + '</span>' + badge + '</td>' +
-        '<td class="num"><b>' + fmtPrice(lvl) + '</b><span class="su-mini">المستوى</span></td>' +
-        '<td class="num">' + fmtPrice(ent) + '</td>' +
-        '<td class="num">' + fmtPrice(stop) + '</td>' +
-        '<td class="num">' + fmtPrice(tgt) + '</td>' +
-        '<td class="num"><b>' + num(rr, '—') + '</b></td>' +
-        '<td class="num">' + (ev.atr_pct != null ? Number(ev.atr_pct).toFixed(1) + '%' : '—') +
-          '<span class="su-mini">' + (ev.vol_ratio != null ? 'حجم ×' + Number(ev.vol_ratio).toFixed(2) : '') + '</span></td>' +
-        '<td class="num">' + fmtDate(it.detected_at) + '</td>' +
-        '</tr>';
+        ? '<span class="su-tag soft">مش مُقاس</span>'
+        : '<span class="su-tag ok">مُقاس</span>';
+      var volTag = it.volume_confirmed
+        ? '<span class="su-tag ok">حجم مؤكد</span>'
+        : '<span class="su-tag soft">بدون تأكيد حجم</span>';
+      var act = (S.selected && S.selected.code === it.code) ? ' sel' : '';
+      return '<article class="su-card' + act + '" data-code="' + esc(it.code) + '" tabindex="0">' +
+        '<div class="su-cardhead">' +
+          '<div class="su-cardid">' +
+            '<b>' + esc(it.code) + '</b>' +
+            '<span class="su-cardname">' + esc(it.name || '') + '</span>' +
+            (it.sector ? '<span class="su-cardsector">' + esc(it.sector) + '</span>' : '') +
+          '</div>' +
+          '<span class="su-dir ' + dirCls + '">' + dirTxt + '</span>' +
+        '</div>' +
+        '<div class="su-cardlevels">' +
+          '<div><span>المستوى</span><b>' + fmtPrice(lvl) + '</b></div>' +
+          '<div><span>الدخول</span><b class="e">' + fmtPrice(ent) + '</b></div>' +
+          '<div><span>الوقف</span><b class="d">' + fmtPrice(stop) + '</b></div>' +
+          '<div><span>الهدف</span><b class="u">' + fmtPrice(tgt) + '</b></div>' +
+        '</div>' +
+        '<div class="su-cardmeta">' +
+          '<span>ع/م <b>' + num(rr, '—') + '</b></span>' +
+          '<span>تذبذب <b>' + (ev.atr_pct != null ? Number(ev.atr_pct).toFixed(1) + '%' : '—') + '</b></span>' +
+          '<span>حجم <b>' + (ev.vol_ratio != null ? '×' + Number(ev.vol_ratio).toFixed(2) : '—') + '</b></span>' +
+          '<span>لمسات <b>' + num(ev.touches, '—') + '</b></span>' +
+          '<span>يوم الكسر <b>' + fmtDate(it.detected_at) + '</b></span>' +
+          (it.days_ago ? '<span>من <b>' + it.days_ago + '</b> يوم</span>' : '') +
+        '</div>' +
+        '<div class="su-cardtags">' + badge + volTag +
+          '<span class="su-tag">' + esc(it.kind || 'BREAKOUT') + '</span>' +
+        '</div>' +
+        '<p class="su-cardwhy">' + esc(it.why || '') + '</p>' +
+        '<div class="su-cardact">' +
+          '<button class="su-chip" type="button" data-act="chart">📈 الشارت</button>' +
+          '<button class="su-chip" type="button" data-act="detail">التفاصيل الكاملة</button>' +
+          '<a class="su-chip" target="_blank" rel="noopener noreferrer" href="' +
+            esc((window.OCTAChartKit && window.OCTAChartKit.tvOpenUrl) ?
+              window.OCTAChartKit.tvOpenUrl(it.code) :
+              ('https://www.tradingview.com/chart/?symbol=EGX%3A' + encodeURIComponent(it.code))) +
+            '">TradingView ↗</a>' +
+        '</div>' +
+      '</article>';
     }).join('');
 
     var first = S.filtered[0];
     if (first && (!S.selected || S.filtered.indexOf(S.selected) < 0)) {
       selectItem(first);
     }
-    box.innerHTML = '<div class="su-tablewrap"><table class="su-table"><thead><tr>' +
-      '<th class="sticky-c">السهم</th><th>الاتجاه</th><th>المستوى</th>' +
-      '<th>الدخول</th><th>الوقف</th><th>الهدف</th>' +
-      '<th>ع/م</th><th>التذبذب</th><th>التاريخ</th>' +
-      '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    box.innerHTML = '<div class="su-cards">' + cards + '</div>' +
       measuredNote() +
       '<div class="su-note">⛔ الأرقام دي من محرك OCTA على شموع يومية حقيقية. ' +
       'مفيش توصية شراء أو بيع — القرار قرارك.</div>';
 
-    var trs = box.querySelectorAll('tbody tr');
-    for (var i = 0; i < trs.length; i++) {
-      (function (tr) {
-        tr.addEventListener('click', function () {
-          var code = tr.getAttribute('data-code');
+    var nodes = box.querySelectorAll('.su-card');
+    for (var i = 0; i < nodes.length; i++) {
+      (function (card) {
+        var code = card.getAttribute('data-code');
+        var pick = function () {
           var it = null;
           for (var q = 0; q < S.filtered.length; q++) {
             if (S.filtered[q].code === code) { it = S.filtered[q]; break; }
           }
           if (it) selectItem(it);
+          return it;
+        };
+        card.addEventListener('click', function (e) {
+          var b = e.target && e.target.getAttribute ? e.target.getAttribute('data-act') : null;
+          if (b === 'detail') { e.stopPropagation(); openDetail(code); return; }
+          if (b === 'chart') { e.stopPropagation(); var it = pick(); if (it) focusPanel(); return; }
+          pick();
         });
-        tr.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            openDetail(tr.getAttribute('data-code'));
-          }
+        card.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(code); }
         });
-      })(trs[i]);
+      })(nodes[i]);
     }
+  }
+
+  /* 📌_scroll للوحة الشارت (الكارت اتضغط) */
+  function focusPanel() {
+    try {
+      var p = $('suPanel');
+      if (p && p.scrollIntoView) p.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) { }
   }
 
   /* ══════════ تفاصيل النمط ══════════ */
@@ -495,29 +619,8 @@
 
   function drawChart(it, box) {
     if (!box) return;
-    getJson('/api/radar/history?list=' + encodeURIComponent(it.code) + '&n=180', 60000)
-      .then(function (res) {
-        var j = res.json || {};
-        var arr = j.candles || j.data || (j[it.code] || []);
-        var rows = [];
-        for (var i = 0; i < arr.length; i++) {
-          var c = arr[i];
-          var t = c.t || c.time || c.d;
-          if (t == null) continue;
-          rows.push({
-            time: typeof t === 'string' ? t : (typeof t === 'number' ? t : String(t)),
-            open: num(c.o, 0), high: num(c.h, 0), low: num(c.l, 0), close: num(c.c, 0)
-          });
-        }
-        if (!rows.length) {
-          box.innerHTML = '<div class="su-empty">مفيش شموع للعرض</div>';
-          return;
-        }
-        mount(box, rows, it);
-      })
-      .catch(function () {
-        box.innerHTML = '<div class="su-empty">تعذّر جلب الشموع — الأرقام فوق كاملة</div>';
-      });
+    box.innerHTML = '<div class="su-empty">بنجيب الشموع…</div>';
+    drawPattern(it, box, 300);
   }
 
   function mount(box, rows, it) {
@@ -553,6 +656,14 @@
     if (d) d.addEventListener('click', function () {
       if (S.selected) openDetail(S.selected.code);
     });
+    var tabs = document.querySelectorAll ? document.querySelectorAll('.su-tab') : [];
+    for (var i = 0; i < tabs.length; i++) {
+      (function (tb) {
+        tb.addEventListener('click', function () {
+          showTab(tb.getAttribute('data-tab'));
+        });
+      })(tabs[i]);
+    }
   }
 
   function init() {
@@ -578,7 +689,11 @@
       openDetail: openDetail,
       lockHTML: lockHTML,
       fmtPrice: fmtPrice,
-      num: num
+      num: num,
+      tvBoxHtml: tvBoxHtml,
+      priceLines: priceLines,
+      patternOf: patternOf,
+      showTab: showTab
     }
   };
 })();

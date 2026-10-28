@@ -123,6 +123,15 @@ function mockApi(payload, status) {
   };
 }
 
+
+/* ═══════════ loader لمكتبة الرسم (اختبار التحويل) ═══════════ */
+function loadKit() {
+  const sb = mkSandbox();
+  const code = fs.readFileSync(path.join(ROOT, 'assets/js/octa-chartkit.js'), 'utf8');
+  vm.runInContext(code, sb.ctx, { filename: 'octa-chartkit.js' });
+  return sb.win.OCTAChartKit;
+}
+
 /* ═══════════ 1) التحمّل ═══════════ */
 test('الواجهة بتتحمّل من غير crash', () => {
   const sb = loadUI();
@@ -140,7 +149,7 @@ test('الجدول بيعرض الأنماط من الـAPI كما هي', async 
   const html = sb.els['suTableBox'].innerHTML;
   assert.ok(html.indexOf('COMI') >= 0, 'الرمز ظاهر');
   assert.ok(html.indexOf('تجاري') >= 0, 'الاسم ظاهر');
-  assert.ok(html.indexOf('▲ صعود') >= 0, 'الاتجاه');
+  assert.ok(html.indexOf('▲ كسر صعودي') >= 0, 'الاتجاه');
   assert.ok(html.indexOf('52.4') >= 0, 'سعر الدخول');
   assert.ok(html.indexOf('50.9') >= 0, 'الوقف');
   assert.ok(html.indexOf('55.4') >= 0, 'الهدف');
@@ -233,4 +242,192 @@ test('تنسيق الأرقام: الأسعار والأرقام الفارغة'
   assert.equal(T.num(null, '—'), '—');
   assert.equal(T.num(undefined, '—'), '—');
   assert.equal(T.num(0, '—'), 0, '⛔ الصفر رقم مش naN');
+});
+
+
+/* ═══════════ 8) كروت الأسهم بدل الجدول ═══════════ */
+test('الجدول اتحول لكروت — مفيش سحب أفقي', async () => {
+  const items = [mkItem({ code: 'COMI', name: 'تجاري' }), mkItem({ code: 'ETEL', name: 'اتصالات' })];
+  const sb = loadUI(mockApi({ ok: true, items: items }));
+  sb.win.OCTASetups.state.items = items;
+  sb.win.OCTASetups.state.loaded = true;
+  sb.win.OCTASetups._test.render();
+  const html = sb.els['suTableBox'].innerHTML;
+  assert.ok(html.indexOf('su-card') >= 0, 'الكارت موجود');
+  assert.ok(html.indexOf('su-cards') >= 0, 'حاوية الكروت');
+  assert.ok(html.indexOf('<table') < 0, 'مفيش جدول');
+  assert.ok(html.indexOf('su-tablewrap') < 0, 'مفيش سحب أفقي');
+  assert.ok(html.indexOf('COMI') >= 0 && html.indexOf('ETEL') >= 0, 'الأسهم كلها');
+});
+
+test('الكارت فيه كل المعلومات (مستويات + ع/م + تذبذب + تاريخ)', async () => {
+  const items = [mkItem({ code: 'COMI', name: 'تجاري' })];
+  const sb = loadUI(mockApi({ ok: true, items: items }));
+  sb.win.OCTASetups.state.items = items;
+  sb.win.OCTASetups.state.loaded = true;
+  sb.win.OCTASetups._test.render();
+  const html = sb.els['suTableBox'].innerHTML;
+  ['المستوى', 'الدخول', 'الوقف', 'الهدف'].forEach(function (k) {
+    assert.ok(html.indexOf(k) >= 0, 'الحقل ' + k);
+  });
+  assert.ok(html.indexOf('ع/م') >= 0, 'العائد/المخاطرة');
+  assert.ok(html.indexOf('تذبذب') >= 0, 'التذبذب');
+  assert.ok(html.indexOf('يوم الكسر') >= 0, 'يوم الكسر');
+  assert.ok(html.indexOf('2026-10-27') >= 0, 'تاريخ الكسر');
+  assert.ok(html.indexOf('لمسات') >= 0, 'لمسات النطاق');
+});
+
+/* ═══════════ 9) تبويب TradingView ═══════════ */
+test('تبويب TradingView بيطلّع iframe بالرمز الصح', async () => {
+  const items = [mkItem({ code: 'COMI' })];
+  const sb = loadUI(mockApi({ ok: true, items: items }));
+  sb.win.OCTASetups.state.items = items;
+  sb.win.OCTASetups.state.loaded = true;
+  sb.win.OCTASetups._test.render();
+  const html = sb.win.OCTASetups._test.tvBoxHtml('COMI');
+  assert.ok(html.indexOf('tradingview.com/widgetembed') >= 0, 'الـwidget');
+  assert.ok(html.indexOf('EGX%3ACOMI') >= 0, 'الرمز EGX:COMI');
+  assert.ok(html.indexOf('tradingview.com/chart') >= 0, 'زرار فتح TradingView');
+});
+
+/* ═══════════ 10) خطوط السعر (رسم النمط) ═══════════ */
+test('خطوط السعر: مستوى ودخول ووقف وهدف', () => {
+  const sb = loadUI();
+  const lines = sb.win.OCTASetups._test.priceLines({
+    code: 'COMI', level: 52.0, entry: 52.4, stop: 50.9, target: 55.4,
+    setup: { level: 52.0, entry_ref: 52.4, stop: 50.9, target: 55.4, rr: 2 }
+  });
+  const titles = lines.map(function (l) { return l.title; }).join('|');
+  assert.ok(titles.indexOf('مستوى الكسر') >= 0, 'المستوى');
+  assert.ok(titles.indexOf('الدخول') >= 0, 'الدخول');
+  assert.ok(titles.indexOf('الوقف') >= 0, 'الوقف');
+  assert.ok(titles.indexOf('الهدف') >= 0, 'الهدف');
+});
+
+/* ═══════════ 11) ⛔ إصلاح باج الشارت الفاضي ═══════════ */
+test('⛔ تحويل الأعمدة (t/o/h/l/c/v) لصفوف — الباج القديم', () => {
+  const sb = loadUI();
+  const kit = loadKit();
+  const json = {
+    cached: true,
+    codes: {
+      COMI: {
+        t: ['2026-10-01', '2026-10-02', '2026-10-05'],
+        o: [10, 11, 12], h: [12, 13, 14], l: [9, 10, 11],
+        c: [11, 12, 13], v: [100, 200, 300]
+      }
+    }
+  };
+  const rows = kit.rowsFromHistory(json, 'COMI');
+  assert.equal(rows.length, 3, '3 صفوف');
+  assert.equal(rows[0].time, '2026-10-01', 'التاريخ');
+  assert.equal(rows[0].close, 11, 'الإغلاق');
+  assert.equal(rows[2].high, 14, 'الأعلى');
+  assert.equal(rows[2].volume, 300, 'الحجم');
+  assert.equal(kit.rowsFromHistory(json, 'NOPE').length, 0, 'رمز مش موجود ⇒ فاضي');
+  assert.equal(kit.rowsFromHistory(null, 'COMI').length, 0, 'مافيش بيانات');
+});
+
+test('⛔ تحويل الشكل القديم (مصفوفة كائنات) لسماوات', () => {
+  const kit = loadKit();
+  const rows = kit.rowsFromHistory(
+    { candles: [{ t: '2026-10-01', o: 1, h: 2, l: 0.5, c: 1.5, v: 9 }] }, 'COMI');
+  assert.equal(rows.length, 1, 'صف واحد');
+  assert.equal(rows[0].close, 1.5, 'الإغلاق');
+});
+
+test('⛔ شموع ناقصة (سعر صفري) بتتتشال — عشان مقياس السعر يفضل صح', () => {
+  const kit = loadKit();
+  const rows = kit.rowsFromHistory({
+    codes: { C: { t: ['2026-10-01', '2026-10-02'], o: [1, 0], h: [2, 0], l: [0.5, 0], c: [1.5, 0], v: [1, 1] } }
+  }, 'C');
+  assert.equal(rows.length, 1, 'اتشالت الشمعة الفاضية');
+});
+
+/* ═══════════ 12) 🎨 الرسم الاحترافي — المسار كامل (canvas stub) ═══════════ */
+test('🎨 mountPattern بيرسم من غير exception (canvas + إحداثيات وهمية)', async () => {
+  const sb = mkSandbox();
+  /* 🖌️ stub للرسم: بنسجّل كل نداء */
+  const calls = { fillRect: 0, moveTo: 0, fill: 0, stroke: 0, setLineDash: 0 };
+  const ctx = new Proxy({}, {
+    get(t, k) {
+      if (k === 'canvas') return { width: 400, height: 300 };
+      if (typeof k === 'string' && k in calls) return function () { calls[k]++; };
+      if (k === 'measureText') return function () { return { width: 10 }; };
+      /* 🖌️ أي دالة تانية ⇒ no-op (زي الـcanvas الحقيقي) */
+      if (typeof k === 'string') return function () { };
+      return undefined;
+    },
+    set(t, k, v) { t[k] = v; return true; }
+  });
+
+  const fakeSeries = {
+    setData() { }, createPriceLine(o) { (fakeSeries.lines = fakeSeries.lines || []).push(o); },
+    priceToCoordinate(p) { return 150 - p; }
+  };
+  const fakeChart = {
+    __octaSeries: fakeSeries,
+    addSeries() { return fakeSeries; },
+    timeScale() {
+      return {
+        fitContent() { },
+        timeToCoordinate(t) { return 10 + String(t).length * 3; },
+        subscribeVisibleLogicalRangeChange(fn) { fakeChart._onRange = fn; }
+      };
+    },
+    priceScale() { return { width: () => 60 }; },
+    subscribeClick() { }
+  };
+
+  sb.win.LightweightCharts = {
+    createChart: () => fakeChart,
+    CandlestickSeries: 'candle',
+    HistogramSeries: 'hist'
+  };
+  sb.win.devicePixelRatio = 2;
+  /* 🖌️ canvas stub */
+  const origCreate = sb.doc.createElement;
+  sb.doc.createElement = function (tag) {
+    const el = origCreate(tag);
+    if (String(tag).toLowerCase() === 'canvas') {
+      el.getContext = () => ctx;
+      el.width = 0; el.height = 0;
+      el.style = {};
+    }
+    return el;
+  };
+  sb.win.innerWidth = 400;
+
+  const code = fs.readFileSync(path.join(ROOT, 'assets/js/octa-chartkit.js'), 'utf8');
+  vm.runInContext(code, sb.ctx, { filename: 'octa-chartkit.js' });
+  const kit = sb.win.OCTAChartKit;
+
+  const rows = kit.rowsFromHistory({
+    codes: {
+      COMI: {
+        t: ['2026-08-01', '2026-09-01', '2026-10-01', '2026-10-14', '2026-10-27'],
+        o: [50, 51, 52, 53, 55], h: [52, 53, 54, 55, 57],
+        l: [49, 50, 51, 52, 54], c: [51, 52, 53, 54, 56], v: [1, 2, 3, 4, 5]
+      }
+    }
+  }, 'COMI');
+
+  const box = makeEl('chartbox');
+  box.clientWidth = 400; box.clientHeight = 320;
+  box.style = {};
+
+  const chart = await kit.mountPattern(box, rows, {
+    lines: [{ price: 52, color: '#a855f7', title: 'مستوى الكسر' }],
+    volume: true, height: 320,
+    pattern: {
+      zone_low: 50, zone_high: 52, detect_at: '2026-10-14', age_days: 77,
+      entry: 53, stop: 49, target: 61
+    }
+  });
+  assert.ok(chart, 'الشارت اتعمل');
+  assert.ok(calls.fillRect >= 3, 'اترسمت المستطيلات (نطاق + عائد + مخاطرة) · ' + calls.fillRect);
+  assert.ok(calls.fill >= 3, 'اترسمت علامات الكسر · ' + calls.fill);
+  assert.ok(calls.moveTo >= 2, 'اترسمت الخطوط');
+  assert.ok(fakeSeries.lines && fakeSeries.lines.length === 1, 'خط السعر اتعمل');
+  assert.equal(fakeSeries.lines[0].title, 'مستوى الكسر', 'التسمية العربية');
 });
