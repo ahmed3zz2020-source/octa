@@ -227,7 +227,7 @@
     var pat = opts.pattern || {};
     return mount(box, rows, opts).then(function (chart) {
       /* ⛔ لو الرسم foursed ⇒ الشارت يفضل شغال، بس نسجّل عشان نعرف */
-      try { return paint(chart, box, rows, pat); }
+      try { return paint(chart, box, rows, pat, opts); }
       catch (e) {
         try { if (window.console) console.warn('[chartkit] تعذّر رسم النمط:', e); } catch (e2) { }
         return chart;
@@ -235,7 +235,7 @@
     });
   }
 
-  function paint(chart, box, rows, pat) {
+  function paint(chart, box, rows, pat, opts) {
     if (!chart || !rows || !rows.length) return chart;
     var cv = document.createElement('canvas');
     cv.className = 'octa-ovl';
@@ -367,6 +367,27 @@
     }
 
     draw();
+    /* ⭐ الـlegend: قائمة المستويات جوّه الشارت (DOM ⇒ تشكيل عربي صح) */
+    try {
+      var lg = (opts || {}).legend;
+      if (lg && lg.length) {
+        var box2 = document.createElement('div');
+        box2.className = 'octa-legend';
+        var html = '';
+        for (var li = 0; li < lg.length; li++) {
+          var it2 = lg[li];
+          if (!it2 || it2.price == null) continue;
+          html += '<div class="lg-row' + (it2.soft ? ' soft' : '') + '">' +
+            '<i style="background:' + (it2.color || '#d4af37') + '"></i>' +
+            '<span>' + (it2.label || '') + '</span>' +
+            '<b dir="ltr">' + it2.price + '</b>' +
+            (it2.tag ? '<u>' + it2.tag + '</u>' : '') +
+            '</div>';
+        }
+        box2.innerHTML = html;
+        box.appendChild(box2);
+      }
+    } catch (e) { }
     try {
       ts.subscribeVisibleLogicalRangeChange(function () { draw(); });
     } catch (e) { }

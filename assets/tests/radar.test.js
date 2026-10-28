@@ -414,7 +414,7 @@ test('حجم ضعيف ⇒ LOW', () => {
 test('السيولة: نسبة turnover من mc ÷ السعر', () => {
   const c = mkCandles({ n: 60, vol: 100000, start: 50 });
   const px = c[c.length - 1].c;
-  /* ١٠٠ ألف سهم متداو�� على ١٠ ملايين سهم ⇒ turnover = ١٪ ⇒ DEEP */
+  /* ١٠٠ ألف سهم متداول على ١٠ ملايين سهم ⇒ turnover = ١٪ ⇒ DEEP */
   const mc = px * 10000000;
   const v = R.volumeEngine(c, R.dataQuality(c), { marketCap: mc, price: px });
   assert.equal(v.liq, R.LIQ.DEEP, 'سيولة عالية — ' + v.liq);

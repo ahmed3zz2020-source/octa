@@ -7145,7 +7145,7 @@ body.light .fz-wx { background: #fffdf7; }
 
 /* ══════════════════════════════════════════════════════════════
    📖 نافذة الشرح (؟) — 16 أكتوبر 2026
-   ⛔слashed: من غير تباين 4.5:1 في الوضعين، ومفيش ��نص أقصر من 44px
+   ⛔слashed: من غير تباين 4.5:1 في الوضعين، ومفيش نص أقصر من 44px
    ══════════════════════════════════════════════════════════════ */
 .octa-why-wrap { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 18px; }
 .octa-why-bg { position: absolute; inset: 0; background: rgba(4,10,18,.72); backdrop-filter: blur(4px); }

@@ -323,7 +323,7 @@ test('نموذج رانيا: ٣ شموع صاعدة مكتملة بتتعرف', 
   assert.ok(r.strength > 0, 'فيه قوة');
 });
 
-test('نموذج رانيا: مفيش نم��ذج ⇒ مفيش ادعاء كاذب', () => {
+test('نموذج رانيا: مفيش نموذج ⇒ مفيش ادعاء كاذب', () => {
   const c = [];
   for (let i = 0; i < 40; i++) c.push({ t: dayIso(59 - i), o: 100, h: 101, l: 99, c: 100, v: 1000 });
   const r = SM.ranaPattern(c);
@@ -337,7 +337,7 @@ test('Order Block: زون شراء/بيع بيتحسب ومش مخترع', () =>
   c.push({ t: 'imp', o: 95.5, h: 108, l: 95.4, c: 107, v: 9000 }); /* اندفاع صاعد */
   const ob = SM.orderBlock(c);
   assert.ok(ob, 'الزون اتحسب');
-  assert.equal(ob.state, 'bull', 'ز��ن شراء');
+  assert.equal(ob.state, 'bull', 'زمن شراء');
   assert.ok(ob.lo >= 94 && ob.hi <= 102, 'نطاق الزون من الشمعة المعاكسة');
 });
 

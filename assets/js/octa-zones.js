@@ -10,6 +10,7 @@
 
   var S = {
     rows: [],
+    allRows: [],
     filtered: [],
     code: '',
     q: '',
@@ -55,11 +56,13 @@
   function load() {
     setStatus('بنحسب خريطة المستويات…', 'busy');
     apiGet('/api/zones', 120000).then(function (j) {
-      S.rows = j.rows || [];
+      S.allRows = j.rows || [];
+      S.egx30 = j.egx30 || [];
       S.loaded = true;
       S.locked = false;
       apply();
-      setStatus('اتحمّل · ' + S.rows.length + ' مستوى', 'live');
+      setStatus('اتحمّل · ' + S.rows.length + ' مستوى' +
+        (S.scope === 'egx30' ? ' (مؤشر EGX30)' : ''), 'live');
     }).catch(function (e) {
       if (e && e.status === 403) {
         S.locked = true; S.loaded = true;
@@ -77,6 +80,16 @@
   }
 
   function apply() {
+    /* ⭐ النطاق: مؤشر EGX30 (الافتراضي) أو كل الأسهم
+       📌 نشتغل على allRows (الخام) ⇒ تبديل النطاق ما بيكسرش. */
+    var src = S.allRows && S.allRows.length ? S.allRows : S.rows;
+    if (S.scope === 'egx30' && S.egx30 && S.egx30.length) {
+      var eg = {};
+      for (var i = 0; i < S.egx30.length; i++) eg[S.egx30[i]] = 1;
+      S.rows = src.filter(function (r) { return eg[r.code]; });
+    } else {
+      S.rows = src.slice();
+    }
     var q = S.q.trim().toLowerCase();
     S.filtered = S.rows.filter(function (r) {
       if (S.kind !== 'all' && r.kind !== S.kind) return false;
@@ -220,6 +233,14 @@
     if (d) d.addEventListener('change', function () { S.maxDist = parseFloat(d.value) || 25; apply(); });
     var r = $('znRefresh');
     if (r) r.addEventListener('click', function () { load(); });
+    var sc = $('znScope');
+    if (sc) sc.addEventListener('click', function () {
+      S.scope = (S.scope === 'egx30') ? 'all' : 'egx30';
+      sc.textContent = (S.scope === 'egx30') ? '📊 مؤشر EGX30' : '🌐 كل الأسهم';
+      S.selected = null;
+      apply();
+      renderTable();
+    });
   }
 
   function init() {

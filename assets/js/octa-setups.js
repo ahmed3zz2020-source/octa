@@ -22,7 +22,9 @@
     selected: null,
     subscription: null,
     chartLib: null,
-    tab: 'chart'
+    tab: 'chart',
+    scope: 'egx30',
+    scopeInfo: null
   };
 
   function $(id) { return document.getElementById(id); }
@@ -90,15 +92,17 @@
   function load() {
     setStatus('busy', 'بنجيب الأنماط…');
     /* ⛔ أول طلب بعد النشر ممكن يبني المسح من الصفر ⇒ مهلة طويلة */
-    getJson('/api/setups', 120000).then(function (res) {
+    getJson('/api/setups?scope=' + encodeURIComponent(S.scope), 120000).then(function (res) {
       var j = res.json || {};
       S.items = j.items || [];
       S.measured = j.measured || null;
+      S.scopeInfo = j;
       S.loaded = true;
       S.locked = false;
       render();
       loadSubscription();
       setStatus('live', 'اتحمّل · ' + (j.items || []).length + ' نمط' +
+        (j.scope_label ? (' · ' + j.scope_label) : '') +
         (j.stale ? ' · بنحدّث في الخلفية' : ''));
     }).catch(function (err) {
       var st = err && err.status;
@@ -252,6 +256,30 @@
     return lines;
   }
 
+  /* ⭐ legend الشارت: قائمة المستويات بألوانها (زي الرسومات الاحترافية) */
+  function legendOf(it) {
+    var st = (it && it.setup) || {};
+    var ev = (it && it.evidence) || {};
+    var out = [];
+    var add = function (label, price, color, tag, soft) {
+      if (price == null || !isFinite(price)) return;
+      out.push({ label: label, price: fmtPrice(price), color: color, tag: tag || '', soft: !!soft });
+    };
+    if (it && it.zone_low != null && it.zone_high != null) {
+      add('نطاق الكسر', it.zone_high, '#a855f7', fmtPrice(it.zone_low) + ' ←', true);
+    }
+    add('مستوى الكسر', st.level != null ? st.level : (it ? it.level : null), '#a855f7', '', true);
+    add('الدخول', st.entry_ref != null ? st.entry_ref : (it ? it.entry : null), '#d4af37', 'مُقاس');
+    add('دخول أعمق', st.entry_deep, '#fbbf24', 'إدارة', true);
+    add('هدف أول', st.target_partial, '#4ade80', 'إدارة', true);
+    add('الهدف', st.target != null ? st.target : (it ? it.target : null), '#22c55e', 'مُقاس');
+    add('الوقف', st.stop != null ? st.stop : (it ? it.stop : null), '#ef4444', 'مُقاس');
+    if (ev.atr_pct != null) {
+      out.push({ label: 'ATR', price: Number(ev.atr_pct).toFixed(2) + '%', color: '#64748b', tag: 'تذبذب', soft: true });
+    }
+    return out;
+  }
+
   /* 📌 جلب الشموع + الرسم الاحترافي */
   function drawPattern(it, box, height) {
     if (!box || !it) return;
@@ -269,6 +297,7 @@
           volume: true,
           height: height || 320,
           focusBars: 90,
+          legend: legendOf(it),
           /* ⭐ المتوسطات المتحركة = السياق الفني (20/50) */
           emas: [
             { period: 20, color: '#38bdf8', title: 'EMA 20' },
@@ -408,11 +437,25 @@
     var box = $('suTableBox');
     if (!box) return;
     if (!S.filtered.length) {
-      box.innerHTML = '<div class="su-empty">' +
+      var scopeNote = '';
+      if (S.scope === 'egx30' && S.scopeInfo && S.scopeInfo.scope_total) {
+        scopeNote = '<div class="su-empty">' +
+          '⛔ مفيش نمط النهاردة داخل **مؤشر EGX30** (' + num(S.scopeInfo.scope_total, '—') +
+          ' نمط في كل الأسهم).' +
+          '<br><button class="su-chip primary" type="button" id="suScopeAll">🌐 شوف كل الأسهم</button></div>';
+      }
+      box.innerHTML = scopeNote || '<div class="su-empty">' +
         (S.items.length
           ? '⛔ مفيش نمط مطابق للفلاتر — جرّب وسّعها.'
           : '⛔ مفيش أنماط دلوقتي. المسح بيحصل مرة في اليوم بعد قفل السوق — جرّب بكرة.') +
         '</div>';
+      var all = box.querySelector('#suScopeAll');
+      if (all) all.addEventListener('click', function () {
+        S.scope = 'all';
+        var sc2 = $('suScope');
+        if (sc2) sc2.textContent = '🌐 كل الأسهم';
+        load();
+      });
       return;
     }
 
@@ -806,6 +849,11 @@
       '<p><b>الطريقة:</b> ' + esc(m.note || '') + '</p>' +
       '<p><b>ضابط المقارنة:</b> كسر «فوق أعلى ٢٠ شمعة» (بدون محرك OCTA) = ' +
       (m.control_benchmark_r > 0 ? '+' : '') + num(m.control_benchmark_r, '—') + 'R ⇒ محرّكنا أحسن.</p>' +
+      (S.scopeInfo && S.scopeInfo.scope_label
+        ? '<p class="su-disclaimer">📊 الأرقام دي محسوبة على **كل الأسهم** (' +
+          num(m.stocks, '—') + ' سهم) — والقائمة المعروضة دلوقتي: **' +
+          esc(S.scopeInfo.scope_label) + '**.</p>'
+        : '') +
       '<p class="su-disclaimer">⛔ كل الأرقام دي محسوبة على صفقات مُنفّذة فعلياً بتكلفة عمولة — ' +
       'مش تقدير. ودي أداة تحليل — مش توصية شراء أو بيع. القرار قرارك.</p>' +
       '</div>';
@@ -858,6 +906,13 @@
     });
     var b = $('suRefresh');
     if (b) b.addEventListener('click', function () { load(); });
+    var sc = $('suScope');
+    if (sc) sc.addEventListener('click', function () {
+      S.scope = (S.scope === 'egx30') ? 'all' : 'egx30';
+      sc.textContent = (S.scope === 'egx30') ? '📊 مؤشر EGX30' : '🌐 كل الأسهم';
+      S.selected = null;
+      load();
+    });
     var d = $('suDetails');
     if (d) d.addEventListener('click', function () {
       if (S.selected) openDetail(S.selected.code);
@@ -895,6 +950,7 @@
       openDetail: openDetail,
       openAnalysis: openAnalysis,
       analysisHTML: analysisHTML,
+      legendOf: legendOf,
       lockHTML: lockHTML,
       fmtPrice: fmtPrice,
       num: num,

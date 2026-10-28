@@ -403,3 +403,31 @@
   .an-grid { grid-template-columns: 1fr; }
   .an-levels { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   ⭐ Legend الشارت — قائمة المستويات (زي الرسومات الاحترافية)
+   ══════════════════════════════════════════════════════════════ */
+.octa-legend {
+  position: absolute; top: 8px; inset-inline-start: 8px; z-index: 5;
+  background: rgba(12,17,23,.86); border: 1px solid rgba(255,255,255,.10);
+  border-radius: 10px; padding: 7px 9px; pointer-events: none;
+  max-width: 62%; min-width: 140px;
+}
+.octa-legend .lg-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 10.5px; line-height: 1.85; white-space: nowrap;
+}
+.octa-legend .lg-row i {
+  width: 9px; height: 3px; border-radius: 2px; flex: 0 0 auto;
+}
+.octa-legend .lg-row span { color: #9fb0c0; }
+.octa-legend .lg-row b { color: #e7eef5; font-weight: 800; margin-inline-start: auto; }
+.octa-legend .lg-row u {
+  text-decoration: none; color: #d4af55; font-size: 9px;
+  border: 1px solid rgba(212,175,55,.35); border-radius: 999px; padding: 0 5px;
+}
+.octa-legend .lg-row.soft u { color: #7c8b99; border-color: rgba(255,255,255,.12); }
+@media (max-width: 520px) {
+  .octa-legend { max-width: 74%; }
+  .octa-legend .lg-row { font-size: 9.5px; }
+}

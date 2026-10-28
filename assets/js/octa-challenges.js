@@ -427,7 +427,7 @@
     if (S.lbStatus === 'hidden') {
       box.innerHTML = '<div class="ch-empty invite">🏆 <b>المتصدرون لسه مافتحوش</b><br>' +
         'لوحة المتصدرين هتفتح بعد ٣ مصوّتين — كن التالت وابدأ السباق.<br>' +
-        '<span class="su-mini">وكل ما ال��لوحة تفتح، هتشوف رتبتك فيها.</span></div>';
+        '<span class="su-mini">وكل ما اللوحة تفتح، هتشوف رتبتك فيها.</span></div>';
       return;
     }
     if (S.lbStatus === 'locked') {

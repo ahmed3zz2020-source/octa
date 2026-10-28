@@ -477,3 +477,47 @@ test('📐 أرقام التحليل كلها من الـAPI (مفيش مختر�
   assert.ok(html.indexOf('undefined') < 0, 'مفيش undefined');
   assert.ok(html.indexOf('NaN') < 0, 'مفيش NaN');
 });
+
+/* ═══════════ 19) ⭐ نطاق مؤشر EGX30 ═══════════ */
+test('⭐ القائمة بتفتح على نطاق EGX30 + بتعرض النطاق من الخادم', () => {
+  const sb = loadUI(mockApi({ ok: true, items: [mkItem({})], scope: 'egx30',
+    scope_label: 'أسهم مؤشر EGX30', scope_count: 1, scope_total: 9,
+    scope_codes: ['COMI', 'EAST'] }));
+  const S = sb.win.OCTASetups.state;
+  S.items = [mkItem({})];
+  S.loaded = true;
+  S.scopeInfo = { scope: 'egx30', scope_label: 'أسهم مؤشر EGX30',
+                  scope_count: 1, scope_total: 9, scope_codes: ['COMI', 'EAST'] };
+  sb.win.OCTASetups._test.render();
+  assert.equal(S.scope, 'egx30', 'النطاق الافتراضي = مؤشر EGX30');
+  assert.ok(S.scopeInfo && S.scopeInfo.scope_label === 'أسهم مؤشر EGX30',
+            'النطاق جاي من الـAPI');
+});
+
+test('⭐ زر النطاق بيبدّل بين EGX30 وكل الأسهم', () => {
+  const sb = loadUI(mockApi({ ok: true, items: [] }));
+  const btn = sb.els['suScope'];
+  assert.ok(btn, 'زرار النطاق موجود');
+  const before = sb.win.OCTASetups.state.scope;
+  btn._l['click'][0]();
+  const after = sb.win.OCTASetups.state.scope;
+  assert.notEqual(before, after, 'النطاق اتبدّل');
+  assert.ok(after === 'all' || after === 'egx30', 'القيمة صح');
+});
+
+test('⭐ الـlegend بيلوّن المستويات (نطاق · دخول · هدف · وقف)', () => {
+  const sb = loadUI(mockApi({ ok: true, items: [] }));
+  const it = mkItem({});
+  it.setup = { level: 52.0, entry_ref: 52.4, stop: 50.9, target: 55.4, rr: 3.2,
+    entry_deep: 51.5, target_partial: 53.9 };
+  it.zone_low = 51.0; it.zone_high = 52.0;
+  const lg = sb.win.OCTASetups._test.legendOf(it);
+  const labels = lg.map(function (x) { return x.label; }).join('|');
+  assert.ok(labels.indexOf('نطاق الكسر') >= 0, 'النطاق');
+  assert.ok(labels.indexOf('الدخول') >= 0, 'الدخول');
+  assert.ok(labels.indexOf('الهدف') >= 0, 'الهدف');
+  assert.ok(labels.indexOf('الوقف') >= 0, 'الوقف');
+  assert.ok(labels.indexOf('دخول أعمق') >= 0, 'دخول أعمق');
+  assert.ok(lg.every(function (x) { return x.price != null && x.price !== 'undefined'; }),
+            'كل صف في الـlegend له سعر');
+});
