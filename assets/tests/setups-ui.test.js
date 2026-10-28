@@ -698,7 +698,10 @@ test('⭐ السكربت ما فيهوش نقاط ناقصة + فيه تنويه
   const sb = loadUI(mockApi({ ok: true, items: [] }));
   const pine = sb.win.OCTASetups._test.pineFor(mkTvItem({}));
   assert.equal(pine.indexOf('...'), -1, 'مفيش ... (قاعدة المشروع)');
-  assert.ok(pine.indexOf('مش توصية شراء أو بيع') >= 0, 'التنويه موجود');
+  assert.ok(pine.indexOf('not a buy/sell recommendation') >= 0, 'التنويه موجود');
+  /* ⛔ السكربت لازم يفضل ASCII: العربي جوّه نص لاتيني بيتلخبط،
+     وبيطلع مربعات على كانفاس TradingView. */
+  assert.equal(/[^\x00-\x7F]/.test(pine), false, 'السكربت ASCII خالص');
 });
 
 test('⭐ «انسخ الأرقام» بيطلع المستويات + التنويه', () => {
@@ -719,4 +722,5 @@ test('⭐ بلوك «نقل لـTradingView» فيه الخطوات والزرا
   assert.ok(html.indexOf('id="suCopyLv"') >= 0, 'زر الأرقام');
   assert.ok(html.indexOf('su-code') >= 0, 'بلوك الكود');
   assert.equal(html.indexOf('...'), -1, 'مفيش ...');
+  assert.ok(html.indexOf('= الدخول') >= 0, 'خريطة أسماء المستويات بالعربي');
 });

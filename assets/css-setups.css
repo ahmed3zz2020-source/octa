@@ -480,6 +480,7 @@
   padding: 10px 12px; margin: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11px; line-height: 1.6; color: var(--txt);
-  overflow-x: auto; max-height: 340px; white-space: pre;
+  overflow-x: auto; max-height: 340px;
+  white-space: pre-wrap; overflow-wrap: anywhere;
   -webkit-overflow-scrolling: touch;
 }

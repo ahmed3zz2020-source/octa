@@ -708,31 +708,35 @@
     };
   }
 
-  /* 🐍 سكربت Pine — يرسم المستويات + شروط الإنذار */
+  /* 🐍 سكربت Pine — يرسم المستويات + شروط الإنذار
+     ⛔ السكربت كله ASCII (إنجليزي) عن قصد:
+     📌   النص العربي جوّه نص لاتيني (dir=ltr) بيتلخبط بترتيب الـbidi،
+     📌   وبيظهر مربعات على كانفاس TradingView لو فيه محارف اتجاه مخفية.
+     📌   ⇒ أسماء المستويات بالإنجليزي، والعربي موجود في الواجهة فوق.
+     📌   (التعليق في الكود بيبقى إنجليزي عادي — مفهوم لكل traders) */
   function pineFor(it) {
     var code = String((it && it.code) || '').replace(/["\n\r]/g, '');
-    var name = String((it && it.name) || code).replace(/["\n\r]/g, '');
     var up = (it && it.direction) === 'up';
     var L = levelSet(it);
     var A = [];
 
     A.push('//@version=6');
-    A.push('indicator("OCTA — مستويات صفقة ' + code + '", overlay=true, max_lines_count=500, max_labels_count=500)');
+    A.push('indicator("OCTA - Setup levels ' + code + '", overlay=true, max_lines_count=500, max_labels_count=500)');
     A.push('');
-    A.push('// ' + name + ' (' + code + ') · ' + (up ? 'كسر صعودي' : 'كسر هبوطي') +
-      ' · كسر بتاريخ ' + fmtDate(it && it.detected_at));
-    A.push('// استخدم السكربت على نفس السهم (EGX:' + code + ') واليوم (1D).');
-    A.push('// المستويات دي وقت التصدير — السعر الحالي من TradingView.');
-    A.push('// أداة تحليل — مش توصية شراء أو بيع. القرار قرارك.');
+    A.push('// ' + code + ' - ' + (up ? 'breakout UP' : 'breakout DOWN') +
+      ' - detected ' + fmtDate(it && it.detected_at));
+    A.push('// Use on the same symbol (EGX:' + code + ') and timeframe (1D).');
+    A.push('// Levels are as of export time - live price comes from TradingView.');
+    A.push('// Analysis tool - not a buy/sell recommendation. Your decision.');
     A.push('');
-    A.push('// ⚙️ المستويات — تقدر تعدّلها من إعدادات المؤشر');
-    if (L.entry != null) A.push('iEntry  = input.float(' + L.entry + ', "الدخول", group="المستويات")');
-    if (L.stop != null) A.push('iStop   = input.float(' + L.stop + ', "الوقف", group="المستويات")');
-    if (L.target != null) A.push('iTarget = input.float(' + L.target + ', "الهدف", group="المستويات")');
-    if (L.brk != null) A.push('iBreak  = input.float(' + L.brk + ', "مستوى الكسر", group="المستويات")');
-    if (L.deep != null) A.push('iDeep   = input.float(' + L.deep + ', "دخول أعمق — إدارة", group="إدارة الصفقة")');
-    if (L.part != null) A.push('iPart   = input.float(' + L.part + ', "هدف أول — إدارة", group="إدارة الصفقة")');
-    A.push('showAdmin = input.bool(true, "اظهر مستويات الإدارة", group="إدارة الصفقة")');
+    A.push('// Levels - you can edit them from the indicator settings');
+    if (L.entry != null) A.push('iEntry  = input.float(' + L.entry + ', "Entry", group="Levels")');
+    if (L.stop != null) A.push('iStop   = input.float(' + L.stop + ', "Stop", group="Levels")');
+    if (L.target != null) A.push('iTarget = input.float(' + L.target + ', "Target", group="Levels")');
+    if (L.brk != null) A.push('iBreak  = input.float(' + L.brk + ', "Break level", group="Levels")');
+    if (L.deep != null) A.push('iDeep   = input.float(' + L.deep + ', "Deeper entry (management)", group="Trade management")');
+    if (L.part != null) A.push('iPart   = input.float(' + L.part + ', "First target (management)", group="Trade management")');
+    A.push('showAdmin = input.bool(true, "Show management levels", group="Trade management")');
     A.push('');
     A.push('if barstate.islast');
     A.push('    x0 = math.max(0, bar_index - 400)');
@@ -746,32 +750,32 @@
         ', format.mintick), style=label.style_label_left, color=' + color + ', textcolor=' + tc + ')');
     };
 
-    if (L.entry != null) draw('iEntry', 'الدخول', 'color.teal', 'color.white', '2', false);
-    if (L.stop != null) draw('iStop', 'الوقف', 'color.red', 'color.white', '2', false);
-    if (L.target != null) draw('iTarget', 'الهدف', 'color.lime', 'color.black', '2', false);
-    if (L.brk != null) draw('iBreak', 'الكسر', 'color.orange', 'color.black', '2', false);
+    if (L.entry != null) draw('iEntry', 'Entry', 'color.teal', 'color.white', '2', false);
+    if (L.stop != null) draw('iStop', 'Stop', 'color.red', 'color.white', '2', false);
+    if (L.target != null) draw('iTarget', 'Target', 'color.lime', 'color.black', '2', false);
+    if (L.brk != null) draw('iBreak', 'Break', 'color.orange', 'color.black', '2', false);
     if (L.deep != null || L.part != null) {
       A.push('    if showAdmin');
-      if (L.deep != null) draw('iDeep', 'دخول أعمق', 'color.new(color.gray, 55)', 'color.white', '1', true, '        ');
-      if (L.part != null) draw('iPart', 'هدف أول', 'color.new(color.gray, 55)', 'color.white', '1', true, '        ');
+      if (L.deep != null) draw('iDeep', 'Deeper entry', 'color.new(color.gray, 55)', 'color.white', '1', true, '        ');
+      if (L.part != null) draw('iPart', 'First target', 'color.new(color.gray, 55)', 'color.white', '1', true, '        ');
     }
 
     A.push('');
-    A.push('// 🔔 شروط الإنذار — من TradingView: Alert → Condition → اختار اسم الشرط ده');
+    A.push('// Alert conditions - in TradingView: Alert -> Condition -> pick the name');
     if (L.target != null) {
       A.push(up
-        ? 'alertcondition(close >= iTarget, title="OCTA: وصل الهدف", message="السهم وصل الهدف (' + code + ')")'
-        : 'alertcondition(close <= iTarget, title="OCTA: وصل الهدف", message="السهم وصل الهدف (' + code + ')")');
+        ? 'alertcondition(close >= iTarget, title="OCTA: Target reached", message="Target reached (' + code + ')")'
+        : 'alertcondition(close <= iTarget, title="OCTA: Target reached", message="Target reached (' + code + ')")');
     }
     if (L.stop != null) {
       A.push(up
-        ? 'alertcondition(close <= iStop, title="OCTA: اتكسر الوقف", message="الوقف اتكسر (' + code + ')")'
-        : 'alertcondition(close >= iStop, title="OCTA: اتكسر الوقف", message="الوقف اتكسر (' + code + ')")');
+        ? 'alertcondition(close <= iStop, title="OCTA: Stop broken", message="Stop was broken (' + code + ')")'
+        : 'alertcondition(close >= iStop, title="OCTA: Stop broken", message="Stop was broken (' + code + ')")');
     }
     if (L.brk != null) {
       A.push(up
-        ? 'alertcondition(close <= iBreak, title="OCTA: رجع تحت الكسر", message="رجع تحت مستوى الكسر (' + code + ')")'
-        : 'alertcondition(close >= iBreak, title="OCTA: رجع فوق الكسر", message="رجع فوق مستوى الكسر (' + code + ')")');
+        ? 'alertcondition(close <= iBreak, title="OCTA: Back inside the zone", message="Price went back inside the zone (' + code + ')")'
+        : 'alertcondition(close >= iBreak, title="OCTA: Back inside the zone", message="Price went back inside the zone (' + code + ')")');
     }
     return A.join('\n');
   }
@@ -845,8 +849,13 @@
       '<button class="su-btn" type="button" id="suCopyLv">📋 انسخ الأرقام</button>' +
       '</div>' +
       '<pre class="su-code" id="suPineBox">' + esc(pineFor(it)) + '</pre>' +
+      '<p class="su-note">🏷️ أسماء المستويات على شart TradingView بالإنجليزي: ' +
+      '<b dir="ltr">Entry</b> = الدخول · <b dir="ltr">Stop</b> = الوقف · ' +
+      '<b dir="ltr">Target</b> = الهدف · <b dir="ltr">Break</b> = مستوى الكسر · ' +
+      '<b dir="ltr">Deeper entry</b> = دخول أعمق · <b dir="ltr">First target</b> = هدف أول. ' +
+      '(الإنجليزي عادي في كود TradingView عشان ميتلخبطش الترتيب ولا تظهر مربعات على الشارت.)</p>' +
       '<p class="su-note">🔔 الإنذار (من على الكمبيوتر): افتح إعدادات الـAlert في TradingView → Condition → ' +
-      'اختار «OCTA: وصل الهدف» أو «OCTA: اتكسر الوقف» — والحكم على السعر الحي بتاع TradingView، مش على سعرك في الموقع.</p>' +
+      'اختار «OCTA: Target reached» أو «OCTA: Stop broken» — والحكم على السعر الحي بتاع TradingView، مش على سعرك في الموقع.</p>' +
       '<p class="su-note">⛔ المستويات دي وقت تصدير السكربت (' + fmtDate(it && it.detected_at) +
       ') — والسعر بيتحرك مع السوق. أداة تحليل — مش توصية شراء أو بيع. القرار قرارك.</p>';
   }
