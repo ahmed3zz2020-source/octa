@@ -103,7 +103,8 @@
         S.locked = true;
         S.loaded = true;
         render();
-        note('الباقة مقفولة — التفعيل من الأدمن', 'err');
+        loadMeta();
+        note('الباقة مقفولة — كلّم الدعم للتفعيل', 'err');
       } else if (st === 401) {
         S.loaded = true;
         render();
@@ -112,6 +113,17 @@
         note('تعذّر تحميل الأنماط — جرّب تاني', 'err');
       }
     });
+  }
+
+  /* ══════════ البيانات الوصفية (متاحة لكل مسجّل) ══════════ */
+  function loadMeta() {
+    getJson('/api/setups/meta', 20000).then(function (res) {
+      var j = res.json || {};
+      if (j.measured) {
+        S.measured = j.measured;
+        if (S.locked) render();
+      }
+    }).catch(function () { });
   }
 
   /* ══════════ الفلترة ══════════ */
@@ -213,6 +225,19 @@
   }
 
   function lockHTML() {
+    var m = S.measured;
+    var stats = '';
+    if (m) {
+      var pct = function (v) { return (v == null) ? '—' : (Math.round(v * 1000) / 10) + '%'; };
+      var ci = (m.ci95 && m.ci95.length === 2)
+        ? (m.ci95[0] > 0 ? '+' : '') + m.ci95[0] + ' .. ' + (m.ci95[1] > 0 ? '+' : '') + m.ci95[1] : '—';
+      stats = '<div class="su-mgrid">' +
+        '<div><span>إشارات مُقاسة</span><b>' + num(m.signals, '—') + '</b></div>' +
+        '<div><span>نسبة النجاح</span><b>' + pct(m.hit_rate) + '</b></div>' +
+        '<div><span>R لكل صفقة</span><b>' + (m.r_per_trade > 0 ? '+' : '') + num(m.r_per_trade, '—') + '</b></div>' +
+        '<div><span>٩٥٪ ثقة</span><b>' + ci + '</b></div>' +
+        '</div>';
+    }
     return '<div class="su-lock">' +
       '<h3>🧩 باقة «نماذجي» — ٣٥٠ جنيه/شهر</h3>' +
       '<p>النماذج دي <b>مقيسة على ٦ سنين</b> من البورصة المصرية (٣١٥٣ إشارة · ١٨٦ سهم) ' +
@@ -224,7 +249,11 @@
       '• <b>إنذار تيليجرام</b> كل يوم بعد القفل<br>' +
       '• <b>مش توصية</b> — المعلومة أداة، والقرار قرارك' +
       '</div>' +
-      '<p>الباقة غير مفعّلة على حسابك دلوقتي. لو محتاجها، كلّم الدعم وهي تتفعّل في ثواني.</p>' +
+      '<p style="margin-top:10px"><b>وده اللي هتاخده بالأرقام المقاسة (مش وعود):</b></p>' +
+      '</div>' + stats +
+      '<p style="margin-top:12px">الباقة غير مفعّلة على حسابك دلوقتي. ' +
+      'لو محتاجها، كلّم الدعم وهي تتفعّل في ثواني — ' +
+      '<b>٣٥٠ جنيه/شهر</b> (أو باقة سنوية بخصم).</p>' +
       '</div>';
   }
 
