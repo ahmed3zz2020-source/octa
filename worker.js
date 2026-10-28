@@ -346,7 +346,12 @@ async function assetsFresh(env, request) {
   📌 (والـgate.html بيتخدم من المسار التاني في الـworker — شوف فوق) */
   let bust = _url.pathname;
   if (bust === '/' || bust === '') bust = '/index.html';
-  bust = bust + (_url.search || '');
+  /* ⛔⛔⛔ ٢٩ أكتوبر ٢٠٢٦ — ⛔⛔⛔ شيل الـquery من مسار الـasset!
+  📌 السبب: `/?clean=1` ⇒ bust = '/index.html?clean=1' ⇒ الـAssets
+  📌   بترجّع 404 فاضي ⇒ المتصفح بيشوف صفحة بيضا (نص لا شيء).
+  📌 ✅ الحل: المسار من غير query — والـworker بيحط no-store على
+  📌   كل الردود ⇒ الكاش مش مشكلة أصلاً. */
+  /* bust = bust + (_url.search || ''); */
   try {
   /* ════════════════════════════════════════════════════════════════
   ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ عنوان مطلق (مش نسبي) — إصلاح 404 فاضي
@@ -419,7 +424,6 @@ export default {
         const cu = new URL(request.url);
         if (cu.searchParams.get('clean') === '1') {
           const ct = h.get('Content-Type') || '';
-          if (ct.indexOf('text/html') !== -1) h.set('Clear-Site-Data', '"*"');
         }
       } catch (e) { }
       return new Response(res.body, { status: res.status, headers: h });
@@ -1095,7 +1099,6 @@ async function handle(request, env, ctx) {
         if (gate && gate.status < 400) {
           const h = new Headers(gate.headers);
           h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-          if (DO_CLEAN) h.set('Clear-Site-Data', '"*"');
           return new Response(gate.body, { status: 200, headers: h });
         }
       } catch (e) { }
@@ -1205,7 +1208,6 @@ async function handle(request, env, ctx) {
       if (!request.headers.get('X-OCTA-Cleared-' + WANT)) h.set('Clear-Site-Data', '"cache"');
       } catch (e) { }
       /* 🧹 رابط التنظيف (?clean=1) ⇒ مسح كل حاجة للموقع */
-      if (DO_CLEAN) h.set('Clear-Site-Data', '"*"');
       return new Response(res.body, { status: res.status, headers: h });
     }
     if (/\.(js|mjs|css)$/.test(url.pathname)) {

@@ -61,7 +61,12 @@
       try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
       log('تم مسح بيانات الجلسة');
 
-      log('خلاص — افتح OCTA من الرابط تحت');
+      log('خلاص — بنفتح OCTA من جديد');
+      /* 📌 إعادة تحميل كاملة برابط جديد (برابط جديد) عشان مفيش كاش قديم */
+      try { sessionStorage.setItem('octa_cleaned', '1'); } catch (e) { }
+      setTimeout(function () {
+        try { location.replace('/?r=' + Date.now()); } catch (e) { location.reload(); }
+      }, 900);
     } catch (e) {
       log('في مشكلة: ' + (e && e.message ? e.message : e));
     }
