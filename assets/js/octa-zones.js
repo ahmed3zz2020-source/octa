@@ -111,32 +111,55 @@
       box.innerHTML = '<div class="su-empty">⛔ مفيش مستويات مطابقة للفلاتر.</div>';
       return;
     }
-    var rows = S.filtered.map(function (r) {
+    /* 🗂️ كروت بدل جدول — مفيش سحب أفقي على الموبايل */
+    var cards = S.filtered.map(function (r) {
       var up = r.kind === 'resistance';
-      return '<tr tabindex="0" data-code="' + esc(r.code) + '">' +
-        '<td class="sticky-c"><b>' + esc(r.code) + '</b><span>' + esc(r.name || '') + '</span></td>' +
-        '<td><span class="su-dir ' + (up ? 'dn' : 'up') + '">' + (up ? '▼ مقاومة' : '▲ دعم') + '</span></td>' +
-        '<td class="num"><b>' + fmtPrice(r.level) + '</b></td>' +
-        '<td class="num">' + fmtPrice(r.price) + '</td>' +
-        '<td class="num">' + (r.distance_pct > 0 ? '+' : '') + num(r.distance_pct, '—') + '%' +
-          '<span class="su-mini">' + num(r.distance_atr, '—') + ' ATR</span></td>' +
-        '<td class="num">' + num(r.touches, '—') + '<span class="su-mini">آخر ' + esc(r.last_test || '—') + '</span></td>' +
-        '<td class="num">' + num(r.score, '—') + '</td>' +
-        '<td class="num">' + (r.atr_pct != null ? num(r.atr_pct, '—') + '%' : '—') + '</td>' +
-        '</tr>';
+      var act = (S.selected && S.selected.code === r.code) ? ' sel' : '';
+      return '<article class="su-card' + act + '" data-code="' + esc(r.code) + '" tabindex="0">' +
+        '<div class="su-cardhead">' +
+          '<div class="su-cardid"><b>' + esc(r.code) + '</b>' +
+          '<span class="su-cardname">' + esc(r.name || '') + '</span></div>' +
+          '<span class="su-dir ' + (up ? 'dn' : 'up') + '">' + (up ? '▼ مقاومة' : '▲ دعم') + '</span>' +
+        '</div>' +
+        '<div class="su-cardlevels">' +
+          '<div><span>المستوى</span><b class="' + (up ? 'd' : 'u') + '">' + fmtPrice(r.level) + '</b></div>' +
+          '<div><span>السعر</span><b>' + fmtPrice(r.price) + '</b></div>' +
+          '<div><span>البُعد</span><b>' + (r.distance_pct > 0 ? '+' : '') + num(r.distance_pct, '—') + '%</b></div>' +
+          '<div><span>بـATR</span><b>' + num(r.distance_atr, '—') + '</b></div>' +
+        '</div>' +
+        '<div class="su-cardmeta">' +
+          '<span>لمسات <b>' + num(r.touches, '—') + '</b></span>' +
+          '<span>آخر اختبار <b>' + esc(r.last_test || '—') + '</b></span>' +
+          '<span>قوة المنطقة <b>' + num(r.score, '—') + '</b></span>' +
+          '<span>تذبذب <b>' + (r.atr_pct != null ? num(r.atr_pct, '—') + '%' : '—') + '</b></span>' +
+        '</div>' +
+        '<div class="su-cardact">' +
+          '<button class="su-chip" type="button" data-act="chart">📈 الشارت</button>' +
+          '<a class="su-chip" target="_blank" rel="noopener noreferrer" href="' +
+            esc((window.OCTAChartKit && window.OCTAChartKit.tvOpenUrl) ?
+              window.OCTAChartKit.tvOpenUrl(r.code) :
+              ('https://www.tradingview.com/chart/?symbol=EGX%3A' + encodeURIComponent(r.code))) +
+            '">TradingView ↗</a>' +
+        '</div>' +
+      '</article>';
     }).join('');
-    box.innerHTML = '<div class="su-tablewrap"><table class="su-table"><thead><tr>' +
-      '<th class="sticky-c">السهم</th><th>النوع</th><th>المستوى</th><th>السعر</th>' +
-      '<th>البُعد</th><th>لمسات</th><th>قوة المنطقة</th><th>التذبذب</th>' +
-      '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    box.innerHTML = '<div class="su-cards">' + cards + '</div>' +
       '<div class="su-note">⛔ المستويات محسوبة من الشموع اليومية بمحرّك OCTA. ' +
       'مفيش توصية شراء أو بيع — أداة مراقبة.</div>';
 
-    var trs = box.querySelectorAll('tbody tr');
-    for (var i = 0; i < trs.length; i++) {
-      (function (tr) {
-        tr.addEventListener('click', function () { select(tr.getAttribute('data-code')); });
-      })(trs[i]);
+    var nodes = box.querySelectorAll('.su-card');
+    for (var i = 0; i < nodes.length; i++) {
+      (function (card) {
+        card.addEventListener('click', function () {
+          select(card.getAttribute('data-code'));
+        });
+        card.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            select(card.getAttribute('data-code'));
+          }
+        });
+      })(nodes[i]);
     }
     if (!S.selected && S.filtered.length) select(S.filtered[0].code);
   }

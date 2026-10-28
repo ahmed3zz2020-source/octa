@@ -127,3 +127,18 @@ test('فلتر النوع والبُعد والبحث', () => {
   sb.win.OCTAZones._test.apply();
   assert.equal(S.filtered.length, 1, 'فلتر البحث');
 });
+
+test('🗂️ كروت بدل جدول — مفيش سحب أفقي', () => {
+  const sb = loadUI();
+  const S = sb.win.OCTAZones.state;
+  S.rows = [mkRow({}), mkRow({ code: 'ETEL', kind: 'support', level: 120, distance_pct: -2.1 })];
+  S.loaded = true;
+  sb.win.OCTAZones._test.apply();
+  sb.win.OCTAZones._test.renderTable();
+  const html = sb.els['znTableBox'].innerHTML;
+  assert.ok(html.indexOf('su-card') >= 0, 'الكارت موجود');
+  assert.ok(html.indexOf('su-cards') >= 0, 'حاوية الكروت');
+  assert.ok(html.indexOf('<table') < 0, 'مفيش جدول');
+  assert.ok(html.indexOf('su-tablewrap') < 0, 'مفيش سحب أفقي');
+  assert.ok(html.indexOf('TradingView') >= 0, 'زرار TradingView');
+});
