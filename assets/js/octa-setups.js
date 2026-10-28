@@ -237,10 +237,18 @@
     var ent = (st.entry_ref != null) ? st.entry_ref : (it ? it.entry : null);
     var stop = (st.stop != null) ? st.stop : (it ? it.stop : null);
     var tgt = (st.target != null) ? st.target : (it ? it.target : null);
+    /* ⭐ الإعداد المُقاس (٥٨٪ / +0.43R) — بخطوط عريضة */
     if (lvl != null) lines.push({ price: lvl, color: '#a855f7', style: 2, width: 1, title: 'مستوى الكسر' });
     if (ent != null) lines.push({ price: ent, color: '#d4af37', style: 2, width: 2, title: 'الدخول' });
     if (stop != null) lines.push({ price: stop, color: '#ef4444', style: 0, width: 2, title: 'الوقف' });
     if (tgt != null) lines.push({ price: tgt, color: '#22c55e', style: 0, width: 2, title: 'الهدف' });
+    /* 📌 إدارة الصفقة (مش جزء من القياس — لازم الواجهة توضّح) */
+    if (st.entry_deep != null && st.entry_deep !== ent) {
+      lines.push({ price: st.entry_deep, color: '#fbbf24', style: 2, width: 1, title: 'دخول أعمق' });
+    }
+    if (st.target_partial != null && st.target_partial !== tgt) {
+      lines.push({ price: st.target_partial, color: '#4ade80', style: 2, width: 1, title: 'هدف أول' });
+    }
     return lines;
   }
 
@@ -261,6 +269,11 @@
           volume: true,
           height: height || 320,
           focusBars: 90,
+          /* ⭐ المتوسطات المتحركة = السياق الفني (20/50) */
+          emas: [
+            { period: 20, color: '#38bdf8', title: 'EMA 20' },
+            { period: 50, color: '#a78bfa', title: 'EMA 50' }
+          ],
           pattern: patternOf(it)
         });
       })
@@ -448,6 +461,7 @@
         '</div>' +
         '<p class="su-cardwhy">' + esc(it.why || '') + '</p>' +
         '<div class="su-cardact">' +
+          '<button class="su-chip primary" type="button" data-act="analysis">📐 التحليل الكامل</button>' +
           '<button class="su-chip" type="button" data-act="chart">📈 الشارت</button>' +
           '<button class="su-chip" type="button" data-act="detail">التفاصيل الكاملة</button>' +
           '<a class="su-chip" target="_blank" rel="noopener noreferrer" href="' +
@@ -484,6 +498,7 @@
           var b = e.target && e.target.getAttribute ? e.target.getAttribute('data-act') : null;
           if (b === 'detail') { e.stopPropagation(); openDetail(code); return; }
           if (b === 'chart') { e.stopPropagation(); var it = pick(); if (it) focusPanel(); return; }
+          if (b === 'analysis') { e.stopPropagation(); var ia = pick(); if (ia) openAnalysis(ia); return; }
           pick();
         });
         card.addEventListener('keydown', function (e) {
@@ -499,6 +514,196 @@
       var p = $('suPanel');
       if (p && p.scrollIntoView) p.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) { }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     📐 التحليل الفني الكامل — «الصورة كاملة» قدام المستخدم
+     ══════════════════════════════════════════════════════════════
+     📌 كل رقم هنا من الـAPI (evidence/setup) — مافيش رقم مخترع.
+     📌 الأرقام اللي مش جزء من الإعداد المُقاس لازم تتعلّم بوضوح.
+     */
+  function analysisHTML(it) {
+    var ev = (it && it.evidence) || {};
+    var st = (it && it.setup) || {};
+    var lvl = (st.level != null) ? st.level : (it ? it.level : null);
+    var ent = (st.entry_ref != null) ? st.entry_ref : (it ? it.entry : null);
+    var stop = (st.stop != null) ? st.stop : (it ? it.stop : null);
+    var tgt = (st.target != null) ? st.target : (it ? it.target : null);
+    var rr = (st.rr != null) ? st.rr : (it ? it.rr : null);
+    var rows = [];
+    var push = function (k, v, hint) {
+      rows.push('<div class="an-row"><span>' + esc(k) + '</span><b dir="ltr">' + esc(v) + '</b>' +
+        (hint ? '<i>' + esc(hint) + '</i>' : '') + '</div>');
+    };
+
+    /* 📐 البنية */
+    push('البنية', ev.structure_label || '—', 'نطاق عرضي قبل الكسر');
+    if (it && it.zone_low != null && it.zone_high != null) {
+      push('النطاق', fmtPrice(it.zone_low) + ' ← ' + fmtPrice(it.zone_high),
+        'الحد اللي كسره السعر');
+    }
+    push('لمسات النطاق', num(ev.touches, '—') + ' · ردود ' + num(ev.reactions, '—'),
+      'قوة المنطقة');
+    push('آخر اختبار', fmtDate(ev.last_test),
+      'من ' + num(ev.age_days, '—') + ' يوم');
+    push('قوة النطاق', num(ev.zone_score, '—'), 'مجموع الدرجات');
+
+    /* 📊 الحركة */
+    if (it && it.confirmed) {
+      push('التأكيد', '٣ إغلاقات فوق ' + fmtPrice(lvl),
+        '+' + num(ev.close_beyond_pct, '—') + '% فوق النطاق');
+    }
+    push('من يوم الكسر', num(it.bars_since, '—') + ' شمعة',
+      'بتاريخ ' + fmtDate(it.detected_at));
+    push('الحركة المقاسة', num(ev.measured_move, '—') + ' ATR',
+      'المسافة المتوقعة بعد الكسر');
+
+    /* 💧 الحجم */
+    push('الحجم', (ev.vol_ratio != null ? '×' + Number(ev.vol_ratio).toFixed(2) : '—') + ' من متوسط ٢٠',
+      it && it.volume_confirmed ? 'مؤكد ✓' : 'غير مؤكد');
+
+    /* 📈 التذبذب */
+    push('التذبذب (ATR)', num(ev.atr_pct, '—') + '% من السعر',
+      'مدى الحركة اليومية');
+
+    /* 📏 الاتجاه والسوق */
+    if (it && it.trend) {
+      var tr = it.trend === 'up' ? 'صاعد' : (it.trend === 'down' ? 'هابط' : 'عرضي');
+      push('اتجاه السهم', tr, 'على الشموع اليومية');
+    }
+    if (it && it.market_above_ema200 !== undefined && it.market_above_ema200 !== null) {
+      push('سوق EGX30', it.market_above_ema200 ? 'فوق EMA200 ✓' : 'تحت EMA200 ✗',
+        'شرط مُقاس في الفلتر');
+    }
+
+    /* ⚖️ المخاطرة/العائد */
+    push('عائد/مخاطرة', num(rr, '—') + 'R', 'الهدف ÷ المسافة للوقف');
+    if (it && it.entry && stop) {
+      var riskPct = Math.abs((it.entry - stop) / it.entry) * 100;
+      push('المخاطرة', num(riskPct, '—') + '% من السعر', 'المسافة للوقف');
+    }
+
+    var head = '<div class="an-block"><h4>📐 التحليل الفني</h4><div class="an-grid">' +
+      rows.join('') + '</div></div>';
+
+    /* 📊 المستويات: المُقاس vs إدارة الصفقة */
+    var lv = '<div class="an-block"><h4>🎯 المستويات على الشارت</h4>' +
+      '<div class="an-levels">' +
+      '<div class="an-lv measured"><span>الدخول</span><b dir="ltr">' + fmtPrice(ent) + '</b><i>مُقاس</i></div>' +
+      '<div class="an-lv measured"><span>الهدف</span><b dir="ltr">' + fmtPrice(tgt) + '</b><i>مُقاس · ' + num(st.target_atr, '—') + ' ATR</i></div>' +
+      '<div class="an-lv measured"><span>الوقف</span><b dir="ltr">' + fmtPrice(stop) + '</b><i>مُقاس · ' + num(st.stop_atr, '—') + ' ATR</i></div>' +
+      (st.entry_deep != null ? '<div class="an-lv"><span>دخول أعمق</span><b dir="ltr">' + fmtPrice(st.entry_deep) + '</b><i>إدارة — مش مقاس</i></div>' : '') +
+      (st.target_partial != null ? '<div class="an-lv"><span>هدف أول</span><b dir="ltr">' + fmtPrice(st.target_partial) + '</b><i>إدارة — مش مقاس</i></div>' : '') +
+      '<div class="an-lv measured"><span>مستوى الكسر</span><b dir="ltr">' + fmtPrice(lvl) + '</b><i>حافة النطاق</i></div>' +
+      '</div>' +
+      '<p class="an-note">🟡 «مُقاس» = الإعداد اللي اتقاس على ٣١٥٣ إشارة من ١٨٦ سهم (نجاح ٥٨٫٢٪ · +٠٫٤٣R). ' +
+      '«إدارة» = مستويات مساعدة بتقسيم الصفقة — مش جزء من القياس.</p></div>';
+
+    /* 🧪 المصداقية: الأرقام المقاسة */
+    var m = S.measured;
+    var cred = '';
+    if (m) {
+      var pct = function (v) { return (v == null) ? '—' : (Math.round(v * 1000) / 10) + '%'; };
+      cred = '<div class="an-block"><h4>🧪 ليه الإعداد ده مُقاس</h4>' +
+        '<div class="an-grid">' +
+        '<div class="an-row"><span>إشارات مُقاسة</span><b dir="ltr">' + num(m.signals, '—') + '</b><i>من ' + num(m.stocks, '—') + ' سهم</i></div>' +
+        '<div class="an-row"><span>نسبة النجاح</span><b dir="ltr">' + pct(m.hit_rate) + '</b><i>بعد التكلفة</i></div>' +
+        '<div class="an-row"><span>R لكل صفقة</span><b dir="ltr">' + num(m.r_per_trade, '—') + '</b><i>صافي</i></div>' +
+        '<div class="an-row"><span>ضابط عشوائي</span><b dir="ltr">' + num(m.control_random_level_r, '—') + '</b><i>مستوى عشوائي بنفس التوقيت</i></div>' +
+        '</div></div>';
+    }
+
+    return head + lv + cred;
+  }
+
+  /* ══════════ نافذة «التحليل الكامل» ══════════ */
+  function openAnalysis(it) {
+    if (!it) return;
+    var ov = document.createElement('div');
+    ov.className = 'su-modal su-analysis';
+    ov.id = 'suAnalysis';
+    ov.innerHTML =
+      '<div class="su-modalbox" role="dialog" aria-modal="true">' +
+      '<div class="su-mhead">' +
+      '<div><h3>' + esc(it.name || it.code) + ' · ' + esc(it.code || '') + '</h3>' +
+      '<div class="su-mcode">تحليل النمط على الشارت · ' +
+      (it.direction === 'up' ? 'كسر صعودي' : 'كسر هبوطي') +
+      ' · ' + fmtDate(it.detected_at) +
+      (it.measured_fit === false ? ' · <b>مش مُقاس بالشرط العام</b>' : ' · <b>مُقاس</b>') +
+      '</div></div>' +
+      '<button class="su-mclose" type="button" aria-label="اقفل">✕</button>' +
+      '</div>' +
+      '<div class="su-tabs">' +
+      '<button class="su-tab on" type="button" data-atab="chart">📈 شارت التحليل</button>' +
+      '<button class="su-tab" type="button" data-atab="tv">TradingView</button>' +
+      '</div>' +
+      '<div class="su-chart" id="suAnChart"></div>' +
+      '<div class="su-tvbox" id="suAnTv" style="display:none;"></div>' +
+      analysisHTML(it) +
+      '<div class="su-mact">' +
+      '<button class="su-btn primary" type="button" id="suAnStock">افتح صفحة السهم</button>' +
+      '<button class="su-btn" type="button" id="suAnCalc">⚖️ احسب حجم مركزك</button>' +
+      '<a class="su-btn" target="_blank" rel="noopener noreferrer" href="https://www.tradingview.com/chart/?symbol=EGX%3A' + encodeURIComponent(it.code) + '">افتح على TradingView ↗</a>' +
+      '<button class="su-btn" type="button" id="suAnClose">اقفل</button>' +
+      '</div>' +
+      '<p class="su-note">⛔ أداة تعليمية — مش توصية شراء أو بيع. القرار قرارك.</p>' +
+      '</div>';
+    document.body.appendChild(ov);
+
+    var close = function () { if (ov.parentNode) ov.parentNode.removeChild(ov); };
+    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+    ov.querySelector('.su-mclose').addEventListener('click', close);
+    var c2 = ov.querySelector('#suAnClose'); if (c2) c2.addEventListener('click', close);
+    var cb = ov.querySelector('#suAnCalc');
+    if (cb) cb.addEventListener('click', function () {
+      close();
+      try {
+        window.OCTA_CALC_PREFILL = {
+          type: 'position',
+          values: { entry: it.entry, stop: it.stop, capital: 100000, risk: 2 }
+        };
+        if (typeof switchPage === 'function') switchPage('calc');
+        if (typeof renderCalc === 'function') renderCalc('position');
+      } catch (e) { }
+    });
+    var ob = ov.querySelector('#suAnStock');
+    if (ob) ob.addEventListener('click', function () {
+      close();
+      try { if (typeof openStock === 'function') openStock(it.code); }
+      catch (e) { window.location.hash = '#stock/' + it.code; }
+    });
+
+    /* 📌 التبويبات: شارت التحليل / TradingView */
+    var tabs = ov.querySelectorAll('.su-tab');
+    for (var i = 0; i < tabs.length; i++) {
+      (function (tb) {
+        tb.addEventListener('click', function () {
+          var which = tb.getAttribute('data-atab');
+          for (var k = 0; k < tabs.length; k++) tabs[k].classList.toggle('on', tabs[k] === tb);
+          var cbox = ov.querySelector('#suAnChart');
+          var tbox = ov.querySelector('#suAnTv');
+          if (!cbox || !tbox) return;
+          cbox.style.display = (which === 'chart') ? '' : 'none';
+          tbox.style.display = (which === 'tv') ? '' : 'none';
+          if (which === 'tv' && !tbox.getAttribute('data-loaded')) {
+            tbox.setAttribute('data-loaded', '1');
+            var kit = window.OCTAChartKit;
+            var url = (kit && kit.tvWidgetUrl) ? kit.tvWidgetUrl(it.code) :
+              ('https://s.tradingview.com/widgetembed/?frameElementId=octa-tv-an-' +
+                encodeURIComponent(String(it.code || 'x')) +
+                '&symbol=' + encodeURIComponent('EGX:' + String(it.code || '')) +
+                '&interval=1D&range=180&timezone=Africa%2FCairo&theme=dark&style=1&locale=ar');
+            tbox.innerHTML = '<div class="su-tvframe"><iframe src="' + esc(url) +
+              '" title="TradingView ' + esc(it.code || '') +
+              '" allowtransparency="true" scrolling="no" frameborder="0" ' +
+              'style="width:100%;height:100%;border:0"></iframe></div>' +
+              '<div class="su-tvfoot"><span class="su-mini">شارت TradingView الرسمي · اليومي</span></div>';
+          }
+        });
+      })(tabs[i]);
+    }
+
+    drawPattern(it, ov.querySelector('#suAnChart'), 340);
   }
 
   /* ══════════ تفاصيل النمط ══════════ */
@@ -688,6 +893,8 @@
       renderTable: renderTable,
       applyFilters: applyFilters,
       openDetail: openDetail,
+      openAnalysis: openAnalysis,
+      analysisHTML: analysisHTML,
       lockHTML: lockHTML,
       fmtPrice: fmtPrice,
       num: num,

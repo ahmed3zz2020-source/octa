@@ -107,7 +107,8 @@ function mkItem(o) {
       touches: 3, reactions: 2, atr: 1.4, atr_pct: o.atr_pct || 2.6,
       distance_pct: 0.8, zone_score: 72, vol_ratio: 1.6, vol_avg20: 900000,
       close_beyond_pct: 0.8, measured_move: 1.0, target_method: 'measured_move',
-      structure_label: 'كسر مقاومة', source: 'startamarkets', bars_used: 320
+      structure_label: 'كسر مقاومة', source: 'startamarkets', bars_used: 320,
+      last_test: '2026-08-05', age_days: 77
     },
     why: 'كسر مقاومة 51.0 — 52.0 بثلاث إغلاقات وتأكيد حجم.'
   };
@@ -430,4 +431,49 @@ test('🎨 mountPattern بيرسم من غير exception (canvas + إحداثي�
   assert.ok(calls.moveTo >= 2, 'اترسمت الخطوط');
   assert.ok(fakeSeries.lines && fakeSeries.lines.length === 1, 'خط السعر اتعمل');
   assert.equal(fakeSeries.lines[0].title, 'مستوى الكسر', 'التسمية العربية');
+});
+
+/* ═══════════ 17) 📐 التحليل الفني الكامل ═══════════ */
+test('📐 نافذة «التحليل الكامل» فيها الشارت + التحليل + levels', async () => {
+  const sb = loadUI(mockApi({ ok: true, items: [mkItem({})] }));
+  const it = mkItem({});
+  it.setup = { level: 52.0, entry_ref: 52.4, stop: 50.9, target: 55.4, rr: 3.2,
+    stop_atr: 1, target_atr: 4, entry_deep: 51.5, target_partial: 53.9 };
+  it.zone_low = 51.0; it.zone_high = 52.0; it.trend = 'up'; it.market_above_ema200 = true;
+  sb.win.OCTASetups._test.openAnalysis(it);
+  /* 📌 الـDOM المصغّر: المودال بيتضاف في body.children */
+  const modal = sb.win.document.body.children[0];
+  const html = modal.innerHTML;
+  assert.ok(html.indexOf('suAnChart') >= 0, 'الشارت موجود');
+  assert.ok(html.indexOf('suAnTv') >= 0, 'تبويب TradingView موجود');
+  assert.ok(html.indexOf('التحليل الفني') >= 0, 'بلوك التحليل الفني');
+  assert.ok(html.indexOf('مُقاس') >= 0, 'المستويات المُقاسة متعلّمة');
+  assert.ok(html.indexOf('إدارة — مش مقاس') >= 0, 'مستويات الإدارة متعلّمة إنها مش مقاسة');
+  assert.ok(html.indexOf('البنية') >= 0, 'البنية');
+  assert.ok(html.indexOf('الحجم') >= 0, 'الحجم');
+  assert.ok(html.indexOf('عائد/مخاطرة') >= 0, 'ع/م');
+  assert.ok(html.indexOf('undefined') < 0, 'مفيش undefined');
+  assert.ok(html.indexOf('NaN') < 0, 'مفيش NaN');
+});
+
+test('📐 الكارت فيه زرار «التحليل الكامل»', async () => {
+  const sb = loadUI(mockApi({ ok: true, items: [mkItem({})] }));
+  sb.win.OCTASetups.state.items = [mkItem({})];
+  sb.win.OCTASetups.state.loaded = true;
+  sb.win.OCTASetups._test.render();
+  const html = sb.els['suTableBox'].innerHTML;
+  assert.ok(html.indexOf('التحليل الكامل') >= 0, 'الزرار موجود');
+  assert.ok(html.indexOf('data-act="analysis"') >= 0, 'الزرار مربوط');
+});
+
+test('📐 أرقام التحليل كلها من الـAPI (مفيش مخترع)', async () => {
+  const sb = loadUI(mockApi({ ok: true, items: [mkItem({})] }));
+  const it = mkItem({});
+  const html = sb.win.OCTASetups._test.analysisHTML(it);
+  assert.ok(html.indexOf('كسر مقاومة') >= 0, 'البنية من الـevidence');
+  assert.ok(html.indexOf('×1.60') >= 0, 'نسبة الحجم من الـevidence');
+  assert.ok(html.indexOf('2.6%') >= 0, 'ATR% من الـevidence');
+  assert.ok(html.indexOf(String(it.evidence.last_test)) >= 0, 'آخر اختبار من الـevidence');
+  assert.ok(html.indexOf('undefined') < 0, 'مفيش undefined');
+  assert.ok(html.indexOf('NaN') < 0, 'مفيش NaN');
 });

@@ -80,6 +80,20 @@
     });
   }
 
+  /* ══════════ EMA (للسياق الفني) ══════════ */
+  function ema(values, period) {
+    var out = [];
+    var k = 2 / (period + 1);
+    var prev = null;
+    for (var i = 0; i < values.length; i++) {
+      var v = values[i];
+      if (v == null || !isFinite(v)) { out.push({ time: null, value: null }); continue; }
+      prev = (prev == null) ? v : (v * k + prev * (1 - k));
+      out.push({ time: null, value: prev });
+    }
+    return out;
+  }
+
   /* ══════════ شارت TradingView الرسمي ══════════
      📌 الـwidget المجاني (s.tradingview.com/widgetembed) مش بيسمح
         برسم أشكال مخصوصة ⇒ الرسم الاحترافي للنمط بيتم على شارتنا
@@ -121,6 +135,29 @@
       }));
       /* 📌 نحتفظ بالسلسلة ⇒ الـoverlay يقدر يحوّل سعر ⇒ إحداثي */
       chart.__octaSeries = cs;
+      /* ⭐ المتوسطات المتحركة (السياق الفني) — ٢٠ و٥٠ */
+      chart.__octaEma = [];
+      if (opts.emas && opts.emas.length && L.LineSeries) {
+        var closes = rows.map(function (c) { return c.close; });
+        for (var ei = 0; ei < opts.emas.length; ei++) {
+          var em = opts.emas[ei];
+          try {
+            var ls = chart.addSeries(L.LineSeries, {
+              color: em.color || '#64748b', lineWidth: 1,
+              priceLineVisible: false, lastValueVisible: false,
+              crosshairMarkerVisible: false
+            });
+            var eSeries = ema(closes, em.period);
+            var pts = [];
+            for (var pi = 0; pi < rows.length; pi++) {
+              if (eSeries[pi].value == null) continue;
+              pts.push({ time: rows[pi].time, value: eSeries[pi].value });
+            }
+            ls.setData(pts);
+            chart.__octaEma.push({ period: em.period, series: ls, title: em.title });
+          } catch (e) { }
+        }
+      }
       if (opts.volume) {
         var vs = chart.addSeries(L.HistogramSeries, { priceFormat: { type: 'volume' }, priceScaleId: '' }, 1);
         vs.setData(rows.map(function (c) {
@@ -346,6 +383,7 @@
     mount: mount,
     mountPattern: mountPattern,
     rowsFromHistory: rowsFromHistory,
+    ema: ema,
     tvWidgetUrl: tvWidgetUrl,
     tvOpenUrl: tvOpenUrl
   };

@@ -369,3 +369,37 @@
   .su-cards { display: grid; grid-template-columns: repeat(2, 1fr); }
   .su-tvframe { height: 460px; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   📐 التحليل الفني الكامل — «الصورة كاملة»
+   ══════════════════════════════════════════════════════════════ */
+.su-analysis .su-modalbox { max-width: 920px; }
+.su-analysis .su-chart { height: 340px; }
+.an-block {
+  background: var(--pri3); border: 1px solid var(--line);
+  border-radius: 12px; padding: 11px 13px; margin: 10px 0;
+}
+.an-block h4 { margin: 0 0 9px; font-size: 13.5px; color: var(--gold); }
+.an-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
+.an-row {
+  background: var(--pri2); border: 1px solid var(--line);
+  border-radius: 9px; padding: 6px 9px; min-width: 0;
+}
+.an-row span { display: block; font-size: 10.5px; color: var(--muted); }
+.an-row b { font-size: 13px; font-weight: 800; color: var(--txt); }
+.an-row i { display: block; font-style: normal; font-size: 9.5px; color: var(--muted); margin-top: 1px; }
+.an-levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.an-lv {
+  background: var(--pri2); border: 1px solid var(--line);
+  border-radius: 9px; padding: 6px 8px; text-align: center; min-width: 0;
+}
+.an-lv span { display: block; font-size: 10.5px; color: var(--muted); }
+.an-lv b { font-size: 13.5px; font-weight: 800; color: var(--txt); }
+.an-lv i { display: block; font-style: normal; font-size: 9px; color: var(--muted); margin-top: 2px; }
+.an-lv.measured { border-color: rgba(212,175,55,.4); background: rgba(212,175,55,.07); }
+.an-lv.measured i { color: var(--gold); }
+.an-note { margin: 9px 0 0; font-size: 10.5px; color: var(--muted); line-height: 1.75; }
+@media (max-width: 560px) {
+  .an-grid { grid-template-columns: 1fr; }
+  .an-levels { grid-template-columns: repeat(2, 1fr); }
+}
