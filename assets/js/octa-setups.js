@@ -262,11 +262,18 @@
     var ev = (it && it.evidence) || {};
     var out = [];
     var add = function (label, price, color, tag, soft) {
-      if (price == null || !isFinite(price)) return;
-      out.push({ label: label, price: fmtPrice(price), color: color, tag: tag || '', soft: !!soft });
+      if (price == null) return;
+      /* ⛔ السعر ممكن يكون رقم (يُنسّق) أو نص جاهز (مثل نطاق "أ ← ب") */
+      var txt = (typeof price === 'number') ? fmtPrice(price) : String(price);
+      if (!txt || txt === 'NaN' || txt === 'undefined') return;
+      out.push({ label: label, price: txt, color: color, tag: tag || '', soft: !!soft });
     };
     if (it && it.zone_low != null && it.zone_high != null) {
-      add('نطاق الكسر', it.zone_high, '#a855f7', fmtPrice(it.zone_low) + ' ←', true);
+      /* ⛔ لو النطاق نقطة واحدة ⇒ نكتب السعر مرة واحدة (مش مكرر) */
+      var ztxt = (Math.abs(it.zone_low - it.zone_high) < 1e-9)
+        ? fmtPrice(it.zone_high)
+        : (fmtPrice(it.zone_low) + ' ← ' + fmtPrice(it.zone_high));
+      add('نطاق الكسر', ztxt, '#a855f7', '', true);
     }
     add('مستوى الكسر', st.level != null ? st.level : (it ? it.level : null), '#a855f7', '', true);
     add('الدخول', st.entry_ref != null ? st.entry_ref : (it ? it.entry : null), '#d4af37', 'مُقاس');
@@ -540,7 +547,11 @@
           return it;
         };
         card.addEventListener('click', function (e) {
-          var b = e.target && e.target.getAttribute ? e.target.getAttribute('data-act') : null;
+          /* ⛔ closest(): لو ضغط المستخدم على أي جوه الزر (إيموجي/نص)
+             ⇒ لازم الزر هو اللي يتقرا، مش العنصر الداخلي. */
+          var act = (e.target && e.target.closest) ? e.target.closest('[data-act]') : null;
+          var b = act ? act.getAttribute('data-act')
+            : (e.target && e.target.getAttribute ? e.target.getAttribute('data-act') : null);
           if (b === 'detail') { e.stopPropagation(); openDetail(code); return; }
           if (b === 'chart') { e.stopPropagation(); var it = pick(); if (it) focusPanel(); return; }
           if (b === 'analysis') { e.stopPropagation(); var ia = pick(); if (ia) openAnalysis(ia); return; }
