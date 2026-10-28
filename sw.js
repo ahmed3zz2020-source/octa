@@ -51,6 +51,14 @@ self.addEventListener('activate', function (e) {
         return caches.delete(k);
       }));
     }).then(function () {
+      /* 📌 نملا الكاش تاني — التنظيف (?clean=1) بيمسحه، فلازم
+         نرجّع نخزّن هيكل التطبيق فوراً. */
+      return caches.open(CACHE).then(function (c) {
+        return Promise.allSettled(SHELL.map(function (u) {
+          return c.add(new Request(u, { cache: 'reload' }));
+        }));
+      });
+    }).then(function () {
       return self.clients.claim();
     })
   );
@@ -110,7 +118,15 @@ self.addEventListener('fetch', function (e) {
             });
           });
         }
-        return new Response('', { status: 504, statusText: 'offline' });
+        /* ⛔⛔⛔⛔⛔ ٢٩ أكتوبر ٢٠٢٦ — فخ قاتل اتكتشف بال_sdkahaa
+        📌 الرد الفاضي (body فاضي + مفيش content-type) ⇒ كروم بيحمله
+        📌   **ملف** ⇒ يبان «هل تريد تنزيل الملف مرة أخرى؟» والصفحة
+        📌   بتبقى بيضا ⇒ ⛔ ده سبب الشاشة البيضاء في كروم!
+        ✅ الحل: دايماً رد له نوع محتوى ونص واضح. */
+        return new Response('OCTA — لا يوجد اتصال بالإنترنت الآن.', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
       });
     })
   );
