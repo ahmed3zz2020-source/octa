@@ -260,6 +260,7 @@
           lines: priceLines(it),
           volume: true,
           height: height || 320,
+          focusBars: 90,
           pattern: patternOf(it)
         });
       })

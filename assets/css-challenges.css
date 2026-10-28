@@ -255,3 +255,30 @@
   .ch-chart { height: 360px; }
   .ch-resgrid { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   🗓️ سجلّك + دعوة المتصدرين (بيوضّحوا الفايدة من أول نظرة)
+   ══════════════════════════════════════════════════════════════ */
+.ch-why {
+  margin-top: 8px; font-size: 12px; line-height: 1.8; color: var(--muted);
+  background: var(--pri3); border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--gold);
+  border-radius: 10px; padding: 8px 11px;
+}
+.ch-why b { color: var(--gold); }
+
+.ch-stats.empty { display: block; }
+.ch-statinvite {
+  font-size: 12.5px; line-height: 1.85; color: var(--muted);
+  background: var(--pri3); border: 1px dashed var(--line);
+  border-radius: 12px; padding: 11px 13px;
+}
+.ch-statinvite b { color: var(--gold); font-size: 13.5px; }
+
+.ch-empty.invite {
+  text-align: center; line-height: 1.9;
+  border: 1px dashed var(--line); border-radius: 12px; padding: 14px;
+}
+.ch-empty.invite b { color: var(--gold); font-size: 14px; }
+
+.ch-levels i { font-style: normal; font-size: 9.5px; color: var(--muted); }

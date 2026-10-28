@@ -100,7 +100,12 @@ function mkChallenge(o) {
     expires_at: o.expires_at || '2026-10-29',
     status: o.status || 'open',
     resolved: o.resolved === undefined ? null : o.resolved,
-    my_vote: o.my_vote === undefined ? null : o.my_vote
+    my_vote: o.my_vote === undefined ? null : o.my_vote,
+    /* 📌 الباك بيبعت نوع الهدف والوقف (دعم/مقاومة) — ده اللي بيوضّح السؤال */
+    zone_kind: o.zone_kind || 'resistance',
+    zone_label: o.zone_label || 'مقاومة',
+    other_kind: o.other_kind || 'support',
+    other_level: o.other_level === undefined ? 50.9 : o.other_level
   };
 }
 
@@ -216,9 +221,11 @@ test('الكارت بيعرض الرمز والاسم والقطاع والمس�
   assert.ok(head.indexOf('▲') >= 0, 'اتجاه الصعود ظاهر');
 
   const lv = sb.els['chCardLevels'].innerHTML;
-  assert.ok(lv.indexOf('الدخول') >= 0, 'الدخول');
+  assert.ok(lv.indexOf('السعر دلوقتي') >= 0, 'السعر الحالي');
   assert.ok(lv.indexOf('الوقف') >= 0, 'الوقف');
   assert.ok(lv.indexOf('الهدف') >= 0, 'الهدف');
+  /* 📌 توضيح نوع كل مستوى (دعم/مقاومة) — ده اللي بيوضّح السؤال */
+  assert.ok(lv.indexOf('دعم') >= 0 || lv.indexOf('مقاومة') >= 0, 'نوع المستوى ظاهر');
   assert.ok(lv.indexOf('52.4') >= 0, 'سعر الدخول');
   assert.ok(lv.indexOf('50.9') >= 0, 'سعر الوقف');
   assert.ok(lv.indexOf('55.4') >= 0, 'سعر الهدف');
@@ -258,11 +265,10 @@ test('⛔ مفيش undefined ولا NaN في أي جزء من الصفحة', asy
     assert.ok(html.indexOf('undefined') < 0, 'مفيش undefined في ' + id + ' → ' + html.slice(0, 120));
     assert.ok(html.indexOf('NaN') < 0, 'مفيش NaN في ' + id + ' → ' + html.slice(0, 120));
   });
-  ['chPoints', 'chCorrect', 'chWrong', 'chAccuracy', 'chStreak', 'chRank'].forEach(function (id) {
-    const t = sb.els[id].textContent;
-    assert.ok(String(t).indexOf('undefined') < 0, 'مفيش undefined في ' + id);
-    assert.ok(String(t).indexOf('NaN') < 0, 'مفيش NaN في ' + id);
-  });
+  /* 📌 الإحصاءات دلوقتي بتترسم جوّه #chStats (مش عناصر منفصلة) */
+  const statsHtml = String(sb.els['chStats'].innerHTML || '');
+  assert.ok(statsHtml.indexOf('undefined') < 0, 'مفيش undefined في الإحصاءات');
+  assert.ok(statsHtml.indexOf('NaN') < 0, 'مفيش NaN في الإحصاءات');
 });
 
 test('⛔ بيانات ناقصة (من غير أسعار) ⇒ مفيش undefined/NaN', async () => {

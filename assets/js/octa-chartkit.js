@@ -143,7 +143,19 @@
           title: l.title || ''
         });
       }
-      chart.timeScale().fitContent();
+      /* 📌 تركيز على آخر ٦٠ شمعة (مش كل التاريخ) ⇒ المستويات واضحة
+         والشارت مقروء على الموبايل. */
+      try {
+        if (opts.focusBars && rows.length > opts.focusBars) {
+          chart.timeScale().setVisibleLogicalRange({
+            from: rows.length - opts.focusBars, to: rows.length + 2
+          });
+        } else {
+          chart.timeScale().fitContent();
+        }
+      } catch (e) {
+        try { chart.timeScale().fitContent(); } catch (e2) { }
+      }
       if (typeof opts.onPriceClick === 'function') {
         /* ⛔ lightweight-charts v4: بنقرأ السعر من إحداثيات الماوس
            عبر subscribeClick على الـchart (متاح في v4.1+) */

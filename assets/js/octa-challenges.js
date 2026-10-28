@@ -185,18 +185,28 @@
     renderChallenge();
     renderResult();
   }
-  /* 📊 إحصاءاتك — نقاط · صح · غلط · دقة · سلسلة · رتبة */
+  /* 📊 سجلّك — نقاط · صح · غلط · دقة · سلسلة · رتبة
+     📌 مافيش أصفار مضللة: قبل أول تصويت بنعرض دعوة، مش ٦ أصفار. */
   function renderStats() {
-    var set = function (id, v) { var e = $(id); if (e) e.textContent = v; };
+    var box = $('chStats');
     var me = S.me || {};
-    set('chPoints', num(me.points, '—'));
-    set('chCorrect', num(me.correct, '—'));
-    set('chWrong', num(me.wrong, '—'));
-    set('chAccuracy', fmtPct(me.accuracy));
-    set('chStreak', num(me.streak, '—'));
-    set('chRank', me.rank != null ? ('#' + num(me.rank, '—')) : '—');
-    var days = $('chDaysPlayed');
-    if (days) days.textContent = num(me.days_played, '—');
+    var votes = me.votes || 0;
+    if (!box) return;
+    if (!votes) {
+      box.className = 'ch-stats empty';
+      box.innerHTML = '<div class="ch-statinvite">🗓️ <b>سجلّك لسه فاضي</b><br>' +
+        'صوّت على تحدي النهاردة، وكل تحدي بيتحل بعد ١٠ جلسات — فتشوف إنت ماشي صح ولا غلط، ' +
+        'وتتبني نقاطك يوم بيوم.</div>';
+      return;
+    }
+    box.className = 'ch-stats';
+    box.innerHTML =
+      '<div class="ch-stat a"><span>نقاط</span><b dir="ltr">' + num(me.points, '—') + '</b></div>' +
+      '<div class="ch-stat"><span>صح</span><b dir="ltr">' + num(me.correct, '—') + '</b></div>' +
+      '<div class="ch-stat c"><span>غلط</span><b dir="ltr">' + num(me.wrong, '—') + '</b></div>' +
+      '<div class="ch-stat b"><span>الدقة</span><b dir="ltr">' + fmtPct(me.accuracy) + '</b></div>' +
+      '<div class="ch-stat"><span>سلسلة</span><b dir="ltr">' + num(me.streak, '—') + '</b></div>' +
+      '<div class="ch-stat"><span>ترتيبك</span><b dir="ltr">' + (me.rank != null ? ('#' + num(me.rank, '—')) : '—') + '</b></div>';
   }
 
   /* ══════════ كارت التحدي ══════════ */
@@ -253,10 +263,15 @@
 
   /* 📐 شبكة المستويات: دخول · وقف · هدف */
   function levelsHTML(ch) {
+    /* 📌 «الهدف = دعم» و«الوقف = مقاومة» ⇒ السؤال يبقى واضح من أول نظرة */
+    var tKind = (ch.zone_kind === 'support') ? 'دعم' : (ch.zone_kind === 'resistance' ? 'مقاومة' : '');
+    var sKind = (ch.other_kind === 'resistance') ? 'مقاومة' : (ch.other_kind === 'support' ? 'دعم' : '');
+    var tSub = tKind ? ('<i>' + tKind + '</i>') : '';
+    var sSub = sKind ? ('<i>' + sKind + '</i>') : '';
     return '<div class="ch-levels">' +
-      '<div><span>الدخول</span><b class="e" dir="ltr">' + fmtPrice(ch.entry) + '</b></div>' +
-      '<div><span>الوقف</span><b class="d" dir="ltr">' + fmtPrice(ch.stop) + '</b></div>' +
-      '<div><span>الهدف</span><b class="u" dir="ltr">' + fmtPrice(ch.target) + '</b></div>' +
+      '<div><span>السعر دلوقتي</span><b class="e" dir="ltr">' + fmtPrice(ch.entry) + '</b></div>' +
+      '<div><span>الهدف ' + tSub + '</span><b class="u" dir="ltr">' + fmtPrice(ch.target) + '</b></div>' +
+      '<div><span>الوقف ' + sSub + '</span><b class="d" dir="ltr">' + fmtPrice(ch.stop) + '</b></div>' +
     '</div>' +
     '<div class="ch-meta">' +
       '<span>ع/م <b dir="ltr">' + num(ch.rr, '—') + '</b></span>' +
@@ -410,7 +425,9 @@
     var box = $('chLeaderboard');
     if (!box) return;
     if (S.lbStatus === 'hidden') {
-      box.innerHTML = '<div class="ch-empty">🏆 لوحة المتصدرين هتفتح بعد ٣ مصوّتين</div>';
+      box.innerHTML = '<div class="ch-empty invite">🏆 <b>المتصدرون لسه مافتحوش</b><br>' +
+        'لوحة المتصدرين هتفتح بعد ٣ مصوّتين — كن التالت وابدأ السباق.<br>' +
+        '<span class="su-mini">وكل ما ال��لوحة تفتح، هتشوف رتبتك فيها.</span></div>';
       return;
     }
     if (S.lbStatus === 'locked') {
@@ -523,6 +540,7 @@
         lines: priceLines(ch),
         volume: true,
         height: 300,
+        focusBars: 60,
         pattern: patternOf(ch)
       });
     }).catch(function () {
