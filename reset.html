@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OCTA — تنظيف</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 18px;
+    background: #0a1929; color: #eaf1ff;
+    font: 500 16px/1.7 system-ui, "Segoe UI", Tahoma, sans-serif;
+    padding: 32px 22px; text-align: center;
+  }
+  .logo { width: 84px; height: 84px; border-radius: 22px; background: #d4af37;
+          display: flex; align-items: center; justify-content: center;
+          font: 800 26px system-ui; color: #0a1929; }
+  h1 { font-size: 20px; margin: 0; }
+  p { margin: 0; opacity: .82; max-width: 420px; }
+  .st { font: 600 14px/1.9 system-ui, monospace; background: #10243e;
+        border: 1px solid #24405f; border-radius: 12px; padding: 12px 14px;
+        width: 100%; max-width: 420px; text-align: right; white-space: pre-wrap; }
+  a, button { display: inline-block; background: #d4af37; color: #0a1929; border: 0;
+              border-radius: 14px; padding: 14px 22px; font: 700 16px system-ui;
+              text-decoration: none; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div class="logo">O</div>
+  <h1>تنظيف بيانات الموقع</h1>
+  <p>الصفحة دي بتمسح الكاش وكل Service Workers المسجّلة على الموقع — عشان لو التطبيق المثبّت بيفتح شاشة بيضا.</p>
+  <div class="st" id="st">جاهز…</div>
+  <button id="go">نظّف دلوقتي</button>
+  <a href="/">افتح OCTA</a>
+
+<script>
+(function () {
+  var out = document.getElementById('st');
+  function log(t) { out.textContent = (out.textContent.indexOf('جاهز') === 0 ? '' : out.textContent + '\n') + t; }
+
+  async function clean() {
+    try {
+      /* ① نلغي كل Service Workers (منها بتاع كروم للتطبيق المثبّت) */
+      var regs = [];
+      try { regs = await navigator.serviceWorker.getRegistrations(); } catch (e) {}
+      for (var i = 0; i < regs.length; i++) {
+        try { await regs[i].unregister(); } catch (e) {}
+      }
+      log('تم إلغاء ' + regs.length + ' Service Worker');
+
+      /* ② نمسح كل الكاش */
+      var keys = [];
+      try { keys = await caches.keys(); } catch (e) {}
+      for (var j = 0; j < keys.length; j++) {
+        try { await caches.delete(keys[j]); } catch (e) {}
+      }
+      log('تم مسح ' + keys.length + ' كاش');
+
+      /* ③ بيانات المتصفح المحلية (الجلسة بتتسجل تاني بالـPIN) */
+      try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
+      log('تم مسح بيانات الجلسة');
+
+      log('خلاص — افتح OCTA من الرابط تحت');
+    } catch (e) {
+      log('في مشكلة: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  document.getElementById('go').addEventListener('click', clean);
+  /* ⛔ بننفّذها لوحدها كمان — الصفحة دي وظيفتها التنظيف */
+  setTimeout(clean, 700);
+})();
+</script>
+</body>
+</html>

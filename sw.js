@@ -23,6 +23,7 @@ const SHELL = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/reset.html',
   '/assets/octa.css',
   '/assets/octa-tokens.css',
   '/assets/octa-logo.png',
@@ -68,10 +69,21 @@ self.addEventListener('fetch', function (e) {
   /* ⛔ الـAPI ⇒ الـworker هو اللي بيوكّلها (مع الكوكيز والجلسة) */
   if (url.pathname.indexOf('/api/') === 0) return;
 
+  /* ⛔⛔⛔ رابط التنظيف (?clean=1) — ٢٩ أكتوبر ٢٠٢٦
+     📌 كروم **بيتجاهل** هيدر Clear-Site-Data لو الرد جاي من SW
+     📌   ⇒ لازم الطلب يوصل للشبكة مباشرة.
+     📌 ✅ الحل: متتدخّلش فيه خالص ⇒ يروح للشبكة ⇒ الهيدر يشتغل. */
+  if (url.searchParams.get('clean') === '1') return;
+
   /* 📌 network-first: الشبكة الأول ⇒ نسخة جديدة دايماً */
   e.respondWith(
     fetch(req).then(function (res) {
-      if (res && res.status === 200 && res.type === 'basic') {
+      /* ⛔⛔⛔ ما نخزّنش رد فيه Clear-Site-Data!
+         📌 لو خزّنناه وخدمناه من الكاش ⇒ كروم هيمسح بيانات
+         📌   المستخدم في وقت عشوائي ⇒ logout مفاجئ. */
+      var hasClear = false;
+      try { hasClear = !!(res && res.headers && res.headers.get('clear-site-data')); } catch (e) { }
+      if (res && res.status === 200 && res.type === 'basic' && !hasClear) {
         var copy = res.clone();
         caches.open(CACHE).then(function (c) {
           c.put(req, copy).catch(function () { });

@@ -212,7 +212,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
    📌 الغرض: لو الـRailway بطيء/ واقع، الطلب يرجع بسرعة والواجهة
    📌   تعيد المحاولة بنفسها ⇒ المستخدم بيشوف «بنحاول تاني» بدل صفحة ميتة. */
 const PROXY_TIMEOUT_MS = 6000;
-const PROXY_TRIES = 2;
+/* ⛔ ٢٩ أكتوبر ٢٠٢٦ — ٣ محاولات بدل ٢.
+   📌 السبب: أول طلب بعد فترة سكون ⇒ الـAPI بيعمل cold start
+   📌   (≈١٢ ثانية) ⇒ المحاولة الأولى بتـtimeout ⇒ 502 والمستخدم
+   📌   واقف قدام شاشة تحميل.
+   ✅ الحل: ٣ محاولات × ٦ ثواني ⇒ المحاولة التانية بتلاقي السيرفر
+   ✅   دافي وبترد في ثانية ⇒ البيانات بتوصل بدل ما تفشل. */
+const PROXY_TRIES = 3;
 
 /* 🔁 جلب من الـAPI مع إعادة محاولة — الخطأ البسيط بيتراجع لوحده */
 async function fetchApi(target, init) {
@@ -405,6 +411,17 @@ export default {
           h.set('Cross-Origin-Resource-Policy', 'same-site');
         }
       } catch (e) { }
+      /* 🧹 رابط التنظيف (?clean=1) — ٢٩ أكتوبر ٢٠٢٦
+         📌 كاشف شامل: كوكيز + كاش + localStorage + service workers.
+         📌 ⛔ كروم بيتجاهل الهيدر في الأجزاء الفرعية ⇒ لازم navigation.
+         📌 بنحطه على أي رد HTML (بوابة · رئيسية · SPA). */
+      try {
+        const cu = new URL(request.url);
+        if (cu.searchParams.get('clean') === '1') {
+          const ct = h.get('Content-Type') || '';
+          if (ct.indexOf('text/html') !== -1) h.set('Clear-Site-Data', '"*"');
+        }
+      } catch (e) { }
       return new Response(res.body, { status: res.status, headers: h });
     } catch (e) {
       return res;
@@ -414,6 +431,24 @@ export default {
 
 async function handle(request, env, ctx) {
   const url = new URL(request.url);
+
+  /* ══════════════════════════════════════════════════════════════
+  🧹 ٢٩ أكتوبر ٢٠٢٦ — رابط التنظيف: /?clean=1
+  ────────────────────────────────────────────────────────────────
+  📌 المشكلة: كروم (في المتصفح نفسه) بقى بيفتح شاشة بيضا بعد ما
+  📌   المستخدم يعمل «تثبيت» ⇒ كروم سجّل service worker خاص بالتطبيق
+  📌   (WebAPK) وبيحبسك على نسخة قديمة/فاضية من الصفحة.
+  📌   ⇒ المتصفح التاني شغّال (سجل الـSW منفصل) — وده اللي فاضلنا
+  📌   عليه في العزل.
+  📌 ✅ الحل: رابط التنظيف بيرجّع الصفحة مع هيدر
+  📌   Clear-Site-Data: "*" ⇒ كروم يمسح كل حاجة للموقع:
+  📌   الكوكيز · الكاش · localStorage · ⛔ و(service worker) كلهم.
+  📌   ⇒ الـSW القديم بيتمسح وبعدها الـSW الجديد (network-first)
+  📌   بيسجّل نفسه من أول تحميل.
+  ⛔ لازم يكون navigation (فتح صفحة) — كروم بيتجاهل الهيدر في
+  ⛔   الأجزاء الفرعية (صور/سكربتات).
+  ══════════════════════════════════════════════════════════════ */
+  const DO_CLEAN = url.searchParams.get('clean') === '1';
 
     /* ══════════════════════════════════════════════════════════════
     🛡️ ⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ منع بيانات الإدارة من الوصول العام
@@ -1060,6 +1095,7 @@ async function handle(request, env, ctx) {
         if (gate && gate.status < 400) {
           const h = new Headers(gate.headers);
           h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+          if (DO_CLEAN) h.set('Clear-Site-Data', '"*"');
           return new Response(gate.body, { status: 200, headers: h });
         }
       } catch (e) { }
@@ -1168,6 +1204,8 @@ async function handle(request, env, ctx) {
       const WANT = '202610250945';
       if (!request.headers.get('X-OCTA-Cleared-' + WANT)) h.set('Clear-Site-Data', '"cache"');
       } catch (e) { }
+      /* 🧹 رابط التنظيف (?clean=1) ⇒ مسح كل حاجة للموقع */
+      if (DO_CLEAN) h.set('Clear-Site-Data', '"*"');
       return new Response(res.body, { status: res.status, headers: h });
     }
     if (/\.(js|mjs|css)$/.test(url.pathname)) {

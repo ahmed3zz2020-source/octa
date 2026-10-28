@@ -5,7 +5,7 @@
   "description": "🐙 OCTA — منصة تحليل أسهم عربية (مصر/أمريكا/السعودية/الإمارات)",
   "scripts": {
     "bump": "node bump-cache.js",
-    "build": "npm run bump && rm -rf dist && mkdir -p dist && cp index.html dist/ && cp sw.js dist/ && cp gate.html dist/ && cp manifest.json dist/ && mkdir -p dist/admin && cp admin/index.html admin/users.html admin/README.md admin/MONTHLY-REPORT.md dist/admin/ && cp -r assets/. dist/assets/ && node tools/copy-data.js && cp _headers dist/_headers && cp data_ipo.json dist/data_ipo.json && node tools/mk-chart-root.js && echo _worker.js > dist/.assetsignore && node tools/check-dist.js",
+    "build": "npm run bump && rm -rf dist && mkdir -p dist && cp index.html dist/ && cp sw.js dist/ && cp reset.html dist/ && cp gate.html dist/ && cp manifest.json dist/ && mkdir -p dist/admin && cp admin/index.html admin/users.html admin/README.md admin/MONTHLY-REPORT.md dist/admin/ && cp -r assets/. dist/assets/ && node tools/copy-data.js && cp _headers dist/_headers && cp data_ipo.json dist/data_ipo.json && node tools/mk-chart-root.js && echo _worker.js > dist/.assetsignore && node tools/check-dist.js",
     "build:secure": "OCTA_STATIC_MARKETS=0 npm run build",
     "build:strict": "OCTA_STATIC_MARKETS=0 npm run build",
     "deploy": "npm run build:strict && wrangler deploy",
