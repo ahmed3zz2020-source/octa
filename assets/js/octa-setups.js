@@ -20,6 +20,7 @@
     locked: false,
     measured: null,
     selected: null,
+    subscription: null,
     chartLib: null
   };
 
@@ -95,6 +96,7 @@
       S.loaded = true;
       S.locked = false;
       render();
+      loadSubscription();
       setStatus('live', 'اتحمّل · ' + (j.items || []).length + ' نمط' +
         (j.stale ? ' · بنحدّث في الخلفية' : ''));
     }).catch(function (err) {
@@ -104,6 +106,7 @@
         S.loaded = true;
         render();
         loadMeta();
+        loadSubscription();
         note('الباقة مقفولة — كلّم الدعم للتفعيل', 'err');
       } else if (st === 401) {
         S.loaded = true;
@@ -113,6 +116,34 @@
         note('تعذّر تحميل الأنماط — جرّب تاني', 'err');
       }
     });
+  }
+
+  /* 💳 كارت الباقة: الحالة + تاريخ الانتهاء */
+  function renderSub() {
+    var el = $('suSub'), stat = $('suSubStat');
+    if (!el) return;
+    var sub = S.subscription;
+    if (!sub) { el.textContent = '—'; return; }
+    if (sub.plan === 'pro') {
+      el.textContent = 'مفعّلة';
+      el.style.color = 'var(--up)';
+      if (stat) stat.classList.remove('e');
+      if (sub.days_left != null) {
+        el.textContent = 'مفعّلة · ' + sub.days_left + ' يوم';
+      }
+    } else {
+      el.textContent = 'غير مفعّلة';
+      el.style.color = 'var(--dn)';
+      if (stat) stat.classList.add('e');
+    }
+  }
+
+  function loadSubscription() {
+    getJson('/api/subscriptions/me', 15000).then(function (res) {
+      S.subscription = (res.json || {}).subscription || null;
+      renderSub();
+      if (S.locked) render();
+    }).catch(function () { });
   }
 
   /* ══════════ البيانات الوصفية (متاحة لكل مسجّل) ══════════ */
@@ -251,9 +282,11 @@
       '</div>' +
       '<p style="margin-top:10px"><b>وده اللي هتاخده بالأرقام المقاسة (مش وعود):</b></p>' +
       '</div>' + stats +
-      '<p style="margin-top:12px">الباقة غير مفعّلة على حسابك دلوقتي. ' +
-      'لو محتاجها، كلّم الدعم وهي تتفعّل في ثواني — ' +
-      '<b>٣٥٠ جنيه/شهر</b> (أو باقة سنوية بخصم).</p>' +
+      '<p style="margin-top:12px">' + (S.subscription && S.subscription.expired
+        ? ('باقتك خلصت يوم ' + (S.subscription.until_date || '—') + ' — جددها وارجع كمل.')
+        : 'الباقة غير مفعّلة على حسابك دلوقتي.') +
+      ' كلّم الدعم وهي تتفعّل في ثواني — ' +
+      '<b>٣٥٠ جنيه/شهر</b> (أو باقة سنوية ' + num(3500, '٣٥٠٠') + ' جنيه).</p>' +
       '</div>';
   }
 

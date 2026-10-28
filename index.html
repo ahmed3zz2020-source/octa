@@ -1869,6 +1869,52 @@ window.addEventListener('error', function (e) {
   </div>
 
 
+  <!-- ══════ صفحة «المناطق» — خريطة المستويات ══════ -->
+  <div class="page" id="page-zones">
+  <div class="su-wrap">
+
+  <div class="su-top">
+    <div style="flex:1;min-width:230px">
+      <div class="su-title">🗺️ المناطق</div>
+      <div class="su-sub">أقرب مستوى قدام كل سهم — قبل ما الكسر يحصل. مع قوة المنطقة وعدد لمساتها وآخر اختبار عليها.</div>
+      <div class="su-status" id="znStatus"><span class="su-dot"></span> بنحسب الخريطة…</div>
+    </div>
+  </div>
+
+  <div class="su-tools">
+    <input id="znQ" class="su-in" type="search" placeholder="دوّر بالاسم أو الرمز…" autocomplete="off">
+    <select id="znKind" class="su-sel" aria-label="النوع">
+      <option value="all">الكل</option>
+      <option value="resistance">مقاومات</option>
+      <option value="support">دعم</option>
+    </select>
+    <select id="znDist" class="su-sel" aria-label="أقصى بُعد">
+      <option value="25">أقرب ٢٥٪</option>
+      <option value="10">أقرب ١٠٪</option>
+      <option value="5">أقرب ٥٪</option>
+      <option value="3">أقرب ٣٪</option>
+    </select>
+    <button id="znRefresh" class="su-chip primary" type="button">⟳ تحديث</button>
+  </div>
+
+  <div class="su-panel" id="znPanel" style="display:none;">
+    <div class="su-phead">
+      <div>
+        <div class="su-ptitle" id="znTitle">—</div>
+        <div class="su-psub" id="znSub">—</div>
+      </div>
+    </div>
+    <div class="su-chart" id="znChart"></div>
+  </div>
+
+  <div id="znBody">
+  <div id="znTableBox"></div>
+  </div>
+
+  </div>
+  </div>
+
+
   <!-- ══════ صفحة «نماذجي» — أنماط الكسر المُقاسة ══════ -->
   <div class="page" id="page-setups">
   <div class="su-wrap">
@@ -1884,6 +1930,7 @@ window.addEventListener('error', function (e) {
       <div class="su-stat"><span>صعودي</span><b id="suUp">—</b></div>
       <div class="su-stat b"><span>أعلى ع/م</span><b id="suRR">—</b></div>
       <div class="su-stat"><span>آخر إشارة</span><b id="suWhen">—</b></div>
+      <div class="su-stat e" id="suSubStat"><span>الباقة</span><b id="suSub">—</b></div>
     </div>
   </div>
 
@@ -2002,6 +2049,7 @@ window.addEventListener('error', function (e) {
 <!-- 🧩 «نماذجي» — صفحة أنماط الكسر (٢٨ أكتوبر ٢٠٢٦) -->
 <script src="assets/js/octa-chartkit.js?v=202610280843"></script>
 <script src="assets/js/octa-setups.js?v=202610280843"></script>
+<script src="assets/js/octa-zones.js?v=202610281900"></script>
 <script src="assets/js/octa-studio.js?v=202610280843"></script>
 
 <!-- 🛠️ أدوات المطوّر — بتظهر بالمصادفة ولا ما فيش زرار عادي -->

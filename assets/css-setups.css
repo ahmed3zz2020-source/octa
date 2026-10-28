@@ -275,3 +275,7 @@
 .su-pact { margin-inline-start: auto; display: flex; gap: 8px; }
 .su-panel .su-chart { width: 100%; height: 320px; }
 .su-panel .su-kv { margin-top: 10px; margin-bottom: 0; }
+
+/* 💳 كارت الباقة */
+.su-stat.e b { color: var(--dn); }
+.su-stat.e b[style*="up"], .su-stat b { color: var(--up); }
