@@ -19,6 +19,7 @@
     loaded: false,
     locked: false,
     measured: null,
+    selected: null,
     chartLib: null
   };
 
@@ -130,6 +131,72 @@
   }
 
   /* ══════════ الرسم ══════════ */
+  /* ⭐ لوحة النمط المختار: شارت + المستويات */
+  function selectItem(it) {
+    S.selected = it;
+    var panel = $('suPanel');
+    if (!panel) return;
+    if (!it) { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    var st = it.setup || {};
+    var ev = it.evidence || {};
+    var title = $('suPTitle'), sub = $('suPSub'), kvBox = $('suPKv');
+    if (title) title.textContent = (it.code || '') + ' · ' + (it.name || '');
+    if (sub) {
+      sub.innerHTML = (it.direction === 'up' ? '▲ كسر صعودي' : '▼ كسر هبوطي') +
+        ' · ' + fmtDate(it.detected_at) +
+        (it.days_ago ? (' · من ' + it.days_ago + ' يوم') : '') +
+        (it.measured_fit === false ? ' · <b>مش مُقاس بالشرط العام</b>' : ' · <b>مُقاس</b>') +
+        ' · ' + esc(it.why || '');
+    }
+    if (kvBox) {
+      kvBox.innerHTML =
+        kv('مستوى الكسر', fmtPrice(st.level != null ? st.level : it.level)) +
+        kv('الدخول', fmtPrice(st.entry_ref != null ? st.entry_ref : it.entry)) +
+        kv('الوقف', fmtPrice(st.stop != null ? st.stop : it.stop)) +
+        kv('الهدف', fmtPrice(st.target != null ? st.target : it.target)) +
+        kv('عائد/مخاطرة', num(st.rr != null ? st.rr : it.rr, '—')) +
+        kv('نسبة التذبذب', ev.atr_pct != null ? Number(ev.atr_pct).toFixed(2) + '%' : '—') +
+        kv('تأكيد الحجم', it.volume_confirmed ? 'نعم' : 'لا') +
+        kv('حجم السوق', ev.vol_ratio != null ? '×' + Number(ev.vol_ratio).toFixed(2) : '—');
+    }
+    drawMainChart(it);
+  }
+
+  function drawMainChart(it) {
+    var box = $('suChartMain');
+    if (!box) return;
+    getJson('/api/radar/history?list=' + encodeURIComponent(it.code) + '&n=180', 60000)
+      .then(function (res) {
+        var j = res.json || {};
+        var arr = j.candles || j.data || (j[it.code] || []);
+        var rows = [];
+        for (var i = 0; i < arr.length; i++) {
+          var c = arr[i];
+          var t = c.t || c.time || c.d;
+          if (t == null) continue;
+          rows.push({ time: typeof t === 'string' ? t : String(t),
+                      open: c.o, high: c.h, low: c.l, close: c.c, volume: c.v });
+        }
+        if (!rows.length) { box.innerHTML = '<div class="su-empty">مفيش شموع للعرض</div>'; return; }
+        var st = it.setup || {};
+        var lines = [];
+        if (st.level != null) lines.push({ price: st.level, color: '#a855f7', title: 'مستوى الكسر' });
+        if (st.entry_ref != null) lines.push({ price: st.entry_ref, color: '#d4af37', title: 'دخول' });
+        if (st.stop != null) lines.push({ price: st.stop, color: '#ef4444', title: 'وقف' });
+        if (st.target != null) lines.push({ price: st.target, color: '#22c55e', title: 'هدف' });
+        var p = (window.OCTAChartKit)
+          ? window.OCTAChartKit.mount(box, rows, { lines: lines, volume: true, height: 320 })
+          : Promise.reject(new Error('no kit'));
+        Promise.resolve(p).catch(function () {
+          box.innerHTML = '<div class="su-empty">مكتبة الرسم مش متاحة</div>';
+        });
+      })
+      .catch(function () {
+        box.innerHTML = '<div class="su-empty">تعذّر جلب الشموع</div>';
+      });
+  }
+
   function render() {
     renderStats();
     var wrap = $('suBody');
@@ -213,6 +280,10 @@
         '</tr>';
     }).join('');
 
+    var first = S.filtered[0];
+    if (first && (!S.selected || S.filtered.indexOf(S.selected) < 0)) {
+      selectItem(first);
+    }
     box.innerHTML = '<div class="su-tablewrap"><table class="su-table"><thead><tr>' +
       '<th class="sticky-c">السهم</th><th>الاتجاه</th><th>المستوى</th>' +
       '<th>الدخول</th><th>الوقف</th><th>الهدف</th>' +
@@ -225,7 +296,14 @@
     var trs = box.querySelectorAll('tbody tr');
     for (var i = 0; i < trs.length; i++) {
       (function (tr) {
-        tr.addEventListener('click', function () { openDetail(tr.getAttribute('data-code')); });
+        tr.addEventListener('click', function () {
+          var code = tr.getAttribute('data-code');
+          var it = null;
+          for (var q = 0; q < S.filtered.length; q++) {
+            if (S.filtered[q].code === code) { it = S.filtered[q]; break; }
+          }
+          if (it) selectItem(it);
+        });
         tr.addEventListener('keydown', function (e) {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -409,6 +487,10 @@
     });
     var b = $('suRefresh');
     if (b) b.addEventListener('click', function () { load(); });
+    var d = $('suDetails');
+    if (d) d.addEventListener('click', function () {
+      if (S.selected) openDetail(S.selected.code);
+    });
   }
 
   function init() {
