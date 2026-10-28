@@ -612,6 +612,9 @@ function octaPageInit(id) {
   if (id === 'studio' && typeof OCTAStudio === 'object') setTimeout(()=>{ try { OCTAStudio._test && OCTAStudio._test.renderList(); } catch(e){ console.warn('studio:', e.message); } }, 180);
   /* 🗺️ المناطق — خريطة المستويات (٢٨ أكتوبر ٢٠٢٦) */
   if (id === 'zones' && typeof OCTAZones === 'object') setTimeout(()=>{ try { OCTAZones.load(); } catch(e){ console.warn('zones:', e.message); } }, 180);
+  /* 🎯 التحديات — تحدي اليوم + لوحة المتصدرين (٢٨ أكتوبر ٢٠٢٦)
+     ⛔ الـinit مرتين (فتح الصفحة + بعد البوابة) — زي باقي الصفحات. */
+  if (id === 'challenges' && typeof OCTAChallenges === 'object') setTimeout(()=>{ try { OCTAChallenges.load(); } catch(e){ console.warn('challenges:', e.message); } }, 180);
   if (id === 'compare') setTimeout(()=>{ if (typeof cmpInit==='function') cmpInit(); }, 150);
   /* 🔴⛔⛔ إصلاح 2026-10-15 — الباج اللي Ahmed صوّره.
      كان: `setTimeout(fzInit, 180)` — يعني بنستنى ١٨٠ مللي ثم نرسم.
@@ -768,7 +771,7 @@ function switchPage(id) {
    📌 رابط مباشر `#/stocks` أو `#/markets` يفتح لوحة الأسواق.
    📌 + URL كامل (octashares.com/markets) — الـworker بيقدّم index.html.
    ⚠️ 'stocks' و 'markets' نقطة واحدة — كلهم بيفتحوا نفس الصفحة. */
-const TOOL_PAGES = ['filter','best','screener','dividends','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms','money','radar','radar-stock','setups','studio','zones','stocks','markets'];
+const TOOL_PAGES = ['filter','best','screener','dividends','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms','money','radar','radar-stock','setups','studio','zones','challenges','stocks','markets'];
 /* ══════════════════════════════════════════════════════════════
  *  🧰 شريط الأدوات — 8 أدوات بس، والباتاقي في الـsidebar
  *  ──────────────────────────────────────────────────────────
@@ -793,6 +796,7 @@ const TOOLS = [
   { id:'setups',  i:'🧩', n:'نماذجي', d:'أنماط كسر مُقاسة بمدخل ووقف وهدف' },
   { id:'studio',  i:'🎨', n:'الاستوديو', d:'ارسم مستوياتك واحفظ ملاحظاتك' },
   { id:'zones',   i:'🗺️', n:'المناطق', d:'أقرب مستوى قدام كل سهم' },
+  { id:'challenges', i:'🎯', n:'التحديات', d:'تحدي يومي + لوحة المتصدرين' },
   { id:'dash',      i:'📊', n:'لوحة التحكم', d:'حالة النظام · أفضل ١٠ أسهم · اختبار الضغط' }
 ];
 

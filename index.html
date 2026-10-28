@@ -300,6 +300,8 @@ window.addEventListener('error', function (e) {
      الشارت القديم (octa-chart.js · octa-chart-v2.js) اتشال من المشروع. */
   'assets/js/tv-shim.js',
   'assets/js/octa-copy.js',
+  /* 🎯 «التحديات» — صفحة جديدة (٢٨ أكتوبر ٢٠٢٦) */
+  'assets/js/octa-challenges.js','assets/css-challenges.css',
   'assets/octa-tokens.css'
   ].forEach(function (u) {
   if (window.caches) caches.open('octa-v1-' + BUILD).then(function (c) { c.delete(u); });
@@ -431,6 +433,7 @@ window.addEventListener('error', function (e) {
 <link rel="stylesheet" href="assets/css-money.css?v=202610281030">
 <link rel="stylesheet" href="assets/css-radar.css?v=202610281030">
 <link rel="stylesheet" href="assets/css-setups.css?v=202610281030">
+<link rel="stylesheet" href="assets/css-challenges.css?v=202610281030">
   <!-- 🔒 سياسة الأمان — بتتقرأ وتتركّب من octa-csp.js (report-only) -->
   <meta name="octa-csp-report" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com https://s.tradingview.com https://www.tradingview.com; frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com; form-action 'self'; img-src 'self' data: blob: https://*.tradingview.com https://*.tradingview-widget.com; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' https://s3.tradingview.com; connect-src 'self' https://octa-prices-production-4ccb.up.railway.app https://scanner.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://www.tradingview-widget.com https://*.tradingview.com https://news.google.com https://api.rss2json.com https://foudalens.com https://api.cors.lol; frame-src https://s3.tradingview.com https://www.tradingview.com https://*.tradingview-widget.com https://*.tradingview.com; media-src 'self' blob:; worker-src 'self' blob:">
 </head>
@@ -1979,6 +1982,67 @@ window.addEventListener('error', function (e) {
   </div>
 
 
+  <!-- ══════ صفحة «التحديات» — تحدي اليوم + لوحة المتصدرين ══════ -->
+  <div class="page" id="page-challenges">
+  <div class="ch-wrap">
+
+  <div class="ch-top">
+    <div style="flex:1;min-width:230px">
+      <div class="ch-title">🎯 التحديات</div>
+      <div class="ch-sub">تحدي واحد كل يوم: سهم من البورصة المصرية بمستويات دخول ووقف وهدف — صوّت صعود ولا هبوط، وتعلّم من النتيجة.</div>
+      <div class="ch-status" id="chStatus"><span class="ch-dot"></span> بنجهّز تحدي اليوم…</div>
+    </div>
+    <div class="ch-stats">
+      <div class="ch-stat a"><span>نقاط</span><b id="chPoints">—</b></div>
+      <div class="ch-stat"><span>صح</span><b id="chCorrect">—</b></div>
+      <div class="ch-stat c"><span>غلط</span><b id="chWrong">—</b></div>
+      <div class="ch-stat b"><span>الدقة</span><b id="chAccuracy">—</b></div>
+      <div class="ch-stat"><span>سلسلة</span><b id="chStreak">—</b></div>
+      <div class="ch-stat"><span>ترتيبك</span><b id="chRank">—</b></div>
+    </div>
+  </div>
+
+  <!-- ⭐ كارت التحدي -->
+  <div id="chLockBox"></div>
+
+  <div id="chBody">
+  <section class="ch-card" id="chCard">
+    <div class="ch-cardhead" id="chCardHead"></div>
+    <div id="chCardLevels"></div>
+    <div class="ch-question" id="chQuestion"></div>
+
+    <div class="ch-vote" id="chVoteBox">
+      <button class="ch-votebtn up" id="chVoteUp" type="button">⬆ صعود</button>
+      <button class="ch-votebtn down" id="chVoteDown" type="button">⬇ هبوط</button>
+    </div>
+    <div class="ch-votestate" id="chVoteState"></div>
+    <div class="ch-days" id="chDaysLeft"></div>
+  </section>
+
+  <div id="chNoMsg" style="display:none;"></div>
+
+  <div class="ch-chart" id="chChart"></div>
+
+  <div id="chResult"></div>
+  </div>
+
+  <!-- 🏆 لوحة المتصدرين -->
+  <section class="ch-panel">
+    <h3 class="ch-h3">🏆 لوحة المتصدرين</h3>
+    <div id="chLeaderboard"></div>
+  </section>
+
+  <div class="ch-tools">
+    <button class="ch-chip" id="chRefresh" type="button">⟳ تحديث</button>
+    <span class="ch-mini">التحدي بيتحدّث مرة في اليوم بعد قفل السوق</span>
+  </div>
+
+  <div class="ch-disclaimer">⛔ أداة تعليمية — مش توصية شراء أو بيع. القرار قرارك.</div>
+
+  </div>
+  </div>
+
+
   <!-- ══════════ 🎯 نافذة قرار اليوم ══════════ -->
   <div id="decideModal" class="dc-modal" onclick="if(event.target===this) closeDecide()">
   <div class="dc-modal-box">
@@ -2056,6 +2120,8 @@ window.addEventListener('error', function (e) {
 <script src="assets/js/octa-setups.js?v=202610281030"></script>
 <script src="assets/js/octa-zones.js?v=202610281030"></script>
 <script src="assets/js/octa-studio.js?v=202610281030"></script>
+<!-- 🎯 «التحديات» — تحدي اليوم + لوحة المتصدرين (٢٨ أكتوبر ٢٠٢٦) -->
+<script src="assets/js/octa-challenges.js?v=202610281030"></script>
 
 <!-- 🛠️ أدوات المطوّر — بتظهر بالمصادفة ولا ما فيش زرار عادي -->
 <div class="octa-devbar">
