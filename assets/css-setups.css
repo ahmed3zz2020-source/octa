@@ -459,3 +459,27 @@
 }
 .octa-attr a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
 .octa-attr a:hover { color: var(--txt); }
+
+/* ══════════ 📋 نقل المستويات لـTradingView (٢٨ أكتوبر ٢٠٢٦) ══════════ */
+.su-codebox { margin-top: 10px; }
+.su-steps {
+  font-size: 12.5px; line-height: 2.1; color: var(--txt);
+  background: var(--pri2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; text-align: start;
+}
+.su-steps b { color: var(--gold); }
+.su-steps code {
+  direction: ltr; unicode-bidi: embed;
+  background: var(--pri3); border: 1px solid var(--line2);
+  border-radius: 5px; padding: 1px 6px; font-size: 12px;
+}
+.su-copyrow { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 8px; }
+.su-code {
+  direction: ltr; unicode-bidi: embed; text-align: left;
+  background: var(--pri4); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px; line-height: 1.6; color: var(--txt);
+  overflow-x: auto; max-height: 340px; white-space: pre;
+  -webkit-overflow-scrolling: touch;
+}

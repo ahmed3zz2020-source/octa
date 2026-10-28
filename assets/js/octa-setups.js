@@ -672,6 +672,185 @@
     return head + lv + cred;
   }
 
+  /* ══════════════════════════════════════════════════════════════
+     📋 نقل مستويات الصفقة لـTradingView (٢٨ أكتوبر ٢٠٢٦)
+     ──────────────────────────────────────────────────────────────
+     📌 ليه سكربت Pine مش «تصدير layout JSON»:
+     📌   TradingView ما بيقبلش استيراد layout JSON للمستخدم العادي
+     📌   (قائمة «Manage layouts» مفيهاش Import — بس تصدير CSV بيانات).
+     📌   ⇒ البديل الوحيد اللي يشتغل فعلاً: سكربت Pine يلصقه المستخدم
+     📌   في Pine Editor → Add to chart ⇒ مستوياته تترسم على شartه.
+     📌   وكمان بنحطّله شروط إنذار جاهزة (وصل الهدف / اتكسر الوقف).
+     ⛔ المستويات وقت التصدير — السعر الحي من TradingView نفسه.
+     ⛔ أداة تحليل — مش توصية شراء أو بيع.
+     ══════════════════════════════════════════════════════════════ */
+
+  /* رقم نظيف للسكربت (من غير فواصل) */
+  function pineNum(v) {
+    if (v == null || !isFinite(v)) return null;
+    var n = Math.abs(v) >= 100 ? 2 : (Math.abs(v) >= 1 ? 3 : 4);
+    return Number(v).toFixed(n);
+  }
+
+  function levelSet(it) {
+    var st = (it && it.setup) || {};
+    var entry = (st.entry_ref != null ? st.entry_ref : it.entry);
+    var stop = (st.stop != null ? st.stop : it.stop);
+    var target = (st.target != null ? st.target : it.target);
+    var brk = (st.level != null ? st.level : it.level);
+    return {
+      entry: pineNum(entry),
+      stop: pineNum(stop),
+      target: pineNum(target),
+      brk: pineNum(brk),
+      deep: pineNum(st.entry_deep),
+      part: pineNum(st.target_partial)
+    };
+  }
+
+  /* 🐍 سكربت Pine — يرسم المستويات + شروط الإنذار */
+  function pineFor(it) {
+    var code = String((it && it.code) || '').replace(/["\n\r]/g, '');
+    var name = String((it && it.name) || code).replace(/["\n\r]/g, '');
+    var up = (it && it.direction) === 'up';
+    var L = levelSet(it);
+    var A = [];
+
+    A.push('//@version=6');
+    A.push('indicator("OCTA — مستويات صفقة ' + code + '", overlay=true, max_lines_count=500, max_labels_count=500)');
+    A.push('');
+    A.push('// ' + name + ' (' + code + ') · ' + (up ? 'كسر صعودي' : 'كسر هبوطي') +
+      ' · كسر بتاريخ ' + fmtDate(it && it.detected_at));
+    A.push('// استخدم السكربت على نفس السهم (EGX:' + code + ') واليوم (1D).');
+    A.push('// المستويات دي وقت التصدير — السعر الحالي من TradingView.');
+    A.push('// أداة تحليل — مش توصية شراء أو بيع. القرار قرارك.');
+    A.push('');
+    A.push('// ⚙️ المستويات — تقدر تعدّلها من إعدادات المؤشر');
+    if (L.entry != null) A.push('iEntry  = input.float(' + L.entry + ', "الدخول", group="المستويات")');
+    if (L.stop != null) A.push('iStop   = input.float(' + L.stop + ', "الوقف", group="المستويات")');
+    if (L.target != null) A.push('iTarget = input.float(' + L.target + ', "الهدف", group="المستويات")');
+    if (L.brk != null) A.push('iBreak  = input.float(' + L.brk + ', "مستوى الكسر", group="المستويات")');
+    if (L.deep != null) A.push('iDeep   = input.float(' + L.deep + ', "دخول أعمق — إدارة", group="إدارة الصفقة")');
+    if (L.part != null) A.push('iPart   = input.float(' + L.part + ', "هدف أول — إدارة", group="إدارة الصفقة")');
+    A.push('showAdmin = input.bool(true, "اظهر مستويات الإدارة", group="إدارة الصفقة")');
+    A.push('');
+    A.push('if barstate.islast');
+    A.push('    x0 = math.max(0, bar_index - 400)');
+
+    var draw = function (v, txt, color, tc, width, dotted, ind) {
+      var p = ind || '    ';
+      A.push(p + 'line.new(x1=x0, y1=' + v + ', x2=bar_index, y2=' + v +
+        ', extend=extend.right, color=' + color + ', width=' + width +
+        (dotted ? ', style=line.style_dotted' : '') + ')');
+      A.push(p + 'label.new(x=bar_index, y=' + v + ', text="' + txt + ' " + str.tostring(' + v +
+        ', format.mintick), style=label.style_label_left, color=' + color + ', textcolor=' + tc + ')');
+    };
+
+    if (L.entry != null) draw('iEntry', 'الدخول', 'color.teal', 'color.white', '2', false);
+    if (L.stop != null) draw('iStop', 'الوقف', 'color.red', 'color.white', '2', false);
+    if (L.target != null) draw('iTarget', 'الهدف', 'color.lime', 'color.black', '2', false);
+    if (L.brk != null) draw('iBreak', 'الكسر', 'color.orange', 'color.black', '2', false);
+    if (L.deep != null || L.part != null) {
+      A.push('    if showAdmin');
+      if (L.deep != null) draw('iDeep', 'دخول أعمق', 'color.new(color.gray, 55)', 'color.white', '1', true, '        ');
+      if (L.part != null) draw('iPart', 'هدف أول', 'color.new(color.gray, 55)', 'color.white', '1', true, '        ');
+    }
+
+    A.push('');
+    A.push('// 🔔 شروط الإنذار — من TradingView: Alert → Condition → اختار اسم الشرط ده');
+    if (L.target != null) {
+      A.push(up
+        ? 'alertcondition(close >= iTarget, title="OCTA: وصل الهدف", message="السهم وصل الهدف (' + code + ')")'
+        : 'alertcondition(close <= iTarget, title="OCTA: وصل الهدف", message="السهم وصل الهدف (' + code + ')")');
+    }
+    if (L.stop != null) {
+      A.push(up
+        ? 'alertcondition(close <= iStop, title="OCTA: اتكسر الوقف", message="الوقف اتكسر (' + code + ')")'
+        : 'alertcondition(close >= iStop, title="OCTA: اتكسر الوقف", message="الوقف اتكسر (' + code + ')")');
+    }
+    if (L.brk != null) {
+      A.push(up
+        ? 'alertcondition(close <= iBreak, title="OCTA: رجع تحت الكسر", message="رجع تحت مستوى الكسر (' + code + ')")'
+        : 'alertcondition(close >= iBreak, title="OCTA: رجع فوق الكسر", message="رجع فوق مستوى الكسر (' + code + ')")');
+    }
+    return A.join('\n');
+  }
+
+  /* 📝 الأرقام ك نص عادي (لو المستخدم مش عايز Pine) */
+  function levelsFor(it) {
+    var st = (it && it.setup) || {};
+    var L = levelSet(it);
+    var up = (it && it.direction) === 'up';
+    var A = [];
+    A.push(String((it && it.name) || '') + ' (' + ((it && it.code) || '') + ') · ' +
+      (up ? 'كسر صعودي' : 'كسر هبوطي') + ' · ' + fmtDate(it && it.detected_at));
+    A.push('TradingView: EGX:' + ((it && it.code) || ''));
+    if (L.entry != null) A.push('الدخول: ' + L.entry);
+    if (L.stop != null) A.push('الوقف: ' + L.stop);
+    if (L.target != null) A.push('الهدف: ' + L.target);
+    if (L.brk != null) A.push('مستوى الكسر: ' + L.brk);
+    if (L.deep != null) A.push('دخول أعمق (إدارة): ' + L.deep);
+    if (L.part != null) A.push('هدف أول (إدارة): ' + L.part);
+    var rr = (st.rr != null ? st.rr : (it && it.rr));
+    if (rr != null && isFinite(rr)) A.push('العائد/المخاطرة: ' + Number(rr).toFixed(2) + 'R');
+    A.push('⛔ أداة تحليل — مش توصية شراء أو بيع. القرار قرارك.');
+    return A.join('\n');
+  }
+
+  /* 📋 نسخ نص — مع بديل للـclipboard (iOS Safari) */
+  function copyText(txt, btn) {
+    var fallback = function () {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = txt;
+        ta.setAttribute('readonly', 'readonly');
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, txt.length);
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        done(ok);
+      } catch (e) { done(false); }
+    };
+    var done = function (ok) {
+      if (!btn) return;
+      if (!btn.getAttribute('data-lbl')) btn.setAttribute('data-lbl', btn.textContent);
+      btn.textContent = ok ? '✅ اتنسخ' : '❌ مقدرتش';
+      setTimeout(function () {
+        btn.textContent = btn.getAttribute('data-lbl') || '📋 انسخ';
+      }, 1900);
+    };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(function () { done(true); }, function () { fallback(); });
+        return;
+      }
+    } catch (e) { }
+    fallback();
+  }
+
+  /* 📦 بلوك «نقل لـTradingView» */
+  function codeBoxHTML(it) {
+    var code = esc((it && it.code) || '');
+    return '<div class="su-steps">' +
+      '<b>①</b> افتح TradingView على السهم <code>EGX:' + code + '</code> — الإطار اليومي (1D).' +
+      '<br><b>②</b> افتح <b>Pine Editor</b> (أيقونة Pine على يمين الشارت — من على الكمبيوتر أضمن) والصق الكود ده.' +
+      '<br><b>③</b> اضغط <b>Add to chart</b> — مستوياته هتترسم على شartك فوق مؤشراك.' +
+      '</div>' +
+      '<div class="su-copyrow">' +
+      '<button class="su-btn primary" type="button" id="suCopyPine">📋 انسخ سكربت TradingView</button>' +
+      '<button class="su-btn" type="button" id="suCopyLv">📋 انسخ الأرقام</button>' +
+      '</div>' +
+      '<pre class="su-code" id="suPineBox">' + esc(pineFor(it)) + '</pre>' +
+      '<p class="su-note">🔔 الإنذار (من على الكمبيوتر): افتح إعدادات الـAlert في TradingView → Condition → ' +
+      'اختار «OCTA: وصل الهدف» أو «OCTA: اتكسر الوقف» — والحكم على السعر الحي بتاع TradingView، مش على سعرك في الموقع.</p>' +
+      '<p class="su-note">⛔ المستويات دي وقت تصدير السكربت (' + fmtDate(it && it.detected_at) +
+      ') — والسعر بيتحرك مع السوق. أداة تحليل — مش توصية شراء أو بيع. القرار قرارك.</p>';
+  }
+
   /* ══════════ نافذة «التحليل الكامل» ══════════ */
   function openAnalysis(it) {
     if (!it) return;
@@ -692,10 +871,12 @@
       '<div class="su-tabs">' +
       '<button class="su-tab on" type="button" data-atab="chart">📈 شارت التحليل</button>' +
       '<button class="su-tab" type="button" data-atab="tv">TradingView</button>' +
+      '<button class="su-tab" type="button" data-atab="code">📋 نقل لـTradingView</button>' +
       '</div>' +
       '<div class="su-chart" id="suAnChart"></div>' +
       '<div class="su-legend" id="suAnLegend"></div>' +
       '<div class="su-tvbox" id="suAnTv" style="display:none;"></div>' +
+      '<div class="su-codebox" id="suAnCode" style="display:none;">' + codeBoxHTML(it) + '</div>' +
       analysisHTML(it) +
       '<div class="su-mact">' +
       '<button class="su-btn primary" type="button" id="suAnStock">افتح صفحة السهم</button>' +
@@ -730,6 +911,16 @@
       catch (e) { window.location.hash = '#stock/' + it.code; }
     });
 
+    /* 📋 نسخ: سكربت TradingView + الأرقام */
+    var cpPine = ov.querySelector('#suCopyPine');
+    if (cpPine) cpPine.addEventListener('click', function () {
+      copyText(pineFor(it), cpPine);
+    });
+    var cpLv = ov.querySelector('#suCopyLv');
+    if (cpLv) cpLv.addEventListener('click', function () {
+      copyText(levelsFor(it), cpLv);
+    });
+
     /* 📌 التبويبات: شارت التحليل / TradingView */
     var tabs = ov.querySelectorAll('.su-tab');
     for (var i = 0; i < tabs.length; i++) {
@@ -740,10 +931,12 @@
           var cbox = ov.querySelector('#suAnChart');
           var tbox = ov.querySelector('#suAnTv');
           var lbox = ov.querySelector('#suAnLegend');
+          var kbox = ov.querySelector('#suAnCode');
           if (!cbox || !tbox) return;
           cbox.style.display = (which === 'chart') ? '' : 'none';
           if (lbox) lbox.style.display = (which === 'chart') ? '' : 'none';
           tbox.style.display = (which === 'tv') ? '' : 'none';
+          if (kbox) kbox.style.display = (which === 'code') ? '' : 'none';
           if (which === 'tv' && !tbox.getAttribute('data-loaded')) {
             tbox.setAttribute('data-loaded', '1');
             var kit = window.OCTAChartKit;
@@ -809,6 +1002,7 @@
       '<div class="su-mact">' +
       '<button class="su-btn primary" type="button" id="suOpenStock">افتح صفحة السهم</button>' +
       '<button class="su-btn" type="button" id="suCalc">⚖️ احسب حجم مركزك</button>' +
+      '<button class="su-btn" type="button" id="suCopyLv2">📋 انسخ المستويات</button>' +
       '<a class="su-btn" target="_blank" rel="noopener noreferrer" href="https://www.tradingview.com/chart/?symbol=EGX%3A' + encodeURIComponent(it.code) + '">افتح على TradingView</a>' +
       '<button class="su-btn" type="button" id="suClose2">اقفل</button>' +
       '</div>' +
@@ -838,6 +1032,10 @@
       close();
       try { if (typeof openStock === 'function') openStock(it.code); }
       catch (e) { window.location.hash = '#stock/' + it.code; }
+    });
+    var cpLv2 = $('suCopyLv2');
+    if (cpLv2) cpLv2.addEventListener('click', function () {
+      copyText(levelsFor(it), cpLv2);
     });
 
     drawChart(it, $('suChart'));
@@ -974,7 +1172,10 @@
       tvBoxHtml: tvBoxHtml,
       priceLines: priceLines,
       patternOf: patternOf,
-      showTab: showTab
+      showTab: showTab,
+      pineFor: pineFor,
+      levelsFor: levelsFor,
+      codeBoxHTML: codeBoxHTML
     }
   };
 })();

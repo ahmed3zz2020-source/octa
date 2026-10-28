@@ -631,3 +631,92 @@ test('⭐ الـlegend بيلوّن المستويات (نطاق · دخول · 
   assert.ok(lg.every(function (x) { return x.price != null && x.price !== 'undefined'; }),
             'كل صف في الـlegend له سعر');
 });
+
+/* ═══════════ 📋 نقل المستويات لـTradingView (٢٨ أكتوبر ٢٠٢٦) ═══════════ */
+
+function mkTvItem(o) {
+  o = o || {};
+  const it = mkItem(o);
+  it.code = o.code || 'EAST';
+  it.name = o.name || 'الشرقية للدخان';
+  it.direction = o.direction || 'up';
+  it.detected_at = o.detected_at || '2026-10-25';
+  it.entry = o.entry || 29.634;
+  it.stop = o.stop || 28.692;
+  it.target = o.target || 32.1459;
+  it.level = o.level || 29.32;
+  it.rr = o.rr || 2.67;
+  it.setup = o.setup || {
+    entry_ref: 29.634, stop: 28.064, target: 34.658, level: 29.32,
+    entry_deep: 29.32, target_partial: 32.146, rr: 3.2,
+    stop_atr: 1.0, target_atr: 4.0
+  };
+  return it;
+}
+
+test('⭐ سكربت TradingView بيتولّد: نسخة 6 + مؤشر + المستويات الأربعة', () => {
+  const sb = loadUI(mockApi({ ok: true, items: [] }));
+  const pine = sb.win.OCTASetups._test.pineFor(mkTvItem({}));
+  assert.ok(pine.indexOf('//@version=6') === 0, 'نسخة Pine 6');
+  assert.ok(pine.indexOf('indicator(') >= 0, 'مؤشر');
+  assert.ok(pine.indexOf('overlay=true') >= 0, 'overlay');
+  assert.ok(pine.indexOf('iEntry  = input.float(29.634') >= 0, 'الدخول');
+  assert.ok(pine.indexOf('iStop   = input.float(28.064') >= 0, 'الوقف');
+  assert.ok(pine.indexOf('iTarget = input.float(34.658') >= 0, 'الهدف');
+  assert.ok(pine.indexOf('iBreak  = input.float(29.320') >= 0, 'مستوى الكسر');
+});
+
+test('⭐ شروط الإنذار بتتظبط حسب اتجاه الكسر', () => {
+  const sb = loadUI(mockApi({ ok: true, items: [] }));
+  const up = sb.win.OCTASetups._test.pineFor(mkTvItem({ direction: 'up' }));
+  assert.ok(up.indexOf('alertcondition(close >= iTarget') >= 0, 'صعودي: الهدف فوق');
+  assert.ok(up.indexOf('alertcondition(close <= iStop') >= 0, 'صعودي: الوقف تحت');
+  const dn = sb.win.OCTASetups._test.pineFor(mkTvItem({
+    direction: 'down',
+    setup: { entry_ref: 10.5, stop: 11.2, target: 8.9, level: 10.8 }
+  }));
+  assert.ok(dn.indexOf('alertcondition(close <= iTarget') >= 0, 'هبوطي: الهدف تحت');
+  assert.ok(dn.indexOf('alertcondition(close >= iStop') >= 0, 'هبوطي: الوقف فوق');
+});
+
+test('⭐ مستويات الإدارة متداخلة جوه if showAdmin (مش على نفس المسافة)', () => {
+  const sb = loadUI(mockApi({ ok: true, items: [] }));
+  const pine = sb.win.OCTASetups._test.pineFor(mkTvItem({}));
+  const lines = pine.split('\n');
+  const ifIdx = lines.findIndex(function (l) { return l.trim() === 'if showAdmin'; });
+  assert.ok(ifIdx >= 0, 'الكتلة موجودة');
+  const body = lines.slice(ifIdx + 1).filter(function (l) { return l.trim() && l.indexOf('iDeep') >= 0 || l.indexOf('iPart') >= 0; });
+  assert.ok(body.length >= 2, 'فيه سطور الإدارة');
+  body.forEach(function (l) {
+    const ind = l.match(/^\s*/)[0].length;
+    const ifInd = lines[ifIdx].match(/^\s*/)[0].length;
+    assert.ok(ind > ifInd, 'السطر متداخل جوه الـif (Pine بيرفض غير كده): ' + l.trim());
+  });
+});
+
+test('⭐ السكربت ما فيهوش نقاط ناقصة + فيه تنويه «مش توصية»', () => {
+  const sb = loadUI(mockApi({ ok: true, items: [] }));
+  const pine = sb.win.OCTASetups._test.pineFor(mkTvItem({}));
+  assert.equal(pine.indexOf('...'), -1, 'مفيش ... (قاعدة المشروع)');
+  assert.ok(pine.indexOf('مش توصية شراء أو بيع') >= 0, 'التنويه موجود');
+});
+
+test('⭐ «انسخ الأرقام» بيطلع المستويات + التنويه', () => {
+  const sb = loadUI(mockApi({ ok: true, items: [] }));
+  const txt = sb.win.OCTASetups._test.levelsFor(mkTvItem({}));
+  assert.ok(txt.indexOf('EGX:EAST') >= 0, 'رمز TradingView');
+  assert.ok(txt.indexOf('الدخول: 29.634') >= 0, 'الدخول');
+  assert.ok(txt.indexOf('الوقف: 28.064') >= 0, 'الوقف');
+  assert.ok(txt.indexOf('الهدف: 34.658') >= 0, 'الهدف');
+  assert.ok(txt.indexOf('مش توصية') >= 0, 'التنويه');
+});
+
+test('⭐ بلوك «نقل لـTradingView» فيه الخطوات والزراير', () => {
+  const sb = loadUI(mockApi({ ok: true, items: [] }));
+  const html = sb.win.OCTASetups._test.codeBoxHTML(mkTvItem({}));
+  assert.ok(html.indexOf('Pine Editor') >= 0, 'الخطوات');
+  assert.ok(html.indexOf('id="suCopyPine"') >= 0, 'زر السكربت');
+  assert.ok(html.indexOf('id="suCopyLv"') >= 0, 'زر الأرقام');
+  assert.ok(html.indexOf('su-code') >= 0, 'بلوك الكود');
+  assert.equal(html.indexOf('...'), -1, 'مفيش ...');
+});
