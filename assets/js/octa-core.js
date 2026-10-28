@@ -774,6 +774,11 @@ function switchPage(id) {
   /* ═══ قرار اليوم — نافذة منبثقة مش صفحة ═══ */
   if (id === 'decide') { if (typeof openDecide==='function') openDecide(); return; }
 
+  /* ✅ علامة «اتعرضت» (٢٩ أكتوبر ٢٠٢٦)
+     📌 الـguard بيستعملها: لو الـJS اشتغل بس الصفحة فضلت فاضية
+     📌   (API 502 وقت الـworker بارد) ⇒ المستخدم يشوف رسالة بدل شاشة بيضا. */
+  try { document.documentElement.setAttribute('data-octa-ready', '1'); } catch (e) { }
+
   octaPageInit(id);
 }
 

@@ -1348,6 +1348,9 @@ function openArm(arm) {
   const cfg = ARM_MAP[arm];
   if (!cfg) return;
   CURRENT_ARM = arm;
+  /* ✅ علامة «اتعرضت» (٢٩ أكتوبر ٢٠٢٦) — شريحة الأذرع (الصفحة الافتراضية)
+     ⇒ لازم تتعلّم إن التطبيق اشتغل، وإلا الـguard هيقول «الصفحة فاضية». */
+  try { document.documentElement.setAttribute('data-octa-ready', '1'); } catch (e) { }
 
   document.querySelectorAll('.arm-btn').forEach(b =>
   b.classList.toggle('active', b.dataset.arm === arm));
