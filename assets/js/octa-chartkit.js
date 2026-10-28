@@ -193,7 +193,7 @@
     cv.style.position = 'absolute';
     cv.style.left = '0'; cv.style.top = '0';
     cv.style.pointerEvents = 'none';
-    cv.style.zIndex = '3';
+    cv.style.zIndex = '9999';
     box.style.position = box.style.position || 'relative';
     box.appendChild(cv);
 
