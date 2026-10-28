@@ -212,10 +212,14 @@
                       open: c.o, high: c.h, low: c.l, close: c.c, volume: c.v });
         }
         if (!rows.length) { box.innerHTML = '<div class="su-empty">مفيش شموع</div>'; return; }
-        var lines = [{ price: row.level, color: row.kind === 'resistance' ? '#ef4444' : '#22c55e',
-                       title: row.label || 'مستوى' }];
+        var lcolor = row.kind === 'resistance' ? '#ef4444' : '#22c55e';
+        var lines = [{ price: row.level, color: lcolor, style: 2, width: 2, title: row.label || 'مستوى' }];
+        var legend = [{ label: row.label || 'مستوى', price: (Math.round(row.level * 1000) / 1000),
+                        color: lcolor, tag: row.kind === 'resistance' ? 'مقاومة' : 'دعم' }];
         if (window.OCTAChartKit) {
-          Promise.resolve(window.OCTAChartKit.mount(box, rows, { lines: lines, volume: true, height: 300 }))
+          Promise.resolve(window.OCTAChartKit.mount(box, rows, {
+            lines: lines, volume: true, height: 300,
+            legend: legend, legendBox: $('znLegend') }))
             .catch(function () { box.innerHTML = '<div class="su-empty">مكتبة الرسم مش متاحة</div>'; });
         } else {
           box.innerHTML = '<div class="su-empty">مكتبة الرسم مش متاحة</div>';

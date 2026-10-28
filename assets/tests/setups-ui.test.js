@@ -429,8 +429,118 @@ test('🎨 mountPattern بيرسم من غير exception (canvas + إحداثي�
   assert.ok(calls.fillRect >= 3, 'اترسمت المستطيلات (نطاق + عائد + مخاطرة) · ' + calls.fillRect);
   assert.ok(calls.fill >= 3, 'اترسمت علامات الكسر · ' + calls.fill);
   assert.ok(calls.moveTo >= 2, 'اترسمت الخطوط');
-  assert.ok(fakeSeries.lines && fakeSeries.lines.length === 1, 'خط السعر اتعمل');
-  assert.equal(fakeSeries.lines[0].title, 'مستوى الكسر', 'التسمية العربية');
+  /* ⛔⛔ مافيش price lines: كانت بتلخبط محور السعر (ملصق لكل مستوى)
+     وبتموّد المقياس ⇒ المستويات على canvas والتسميات في الـlegend. */
+  assert.ok(!fakeSeries.lines || fakeSeries.lines.length === 0,
+    'مافيش price lines على محور السعر');
+  /* ⭐ الـlegend: HTML فيه التسميات العربية والأرقام */
+  const lg = kit.legendHTML([
+    { label: 'مستوى الكسر', price: '52', color: '#a855f7' },
+    { label: 'الدخول', price: '53', color: '#d4af37', tag: 'مُقاس' }
+  ]);
+  assert.ok(lg.indexOf('مستوى الكسر') >= 0, 'التسمية العربية في الـlegend');
+  assert.ok(lg.indexOf('مُقاس') >= 0, 'وسم المقاس في الـlegend');
+  assert.ok(lg.indexOf('52') >= 0, 'الرقم في الـlegend');
+});
+
+/* ═══════════ 16.5) 🛡️ حمايات الشارت (باجات ٢٨ أكتوبر ٢٠٢٦) ═══════════ */
+test('🛡️ الحجم pane لوحده + الارتفاع متزامن + الـlegend بره الشارت + إشعار الرخصة', async () => {
+  const sb = mkSandbox();
+  const calls = { addSeries: [] };
+  const fakeSeries = {
+    setData() { }, createPriceLine(o) { (fakeSeries.lines = fakeSeries.lines || []).push(o); },
+    priceToCoordinate(p) { return 150 - p; }
+  };
+  const fakePanes = [
+    { getHeight: () => 240, setStretchFactor(f) { calls.pane0Stretch = f; } },
+    { getHeight: () => 80, setStretchFactor(f) { calls.pane1Stretch = f; } }
+  ];
+  const fakeChart = {
+    __octaSeries: fakeSeries,
+    addSeries(def, opts, paneIdx) { calls.addSeries.push({ def, opts, paneIdx }); return fakeSeries; },
+    panes() { return fakePanes; },
+    timeScale() {
+      return {
+        fitContent() { }, setVisibleLogicalRange() { },
+        timeToCoordinate(t) { return 10 + String(t).length * 3; },
+        subscribeVisibleLogicalRangeChange(fn) { fakeChart._onRange = fn; },
+        height: () => 28
+      };
+    },
+    priceScale() { return { width: () => 60 }; },
+    subscribeClick() { },
+    applyOptions() { }
+  };
+  sb.win.LightweightCharts = {
+    createChart: (el, o) => { calls.createOpts = o; return fakeChart; },
+    CandlestickSeries: 'candle', HistogramSeries: 'hist', LineSeries: 'line'
+  };
+  sb.win.devicePixelRatio = 2;
+  const origCreate = sb.doc.createElement;
+  sb.doc.createElement = function (tag) {
+    const el = origCreate(tag);
+    if (String(tag).toLowerCase() === 'canvas') {
+      el.getContext = () => new Proxy({}, {
+        get(t, k) {
+          if (k === 'canvas') return { width: 400, height: 300 };
+          if (typeof k === 'string') return function () { };
+          return undefined;
+        },
+        set(t, k, v) { t[k] = v; return true; }
+      });
+    }
+    return el;
+  };
+
+  const code = fs.readFileSync(path.join(ROOT, 'assets/js/octa-chartkit.js'), 'utf8');
+  vm.runInContext(code, sb.ctx, { filename: 'octa-chartkit.js' });
+  const kit = sb.win.OCTAChartKit;
+
+  const rows = kit.rowsFromHistory({
+    codes: { COMI: { t: ['2026-10-01', '2026-10-14', '2026-10-27'],
+      o: [50, 51, 52], h: [52, 53, 54], l: [49, 50, 51], c: [51, 52, 53], v: [1, 2, 3] } }
+  }, 'COMI');
+
+  const box = makeEl('chartbox');
+  box.clientWidth = 400; box.clientHeight = 300;
+  box.style = {};
+  const parent = makeEl('parent');
+  parent.appendChild = function (el) { parent._child = el; };
+  box.parentNode = parent;
+
+  const legendBox = makeEl('legendbox');
+  legendBox.innerHTML = ''; legendBox.style = {};
+
+  await kit.mountPattern(box, rows, {
+    lines: [{ price: 52, color: '#a855f7' }],
+    volume: true, height: 320,
+    legend: [{ label: 'مستوى الكسر', price: '52', color: '#a855f7' }],
+    legendBox: legendBox,
+    pattern: { zone_low: 50, zone_high: 52, detect_at: '2026-10-14', age_days: 30,
+      entry: 53, stop: 49, target: 61 }
+  });
+
+  /* ① ⛔ الحجم في pane لوحده (مش overlay) */
+  const vol = calls.addSeries.find(a => a.def === 'hist');
+  assert.ok(vol, 'سلسلة الحجم اتعملت');
+  assert.equal(vol.paneIdx, 1, '⛔ الحجم في pane 1 (مش overlay على pane السعر)');
+  assert.notEqual(vol.opts.priceScaleId, '', '⛔ الحجم مش overlay scale');
+  assert.equal(vol.opts.lastValueVisible, false, '⛔ مافيش ملصق آخر قيمة للحجم');
+  assert.ok(calls.pane1Stretch > 0, '⛔ pane الحجم له طول (stretch factor)');
+  /* ② ⛔ مافيش price lines */
+  assert.ok(!fakeSeries.lines || fakeSeries.lines.length === 0, '⛔ مافيش price lines');
+  /* ③ ⛔ الارتفاع متزامن (مافيش سرّب فوق الكروت) */
+  assert.equal(calls.createOpts.height, 320, '⛔ ارتفاع الشارت = الارتفاع المطلوب');
+  assert.equal(box.style.height, '320px', '⛔ البوكسtook نفس ارتفاع الشارت');
+  assert.equal(box.style.overflow, 'hidden', '⛔ البوكس بيقص أي تسرّب');
+  /* ④ ⛔ الـlegend بره الشارت */
+  assert.ok(legendBox.innerHTML.indexOf('مستوى الكسر') >= 0, '⛔ الـlegend اتحط في الحاوية');
+  assert.ok(!box._child || box._child.className !== 'octa-legend',
+    '⛔ الـlegend مش جوه صندوق الشارت');
+  /* ⑤ ⚖️ إشعار الرخصة (شرط شيل لوجو TradingView) */
+  assert.equal(calls.createOpts.layout.attributionLogo, false, '⛔ لوجو TradingView مش داخل الشارت');
+  assert.ok(legendBox.innerHTML.indexOf('tradingview.com') >= 0,
+    '⛔ إشعار الرخصة + رابط tradingview.com موجود');
 });
 
 /* ═══════════ 17) 📐 التحليل الفني الكامل ═══════════ */

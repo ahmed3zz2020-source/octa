@@ -407,27 +407,55 @@
 /* ══════════════════════════════════════════════════════════════
    ⭐ Legend الشارت — قائمة المستويات (زي الرسومات الاحترافية)
    ══════════════════════════════════════════════════════════════ */
-.octa-legend {
-  position: absolute; top: 8px; inset-inline-start: 8px; z-index: 5;
-  background: rgba(12,17,23,.86); border: 1px solid rgba(255,255,255,.10);
-  border-radius: 10px; padding: 7px 9px; pointer-events: none;
-  max-width: 62%; min-width: 140px;
+/* ⭐ legend المستويات: **تحت الشارت** (مش فوقه) ⇒ الشارت يفضل واضح
+   والأسماء العربية (DOM) سليمة التشكيل. */
+.octa-legend, .su-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 2px 14px;
+  margin: 0 0 10px;
+  padding: 9px 11px;
+  background: var(--pri3);
+  border: 1px solid var(--line);
+  border-radius: 11px;
 }
-.octa-legend .lg-row {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 10.5px; line-height: 1.85; white-space: nowrap;
+.octa-legend:empty, .su-legend:empty { display: none !important; }
+.octa-legend .lg-row, .su-legend .lg-row {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 11px; line-height: 1.95; min-width: 0;
 }
-.octa-legend .lg-row i {
-  width: 9px; height: 3px; border-radius: 2px; flex: 0 0 auto;
+.octa-legend .lg-row i, .su-legend .lg-row i {
+  width: 13px; height: 3px; border-radius: 2px; flex: 0 0 auto;
 }
-.octa-legend .lg-row span { color: #9fb0c0; }
-.octa-legend .lg-row b { color: #e7eef5; font-weight: 800; margin-inline-start: auto; }
-.octa-legend .lg-row u {
+.octa-legend .lg-row span, .su-legend .lg-row span {
+  color: var(--muted); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.octa-legend .lg-row b, .su-legend .lg-row b {
+  color: var(--txt); font-weight: 800;
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+}
+.octa-legend .lg-row u, .su-legend .lg-row u {
   text-decoration: none; color: #d4af55; font-size: 9px;
-  border: 1px solid rgba(212,175,55,.35); border-radius: 999px; padding: 0 5px;
+  border: 1px solid rgba(212,175,55,.35);
+  border-radius: 999px; padding: 0 5px; flex: 0 0 auto;
 }
-.octa-legend .lg-row.soft u { color: #7c8b99; border-color: rgba(255,255,255,.12); }
+.octa-legend .lg-row.soft u, .su-legend .lg-row.soft u {
+  color: #7c8b99; border-color: rgba(255,255,255,.12);
+}
 @media (max-width: 520px) {
-  .octa-legend { max-width: 74%; }
-  .octa-legend .lg-row { font-size: 9.5px; }
+  .octa-legend, .su-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px 10px; }
+  .octa-legend .lg-row, .su-legend .lg-row { font-size: 10px; }
+  .octa-legend .lg-row u, .su-legend .lg-row u { font-size: 8px; padding: 0 4px; }
 }
+
+/* ⚖️ إشعار رخصة الرسوم (TradingView Lightweight Charts) */
+.octa-attr {
+  grid-column: 1 / -1;
+  font-size: 9.5px; line-height: 1.6; color: var(--muted); opacity: .8;
+  margin: 4px 0 0; padding-top: 6px;
+  border-top: 1px solid var(--line); text-align: start;
+}
+.octa-attr a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.octa-attr a:hover { color: var(--txt); }

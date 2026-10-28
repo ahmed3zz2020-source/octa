@@ -248,10 +248,10 @@
     if (tgt != null) lines.push({ price: tgt, color: '#22c55e', style: 0, width: 2, title: 'الهدف' });
     /* 📌 إدارة الصفقة (مش جزء من القياس — لازم الواجهة توضّح) */
     if (st.entry_deep != null && st.entry_deep !== ent) {
-      lines.push({ price: st.entry_deep, color: '#fbbf24', style: 2, width: 1, title: 'دخول أعمق' });
+      lines.push({ price: st.entry_deep, color: '#fbbf24', style: 2, width: 1, soft: true, title: 'دخول أعمق' });
     }
     if (st.target_partial != null && st.target_partial !== tgt) {
-      lines.push({ price: st.target_partial, color: '#4ade80', style: 2, width: 1, title: 'هدف أول' });
+      lines.push({ price: st.target_partial, color: '#4ade80', style: 2, width: 1, soft: true, title: 'هدف أول' });
     }
     return lines;
   }
@@ -281,7 +281,7 @@
   }
 
   /* 📌 جلب الشموع + الرسم الاحترافي */
-  function drawPattern(it, box, height) {
+  function drawPattern(it, box, height, legendBox) {
     if (!box || !it) return;
     var kit = window.OCTAChartKit;
     if (!kit) { box.innerHTML = '<div class="su-empty">مكتبة الرسم مش متاحة</div>'; return; }
@@ -298,6 +298,7 @@
           height: height || 320,
           focusBars: 90,
           legend: legendOf(it),
+          legendBox: legendBox || null,
           /* ⭐ المتوسطات المتحركة = السياق الفني (20/50) */
           emas: [
             { period: 20, color: '#38bdf8', title: 'EMA 20' },
@@ -341,13 +342,14 @@
 
   function showTab(which) {
     S.tab = which === 'tv' ? 'tv' : 'chart';
-    var cbox = $('suChartMain'), tbox = $('suTvBox');
+    var cbox = $('suChartMain'), tbox = $('suTvBox'), lbox = $('suLegendMain');
     var tabs = document.querySelectorAll ? document.querySelectorAll('.su-tab') : [];
     for (var i = 0; i < tabs.length; i++) {
       var on = tabs[i].getAttribute('data-tab') === S.tab;
       tabs[i].classList.toggle('on', on);
     }
     if (cbox) cbox.style.display = (S.tab === 'chart') ? '' : 'none';
+    if (lbox) lbox.style.display = (S.tab === 'chart') ? '' : 'none';
     if (tbox) {
       tbox.style.display = (S.tab === 'tv') ? '' : 'none';
       if (S.tab === 'tv' && S.selected && !tbox.getAttribute('data-loaded')) {
@@ -361,7 +363,7 @@
     var box = $('suChartMain');
     if (!box) return;
     box.innerHTML = '<div class="su-empty">بنجيب الشموع…</div>';
-    drawPattern(it, box, 320);
+    drawPattern(it, box, 320, $('suLegendMain'));
   }
 
   function render() {
@@ -681,6 +683,7 @@
       '<button class="su-tab" type="button" data-atab="tv">TradingView</button>' +
       '</div>' +
       '<div class="su-chart" id="suAnChart"></div>' +
+      '<div class="su-legend" id="suAnLegend"></div>' +
       '<div class="su-tvbox" id="suAnTv" style="display:none;"></div>' +
       analysisHTML(it) +
       '<div class="su-mact">' +
@@ -725,8 +728,10 @@
           for (var k = 0; k < tabs.length; k++) tabs[k].classList.toggle('on', tabs[k] === tb);
           var cbox = ov.querySelector('#suAnChart');
           var tbox = ov.querySelector('#suAnTv');
+          var lbox = ov.querySelector('#suAnLegend');
           if (!cbox || !tbox) return;
           cbox.style.display = (which === 'chart') ? '' : 'none';
+          if (lbox) lbox.style.display = (which === 'chart') ? '' : 'none';
           tbox.style.display = (which === 'tv') ? '' : 'none';
           if (which === 'tv' && !tbox.getAttribute('data-loaded')) {
             tbox.setAttribute('data-loaded', '1');
@@ -746,7 +751,7 @@
       })(tabs[i]);
     }
 
-    drawPattern(it, ov.querySelector('#suAnChart'), 340);
+    drawPattern(it, ov.querySelector('#suAnChart'), 340, ov.querySelector('#suAnLegend'));
   }
 
   /* ══════════ تفاصيل النمط ══════════ */
@@ -778,6 +783,7 @@
       '<button class="su-mclose" type="button" aria-label="اقفل">✕</button>' +
       '</div>' +
       '<div class="su-chart" id="suChart"></div>' +
+      '<div class="su-legend" id="suLegend"></div>' +
       '<div class="su-why">' + esc(it.why || '') + '</div>' +
       '<div class="su-kv">' +
       kv('مستوى الكسر', fmtPrice((st && st.level) != null ? st.level : it.level)) +

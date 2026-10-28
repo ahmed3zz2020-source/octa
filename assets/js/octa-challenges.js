@@ -509,6 +509,20 @@
     if (ch.target != null) lines.push({ price: ch.target, color: '#22c55e', style: 0, width: 2, title: 'الهدف' });
     return lines;
   }
+  /* ⭐ legend المستويات تحت الشارت (تسميات عربية) */
+  function legendOf(ch) {
+    var out = [];
+    var add = function (label, price, color, tag) {
+      if (price == null || !isFinite(price)) return;
+      out.push({ label: label, price: (Math.round(price * 1000) / 1000), color: color, tag: tag || '' });
+    };
+    if (!ch) return out;
+    add('الدخول', ch.entry, '#d4af37', 'مُقاس');
+    add('الهدف/المقاومة', ch.target, '#22c55e', 'مُقاس');
+    add('الوقف/الدعم', ch.stop, '#ef4444', 'مُقاس');
+    return out;
+  }
+
   /* 📌 معطيات الرسم الاحترافي — النمط = مستويات التحدي */
   function patternOf(ch) {
     if (!ch) return { zone_low: null, zone_high: null, detect_at: null, age_days: 0, entry: null, stop: null, target: null };
@@ -541,6 +555,8 @@
         volume: true,
         height: 300,
         focusBars: 60,
+        legend: legendOf(ch),
+        legendBox: $('chLegend'),
         pattern: patternOf(ch)
       });
     }).catch(function () {
