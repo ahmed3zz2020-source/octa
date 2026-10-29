@@ -1,148 +1,36 @@
 /* ══════════════════════════════════════════════════════════════════════
-   🛡️ OCTA — Service Worker (٢٩ أكتوبر ٢٠٢٦)
+   🧹 OCTA — «مفتاح الإطفاء» للـService Worker (٣٠ أكتوبر ٢٠٢٦)
    ──────────────────────────────────────────────────────────────────────
-   📌 المشكلة: لما أحمد يعمل «تثبيت» من كروم، كروم بيعمل WebAPK
-   📌   (تطبيق مستقل). التطبيق ده بيفتح صفحة مita (start_url) وبيمسك
-   📌   نسخة منها في كاشه — ومش بيعمل fetch جديد كل مرة.
-   📌 ⛔ النتيجة: لو أول فتح حصل وقت كانت الصفحة فاضية/قديمة
-   📌   ⇒ التطبيق بيتقفل على النسخة الميتة ⇒ شاشة بيضا للأبد،
-   📌   والعالم في المتصفح شغّال تمام.
-   ✅ الحل: Service Worker يعمل «network-first» ⇒ كل فتح يطلب الصفحة
-   ✅   من الشبكة الأول، ويستخدم الكاش بس لو النت مش شغّال (أوفلاين).
-   ⛔ قواعد أمان:
-   ⛔   ① الـAPI (/api/*) ما نتدخّلش فيه خالص (الـworker بيوكّل).
-   ⛔   ② أي طلب لبرّه الـorigin (TradingView مثلاً) ⇒ نسيبه.
-   ⛔   ③ بنخزّن نسخة من كل حاجة نجيبها بنجاح (للأوفلاين).
-   ⛔   ④ version الكاش بيتبدّل مع كل نشر ⇒ بنمسح القديم.
+   📌 القصة: أضفنا Service Worker (٣٠ أكتوبر) عشان التطبيق المثبّت
+   📌   (WebAPK) ما يقدّمش نسخة قديمة من الصفحة. ⛔ بس الـSW ده سبّب:
+   📌   · شاشة بيضا في المتصفح (رد احتياطي فاضي).
+   📌   · كروم بيحمّل الصفحة كـ«ملف» (الرد الفاضي مبيعرضش).
+   📌   · كاش/بيانات بتتمسح وسط التحميل (Clear-Site-Data).
+   📌 ✅ القرار: نرجع لوضع المتصفح العادي — مفيش SW خالص.
+   📌   (الأوفلاين كانت ميزة جانبية — مش شرط. ولو حبّينا نرجع ليها
+   📌    بعدين، لازم تتعمل صح من الأول.)
+   📌 ⚠️ الملف ده **مهم**: هو اللي بيوقّف الـSW القديم اللي متسجّل
+   📌   في متصفحات المستخدمين. لما كروم يجيبه، بيلغي تسجيل نفسه
+   📌   ويمسح كل الكاش ⇒ الصفحة بترجع طبيعية فوراً.
    ══════════════════════════════════════════════════════════════════════ */
 
-const CACHE = 'octa-sw-v3';
-
-/* 📌 هيكل التطبيق — لو النت واقع ⇒ دي اللي بتشتغل */
-const SHELL = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/reset.html',
-  '/assets/octa.css',
-  '/assets/octa-tokens.css',
-  '/assets/octa-logo.png',
-  '/assets/icon-192.png'
-];
+/* ⛔ مفيش fetch handler بالظبط ⇒ المتصفح بيرجع للشبكة مباشرةً.
+   ⛔ (الـSW القديم لسه ماسك لحد ما الملف ده يتحدّث — وده أول
+      navigation بعد النشر ⇒ بعدها كل حاجة طبيعية.) */
 
 self.addEventListener('install', function (e) {
-  e.waitUntil(
-    caches.open(CACHE).then(function (c) {
-      /* ⛔ allSettled: لو أصل واحد فشل (مفيش نت) ⇒ الباقي يتحمّل */
-      return Promise.allSettled(SHELL.map(function (u) {
-        return c.add(new Request(u, { cache: 'reload' }));
-      }));
-    }).then(function () {
-      return self.skipWaiting();
-    })
-  );
+  e.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', function (e) {
   e.waitUntil(
     caches.keys().then(function (keys) {
       return Promise.all(keys.map(function (k) {
-        if (k === CACHE) return null;
         return caches.delete(k);
       }));
     }).then(function () {
-      /* 📌 نملا الكاش تاني — التنظيف (?clean=1) بيمسحه، فلازم
-         نرجّع نخزّن هيكل التطبيق فوراً. */
-      return caches.open(CACHE).then(function (c) {
-        return Promise.allSettled(SHELL.map(function (u) {
-          return c.add(new Request(u, { cache: 'reload' }));
-        }));
-      });
-    }).then(function () {
-      return self.clients.claim();
-    })
-  );
-});
-
-self.addEventListener('fetch', function (e) {
-  var req = e.request;
-  if (req.method !== 'GET') return;
-
-  var url;
-  try { url = new URL(req.url); } catch (err) { return; }
-
-  /* ⛔ برّه الـorigin (TradingView / سكربتات خارجية) ⇒ ما نتدخّلش */
-  if (url.origin !== self.location.origin) return;
-
-  /* ⛔ الـAPI ⇒ الـworker هو اللي بيوكّلها (مع الكوكيز والجلسة) */
-  if (url.pathname.indexOf('/api/') === 0) return;
-
-  /* ══════════════════════════════════════════════════════════════
-  🧹 رابط التنظيف (?clean=1) — ٢٩ أكتوبر ٢٠٢٦ · الإصلاح النهائي
-  ────────────────────────────────────────────────────────────────
-  📌 المشكلة: لو الـSW نفسه هو اللي واقف في الطريق، مفيش حاجة
-  📌   في السيرفر تقدر تنقّذه ⇒ لازم الـSW **يلغي نفسه**.
-  📌 ✅ الحل: لما يشوف ?clean=1 ⇒ يلغي تسجيله + يمسح كل الكاش
-  📌   + يسيب الطلب يعدّي للشبكة ⇒ بعدين الصفحة الجديدة بتسجّل
-  📌   SW نظيف من أول مرة.
-  ⛔ ملاحظة: بنمشي بحذر — بنمسح الكاش بس لما الطلب ده يعدّي.
-  ══════════════════════════════════════════════════════════════ */
-  if (url.searchParams.get('clean') === '1') {
-    e.waitUntil((function () {
-      try { return self.registration.unregister(); } catch (err) { return null; }
-    })().then(function () {
-      return caches.keys().then(function (keys) {
-        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-      });
-    }).catch(function () { }));
-    return;   /* ⛔ متتدخّلش ⇒ الطلب يروح للشبكة عادي */
-  }
-
-  /* 📌 network-first: الشبكة الأول ⇒ نسخة جديدة دايماً */
-  e.respondWith(
-    fetch(req).then(function (res) {
-      /* ⛔⛔⛔ ما نخزّنش رد فيه Clear-Site-Data!
-         📌 لو خزّنناه وخدمناه من الكاش ⇒ كروم هيمسح بيانات
-         📌   المستخدم في وقت عشوائي ⇒ logout مفاجئ. */
-      var hasClear = false;
-      try { hasClear = !!(res && res.headers && res.headers.get('clear-site-data')); } catch (e) { }
-      if (res && res.status === 200 && res.type === 'basic' && !hasClear) {
-        var copy = res.clone();
-        caches.open(CACHE).then(function (c) {
-          c.put(req, copy).catch(function () { });
-        });
-      }
-      return res;
-    }).catch(function () {
-      /* ⛔ النت مش شغّال ⇒ الكاش */
-      return caches.match(req).then(function (hit) {
-        if (hit) return hit;
-        /* 📌 تنقّل (فتح صفحة) ⇒ نرجع للصفحة الرئيسية من الكاش */
-        if (req.mode === 'navigate') {
-          return caches.match('/index.html').then(function (idx) {
-            if (idx) return idx;
-            return caches.match('/').then(function (root) {
-              if (root) return root;
-              return new Response(
-                '<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8">' +
-                '<body style="background:#0a1929;color:#fff;font:700 16px system-ui;padding:40px;text-align:center">' +
-                '<p>التطبيق مش شغّال دلوقتي.</p>' +
-                '<p style="font-weight:400;opacity:.8">اقفل التطبيق وافتحه تاني.</p></body></html>',
-                { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-              );
-            });
-          });
-        }
-        /* ⛔⛔⛔⛔⛔ ٢٩ أكتوبر ٢٠٢٦ — فخ قاتل اتكتشف بال_sdkahaa
-        📌 الرد الفاضي (body فاضي + مفيش content-type) ⇒ كروم بيحمله
-        📌   **ملف** ⇒ يبان «هل تريد تنزيل الملف مرة أخرى؟» والصفحة
-        📌   بتبقى بيضا ⇒ ⛔ ده سبب الشاشة البيضاء في كروم!
-        ✅ الحل: دايماً رد له نوع محتوى ونص واضح. */
-        return new Response('OCTA — لا يوجد اتصال بالإنترنت الآن.', {
-          status: 503,
-          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-        });
-      });
-    })
+      /* ⛔ إلغاء تسجيل نفسه ⇒ رجعنا لوضع المتصفح العادي */
+      return self.registration.unregister();
+    }).catch(function () { })
   );
 });

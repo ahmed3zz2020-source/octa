@@ -1147,7 +1147,6 @@ async function handle(request, env, ctx) {
           ════════════════════════════════════════════════════════════ */
           const WANT_CLEAR = '202610250945';
           if (!request.headers.get('X-OCTA-Cleared-' + WANT_CLEAR)) {
-          ih.set('Clear-Site-Data', '"cache"');
           }
           ih.set('ETag', '"' + Date.now() + '"');
           return new Response(idx.body, { status: 200, headers: ih });
@@ -1205,7 +1204,6 @@ async function handle(request, env, ctx) {
       /* ⭐ مسح كاش المتصفح — مرة واحدة (لحد ما كل المستخدمين يحدّثوا) */
       try {
       const WANT = '202610250945';
-      if (!request.headers.get('X-OCTA-Cleared-' + WANT)) h.set('Clear-Site-Data', '"cache"');
       } catch (e) { }
       /* 🧹 رابط التنظيف (?clean=1) ⇒ مسح كل حاجة للموقع */
       return new Response(res.body, { status: res.status, headers: h });
