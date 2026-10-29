@@ -370,6 +370,33 @@ async function assetsFresh(env, request) {
   }
 }
 
+
+/* ══════════════════════════════════════════════════════════════
+🧹 سكربت التطهير — ٣٠ أكتوبر ٢٠٢٦ (يخدمه الـworker لكل النسخ)
+──────────────────────────────────────────────────────────────
+📌 المشكلة الحقيقية: المتصفح عند المستخدم فيه index.html **قديم**
+📌   في الكاش ⇒ وهو بيسجّل الـservice worker القديم ⇒(old SW)
+📌   بيرجع تاني ⇒ الشاشة البيضاء + «تنزيل الملف» ترجع كل مرة.
+📌 ✅ الحل: الـworker يخدم أي طلب لـ octa-sw.js (بأي ?v=) بالـkiller
+📌   ⇒ النسخة القديمة من الـHTML كمان بتعمل التنظيف ⇒ المعضلة اتقفلت.
+══════════════════════════════════════════════════════════════ */
+const OCTA_KILLER_JS = [
+  '/* ⛔ killer — أي Service Worker على الموقع بيتشال + الكاش بيتمسح */',
+  '(function(){try{',
+  'if(!("serviceWorker" in navigator))return;',
+  'function kill(){',
+  'navigator.serviceWorker.getRegistrations().then(function(rs){',
+  'if(!rs||!rs.length)return;',
+  'rs.forEach(function(r){try{r.unregister();}catch(e){}});',
+  'try{if(window.caches&&window.caches.keys)window.caches.keys().then(function(ks){',
+  'ks.forEach(function(k){try{window.caches.delete(k);}catch(e){}});});}catch(e){}',
+  '}).catch(function(){});',
+  '}',
+  'if(document.readyState==="complete")kill();',
+  'else window.addEventListener("load",kill);',
+  '}catch(e){}})();'
+].join('\n');
+
 export default {
   /* ══════════════════════════════════════════════════════════════
    🛡️ ⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ هيدرات الأمان على كل رد
@@ -435,6 +462,19 @@ export default {
 
 async function handle(request, env, ctx) {
   const url = new URL(request.url);
+
+  /* 🧹 التطهير: أي نسخة من سكربت التنظيف (بأي ?v=) ⇒ دايمًا الـkiller.
+     📌 السبب: كاش المتصفح فيه index.html قديم بيسجّل الـSW القديم
+     📌   ⇒ لوخدنا الـkiller من السيرفر، النسخة القديمة كمان بتتطهّر. */
+  if (url.pathname === '/assets/js/octa-sw.js') {
+    return new Response(OCTA_KILLER_JS, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+      }
+    });
+  }
 
   /* ══════════════════════════════════════════════════════════════
   🧹 ٢٩ أكتوبر ٢٠٢٦ — رابط التنظيف: /?clean=1
