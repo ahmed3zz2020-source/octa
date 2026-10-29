@@ -1,0 +1,36 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "account_id": "74e046678adabf0706024b97b205882b",
+  "name": "octa-v2",
+  "compatibility_date": "2026-10-10",
+  "main": "worker.js",
+  "assets": {
+    "directory": "./dist",
+    /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ run_worker_first + binding
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       📌 من غير run_worker_first: Cloudflare بيقدّم الأصول من الكاش
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ والـworker (الجسور + البوابة) مش بيشتغل.
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ وكمان لازم الـbinding (ASSETS) عشان
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ env.ASSETS.fetch يشتغل. */
+    "run_worker_first": true,
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+  "observability": { "enabled": false },
+  "vars": {
+    /* ⛔ ٢٨ أكتوبر ٢٠٢٦ — البوابة بقت ON في المعاينة.
+     📌 السبب: مسارات «نماذجي» و«الاستوديو» محمية (لازم توكن)
+     ⇒ من غير دخول مش هيشوفوا حاجة.
+     📌 الدخول = نفس حساب الإنتاج (البوابة بتروح لنفس الـAPI).
+     ⛌ لو عايز المعاينة مفتوحة ⇒ رجّعها "off" (بس الصفحات الجديدة
+     ⛌   هتفضل «لازم تسجّل دخول»). */
+    "OCTA_GATE": "on",
+    "OCTA_TV_PROXY": "on",
+    "OCTA_BENCH": "on"
+  }
+}
