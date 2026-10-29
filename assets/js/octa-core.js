@@ -731,6 +731,10 @@ function switchPage(id) {
   /* ═══ قرار اليوم — نافذة منبثقة مش صفحة ═══ */
   if (id === 'decide') { if (typeof openDecide==='function') openDecide(); return; }
 
+  /* ✅ علامة «اتعرضت» — الحارس بيستعملها عشان يفرّق بين
+     «الصفحة ظهرت» و«الصفحة فاضية» بدل ما يعمل إنذار كاذب. */
+  try { document.documentElement.setAttribute('data-octa-ready', '1'); } catch (e) { }
+
   octaPageInit(id);
 }
 
