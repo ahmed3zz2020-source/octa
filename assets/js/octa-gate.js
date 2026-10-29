@@ -1040,15 +1040,37 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
 
  function bioSecret() {
  var k = 'octa_bio_key';
+ var ck = 'octa_bio_ck';
+ function readCookie() {
+ try {
+ var m = ('; ' + (document.cookie || '')).match('; ' + ck + '=([^;]*)');
+ return m ? m[1] : '';
+ } catch (e) { return ''; }
+ }
+ function writeCookie(val) {
+ try {
+ /* ⛔⛔⛔ ٣٠ أكتوبر ٢٠٢٦ — ⭐⭐⭐ نسخة تانية في الكوكي
+ 📌 السبب: مسح «الكاش/بيانات المواقع» بيمسح localStorage
+ 📌   ⇒ ⇒ **رقم الجهاز بيتغيّر** ⇒ ⇒ ⇒ الباسورد بيطلب كود
+ 📌   ⇒ ⇒ كل مرة! ⇒ ⇒ الحساب بينسى الجهاز.
+ 📌 ✅ الحل: نسخة في الكوكي كمان ⇒ لو localStorage اتمسحت
+ 📌   ⇒ الكوكي بيرجّع نفس الرقم ⇒ ⇒ الجهاز يفضل معروف.
+ 📌 ⛔ رقم عشوائي (مش مشتق) ⇒ ⛔ محدش يقدر يتzvّه. */
+ document.cookie = ck + '=' + val + '; path=/; max-age=31536000; SameSite=Lax';
+ } catch (e) { }
+ }
  try {
  var v = localStorage.getItem(k);
- if (v && v.length >= 32) return v;
+ if (v && v.length >= 32) { writeCookie(v); return v; }
+ var cv = readCookie();
+ if (cv && cv.length >= 32) { localStorage.setItem(k, cv); return cv; }
  var b = new Uint8Array(32);
  (window.crypto || window.msCrypto).getRandomValues(b);
  var h = [];
  for (var i = 0; i < b.length; i++) h.push(('0' + b[i].toString(16)).slice(-2));
  v = h.join('');
  localStorage.setItem(k, v);
+ writeCookie(v);
  return v;
  } catch (e) { return ''; }
  }
@@ -1083,20 +1105,10 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  ⛔ ولا مرة  ما نبعتهش لـGoogle  ولا لـأي حد تاني. */
  var _bioAsked = false;
 
- function bioSecret() {
- var k = 'octa_bio_key';
- try {
- var v = localStorage.getItem(k);
- if (v && v.length >= 32) return v;
- var b = new Uint8Array(32);
- (window.crypto || window.msCrypto).getRandomValues(b);
- var h = [];
- for (var i = 0; i < b.length; i++) h.push(('0' + b[i].toString(16)).slice(-2));
- v = h.join('');
- localStorage.setItem(k, v);
- return v;
- } catch (e) { return ''; }
- }
+ /* ⛔⛔⛔ ٣٠ أكتوبر ٢٠٢٦ — ⭐ التعريف المكرر ده كان **يلغي** اللي فوقه
+ 📌 (JavaScript: آخر تعريف في نفس النطاق هو اللي بيشتغل)
+ 📌 ⇒ والنسخة القديمة (من غير نسخة الكوكي) كانت هي اللي شغّالة.
+ 📌 ✅ اتشال ⇒ النسخة الوحيدة (فيها الكوكي الاحتياطي) بقت هي الفعّالة. */
 
  function bioDo(on) {
  var s2 = bioSecret();
@@ -1857,8 +1869,15 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  catch (e) { tried = []; }
  if (!Array.isArray(tried)) tried = [];
  if (tried.length > 20) tried = tried.slice(-20);
+ /* ⛔⛔⛔ ٣٠ أكتوبر ٢٠٢٦ — ⭐⭐⭐ إرسال الجهاز مع كود التحقق
+ 📌 السبب: الباك بيسجّل الجهاز على الحساب وقت التحقق
+ 📌   (challenge/verify بيقرا body.device) — بس الواجهة كانت
+ 📌   مش بتبعته ⇒ ⇒ الجهاز **ما كانش بيتسجّل** ⇒ ⇒⇒
+ 📌   ⇒ الكود على الإيميل بيجي **كل مرة** والأبد!
+ 📌 ✅ الحل: نبعته مع الطلب ⇒ بعد أول كود ⇒ الباسورد يكفي.
+ 📌 ⛔ (ما فيش أي تغيير في الباك — ولا في الإنتاج.) */
  post(reg ? SIGNUP.verify : PATHS.verify,
-      { email: flow.email, code: v, tried_pins: tried })
+      { email: flow.email, code: v, tried_pins: tried, device: bioSecret() })
  .then(function (o) {
  var d = o.d || {};
  if (o.s === 200) {
