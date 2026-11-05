@@ -675,6 +675,19 @@ document.addEventListener('octa:authed', function () {
 });
 
 function switchPage(id) {
+  /* ⭐ ٦ نوفمبر ٢٠٢٦ — وضع الأمريكي: صفحة مصرية ⇒ «قيد البناء» بدل البيانات المصرية.
+     📌 السبب: الداشبورد في وضع America كان لسه بيعرض كل حاجة مصرية. */
+  if (id !== 'wip' && window.OCTACtx && window.OCTACtx.isUS() &&
+      !window.OCTACtx.toolAllowed(id)) { openUsWip(id); return; }
+  /* ⭐ وضع الأمريكي: صفحة «الأسهم» = لوحة الأسواق على تاب أمريكا
+     📌 openMarketsPanel (مش openMarkets) ⇒ مفيش دوران لا نهائي. */
+  if ((id === 'stocks' || id === 'markets') && window.OCTACtx && window.OCTACtx.isUS()) {
+    if (typeof openMarketsPanel === 'function') {
+      openMarketsPanel();
+      setTimeout(function(){ try { if (window.mkSetMK) window.mkSetMK('us'); }catch(e){} }, 350);
+      return;
+    }
+  }
   /* ⛔⛔⛔ ٢٢ أكتوبر ٢٠٢٦ — صفحة مش موجودة = شاشة بيضا.
   ⛌ لو الـid مالوش عنصر في الـDOM (صفحة اتمسحت · اسم غلط) ⇒
   ⛌   كل الكود اللي بعده بيشتغل على لا حاجة ⇒ المستخدم بيفتح
@@ -787,7 +800,7 @@ function switchPage(id) {
    📌 رابط مباشر `#/stocks` أو `#/markets` يفتح لوحة الأسواق.
    📌 + URL كامل (octashares.com/markets) — الـworker بيقدّم index.html.
    ⚠️ 'stocks' و 'markets' نقطة واحدة — كلهم بيفتحوا نفس الصفحة. */
-const TOOL_PAGES = ['filter','best','screener','dividends','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms','money','radar','radar-stock','setups','studio','zones','challenges','stocks','markets'];
+const TOOL_PAGES = ['filter','best','screener','dividends','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms','money','radar','radar-stock','setups','studio','zones','challenges','stocks','markets','wip'];
 /* ══════════════════════════════════════════════════════════════
  *  🧰 شريط الأدوات — 8 أدوات بس، والباتاقي في الـsidebar
  *  ──────────────────────────────────────────────────────────
@@ -798,34 +811,40 @@ const TOOL_PAGES = ['filter','best','screener','dividends','octasearch','verdict
  *  أخبار · أكاديمية) بيفضل موجود في الـsidebar بس.
  * ══════════════════════════════════════════════════════════════ */
 const TOOLS = [
-  { id:'stocks',  i:'📊', n:'الأسهم',  d:'كل البورصة المصرية' },
-  { id:'arms',  i:'🐙', n:'الأذرع',  d:'الأذرع الثمانية' },
-  { id:'engine',  i:'🧠', n:'المحرك',  d:'التحليل الكامل بالمحاور' },
-  { id:'octasearch', i:'🔎', n:'بحث OCTA',  d:'تحليل أي سهم بالاسم' },
-  { id:'dividends',  i:'📅', n:'التوزيعات',  d:'نقدي · أسهم · إعلانات' },
-  { id:'pick',  i:'🆚', n:'المقارنة الذكية',
+  /* ⭐ ٦ نوفمبر ٢٠٢٦ — كل أداة لها سوق:
+     mk:'egx' = مصرية بس · mk:'us' = أمريكية بس · mk:'both' = في الوضعين.
+     📌 في وضع الأمريكي: الأدوات المصرية بتتشال من الشريط والقائمة،
+        وأي صفحة مصرية بتتفتح ⇒ «قيد البناء» (مش بيانات مصرية!). */
+  { id:'stocks',  i:'📊', n:'الأسهم',  d:'كل البورصة المصرية', mk:'both',
+    i_us:'🇺🇸', n_us:'الأسهم الأمريكية', d_us:'١١ سهم كبرى · نفس كارت القرار' },
+  { id:'arms',  i:'🐙', n:'الأذرع',  d:'الأذرع الثمانية', mk:'both',
+    i_us:'🐙', n_us:'أذرع أمريكا', d_us:'الأذرع الثمانية على السوق الأمريكي' },
+  { id:'engine',  i:'🧠', n:'المحرك',  d:'التحليل الكامل بالمحاور', mk:'egx' },
+  { id:'octasearch', i:'🔎', n:'بحث OCTA',  d:'تحليل أي سهم بالاسم', mk:'egx' },
+  { id:'dividends',  i:'📅', n:'التوزيعات',  d:'نقدي · أسهم · إعلانات', mk:'egx' },
+  { id:'pick',  i:'🆚', n:'المقارنة الذكية', mk:'egx',
     d:'اكتب لحد 10 أسهم · OCTA يرتّبهم بمعايره' },
-  { id:'filter',  i:'🗂️', n:'فلاتر المؤشرات',  d:'8 فلاتر ذكية' },
-  { id:'screener',  i:'🔍', n:'OCTAView',  d:'الفلاتر المباشرة' },
-  { id:'money',   i:'💰', n:'Smart Money', d:'قوة الفلوس · ٤ محاور' },
-  { id:'radar',   i:'🛰️', n:'الرادار الذكي', d:'مسح السوق · ٤ مؤشرات · مخاطرة' },
-  { id:'setups',  i:'🧩', n:'نماذجي', d:'أنماط كسر مُقاسة بمدخل ووقف وهدف' },
-  { id:'studio',  i:'🎨', n:'الاستوديو', d:'ارسم مستوياتك واحفظ ملاحظاتك' },
-  { id:'zones',   i:'🗺️', n:'المناطق', d:'أقرب مستوى قدام كل سهم' },
-  { id:'challenges', i:'🎯', n:'التحديات', d:'تحدي يومي + لوحة المتصدرين' },
-  { id:'dash',      i:'📊', n:'لوحة التحكم', d:'حالة النظام · أفضل ١٠ أسهم · اختبار الضغط' }
+  { id:'filter',  i:'🗂️', n:'فلاتر المؤشرات',  d:'8 فلاتر ذكية', mk:'egx' },
+  { id:'screener',  i:'🔍', n:'OCTAView',  d:'الفلاتر المباشرة', mk:'egx' },
+  { id:'money',   i:'💰', n:'Smart Money', d:'قوة الفلوس · ٤ محاور', mk:'egx' },
+  { id:'radar',   i:'🛰️', n:'الرادار الذكي', d:'مسح السوق · ٤ مؤشرات · مخاطرة', mk:'egx' },
+  { id:'setups',  i:'🧩', n:'نماذجي', d:'أنماط كسر مُقاسة بمدخل ووقف وهدف', mk:'egx' },
+  { id:'studio',  i:'🎨', n:'الاستوديو', d:'ارسم مستوياتك واحفظ ملاحظاتك', mk:'egx' },
+  { id:'zones',   i:'🗺️', n:'المناطق', d:'أقرب مستوى قدام كل سهم', mk:'egx' },
+  { id:'challenges', i:'🎯', n:'التحديات', d:'تحدي يومي + لوحة المتصدرين', mk:'egx' },
+  { id:'dash',      i:'📊', n:'لوحة التحكم', d:'حالة النظام · أفضل ١٠ أسهم · اختبار الضغط', mk:'egx' }
 ];
 
 /* كل الأدوات — للـsidebar (الـ15 كلها) */
 const ALL_TOOLS = [
   ...TOOLS,
-  { id:'decide',  i:'🎯', n:'قرار اليوم', d:'3 قرارات جاهزة', modal:1 },
-  { id:'verdict',  i:'🃏', n:'كارت القرار', d:'يتحسب وقت الفتح' },
-  { id:'compare',  i:'⚖️', n:'مقارنة الأصول', d:'لحد 6 أصول جنب بعض' },
-  { id:'bestpick',  i:'🏆', n:'أفضل فرصة', d:'اختيار السهم' },
-  { id:'calc',  i:'🧮', n:'حاسبات', d:'4 أدوات' },
-  { id:'news',  i:'📰', n:'أخبار', d:'فلترة بالقطاع' },
-  { id:'academy',  i:'🎓', n:'أكاديمية', d:'بافيت · لينتش' }
+  { id:'decide',  i:'🎯', n:'قرار اليوم', d:'3 قرارات جاهزة', modal:1, mk:'egx' },
+  { id:'verdict',  i:'🃏', n:'كارت القرار', d:'يتحسب وقت الفتح', mk:'egx' },
+  { id:'compare',  i:'⚖️', n:'مقارنة الأصول', d:'لحد 6 أصول جنب بعض', mk:'egx' },
+  { id:'bestpick',  i:'🏆', n:'أفضل فرصة', d:'اختيار السهم', mk:'egx' },
+  { id:'calc',  i:'🧮', n:'حاسبات', d:'4 أدوات', mk:'both' },
+  { id:'news',  i:'📰', n:'أخبار', d:'فلترة بالقطاع', mk:'egx' },
+  { id:'academy',  i:'🎓', n:'أكاديمية', d:'بافيت · لينتش', mk:'both' }
 ];
 const OCTA_QUICK = ['COMI','ETEL','TMGH','SWDY','HRHO','AALR','EGAL','ORWE','ABUK','MASR','ESRS','ADRI'];
 
@@ -844,21 +863,34 @@ function toolOrder(){
 }
 function toolHidden(){ return toolLoad(TOOL_HIDE_KEY, []); }
 
-/* الأزرار الظاهرة — مرتبة حسب ترتيب المستخدم */
+/* الأزرار الظاهرة — مرتبة حسب ترتيب المستخدم
+   ⭐ ٦ نوفمبر ٢٠٢٦ — + فلترة حسب السوق (سياق مصر / أمريكا).
+   📌 في وضع الأمريكي: الأدوات المصرية (mk:'egx') بتتشال من الشريط. */
 function orderedTools(){
   const hid = toolHidden();
-  return toolOrder().map(id => TOOLS.find(t => t.id === id)).filter(Boolean).filter(t => hid.indexOf(t.id) < 0);
+  const us = (typeof window !== 'undefined' && window.OCTACtx && window.OCTACtx.isUS()) ? true : false;
+  return toolOrder().map(id => TOOLS.find(t => t.id === id)).filter(Boolean)
+    .filter(t => hid.indexOf(t.id) < 0)
+    .filter(t => us ? (t.mk === 'us' || t.mk === 'both') : (t.mk === 'egx' || t.mk === 'both'));
+}
+
+/* ⭐ اسم/وصف الأداة حسب السوق */
+function toolLabel(t){
+  const us = (typeof window !== 'undefined' && window.OCTACtx && window.OCTACtx.isUS()) ? true : false;
+  if (us && t.n_us) return { i: (t.i_us || t.i), n: t.n_us, d: (t.d_us || t.d) };
+  return { i: t.i, n: t.n, d: t.d };
 }
 
 function buildToolbar(){
   const el = document.getElementById('toolbar');
   if (!el) return;
   const list = orderedTools();
-  el.innerHTML = list.map(t =>
-  `<button class="tool-btn" data-tool="${t.id}" onclick="${t.modal?'openDecide()':`switchPage('${t.id}')`}" title="${t.d}">
-  <span class="tb-i">${t.i}</span><span class="tb-n">${t.n}</span>
-  </button>`
-  ).join('');
+  el.innerHTML = list.map(t => {
+  const L = toolLabel(t);
+  return `<button class="tool-btn" data-tool="${t.id}" onclick="${t.modal?'openDecide()':`toolGo('${t.id}')`}" title="${L.d}">
+  <span class="tb-i">${L.i}</span><span class="tb-n">${L.n}</span>
+  </button>`;
+  }).join('');
 
   /* 🧭 الصفحة المفتوحة (خصوصاً لو جايدة من رابط مباشر) — نعلّم الزر بتاعها.
      ⛌ الأزرار بتتبني بعد switchPage أحياناً ⇒ فبدون السطر ده
@@ -870,6 +902,34 @@ function buildToolbar(){
     }
   } catch (e) { }
 }
+
+/* ⭐ ٦ نوفمبر ٢٠٢٦ — فتح الأداة حسب سياق السوق
+   📌 في وضع الأمريكي: أداة مصرية ⇒ «قيد البناء» (مش بيانات مصرية!). */
+function toolGo(id){
+  try{
+    if (window.OCTACtx && window.OCTACtx.isUS() && !window.OCTACtx.toolAllowed(id)){
+      openUsWip(id); return;
+    }
+    /* ⭐ في وضع الأمريكي: «الأذرع» = ذراع السوق الأمريكي (مش قائمة الأذرع المصرية) */
+    if (id === 'arms' && window.OCTACtx && window.OCTACtx.isUS()){
+      if (typeof openArm === 'function'){ openArm('market'); return; }
+    }
+  }catch(e){}
+  switchPage(id);
+}
+/* ⭐ صفحة «قيد البناء» — بتاخد عنوان الأداة اللي اتفتحت */
+function openUsWip(id){
+  try{
+    const info = (window.OCTACtx && window.OCTACtx.wipInfo)
+      ? window.OCTACtx.wipInfo(id) : { icon:'🚧', title:'قيد الإنشاء', sub:'لسه شغالة عليها' };
+    const i0 = document.getElementById('usWipIco'); if (i0) i0.textContent = info.icon;
+    const t0 = document.getElementById('usWipT');   if (t0) t0.textContent = info.title;
+    const s0 = document.getElementById('usWipS');   if (s0) s0.textContent = info.sub;
+  }catch(e){}
+  switchPage('wip');
+}
+window.toolGo = toolGo;
+window.openUsWip = openUsWip;
 
 /* ══════ لوحة الترتيب ══════ */
 function openToolEditor(){

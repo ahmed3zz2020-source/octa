@@ -402,9 +402,10 @@
   فلتر صفحة الأسواق لأي زائر جديد. */
   function applyMarket(force) {
   if (typeof window.mkSetMK !== 'function') return;
-  if (!force && S.market === 'egypt') return;
+  var mk = (window.OCTACtx && window.OCTACtx.get) ? window.OCTACtx.get() : S.market;
+  if (!force && mk === 'egypt') return;
   setTimeout(function () {
-  try { window.mkSetMK(force ? S.market : 'us'); } catch (e) { }
+  try { window.mkSetMK(force ? mk : 'us'); } catch (e) { }
   }, 400);
   }
 
@@ -548,12 +549,18 @@
   /* ── ① السوق ── */
   function secMarket() {
   var h = '';
+  var curMkt = (window.OCTACtx && window.OCTACtx.get) ? window.OCTACtx.get() : S.market;
   h += row({
-  t: 'السوق الافتراضي', s: 'الأسهم والبيانات اللي بتظهر افتراضياً',
-  c: seg('market', [['egypt', '🇪🇬 المصري'], ['us', '🇺🇸 الأمريكي']], S.market)
+  t: 'وضع الموقع كله', s: 'يضبط الداشبورد كله — الشريط والأدوات والذراع — على السوق المختار',
+  c: seg('market', [['egypt', '🇪🇬 مصر'], ['us', '🇺🇸 أمريكا']], curMkt)
   });
-  if (S.market === 'us') {
-  h += '<div class="set-note warn">⚠️ السوق الأمريكي بيغيّر نتائج «أفضل فرصة» و«المقارنة الذكية» — المشروع مصري أساساً.</div>';
+  if (curMkt === 'us') {
+  h += '<div class="set-note ok">🇺🇸 <b>وضع أمريكا شغّال.</b> الداشبورد كله يخص السوق الأمريكي: ' +
+  'الأسهم الأمريكية والأذرع الثمانية على الأسهم الأمريكية. ' +
+  'الأدوات المصرية اتشالت لحد ما تبني نسختها الأمريكية (اضغط «بنبنيها» في القائمة). ' +
+  '<br>⛔ أثر ذلك: ما فيش أي رقم مصري بيفتح في الوضع ده.</div>';
+  } else {
+  h += '<div class="set-note">🇪🇬 <b>وضع مصر.</b> الداشبورد بيعرض البورصة المصرية زي ما هو.</div>';
   }
   h += row({
   t: 'تحديث تلقائي للأسعار', s: 'يعمل بس وأنت داخل صفحة الأسواق',
@@ -881,7 +888,11 @@
 
   /* السوق */
   case 'market':
-  S.market = val; save(); applyMarket(true); render(); return;
+  S.market = val; save();
+  /* ⭐ ٦ نوفمبر ٢٠٢٦ — تبديل وضع الموقع كله (مش تاب لوحة الأسواق بس).
+     📌 OCTACtx بيزمّم شريط الأدوات + القائمة + الأذرع + الصفحات. */
+  if (window.OCTACtx && window.OCTACtx.set) { try { window.OCTACtx.set(val); } catch (e) { } }
+  applyMarket(true); render(); return;
   case 'refresh':
   S.refresh = !S.refresh; save(); applyRefresh(); render(); return;
   case 'refreshSec':

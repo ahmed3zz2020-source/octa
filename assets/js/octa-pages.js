@@ -1347,6 +1347,11 @@ let CURRENT_ARM = 'market';
 function openArm(arm) {
   const cfg = ARM_MAP[arm];
   if (!cfg) return;
+  /* ⭐ ٦ نوفمبر ٢٠٢٦ — في وضع الأمريكي: الأذرع كلها على السوق الأمريكي.
+     📌 السبب: الداشبورد في وضع America كان بيعرض أذرع مصرية. */
+  if (window.OCTACtx && window.OCTACtx.isUS() && typeof window.usOpenArm === 'function') {
+    window.usOpenArm(arm); return;
+  }
   CURRENT_ARM = arm;
   /* ✅ علامة «اتعرضت» (٢٩ أكتوبر ٢٠٢٦) — شريحة الأذرع (الصفحة الافتراضية)
      ⇒ لازم تتعلّم إن التطبيق اشتغل، وإلا الـguard هيقول «الصفحة فاضية». */
@@ -4962,7 +4967,7 @@ function icRows(list, valKey) {
   ════════════════════════════════════════════════════════════ */
 (function killLegacyHome() {
   /* ═══ صفحات الأدوات/الفلاتر — لازم نجيبها من الموت مع المحتوى القديم ═══ */
-  const KEEP = ['filter','best','screener','dividends','compare','calc','academy','bestpick','news','search','engine','arms','markets','stocks','intel','dash','octasearch','verdict','pick','money','radar','radar-stock','setups','studio','zones','challenges'];
+  const KEEP = ['filter','best','screener','dividends','compare','calc','academy','bestpick','news','search','engine','arms','markets','stocks','intel','dash','octasearch','verdict','pick','money','radar','radar-stock','setups','studio','zones','challenges','wip'];
   function rescueToolPages(old) {
   let host = document.getElementById('toolPagesHost');
   if (!host) {

@@ -2307,6 +2307,29 @@
   body.m-tools-open .m-tools-btn::before { content: '✕ إغلاق'; }
 
 
+  /* ══════════ 🚧 صفحة «قيد الإنشاء» — وضع السوق الأمريكي ══════════ */
+  .wip-box {
+  background: var(--pri2); border: 1px solid var(--line); border-radius: 18px;
+  padding: 26px 20px; text-align: center; margin: 14px 0 20px;
+  }
+  .wip-ico { font-size: 2.6rem; line-height: 1; margin-bottom: 6px; }
+  .wip-t { font-size: 1.15rem; font-weight: 800; margin: 4px 0 6px; }
+  .wip-s { color: var(--muted); font-size: .86rem; margin-bottom: 14px; }
+  .wip-list { display: flex; flex-direction: column; gap: 8px; text-align: right; margin-bottom: 16px; }
+  .wip-li {
+  background: var(--wash); border: 1px solid var(--line); border-radius: 13px;
+  padding: 11px 13px; font-size: .82rem; line-height: 1.7; color: var(--txt);
+  }
+  .wip-li b { color: var(--gold2); }
+  .wip-btns { display: flex; gap: 9px; justify-content: center; flex-wrap: wrap; }
+  .wip-btn {
+  background: linear-gradient(135deg, rgba(56,189,248,.16), rgba(255,255,255,.02));
+  border: 1px solid rgba(56,189,248,.4); border-radius: 13px; color: var(--txt);
+  padding: 12px 18px; font-family: inherit; font-size: .88rem; font-weight: 800; cursor: pointer;
+  }
+  .wip-btn.ghost { background: var(--wash); border-color: var(--line); }
+  .wip-note { margin-top: 14px; font-size: .74rem; color: var(--muted); }
+
   /* ══════════ 📊 صفحة الأسهم — كل البورصة ══════════ */
   /* ⛔⭐ ٦ نوفمبر ٢٠٢٦ — زرار «الأسهم الأمريكية» (يفتح لوحة الأسواق وفيها تاب أمريكا)
      📌 السبب: صفحة الأسهم (٢٨٥ سهم مصري) مفيهاش طريق واضح للسوق الأمريكي. */

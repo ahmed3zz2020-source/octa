@@ -1557,6 +1557,13 @@ function openMarkets() {
     catch (e) { }
   }
 
+  openMarketsPanel();
+}
+
+/* ⭐ ٦ نوفمبر ٢٠٢٦ — فتح لوحةMarkets (منفصلة عن openMarkets)
+   📌 السبب: switchPage('stocks') في وضع America بيستدعيها ⇒ لو استدعينا
+   📌   openMarkets() كانت هتعمل switchPage('markets') ⇒ دوران لا نهائي. */
+function openMarketsPanel(){
   hardCloseViews();
   document.querySelectorAll('.arm-btn').forEach(b => b.classList.remove('active'));
   const pg = document.getElementById('page-markets');

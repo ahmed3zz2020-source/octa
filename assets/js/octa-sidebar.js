@@ -33,7 +33,15 @@ let OPEN = localStorage.getItem('octa_sidebar') === '1';
  فبنقرأ من ALL_TOOLS مباشرة — المصدر واحد ومكانه واحد. */
  try {
  if (typeof ALL_TOOLS !== 'undefined' && ALL_TOOLS.length) {
- return ALL_TOOLS.map(t => ({ id:t.id, i:t.i, n:t.n, d:t.d, modal:t.modal }));
+ /* ⭐ ٦ نوفمبر ٢٠٢٦ — فلترة حسب سياق السوق.
+ 📌 في وضع الأمريكي: الأدوات المصرية بتتشال من القائمة (مش هتكمّل موجودة). */
+ const us = (window.OCTACtx && window.OCTACtx.isUS()) ? true : false;
+ return ALL_TOOLS.map(t => {
+ const us = (window.OCTACtx && window.OCTACtx.isUS()) ? true : false;
+ if (us && t.n_us) return { id:t.id, i:(t.i_us||t.i), n:t.n_us, d:(t.d_us||t.d), modal:t.modal, mk:t.mk };
+ return { id:t.id, i:t.i, n:t.n, d:t.d, modal:t.modal, mk:t.mk };
+ })
+ .filter(t => us ? (t.mk === 'us' || t.mk === 'both') : (t.mk === 'egx' || t.mk === 'both'));
  }
  } catch (e) {}
  const el = document.getElementById('toolbar');
@@ -73,11 +81,21 @@ let OPEN = localStorage.getItem('octa_sidebar') === '1';
     ⇒ المستخدم مكانش يلاقيها إلا من كارت جوّه صفحة الأذرع.
     📌 الـid = 'world' وبيفتح openMarkets() (مش switchPage) عشان اللوحة تفتح صح. */
  html += '<div class="sg-h"><span class="sg-i">🌎</span>الأسواق</div>';
- html += '<button class="sb-i" data-tool="world" title="مصر وأمريكا — نفس كارت القرار" ' +
+ const usMode = (window.OCTACtx && window.OCTACtx.isUS()) ? true : false;
+ html += '<button class="sb-i" data-tool="world" title="' + (usMode ? 'لوحة السوق الأمريكي' : 'مصر وأمريكا — نفس كارت القرار') + '" ' +
    'onclick="sbGo(\'world\')">' +
-   '<span class="sb-ico">🌎</span>' +
-   '<span class="sb-t"><b>الأسواق العالمية</b><i>مصر · أمريكا · نفس الكارت</i></span>' +
+   '<span class="sb-ico">' + (usMode ? '🇺🇸' : '🌎') + '</span>' +
+   '<span class="sb-t"><b>' + (usMode ? 'لوحة السوق الأمريكي' : 'الأسواق العالمية') + '</b>' +
+   '<i>' + (usMode ? '🇺🇸 نفس كارت القرار' : 'مصر · أمريكا · نفس الكارت') + '</i></span>' +
    '</button>';
+ /* ⭐ ٦ ноября ٢٠٢٦ — في وضع الأمريكي: مدخل «بنبنيها» (خريطة الأدوات الجاية). */
+ if (window.OCTACtx && window.OCTACtx.isUS()) {
+ html += '<button class="sb-i" data-tool="wip" title="الأدوات الأمريكية اللي بنبنيها" ' +
+ 'onclick="sbGo(\'wip\')">' +
+ '<span class="sb-ico">🚧</span>' +
+ '<span class="sb-t"><b>بنبنيها</b><i>الأدوات الأمريكية الجاية</i></span>' +
+ '</button>';
+ }
  GROUPS.forEach(g => {
  const items = g.tools.map(id => map[id]).filter(Boolean);
  if (!items.length) return;
@@ -133,6 +151,9 @@ let OPEN = localStorage.getItem('octa_sidebar') === '1';
  });
  }
 
+ /* ⭐ إعادة بناء القائمة (لما سياق السوق يتغير) */
+ window.sbRebuild = function () { try { build(); } catch (e) {} };
+
  window.sbToggle = function () {
  OPEN = !OPEN;
  try { localStorage.setItem('octa_sidebar', OPEN ? '1' : '0'); } catch (e) {}
@@ -146,6 +167,7 @@ let OPEN = localStorage.getItem('octa_sidebar') === '1';
  /* ⛔⭐ ٦ نوفمبر ٢٠٢٦ — مدخل «الأسواق العالمية» ⇒ openMarkets() (مش switchPage).
     📌 السبب: switchPage('markets') بيروح لصفحة الأسهم المصرية (٢٨٥) مش لوحة الأسواق. */
  else if (id === 'world' && typeof openMarkets === 'function') openMarkets();
+ else if (id === 'wip') { if (typeof openUsWip === 'function') openUsWip('filter'); }
  else if (typeof switchPage === 'function') switchPage(id);
  // على الموبايل نقفل بعد الاختيار
  if (window.innerWidth < 900 && OPEN) {
