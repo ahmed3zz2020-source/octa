@@ -2690,6 +2690,38 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  } catch (e) { try { document.body.appendChild(node); } catch (e2) { } }
  }
 
+/* ⭐ ٥ نوفمبر ٢٠٢٦ — إعادة التحقق في الخلفية.
+ 📌 ليش؟ عشان الرسالة «بنتحقق من حسابك في الخلفية» تبقى صادقة:
+ 📌   لو السيرفر رجع (cold start خلص) ⇒ التوكن يتأكد ⇒ الشريط يختفي.
+ 📌   ٣ محاولات: بعد ٥ و ١٥ و ٣٥ ثانية. */
+ function retryLater(){
+  var waits = [5000, 15000, 35000];
+  for (var i = 0; i < waits.length; i++) {
+  setTimeout(function () {
+  var t = token();
+  if (!t) return;
+  try {
+  fetch(apiBase() + '/api/auth/me', {
+  headers: { 'Authorization': 'Bearer ' + t },
+  credentials: 'include',
+  cache: 'no-store'
+  }).then(function (r) {
+  if (!r.ok) return;
+  try {
+  r.text().then(function (txt) {
+  try {
+  var b = JSON.parse(txt || '{}');
+  if (b && b.token && b.user) put(b.token, b.user);
+  } catch (e) { }
+  clearHint();
+  });
+  } catch (e) { }
+  }).catch(function () { });
+  } catch (e) { }
+  }, waits[i]);
+  }
+ }
+
  /* التأكد إن التوكن لسه صالح — لو مش كده نرجع للبوابة */
  function verify() {
  var t = token();
@@ -2715,15 +2747,20 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
 
  var tries = 0, MAX_TRIES = 3;
  var STARTED = 0;
+ var FIRST = 0;
 
  function verifyOnce(){
  STARTED = Date.now();
- /* ⛔⛔ ٢٢ أكتوبر ٢٠٢٦ — مهلة ٨ ثواني على الطلب نفسه.
- ⛌ الـWorker بيحاول ٣ مرات والـRailway واقع ⇒ الطلب بيرجع بعد
- ⛌   دقيقة أو أكتر. قبل كده المستخدم كان واقف قدام «جاري التحقق»
- ⛌   دقيقة كاملة. دلوقتي بنقطعه بعد ٨ ثواني وندخله تصفح. */
+ if (!FIRST) FIRST = STARTED;
+ /* ⛔⛔⛔ ٥ نوفمبر ٢٠٢٦ — ⭐ مهلة الطلب اتغيّرت من ٨ لـ ٢٠ ثانية
+ ⛌ السبب (مقيس): السيرفر بينام بعد السكون ⇒ أول طلب بيعمل
+ ⛌   cold start (≈١٢ ثانية) — والدليل في كومنت الـWorker نفسه.
+ ⛌   ١٢ > ٨ ⇒ البوابة كانت بتقطع **قبل** ما السيرفر يرد ⇒
+ ⛌   «⚠️ السيرفر بطيء» على أول زيارة بعد كل فترة خمول.
+ ⛌ ⭐ والآن: ٢٠ ثانية تغطي cold start (١٢) + تري الـWorker (٣×٦=١٨)
+ ⛌   ⇒ الرد بيوصل فعلاً بدل ما نقصّ الطلب. */
  var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
- var to = setTimeout(function () { if (ctrl) try { ctrl.abort(); } catch (e) { } }, 8000);
+ var to = setTimeout(function () { if (ctrl) try { ctrl.abort(); } catch (e) { } }, 20000);
  return fetch(apiBase() + '/api/auth/me', {
  headers: { 'Authorization': 'Bearer ' + t },
  credentials: 'include',
@@ -2796,51 +2833,39 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  clearTimeout(to);
  tries++;
  var elapsed = (Date.now() - STARTED) / 1000;
- /* ⛔⛔ ٢١ أكتوبر ٢٠٢٦ — hard limit ٨ ثواني.
-  ⛌ الباك في ساعات الذروة بيرد بعد ١٥ ثانية (timeout curl).
-  ⛌ لو البوابة فضلت مقفولة أكتر من كده، المستخدم ميشوفش حاجة.
-  ⛌ الحل: بعد ٨ ثواني نسمح للزائر يفتح زي ما في حالة عدم وجود توكن
-  ⛌ (كل endpoints محمية محمية بـrequire_user على السيرفر — فمش دخول). */
- if (elapsed >= 8) {
+/* ⛔⛔⛔ ٥ نوفمبر ٢٠٢٦ — ⭐ إصلاح «بنحاول تاني» اللي مكانش بيحاول
+ 📌 الكود القديم: فرع `elapsed >= 8` كان بيعمل return **قبل** سطر
+ 📌 إعادة المحاولة ⇒ الرسالة بتوعد «بنحاول تاني» بس مفيش إعادة محاولة.
+ 📌 ⭐ الحل (٣ حاجات):
+ 📌   (١) إعادة المحاولة بتفضل شغالة (٣ محاولات) بحدّ زمني كلي ٤٥ ثانية.
+ 📌   (٢) بعد الفشل النهائي: نفتح التصفح + **نعيد التحقق في الخلفية**
+ 📌       ⇒ لو السيرفر رجع، الشريط يختفي لوحده (الرسالة تبقى صادقة).
+ 📌   (③) أثناء الانتظار: «⏳» مش «⚠️» — الإنذار الأحمر مش على حاله. */
+ var total = (Date.now() - FIRST) / 1000;
+ if (tries < MAX_TRIES && total < 45) {
+  hint('⏳ بنحاول نتأكد من حسابك… (' + tries + '/' + MAX_TRIES + ') — استنى ثانية', '#0f2a44', '#cfe3f5');
+  setTimeout(verifyOnce, 900 * tries);
+  return;
+ }
+ /* ⛌ فشلت كل المحاولات → نفتح التصفح ونكمل التحقق في الخلفية */
  clearHint();
- /* ⛔⛔⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐⭐⭐ إصلاح «الموقع فتح عادي»
- 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
- 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
- 📌 السبب: الكود القديم هنا كان يعمل shut() ⇒ **الموقع بيفتح**
- 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
- 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
- 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
- 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
- 📌 ⇒ ده بالظبط اللي شكا منه أحمد («الموقع فتح عادي كمان»).
- 📌 ✅ الحل: (١) مستخدم في تدفّق ⇒ ما نفتحش
- 📌 ✅ (٢) مستخدم عنده توكن ⇒ ما نفتحش (البوابة تفضل مقفولة)
- 📌 ✅ (٣) زائر من غير توكن ⇒ التصفح مفتوح (صح)
- */
  try { sessionStorage.setItem('octa_allow_browse', '1'); } catch (e) { }
  if (inFlow()) {
- hint('⚠️ السيرفر بطيء — استنى ثانية وحاول تكمل.', '#7a2b16', '#ffd9c9');
- mount(); welcome(); open();
- return;
+  hint('⚠️ الاتصال بالسيرفر بطيء — افتحنا لك تصفحك، استنى ثانية.', '#7a2b16', '#ffd9c9');
+  mount(); welcome(); open();
+  retryLater();
+  return;
  }
  if (token()) {
- hint('⚠️ السيرفر بطيء — بنحاول تاني. متقفلش الصفحة.', '#7a2b16', '#ffd9c9');
- mount(); welcome(); open();
- return;
+  hint('⏳ السيرفر بطيء — بنتحقق من حسابك في الخلفية. تقدر تتفرج دلوقتي.', '#7a2b16', '#ffd9c9');
+  mount(); welcome(); open();
+  retryLater();
+  return;
  }
  /* ⛌ زائر من غير توكن ⇒ التصفح مفتوح (صح) */
  hint('⚠️ السيرفر بطيء — بتفتح بدون تسجيل. الداتا المحمية هتطلب الدخول.', '#7a2b16', '#ffd9c9');
  shut();
  return;
- }
- if (tries < MAX_TRIES) {
-  hint('⏳ بنحاول نتأكد من حسابك… (' + tries + '/' + MAX_TRIES + ')', '#0f2a44', '#cfe3f5');
-  setTimeout(verifyOnce, 900 * tries);
-  return;
- }
- /* ⛔ فشلت كل المحاولات → نقفل ونقوله بوضوح. */
- hint('⛔ مش قادرين نتأكد من حسابك — الاتصال بالسيرفر ضعيف. جرّب تاني بعد شوية.', '#7a2b16', '#ffd9c9');
- /* ⛔ ما نفتحش. البوابة تفضل مقفولة. */
- mount(); welcome(); open();
  });
  }
 

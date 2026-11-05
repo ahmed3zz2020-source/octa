@@ -457,6 +457,35 @@ export default {
     } catch (e) {
       return res;
     }
+  },
+  /* ══════════════════════════════════════════════════════════════
+   ⭐⭐ إيقاظ السيرفر — scheduled trigger كل ٥ دقايق (٥ نوفمبر ٢٠٢٦)
+   ────────────────────────────────────────────────────────────────
+   📌 المشكلة (مُقيسة على الإنتاج):
+   📌   Railway بينام بعد فترة سكون ⇒ أول طلب بيعمل cold start
+   📌   (≈١٢ ثانية) ⇒ البوابة (octa-gate.js) كانت بتقطع بعد ٨ ثواني
+   📌   ⇒ المستخدم بيشوف «⚠️ السيرفر بطيء — بنحاول تاني» على أول زيارة.
+   📌   وكل الـkeepalive اتشال (١ و ٢ نوفمبر) ⇒ مفيش حاجة بتصحيّيه.
+   📌
+   📌 ✅ الحل: ping خفيف على /api/health كل ٥ دقايق ⇒ السيرفر ما بينامش.
+   📌   ⭐ التكلفة = ٠ كريدت (مش LLM) — كود على Cloudflare.
+   📌   ⭐ read-only: بيقرا /api/health بس (لا يكتب ولا يعدّل).
+   📌   ⭐ بيفوق الـisolate بتاع الـWorker كمان (بيمنع cold start ليه هو).
+   📌
+   📌 التفعيل: في wrangler-preview.jsonc (معاينة) وwrangler.jsonc (إنتاج):
+   📌   "triggers": { "crons": [cron كل ٥ دقايق] }
+   */
+  async scheduled(event, env, ctx) {
+    const target = API + '/api/health';
+    try {
+      const r = await fetch(target, {
+        headers: { 'User-Agent': 'octa-keepalive/1.0' }
+      });
+      console.log('[keepalive]', new Date().toISOString(), 'http', r.status);
+    } catch (e) {
+      console.log('[keepalive]', new Date().toISOString(), 'err',
+        (e && e.message) || 'unknown');
+    }
   }
 };
 
