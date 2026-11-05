@@ -19,6 +19,10 @@ const MARKETS = {
 };
 function TV_SCAN(){return 'https://scanner.tradingview.com/america/scan'}
 
+/* ⭐ ٦ نوفمبر ٢٠٢٦ — الصفحة: ٨٠ كارت في المرة (الكون ٢٠٠٠ سهم)
+   📌 السبب: ٢٠٠٠ كارت في الـDOM = بطيء جداً على الموبايل. */
+const US_PAGE=80;
+let US_SHOWN=US_PAGE;
 const US_COLS=["close","change","volume","relative_volume_10d_calc","market_cap_basic",
 "price_earnings_ttm","price_book_fq","RSI","MACD.macd","MACD.signal","EMA20","EMA50",
 "EMA200","ATR","high_52w","low_52w","Perf.1M","Perf.Y","Volatility.D","beta_1_year",
@@ -247,26 +251,60 @@ async function loadEgypt(){
   top10: merged};
 }
 
+/* ⭐ ٦ نوفمبر ٢٠٢٦ — الكون الأمريكي كله (مش ١١ سهم بس)
+   📌 الطلب: «عاوز كل الأسهم تبقى موجودة في السيرش».
+   📌 الطريقة: مسح الفيدرول للسوق الأمريكي كله (نوعه سهم · مرتّب بالقيمة السوقية).
+   📌 الحجم: ٢٠٠٠ سهم ≈ ١٫٠ ميجا خام / ٤٤٠ ك.ب مضغوط — بيتحمّل مرة واحدة.
+   📌 المؤشر (S&P 500) بيتجيب بطلب صغير منفصل (مش جزء من مسح الأسهم). */
+const US_UNIVERSE_N = 2000;
+
 async function loadUS(){
-  const syms=MARKETS.us.stocks.concat([MARKETS.us.index]);
-  const body=JSON.stringify({symbols:{tickers:syms,query:{types:[]}},columns:US_COLS});
-  const r=await fetchRetry(TV_SCAN(),{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body});
+  const body = {
+    filter: [{ left:'type', operation:'equal', right:'stock' }],
+    options: { lang:'en' },
+    markets: ['america'],
+    symbols: { query:{ types:[] }, tickers:[] },
+    columns: US_COLS,
+    sort: { sortBy:'market_cap_basic', sortOrder:'desc' },
+    range: [0, US_UNIVERSE_N]
+  };
+  const r=await fetchRetry(TV_SCAN(),{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(body)});
   const j=await r.json();
   if(!j.data||!j.data.length) throw new Error('ما قدرتش أوصل لمصدر البيانات الأمريكي');
-  const idxRow=j.data.find(d=>d.s===MARKETS.us.index);
-  const idx=idxRow?{name:'S&P 500',value:idxRow.d[0],change:idxRow.d[1]}:null;
-  const bench=idxRow;
-  const stocks=j.data.filter(d=>d.s!==MARKETS.us.index).map(d=>{
+
+  /* المؤشر — طلب منفصل (مش جزء من مسح الأسهم) */
+  let bench=null;
+  try{
+    const bbody=JSON.stringify({symbols:{tickers:[MARKETS.us.index],query:{types:[]}},columns:US_COLS});
+    const br=await fetchRetry(TV_SCAN(),{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:bbody});
+    const bj=await br.json();
+    if(bj.data&&bj.data.length) bench=bj.data[0];
+  }catch(e){}
+  const bi=k=> bench ? bench.d[US_COLS.indexOf(k)] : null;
+
+  const stocks=j.data.map(d=>{
   const o={_symbol:d.s};
   US_COLS.forEach((c,i)=>o[c]=d.d[i]);
   // مقارنة مع المؤشر
   const rel=(v,b)=>(v!=null&&b!=null)?v-b:null;
-  o._rel={d1M:rel(o['Perf.1M'],bench?bench.d[16]:null), dY:rel(o['Perf.Y'],bench?bench.d[17]:null)};
+  o._rel={d1M:rel(o['Perf.1M'],bi('Perf.1M')), dY:rel(o['Perf.Y'],bi('Perf.Y'))};
   o._sc=scoreUS(o);
   return o;
   });
+  const idx = bench ? {name:'S&P 500',value:bench.d[0],change:bench.d[1]} : null;
   return{index:idx,stocks:stocks};
 }
+
+/* ⭐ إعادة حساب الدرجات لما الأوزان توصل (الأوزان محميّة وبتيجي بعد الدخول)
+   ⇒ من غيرها كل النتائج ٠. */
+function usRescore(){
+  try{
+    const list=(DATA&&DATA.us&&DATA.us.stocks)||[];
+    if(!list.length) return;
+    list.forEach(o=>{ o._sc=scoreUS(o); });
+  }catch(e){}
+}
+document.addEventListener('octa:weights', function(){ usRescore(); try{ render(); }catch(e){} });
 
 /* ══════════ حساب النتيجة ══════════
    الأوزان بقت فاضية وقت التحميل (مخبيّة عن الزائر ومحجوبة بتوكن).
@@ -423,10 +461,19 @@ function render(){
 
   rows=applyFilter(rows,MK);
 
-  $('cnt').textContent=rows.length?
-  ('عرض '+rows.length+' من '+rows0.length+' سهم'):'';
+  const total=rows.length;
+  $('cnt').textContent=total?
+  ('عرض '+total+' من '+rows0.length+' سهم'):'';
 
-  if(!rows.length){ $('out').innerHTML='<div class="empty">مفيش نتائج للفلتر ده</div>'; return }
+  if(!total){ $('out').innerHTML='<div class="empty">مفيش نتائج للفلتر ده</div>'; return }
+
+  /* ⭐ ٦ نوفمبر ٢٠٢٦ —üssrshow بالتدريج (٨٠ كارت في المرة) */
+  let more='';
+  if(MK==='us' && total>US_SHOWN){
+  rows=rows.slice(0,US_SHOWN);
+  more='<div class="more-us"><button class="fbtn on" onclick="usMore()">'+
+  '📄 عرض المزيد — باقي '+(total-US_SHOWN)+' سهم</button></div>';
+  }
 
   $('out').innerHTML='<div class="grid">'+rows.map(r=>{
   /* ⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ guard ضد NaN (لو الدرجة مش متاحة)
@@ -451,17 +498,22 @@ function render(){
   (r.safety!=null?'<span>أمان <b>'+nf(r.safety,0)+'</b></span>':'')+
   (r.decision?'<span>قرار المحرك: <b>'+esc(r.decision)+'</b></span>':'')+
   '</div></div>';
-  }).join('')+'</div>';
+  }).join('')+'</div>'+more;
 }
+function usMore(){ US_SHOWN+=US_PAGE; try{ render(); }catch(e){} }
 
 async function load(){
   try{
   $('out').innerHTML='<div class="load"><span class="spin"></span> جاري التحميل...</div>';
-  // الشريط يبقى فيه كل الأسواق دايمًا — مش بس النشط
-  const jobs=Object.keys(MARKETS).map(async k=>{
-  try{ DATA[k]= k==='egypt'? await loadEgypt() : await loadUS(); }
-  catch(e){ DATA[k]=null; DATA[k+'_err']=e.message; }
-  });
+  /* ⭐ ٦ نوفمبر ٢٠٢٦ — التحميل الذكي:
+     📌 المصري بيتحمّل دايماً · الأمريكي (٢٠٠٠ سهم) بيتحمّل بس لما نحتاجه
+     📌   (وضع America · أو تاب أمريكا مفتوح) ⇒ مش بنحمّل ١ ميجا من غير داعي. */
+  const needUS = (MK==='us') || (window.OCTACtx && window.OCTACtx.isUS());
+  const jobs=[];
+  jobs.push((async()=>{ try{ DATA.egypt= await loadEgypt(); }
+    catch(e){ DATA.egypt=null; DATA.egypt_err=e.message; } })());
+  if(needUS) jobs.push((async()=>{ try{ DATA.us= await loadUS(); }
+    catch(e){ DATA.us=null; DATA.us_err=e.message; } })());
   await Promise.all(jobs);
   renderMktBar(); render();
   }catch(e){
@@ -469,12 +521,22 @@ async function load(){
   '<br><br><button class="fbtn on" onclick="load()">🔄 إعادة المحاولة</button></div>';
   }
   clearInterval(TIMER);
-  const ms = phaseOf(MK)[0]==='open' ? 60000 : 300000;
+  /* ⭐ الأمريكي بيتحدّث كل ٥ دقايق (٢٠٠٠ سهم — مش كل دقيقة). */
+  const ms = (MK==='us') ? 300000 : (phaseOf(MK)[0]==='open' ? 60000 : 300000);
   TIMER=setInterval(load, ms);
 }
 
 function setMK(k){ MK=k; FILTER='all'; QUERY=''; $('q').value='';
-  renderTabs(); renderFilters(); render(); }
+  US_SHOWN=US_PAGE;
+  renderTabs(); renderFilters(); render();
+  /* ⭐ لو تاب Americans فتح والكون لسه مش متحمّل ⇒ حمّله دلوقتي */
+  if(k==='us' && !(DATA&&DATA.us)){
+  $('out').innerHTML='<div class="load"><span class="spin"></span> جاري تحميل الأسهم الأمريكية...</div>';
+  loadUS().then(()=>{ renderMktBar(); render(); })
+  .catch(e=>{ $('out').innerHTML='<div class="err">⚠️ '+esc(e.message||'فشل الاتصال')+
+  '<br><br><button class="fbtn on" onclick="setMK(\'us\')">🔄 إعادة المحاولة</button></div>'; });
+  }
+}
 function setFilter(f){ FILTER=f; renderFilters(); render(); }
 
 $('q').addEventListener('input',e=>{QUERY=e.target.value.trim();render()});
@@ -779,9 +841,17 @@ async function cardEGX(code,row){
 /* ── كارت السوق الأمريكي ── */
 async function cardUS(code){
   const m=MARKETS.us;
-  const sym = m.stocks.find(s=>s.split(':')[1]===code);
+  /* ⭐ ٦ نوفمبر ٢٠٢٦ — الرمز من الكون المحمّل (٢٠٠٠ سهم) مش من ١١ سهم بس */
+  let sym=null;
+  try{
+    const list=(typeof DATA!=='undefined'&&DATA&&DATA.us&&DATA.us.stocks)||[];
+    const hit=list.find(x=>String(x._symbol||'').split(':').pop()===code);
+    if(hit) sym=hit._symbol;
+  }catch(e){}
+  if(!sym) sym = m.stocks.find(s=>s.split(':')[1]===code);
   if(!sym) throw new Error('الرمز مش موجود');
-  const syms=m.stocks.concat([m.index]);
+  /* ⭐ ٦ نوفمبر ٢٠٢٦ — نجيب السهم المطلوب بس (+المؤشر) — مش ١٢ سهم كل مرة */
+  const syms=[sym, m.index];
   const body=JSON.stringify({symbols:{tickers:syms,query:{types:[]}},columns:US_COLS});
   const r=await fetch(TV_SCAN(),{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body});
   const j=await r.json();

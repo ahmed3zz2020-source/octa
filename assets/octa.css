@@ -2307,6 +2307,20 @@
   body.m-tools-open .m-tools-btn::before { content: '✕ إغلاق'; }
 
 
+  /* ⭐ ٦ نوفمبر ٢٠٢٦ — شريط «فيه نسخة جديدة» (التطبيق المثبّت) */
+  #octaUpdateBar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9999;
+    padding: 10px 14px; background: linear-gradient(135deg,#16c79a,#0e8f6e);
+    box-shadow: 0 -6px 22px rgba(0,0,0,.35); }
+  #octaUpdateBar .octa-upd { display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; max-width: 1400px; margin: 0 auto; color: #fff; font-weight: 800; font-size: .84rem; }
+  #octaUpdateBar button { background: rgba(255,255,255,.94); color: #0b6b52; border: none;
+    border-radius: 10px; padding: 9px 14px; font-family: inherit; font-weight: 800; font-size: .8rem;
+    cursor: pointer; white-space: nowrap; }
+
+  /* ⭐ ٦ نوفمبر ٢٠٢٦ — زر «عرض المزيد» (الكون الأمريكي ٢٠٠٠ سهم) */
+  .more-us { display: flex; justify-content: center; margin: 14px 0 6px; }
+  .more-us .fbtn { padding: 10px 18px; font-size: .82rem; }
+
   /* ══════════ 🚧 صفحة «قيد الإنشاء» — وضع السوق الأمريكي ══════════ */
   .wip-box {
   background: var(--pri2); border: 1px solid var(--line); border-radius: 18px;

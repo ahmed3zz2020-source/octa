@@ -1,7 +1,7 @@
 {
-  "name": "OCTA — منصّة البورصة المصرية",
+  "name": "OCTA — تحليل الأسهم المصرية والأمريكية",
   "short_name": "OCTA",
-  "description": "تحليل أسهم البورصة المصرية — ٨ محاور · قرار واحد · شارت TradingView",
+  "description": "تحليل الأسهم المصرية والأمريكية — ٨ محاور · قرار واحد · كارت قرار",
   "start_url": "/?src=pwa",
   "scope": "/",
   "display": "standalone",
