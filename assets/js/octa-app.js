@@ -485,7 +485,7 @@ function render(){
   '<div class="sh"><div>'+
   '<div class="scd">'+esc(r.code)+
   (r.isOTC?' <span class="bdg b-otc">OTC</span>':'')+'</div>'+
-  '<div class="snm">'+esc(r.name)+'</div>'+
+  '<div class="snm" dir="auto">'+esc(r.name)+'</div>'+
   '</div><div class="spx"><b>'+nf(r.price)+'</b>'+
   '<span class="'+(ch>=0?'up':'down')+'">'+(ch>=0?'▲ +':'▼ ')+nf(ch)+'%</span></div></div>'+
   '<div class="sbar"><span class="tk"><span class="fl '+cls(_sc==null?0:_sc)+'" style="width:'+(_sc==null?0:_sc)+'%"></span></span>'+

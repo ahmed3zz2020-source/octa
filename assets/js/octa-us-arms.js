@@ -73,7 +73,7 @@ function row(o, extra){
   var c = o.change||0;
   return '<div class="ic-row" onclick="event.stopPropagation(); openCard(\''+short(o)+'\',null,\'us\')">' +
     '<span class="r-c" style="direction:ltr;text-align:left">' + esc(short(o)) + '</span>' +
-    '<span class="r-n">' + esc(nm(o)) + '</span>' + (extra||'') +
+    '<span class="r-n" dir="auto">' + esc(nm(o)) + '</span>' + (extra||'') +
     '<span class="r-s">' + sc(o) + '</span>' +
     '<span class="r-x ' + (c>=0?'pos':'neg') + '">' + (c>=0?'+':'') + c.toFixed(1) + '%</span>' +
     '</div>';
