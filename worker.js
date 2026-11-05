@@ -453,6 +453,16 @@ export default {
           const ct = h.get('Content-Type') || '';
         }
       } catch (e) { }
+      /* ⭐ وضع الاختبار البطيء (?slowtest=1) ⇒ كوكي مؤقّت
+         ⇒ طلبات /api/auth/me بعدها تتأخر ١٢ ثانية (محاكاة cold start).
+         ⛔ المعاينة بس (OCTA_SLOWTEST=1) — الإنتاج مفعّلوش. */
+      try {
+        const _su = new URL(request.url);
+        if (_su.searchParams.get('slowtest') === '1'
+          && (h.get('Content-Type') || '').indexOf('text/html') === 0) {
+          h.append('Set-Cookie', 'octa_slowtest=1; Path=/; Max-Age=600; SameSite=Lax');
+        }
+      } catch (e) { }
       return new Response(res.body, { status: res.status, headers: h });
     } catch (e) {
       return res;
@@ -1086,6 +1096,19 @@ async function handle(request, env, ctx) {
         } catch (e) { }
       }
       try {
+        /* ⭐ ٥ نوفمبر ٢٠٢٦ — وضع الاختبار (تشخيصي · مؤقّت).
+         📌 الهدف: نخلّي السيرفر «يبان» بطيء (زي الـcold start) عشان
+         📌   المالك يشوف بنفسه الفرق بين البوابة القديمة والجديدة.
+         📌 الاستخدام: افتح ?slowtest=1 ⇒ /api/auth/me بيتأخر ١٢ ثانية.
+         📌 ⛔ شغّال في **المعاينة بس** (OCTA_SLOWTEST=1) — الإنتاج مفعّلوش.
+         📌 ⛔ ومفيش أي بيانات بتتغيّر — تأخير في الرد بس. */
+        const slowCookie = /(^|;\s*)octa_slowtest=1(;|$)/.test(
+          request.headers.get('cookie') || '');
+        if (env && env.OCTA_SLOWTEST === '1'
+          && url.pathname === '/api/auth/me'
+          && (url.searchParams.get('slowtest') === '1' || slowCookie)) {
+          await sleep(12000);
+        }
         const upstream = await fetchApi(target, init);
         const body = await upstream.text();
         const out = new Headers();
@@ -1270,6 +1293,14 @@ async function handle(request, env, ctx) {
       h.set('Pragma', 'no-cache');
       h.set('Expires', '0');
       h.set('ETag', '"' + Date.now() + '"');
+      /* ⭐ وضع الاختبار البطيء: الصفحة اللي اتفتحت بـ ?slowtest=1 ⇒
+         🍪 كوكي مؤقّت ⇒ طلبات /api/auth/me بعدها تتأخر ١٢ ثانية
+         (محاكاة cold start). ⛔ المعاينة بس — الإنتاج مفعّلوش. */
+      try {
+        if (url.searchParams.get('slowtest') === '1') {
+          h.append('Set-Cookie', 'octa_slowtest=1; Path=/; Max-Age=600; SameSite=Lax');
+        }
+      } catch (e) { }
       /* ⭐ مسح كاش المتصفح — مرة واحدة (لحد ما كل المستخدمين يحدّثوا) */
       try {
       const WANT = '202610250945';

@@ -164,8 +164,23 @@ window.OCTA_AXIS_W = function () {
       /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ السيرفر بيبعت الأوزان في d.engine
       📌 السبب: CFG.weights.egx / .intel كانوا فاضيين ⇒ كل الأوزان «0%».
       📌 ✅ الحل: ننسخ نفس الأوزان لكل أسواق (مصدر واحد — الباك). */
+      /* ⭐⭐ ٥ نوفمبر ٢٠٢٦ — ⭐⭐ إصلاح NaN في درجة السهم الأمريكي
+      📌 السبب: كان بينسخ أوزان المحرك المصري (d.engine) لكل الأسواق.
+      📌   وأوزان المحرك المصري فيها news + portfolio — وهما مش
+      📌   موجودين في مقياس السوق الأمريكي ⇒ s['news'] = undefined
+      📌   ⇒ المتوسط = NaN ⇒ الح-ring بيطلع «NaN» في كارت كل سهم.
+      📌 ✅ الحل: us و usScan لهم أوزان خاصة بيهم (نفس اللي في الباك).
+      📌   وegx/intel بيفضلوا ياخدوا أوزان المحرك. */
+      var _DEF = {
+        us: { technical:15, fundamental:20, valuation:15, liquidity:10,
+              news:10, sentiment:10, risk:10, portfolio:10 },
+        usScan: { technical:15, fundamental:20, valuation:15, liquidity:10,
+                  sentiment:10, risk:10 }
+      };
       ['us','egx','usScan','intel'].forEach(function (k) {
-        if (!CFG.weights[k] || !Object.keys(CFG.weights[k]).length) CFG.weights[k] = d.engine;
+        if (!CFG.weights[k] || !Object.keys(CFG.weights[k]).length) {
+          CFG.weights[k] = _DEF[k] || d.engine;
+        }
       });
     }
     if (d.weights) {

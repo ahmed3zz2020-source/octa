@@ -24,6 +24,7 @@ const US_COLS=["close","change","volume","relative_volume_10d_calc","market_cap_
 "EMA200","ATR","high_52w","low_52w","Perf.1M","Perf.Y","Volatility.D","beta_1_year",
 "fundamental_currency_code","exchange","sector","industry","name","description",
 "total_shares_outstanding","Recommend.All","price_target_median",
+"average_volume_30d_calc",
 "earnings_per_share_diluted_ttm","net_income","debt_to_equity","return_on_equity_fq",
 "operating_margin","dividends_yield_current"];
 
@@ -520,6 +521,7 @@ async function openCard(code,row,mk){
   MC.sym = _cardCache.sym;
   $('mTtl').textContent = _cardCache.title;
   $('mBody').innerHTML = _cardCache.html;
+  try { if (typeof usRecalc === 'function') usRecalc(); } catch (e) { }
   return;
   }
 
@@ -530,6 +532,8 @@ async function openCard(code,row,mk){
   MC.sym=d._sym;
   $('mTtl').textContent=d._title;
   $('mBody').innerHTML=d._html;
+  /* ⭐ دليل المنهجية — نحسب حجم الصفقة والبوابة والتذكرة فور العرض */
+  try { if (typeof usRecalc === 'function') usRecalc(); } catch (e) { }
   /* ⛔⛔ ٢٣ أكتوبر — نحفظ نسخة عشان «رجوع» يفتح الكارت فوراً
   ⛌ بدل ما يعيد الحساب من الصفر (وكده يطلع فاضي لو فشل). */
   _cardCache = { code:code, mk:useMk, sym:d._sym,
@@ -1004,6 +1008,8 @@ async function cardUS(code){
   '<div style="font-size:.7rem;color:var(--muted);margin-top:8px">محسوبة من البيانات الحية — مش مكتوبة يدويًا</div></div>'+
 
   cmp+lvl+techHtml+fundHtml+liqHtml+sentHtml+gapHtml+invHtml+
+  /* ⭐ ٥ نوفمبر ٢٠٢٦ — دليل المنهجية: ليه ده مختار؟ (سلسلة الأحكام) */
+  (typeof usEvidence==='function'?usEvidence(d,sc):'')+
 
   '<div class="mcard"><div class="msec">🚨 رايات حمراء</div>'+flags+'</div>'
   };
@@ -1058,7 +1064,17 @@ function scoreUSFull(d){
   if(d['net_income']!=null&&d['net_income']<0)r-=6;
   s.risk=clamp(r);
 
-  const W=WUS();let a=0,wt=0;for(const k in W){a+=s[k]*W[k];wt+=W[k]}
+  /* ⭐ ٥ نوفمبر ٢٠٢٦ — ⭐ حارس NaN.
+  📌 لو أي محور في الأوزان مش موجود في s (زي news/portfolio في
+  📌   مقياس السوق الأمريكي) ⇒ s[k] = undefined ⇒ المتوسط NaN
+  📌   ⇒ الح-ring بيطلع «NaN» والدرجة بتختفي.
+  📌 ✅ الحل: نتجاهل أي محور قيمته مش رقم. */
+  const W=WUS();let a=0,wt=0;
+  for(const k in W){
+    const v=s[k];
+    if(typeof v!=='number'||isNaN(v)) continue;
+    a+=v*W[k]; wt+=W[k];
+  }
   s.total=wt?Math.round(a/wt):0;
   return s;
 }
