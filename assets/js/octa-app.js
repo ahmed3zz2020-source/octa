@@ -1561,10 +1561,36 @@ function openMarkets() {
   document.querySelectorAll('.arm-btn').forEach(b => b.classList.remove('active'));
   const pg = document.getElementById('page-markets');
   if (pg) { pg.classList.add('active'); pg.style.setProperty('display','block','important'); }
+  /* ⛔⭐ ٦ نوفمبر ٢٠٢٦ — الـarmView (صفحة الأذرع) كان بيفضل ظاهر فوق لوحة الأسواق
+     ⇒ تابات 🇪🇬/🇺🇸 كانت تحت ٣٠٠٠ بكسل من المؤشرات ⇒ المستخدم مكانش يلاقي تاب أمريكا.
+     ✅ الحل: نخفي الـarmView (زي switchPage) ونرجع لأعلى الصفحة. */
+  const av = document.getElementById('armView');
+  if (av) av.style.setProperty('display','none','important');
   const ed = document.getElementById('eduBanner');
   if (ed) ed.style.display = '';
+  try { window.scrollTo(0,0); } catch(e){}
+  setTopOffset();
   if (typeof window.mkLoad === 'function') setTimeout(() => { try { window.mkLoad(); } catch(e){ console.warn(e.message); } }, 250);
 }
+
+/* ⛔⭐ ٦ نوفمبر ٢٠٢٦ — ارتفاع الشريط الثابت (topbar) بيتحسب وقت التشغيل
+   ⇒ تابات السوق تثبت تحته بالظبط (مش تحت راسه ولا فوقه).
+   📌 الـtopbar فيه الشريط العلوي + شريط الأذرع ⇒ ارتفاعه متغيّر على الموبايل. */
+function setTopOffset(){
+  try{
+    const tb = document.querySelector('.octa-topbar');
+    if (!tb) return;
+    const h = Math.round(tb.getBoundingClientRect().height);
+    if (h > 0) document.documentElement.style.setProperty('--topH', h + 'px');
+  }catch(e){}
+}
+window.setTopOffset = setTopOffset;
+try {
+  window.addEventListener('resize', setTopOffset);
+  window.addEventListener('orientationchange', setTopOffset);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setTopOffset);
+  else setTopOffset();
+} catch(e){}
 
 /* ══════ الوضع النهاري ══════ */
 function toggleLight() {

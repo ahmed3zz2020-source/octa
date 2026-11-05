@@ -68,6 +68,16 @@ let OPEN = localStorage.getItem('octa_sidebar') === '1';
  }
 
  let html = '';
+ /* ⛔⭐ ٦ نوفمبر ٢٠٢٦ — مدخل «الأسواق العالمية» في أول القائمة.
+    📌 السبب: لوحة الأسواق (وهي اللي فيها تاب 🇺🇸 الأمريكي) مكانتش في الـsidebar خالص
+    ⇒ المستخدم مكانش يلاقيها إلا من كارت جوّه صفحة الأذرع.
+    📌 الـid = 'world' وبيفتح openMarkets() (مش switchPage) عشان اللوحة تفتح صح. */
+ html += '<div class="sg-h"><span class="sg-i">🌎</span>الأسواق</div>';
+ html += '<button class="sb-i" data-tool="world" title="مصر وأمريكا — نفس كارت القرار" ' +
+   'onclick="sbGo(\'world\')">' +
+   '<span class="sb-ico">🌎</span>' +
+   '<span class="sb-t"><b>الأسواق العالمية</b><i>مصر · أمريكا · نفس الكارت</i></span>' +
+   '</button>';
  GROUPS.forEach(g => {
  const items = g.tools.map(id => map[id]).filter(Boolean);
  if (!items.length) return;
@@ -133,6 +143,9 @@ let OPEN = localStorage.getItem('octa_sidebar') === '1';
  const t = allTools().find(x => x.id === id);
  const isModal = id === 'decide';
  if (isModal && typeof openDecide === 'function') openDecide();
+ /* ⛔⭐ ٦ نوفمبر ٢٠٢٦ — مدخل «الأسواق العالمية» ⇒ openMarkets() (مش switchPage).
+    📌 السبب: switchPage('markets') بيروح لصفحة الأسهم المصرية (٢٨٥) مش لوحة الأسواق. */
+ else if (id === 'world' && typeof openMarkets === 'function') openMarkets();
  else if (typeof switchPage === 'function') switchPage(id);
  // على الموبايل نقفل بعد الاختيار
  if (window.innerWidth < 900 && OPEN) {
