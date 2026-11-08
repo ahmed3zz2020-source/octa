@@ -240,6 +240,99 @@ if (/[?&]diag=1/.test(location.search)) {
    ⛌ ملاحظة: لو الباك رجع 200 → الدالة بتعمل return بدري
    ⛌   ومفيش حاجة بتظهر. */
 </script>
+<script id="octaSafeHandler">
+/* ⛔⛔⛔ ٩ نوفمبر ٢٠٢٦ — حارس: «ضغط المستخدم قبل ما السكربت يكمّل تحميله»
+   📌 المشكلة (من واقع موبايل المستخدم):
+     `OCTASettings` معرَّف في **آخر** ملف من ٤٢ ملف JS.
+     لو المستخدم ضغط ⚙️ قبل ما الملف ده يكمّل ⇒ ReferenceError
+     ⇒ توست أحمر «OCTASettings is not defined».
+   📌 الحل: طبقة أمان على document (capture): لو الـfunction لسه
+     مش موجودة ⇒ نمنع الحدث، نستنى لحد ما التحميل يخلص، وبعدين
+     نعيد نفس الحدث ⇒ مفيش خطأ، والزر بيشتغل.
+   📌 بيغطي كل الـinline handlers (٧٥ onclick + input/change/keydown). */
+(function () {
+  var KW = { if: 1, for: 1, while: 1, switch: 1, catch: 1, function: 1, return: 1,
+    typeof: 1, new: 1, await: 1, delete: 1, void: 1, in: 1, of: 1, do: 1, else: 1,
+    try: 1, finally: 1, throw: 1, case: 1, break: 1, continue: 1, class: 1,
+    super: 1, this: 1, event: 1 };
+  var BI = { alert: 1, confirm: 1, prompt: 1, setTimeout: 1, clearTimeout: 1,
+    setInterval: 1, clearInterval: 1, console: 1, parseInt: 1, parseFloat: 1,
+    isNaN: 1, encodeURIComponent: 1, decodeURIComponent: 1, fetch: 1, require: 1 };
+  var ATTRS = ['onclick', 'onchange', 'oninput', 'onkeydown'];
+
+  function missing(code) {
+    /* ⛔ لازم نلمس **جذر** الاستدعاء: `OCTASettings.open()` ⇒ الجذر
+       OCTASettings مش open (window.open موجودة ⇒ الحارس كان بيفوّتها). */
+    var re = /([A-Za-z_$][A-Za-z0-9_$]*)((?:\.[A-Za-z_$][A-Za-z0-9_$]*)*)\s*\(/g,
+      m, out = [], i, n;
+    while ((m = re.exec(code))) {
+      n = m[1];
+      if (KW[n] || BI[n]) continue;
+      if (out.indexOf(n) < 0) out.push(n);
+    }
+    for (i = 0; i < out.length; i++) {
+      if (typeof window[out[i]] === 'undefined') return out[i];
+    }
+    return null;
+  }
+
+  function say(msg) {
+    try {
+      var t = document.createElement('div');
+      t.className = 'octa-safe-toast';
+      t.textContent = msg;
+      t.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);'
+        + 'z-index:999998;background:#16202e;color:#ffd9c9;border:1px solid #7a2b16;'
+        + 'padding:10px 14px;border-radius:12px;font:600 13px/1.6 system-ui;max-width:88vw';
+      document.body.appendChild(t);
+      setTimeout(function () { try { t.remove(); } catch (e) { } }, 2600);
+    } catch (e) { }
+  }
+
+  function replay(el, ev) {
+    var type = ev.type, ev2 = null;
+    try {
+      if (type === 'click') {
+        ev2 = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+      } else if (type === 'keydown') {
+        ev2 = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: ev.key, code: ev.code });
+      } else {
+        ev2 = new Event(type, { bubbles: true, cancelable: true });
+      }
+      el.dispatchEvent(ev2);
+    } catch (e) { }
+  }
+
+  function guard(ev) {
+    var el = null, attr = null, code = '', i;
+    try {
+      el = ev.target && ev.target.closest
+        ? ev.target.closest('[onclick],[onchange],[oninput],[onkeydown]') : null;
+    } catch (e) { return; }
+    if (!el) return;
+    for (i = 0; i < ATTRS.length; i++) {
+      if (el.hasAttribute(ATTRS[i])) { attr = ATTRS[i]; code = el.getAttribute(attr) || ''; break; }
+    }
+    if (!code) return;
+    var name = missing(code);
+    if (!name) return; /* كل الدوال جاهزة ⇐ يتنفذ عادي */
+    ev.preventDefault();
+    ev.stopPropagation();
+    var tries = 0;
+    (function wait() {
+      if (typeof window[name] !== 'undefined') {
+        if (el.isConnected) replay(el, ev);
+        return;
+      }
+      if (tries++ < 200) { setTimeout(wait, 100); return; }
+      say('⏳ لسه بنحمّل — جرّب تاني');
+    })();
+  }
+
+  var EVS = ['click', 'change', 'input', 'keydown'];
+  for (var i = 0; i < EVS.length; i++) document.addEventListener(EVS[i], guard, true);
+})();
+</script>
 <script id="octaErrTrap">
 /* ⛔⛔ لحد دلوقتي أي خطأ JavaScript كان بيختفي تمامًا — المستخدم بيشوف
   صفحة زي الصورة ومحدش بيعرف السبب. الكارت ده بيوريه فوق.
@@ -274,7 +367,7 @@ window.addEventListener('error', function (e) {
 <script id="octa-cache-clear">
   /* 🧹 مسح كاش التطبيق — يخلي أي تعديل جديد يوصل فوراً */
   (function () {
-  var BUILD = 'v=202611052234';
+  var BUILD = 'v=202611082248';
   var KEY = 'octa_build_v1';
   try {
   var prev = localStorage.getItem(KEY);
@@ -424,21 +517,21 @@ window.addEventListener('error', function (e) {
 <meta name="apple-mobile-web-app-title" content="OCTA">
 <link rel="apple-touch-icon" href="assets/icon-192.png">
 <link rel="icon" type="image/png" href="assets/icon-192.png">
-<link rel="stylesheet" href="assets/octa-tokens.css?v=202611052234">
-<link rel="stylesheet" href="assets/ix-intel.css?v=202611052234">
+<link rel="stylesheet" href="assets/octa-tokens.css?v=202611082248">
+<link rel="stylesheet" href="assets/ix-intel.css?v=202611082248">
 <!-- 💵 ذكاء الدولار — OCTA USD INTELLIGENCE (٢٦ أكتوبر ٢٠٢٦) -->
-<link rel="stylesheet" href="assets/usd-intel.css?v=202611052234">
+<link rel="stylesheet" href="assets/usd-intel.css?v=202611082248">
 <link rel="stylesheet" href="assets/octa.css?v=__BUILD__202610260854">
-  <link rel="stylesheet" href="assets/css-decide.css?v=202611052234">
-  <link rel="stylesheet" href="assets/css-screener.css?v=202611052234">
-  <link rel="stylesheet" href="assets/css-chart.css?v=202611052234">
+  <link rel="stylesheet" href="assets/css-decide.css?v=202611082248">
+  <link rel="stylesheet" href="assets/css-screener.css?v=202611082248">
+  <link rel="stylesheet" href="assets/css-chart.css?v=202611082248">
 <!-- 🆕 محرك إشارة الذهب (16 أكتوبر 2026) — شارة + مودال التحليل -->
-<link rel="stylesheet" href="assets/css-gold.css?v=202611052234">
+<link rel="stylesheet" href="assets/css-gold.css?v=202611082248">
 <!-- 💰 Smart Money (22 أكتوبر 2026) — صفحة الفلتر والكروت -->
-<link rel="stylesheet" href="assets/css-money.css?v=202611052234">
-<link rel="stylesheet" href="assets/css-radar.css?v=202611052234">
-<link rel="stylesheet" href="assets/css-setups.css?v=202611052234">
-<link rel="stylesheet" href="assets/css-challenges.css?v=202611052234">
+<link rel="stylesheet" href="assets/css-money.css?v=202611082248">
+<link rel="stylesheet" href="assets/css-radar.css?v=202611082248">
+<link rel="stylesheet" href="assets/css-setups.css?v=202611082248">
+<link rel="stylesheet" href="assets/css-challenges.css?v=202611082248">
   <!-- 🔒 سياسة الأمان — بتتقرأ وتتركّب من octa-csp.js (report-only) -->
   <meta name="octa-csp-report" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com https://s.tradingview.com https://www.tradingview.com; frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com; form-action 'self'; img-src 'self' data: blob: https://*.tradingview.com https://*.tradingview-widget.com; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' https://s3.tradingview.com; connect-src 'self' https://octa-prices-production-4ccb.up.railway.app https://scanner.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://www.tradingview-widget.com https://*.tradingview.com https://news.google.com https://api.rss2json.com https://foudalens.com https://api.cors.lol; frame-src https://s3.tradingview.com https://www.tradingview.com https://*.tradingview-widget.com https://*.tradingview.com; media-src 'self' blob:; worker-src 'self' blob:">
 </head>
@@ -2108,29 +2201,29 @@ window.addEventListener('error', function (e) {
  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
  📌 ⚠️ مهم: لو رجعت الـcore قبل البوابة ⇒ المشكلة دي هترجع تاني.
  ════════════════════════════════════════════════════════════════ -->
-<script src="assets/js/octa-api.js?v=202611052234"></script>
-<script src="assets/js/octa-config.js?v=202611052234"></script>
+<script src="assets/js/octa-api.js?v=202611082248"></script>
+<script src="assets/js/octa-config.js?v=202611082248"></script>
 <!-- ⭐ البوابة هنا — قبل الـcore (عشان استرجاع الجلسة يسبق الطلبات) -->
-<script src="assets/js/octa-gate.js?v=202611052234"></script>
-<script src="assets/js/octa-auth.js?v=202611052234"></script>
-<script src="assets/js/octa-stats.js?v=202611052234"></script>
-<script src="assets/js/octa-core.js?v=202611052234"></script>
-<script src="assets/js/octa-sidebar.js?v=202611052234"></script>
-<script src="assets/js/octa-dev.js?v=202611052234"></script>
-<script src="assets/js/octa-clock.js?v=202611052234"></script>
-<script src="assets/js/octa-screener.js?v=202611052234"></script>
-<script src="assets/js/octa-index-intel.js?v=202611052234"></script>
-<script src="assets/js/octa-usd-intel.js?v=202611052234"></script>
-<script src="assets/js/octa-pages.js?v=202611052234"></script>
-<script src="assets/js/octa-app.js?v=202611052234"></script>
-<script src="assets/js/octa-us-intel.js?v=202611052234"></script>
+<script src="assets/js/octa-gate.js?v=202611082248"></script>
+<script src="assets/js/octa-auth.js?v=202611082248"></script>
+<script src="assets/js/octa-stats.js?v=202611082248"></script>
+<script src="assets/js/octa-core.js?v=202611082248"></script>
+<script src="assets/js/octa-sidebar.js?v=202611082248"></script>
+<script src="assets/js/octa-dev.js?v=202611082248"></script>
+<script src="assets/js/octa-clock.js?v=202611082248"></script>
+<script src="assets/js/octa-screener.js?v=202611082248"></script>
+<script src="assets/js/octa-index-intel.js?v=202611082248"></script>
+<script src="assets/js/octa-usd-intel.js?v=202611082248"></script>
+<script src="assets/js/octa-pages.js?v=202611082248"></script>
+<script src="assets/js/octa-app.js?v=202611082248"></script>
+<script src="assets/js/octa-us-intel.js?v=202611082248"></script>
 <!-- ⭐ ٦ نوفمبر ٢٠٢٦ — سياق السوق (مصر/أمريكا) + أذرع السوق الأمريكي -->
-<script src="assets/js/octa-us-arms.js?v=202611052234"></script>
-<script src="assets/js/octa-ctx.js?v=202611052234"></script>
+<script src="assets/js/octa-us-arms.js?v=202611082248"></script>
+<script src="assets/js/octa-ctx.js?v=202611082248"></script>
 <!-- ⭐ ٦ نوفمبر ٢٠٢٦ — فحص التحديث (التطبيق المثبّت كان بيعرض نسخة قديمة) -->
-<script src="assets/js/octa-update.js?v=202611052234"></script>
-<script src="assets/js/octa-back.js?v=202611052234"></script>
-<script src="assets/js/octa-filters.js?v=202611052234"></script>
+<script src="assets/js/octa-update.js?v=202611082248"></script>
+<script src="assets/js/octa-back.js?v=202611082248"></script>
+<script src="assets/js/octa-filters.js?v=202611082248"></script>
 
 <!-- ❓ شرح تبويبات الصف التاني (؟) — لازم بعد octa-filters.js عشان
      fzRenderTabs/fzGo يبقوا موجودين وقت الـhook. الـmount بيعيد نفسه
@@ -2139,32 +2232,32 @@ window.addEventListener('error', function (e) {
 <!-- 🐙 19 أكتوبر 2026 — tv-shim.js = مصدر الرسومات الوحيد في الموقع.
      شارت TradingView واحد للفلتر والذهب وصفحة الشارت وتحليل السهم.
      اتشال: octa-chart.js · octa-chart-v2.js (الشارت canvas القديم). -->
-<script src="assets/js/tv-shim.js?v=202611052234"></script>
-<script src="assets/js/octa-gold.js?v=202611052234"></script>
-<script src="assets/js/octa-gold-savings.js?v=202611052234"></script>
-<script src="assets/js/octa-copy.js?v=202611052234"></script>
-<script src="assets/js/octa-watch.js?v=202611052234"></script>
-<script src="assets/js/octa-decide.js?v=202611052234"></script>
-<script src="assets/js/octa-settings.js?v=202611052234"></script>
-<script src="assets/js/octa-csp.js?v=202611052234"></script>
-<script src="assets/js/octa-armsfilter.js?v=202611052234"></script>
+<script src="assets/js/tv-shim.js?v=202611082248"></script>
+<script src="assets/js/octa-gold.js?v=202611082248"></script>
+<script src="assets/js/octa-gold-savings.js?v=202611082248"></script>
+<script src="assets/js/octa-copy.js?v=202611082248"></script>
+<script src="assets/js/octa-watch.js?v=202611082248"></script>
+<script src="assets/js/octa-decide.js?v=202611082248"></script>
+<script src="assets/js/octa-settings.js?v=202611082248"></script>
+<script src="assets/js/octa-csp.js?v=202611082248"></script>
+<script src="assets/js/octa-armsfilter.js?v=202611082248"></script>
 
 <!-- 💰 Smart Money (22 أكتوبر 2026) — المحرك النقي + صفحة الفلتر.
      لازم بعد tv-shim.js عشان الشارت (OCTA_TV.mount) يكون موجود. -->
-<script src="assets/js/octa-egx-names.js?v=202611052234"></script>
-<script src="assets/js/octa-radar.js?v=202611052234"></script>
-<script src="assets/js/octa-radar-explain.js?v=202611052234"></script>
-<script src="assets/js/octa-radar-ref.js?v=202611052234"></script>
-<script src="assets/js/octa-radar-ui.js?v=202611052234"></script>
-<script src="assets/js/octa-smartmoney.js?v=202611052234"></script>
-<script src="assets/js/octa-money.js?v=202611052234"></script>
+<script src="assets/js/octa-egx-names.js?v=202611082248"></script>
+<script src="assets/js/octa-radar.js?v=202611082248"></script>
+<script src="assets/js/octa-radar-explain.js?v=202611082248"></script>
+<script src="assets/js/octa-radar-ref.js?v=202611082248"></script>
+<script src="assets/js/octa-radar-ui.js?v=202611082248"></script>
+<script src="assets/js/octa-smartmoney.js?v=202611082248"></script>
+<script src="assets/js/octa-money.js?v=202611082248"></script>
 <!-- 🧩 «نماذجي» — صفحة أنماط الكسر (٢٨ أكتوبر ٢٠٢٦) -->
-<script src="assets/js/octa-chartkit.js?v=202611052234"></script>
-<script src="assets/js/octa-setups.js?v=202611052234"></script>
-<script src="assets/js/octa-zones.js?v=202611052234"></script>
-<script src="assets/js/octa-studio.js?v=202611052234"></script>
+<script src="assets/js/octa-chartkit.js?v=202611082248"></script>
+<script src="assets/js/octa-setups.js?v=202611082248"></script>
+<script src="assets/js/octa-zones.js?v=202611082248"></script>
+<script src="assets/js/octa-studio.js?v=202611082248"></script>
 <!-- 🎯 «التحديات» — تحدي اليوم + لوحة المتصدرين (٢٨ أكتوبر ٢٠٢٦) -->
-<script src="assets/js/octa-challenges.js?v=202611052234"></script>
+<script src="assets/js/octa-challenges.js?v=202611082248"></script>
 
 <!-- 🛠️ أدوات المطوّر — بتظهر بالمصادفة ولا ما فيش زرار عادي -->
 <div class="octa-devbar">
@@ -2277,6 +2370,6 @@ window.addEventListener('error', function (e) {
   later(tick, 2000);
 })();
 </script>
-<script src="assets/js/octa-sw.js?v=202611052234"></script>
+<script src="assets/js/octa-sw.js?v=202611082248"></script>
 </body>
 </html>

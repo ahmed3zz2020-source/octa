@@ -2558,6 +2558,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  + 'font:600 14px/1.5 system-ui;text-align:center';
  nb.textContent = '⚠️ السيرفر بينزل — بتفتح بدون تسجيل. الداتا المحمية هتطلب الدخول.';
  try { placeTopBanner(nb); } catch (e) { }
+ try { watchServer(); } catch (e) { }
  /* ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
  ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
  ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
@@ -2694,6 +2695,26 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  📌 ليش؟ عشان الرسالة «بنتحقق من حسابك في الخلفية» تبقى صادقة:
  📌   لو السيرفر رجع (cold start خلص) ⇒ التوكن يتأكد ⇒ الشريط يختفي.
  📌   ٣ محاولات: بعد ٥ و ١٥ و ٣٥ ثانية. */
+ /* ⭐ ٩ نوفمبر ٢٠٢٦ — مراقبة السيرفر بعد ما يقع.
+ 📌 المشكلة: البانر «السيرفر بينزل» كان يفضل على الشاشة للأبد
+   ⛔ (الـhint كان بيتشال بـclearHint بس في مسار «السيرفر بطيء»).
+ 📌 الحل: نطلب /api/health على فترات ⇒ أول ما يرجّع ⇒ clearHint()
+   ⇒ البانر يختفي لوحده والوضع يرجع طبيعي. */
+ function watchServer(){
+  var waits = [5000, 15000, 35000, 60000, 120000];
+  for (var i = 0; i < waits.length; i++) {
+  setTimeout(function () {
+  try {
+  fetch(apiBase() + '/api/health', {
+  credentials: 'include',
+  cache: 'no-store'
+  }).then(function (r) {
+  if (r && r.ok) { clearHint(); }
+  }).catch(function () { });
+  } catch (e) { }
+  }, waits[i]);
+  }
+ }
  function retryLater(){
   var waits = [5000, 15000, 35000];
   for (var i = 0; i < waits.length; i++) {
@@ -2804,6 +2825,10 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  clearHint();
  try { sessionStorage.setItem('octa_allow_browse', '1'); } catch (e) { }
  hint('⚠️ السيرفر بينزل — بتفتح بدون تسجيل. الداتا المحمية هتطلب الدخول.', '#7a2b16', '#ffd9c9');
+ /* ⭐ ٩ نوفمبر ٢٠٢٦ — السيرفر واقع ⇒ استنى فيه وراجع.
+    ⛔ كان البانر بيفضل للأبد ⇒ نعيد المحاولة في الخلفية
+    ⛔   ونشيل البانر أول ما السيرفر يرجع. */
+ retryLater(); watchServer();
  shut();
  return;
  }
