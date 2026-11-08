@@ -322,7 +322,7 @@
   if (!px) return false;
   if (q) {
   const c = (s.code || '').toLowerCase();
-  const n = (s.name || '').toLowerCase();
+  const n = (s.name || s.nameEn || '').toLowerCase();
   const e = (s.nameEn || '').toLowerCase();
   if (c.indexOf(q) < 0 && n.indexOf(q) < 0 && e.indexOf(q) < 0) return false;
   }
@@ -1687,7 +1687,7 @@
   const px = N(s.price) || 0;
   const ch = N(s.change);
   const dcls = ch > 0 ? 'up' : ch < 0 ? 'dn' : '';
-  const nm = s.name || '';
+  const nm = s.name || s.nameEn || s.code || '';
   const verdict = s.verdict || '—';
   const vcls = verdict === 'إشارة إيجابية' ? 'dg' : verdict === 'إشارة سلبية' ? 'db' :
   verdict === 'إشارة محايدة' ? 'dk' : 'na';
@@ -1733,7 +1733,7 @@
   const ch = N(s.change);
   const tv = tvVerdict(s);
   const dcls = ch > 0 ? 'up' : ch < 0 ? 'dn' : '';
-  const nm = s.name || '';
+  const nm = s.name || s.nameEn || s.code || '';
 
   const cP = (v, g, b) => v == null ? 'na' : v >= g ? 'gg' : v <= b ? 'rm' : 'ym';
   const peC = cP(s.pe, 12, 0);
@@ -1785,6 +1785,10 @@
   window.__scMarket = M.id;  /* نمرّرها للشارت */
   S.shown = 40; render();
   S.live = false; S.lastQ = null; renderLiveDot(); tickLive();
+  /* ⭐ ٩ نوفمبر ٢٠٢٦ — لو السوق الجديد مش محمّل ⇒ حمّله (مسح/‏API)
+     وبعدين ارسم تاني. ⛔ قبل كده التبويب كان بيتبدّل والقائمة
+     بتفضل فاضية (٠ من ٠). */
+  try { loadMK(function () { try { render(); } catch (e) { } }); } catch (e) { }
   };
   window.scQInput = function (el) {
   const v = el.value, p = el.selectionStart;
@@ -1925,6 +1929,23 @@
   function loadMK(cb) {
   const d = mkData();
   if (MK_DONE && d && d[M.id] && d[M.id].length) { cb(); return; }
+  /* ⭐ ٩ نوفمبر ٢٠٢٦ — أسواق غير مصر: مسح TradingView من المتصفح.
+  ⛔ السبب: /api/markets بيرجّع مصر بس ⇒ تبويبات أمريكا/السعودية/
+  ⛔   الإمارات في الفلتر كانت بتطلع «٠ من ٠» (مقيس بجلسة حقيقية).
+  📌 الحل: نفس مسار صفحة الأسواق (octa-mk-scan.js) + نفس أسماء الحقول.
+  📌 ملاحظة: ده قبل فرع EGX_DB — لأن الأخير بيرجّع مصر بس. */
+  if (M.id !== 'egypt' && typeof window !== 'undefined' &&
+  window.OCTAMkScan && window.OCTAMkScan.has(M.id)) {
+  window.OCTAMkScan.scan(M.id, function (rows) {
+  if (rows && rows.length) {
+  MK = MK || {};
+  MK[M.id] = rows;
+  MK_DONE = true;
+  }
+  cb();
+  });
+  return;
+  }
   /* ⭐ ٢٥ أكتوبر ٢٠٢٦ — لو EGX_DB اتحمّل ⇒ فيه كل الحقول الغنية
      ⛔ ⇒ نكتفي بيه (أغنى من /api/markets). */
   try {

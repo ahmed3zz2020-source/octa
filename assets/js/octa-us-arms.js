@@ -114,7 +114,7 @@ function buildMarket(list){
   var movers = byKey(list, function(o){ return o.change; }, true);
   var caps = byKey(list, function(o){ return o.market_cap_basic; }, true);
   var idxCard = idx
-    ? ucard('📊','مؤشر S&P 500','سوق的美国 العام', nf(idx.value,2)+' · '+p1(idx.change),
+    ? ucard('📊','مؤشر S&P 500','السوق الأمريكي العام', nf(idx.value,2)+' · '+p1(idx.change),
         '<div class="ic-rows"><div class="ic-row"><span class="r-c" style="direction:ltr;text-align:left">SPX</span>' +
         '<span class="r-n">S&P 500</span><span class="r-x '+(idx.change>=0?'pos':'neg')+'">' +
         p1(idx.change)+'</span></div></div>', '#38bdf8')
