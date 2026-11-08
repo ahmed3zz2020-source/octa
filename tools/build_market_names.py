@@ -15,6 +15,13 @@ OUT = os.path.join(ROOT, "data", "market_names.js")
 s = open(SRC, encoding="utf-8").read()
 d = json.loads(s[s.index("{"):].rstrip().rstrip(";"))
 
+# ⭐ أسماء رسمية من sahm.finance (التأدوول) للي ناقص من الملف القديم
+SAHM = os.path.join(ROOT, "data", "sahm_names_ar.json")
+extra = {}
+if os.path.exists(SAHM):
+    import json as _j
+    extra = _j.load(open(SAHM, encoding="utf-8"))
+
 names = {}
 stats = {}
 for mk in ("saudi", "uae"):
@@ -23,7 +30,11 @@ for mk in ("saudi", "uae"):
     for r in rows:
         code = str(r.get("code") or "").strip()
         nm = str(r.get("name") or "").strip()
-        if not code or not nm:
+        if not code:
+            continue
+        if not nm:
+            nm = str(extra.get(code) or "").strip()   # ⭐ من sahm.finance
+        if not nm:
             continue
         names[code] = nm
         got += 1
