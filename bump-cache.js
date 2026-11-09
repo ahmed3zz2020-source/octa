@@ -33,7 +33,19 @@ try {
 FILES.forEach(function (F) {
   if (!fs.existsSync(F)) return;
   let h = fs.readFileSync(F, 'utf8');
-  h = h.replace(/var BUILD = '[^']*'(\s*\+\s*'[^']*')?;/, `var BUILD = 'v=${stamp}';`);
+  /* ⭐⭐⭐ ٩ نوفمبر ٢٠٢٦ — `g` flag!
+     📌 كان بينقّص أول `var BUILD` **بس** ⇒ التاني (شريط «نسخة جديدة»
+        في index.html) فضل على ختم قديم ثابت ⇒ الشريط كان بيظهر داماً
+        وكل ضغطة كانت بتمسح كل الكاش ⇒ ⇒ شاشة بيضا في التطبيق المثبّت.
+     ✅ الحل: نعدّل **كل** الـBUILD في الملف. */
+  h = h.replace(/var BUILD = '[^']*'(\s*\+\s*'[^']*')?;/g, `var BUILD = 'v=${stamp}';`);
+  /* ⭐⭐⭐ ٩ نوفمبر ٢٠٢٦ — placeholder `__BUILD__202610260854`
+     📌 كان بيفضل زي ما هو للأبد ⇒ `assets/octa.css?v=__BUILD__…`
+        ⇒ نفس الرابط الثابت ⇒ المتصفح بيمسح كاشه بس بالـETag.
+        📌 والأهم: الـregex بتاع `?v=` مكانش بيلقطه (الـ`_` مش
+        حرف alnum) ⇒ الستايل الرئيسي **ما كانش بياخد ختم جديد**.
+     ✅ الحل: نستبدل الـplaceholder نفسه بالرقم الحقيقي. */
+  h = h.replace(/__BUILD__[0-9a-zA-Z_]*/g, stamp);
   h = h.replace(/(\?v=)[0-9a-zA-Z]+/g, `$1${stamp}`);
   fs.writeFileSync(F, h);
   console.log(`  🔄 cache-buster [${F}]: ${stamp}`);

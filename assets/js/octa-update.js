@@ -48,21 +48,98 @@ function showBar(){
   }catch(e){}
 }
 
-/* ⭐ التحديث: نمسح أي Service Worker + الكاش ⇒ reload ⇒ نسخة جديدة */
+/* ⭐ التحديث: ⭐⭐⭐ ٩ نوفمبر ٢٠٢٦ — الطريقة الآمنة
+   📌 العَرَض (مقيس): التطبيق المثبّت (WebAPK) بيفتح **شاشة بيضا**
+      بعد ضغط «تحديث دلوقتي».
+   📌 السبب الجذري: الكود القديم كان (أ) بيمسح **كل الكاش** و(ب) بيعمل
+      `reload()` **فوراً** — والـService Worker القديم (٢٩ أكتوبر) كان
+      **لسه ماسك** النطاق ⇒ التنقّل بعد المسح بيفشل ⇒ كروم بيعرض
+      صفحة فاضية (مش رسالة، مش خطأ — بيضا).
+      ⛔⇦ ومسح الكاش والـSW لسه شغّال = **حالة ميتة** (catch-22):
+      صفحة الشاشات البيضاء ماتحملش ⇒ سكربت التنظيف مش بيشتغل.
+   ✅ الترتيب الصح (3 خطوات):
+      ① نسجّل `/sw.js` = «مفتاح الإطفاء» (مفيش fetch handler ⇒ كل
+         الطلبات بتعدّي للشبكة) ⇒ الـSW القديم يتسحب.
+      ② نستنى لـclients.claim() ⇒ يبقى المفتاح ماسك الصفحة.
+      ③ نمسح الكاش **بعد ما يبقى شغّال** ⇒ وبعدين reload ⇒ الصفحة بتفتح
+         من الشبكة نظيفة ⇒ والمفتاح بيلغي نفسه.
+   ⛔ ممنوع نعمل reload قبل ما المفتاح يبقى شغّال. */
 window.octaApplyUpdate = function () {
-  try{
-    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations){
-      navigator.serviceWorker.getRegistrations().then(function (rs){
-        (rs||[]).forEach(function (r){ try { r.unregister(); } catch (e) { } });
-        if (window.caches && window.caches.keys){
-          window.caches.keys().then(function (ks){
-            (ks||[]).forEach(function (k){ try { caches.delete(k); } catch (e) { } });
-          }).catch(function () { });
-        }
-      }).catch(function () { });
+  try {
+    var b = document.querySelector('#octaUpdateBar button');
+    if (b) { b.disabled = true; b.textContent = '⏳ بنحدّث…'; }
+  } catch (e) { }
+  var done = false;
+  var reload = function () {
+    if (done) return;
+    done = true;
+    /* ⭐⭐⭐ ٩ نوفمبر ٢٠٢٦ — ⭐⭐⭐ message أثناء التحديث
+       📌 العَرَض: بعد الضغط على «تحديث دلوقتي» الصفحة بتفتح فاضية
+          لحد ما التطبيق يعمل boot (٥–١٥ ثانية على شبكة الموبايل)
+          ⇒ المستخدم بيشوف **شاشة بيضا** ويظن إن التطبيق اتخرّب.
+       ✅ الحل: نكتب رسالة «⏳ بنحدّث…» في الصفحة **قبل** الـreload
+          ⇒ كروم بيخلي الصفحة القديمة ظاهرة لحد ما الجديدة تجي
+          ⇒ المستخدم بيشوف رسالة واضحة بدل بيضا. */
+    try {
+      var m = document.createElement('div');
+      m.setAttribute('style', 'position:fixed;inset:0;z-index:2147483647;background:#0a1929;'
+        + 'color:#e8f1ff;font:700 16px system-ui;display:flex;flex-direction:column;'
+        + 'align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px');
+      m.innerHTML = '<div style="font-size:46px">⏳</div>'
+        + '<div>⏳ بنحدّث دلوقتي…</div>'
+        + '<div style="font-weight:400;opacity:.75;font-size:13px;max-width:280px;line-height:1.7">'
+        + 'جاري تحميل النسخة الجديدة. اقفل الشاشة شوية — التطبيق هيفتح لوحده.'
+        + '</div>';
+      document.body.appendChild(m);
+    } catch (e) { }
+    setTimeout(function () { try { window.location.reload(); } catch (e) { } }, 250);
+  };
+  var clearCaches = function () {
+    try {
+      if (window.caches && window.caches.keys) {
+        window.caches.keys().then(function (ks) {
+          (ks || []).forEach(function (k) { try { caches.delete(k); } catch (e) { } });
+        }).catch(function () { });
+      }
+    } catch (e) { }
+  };
+  /* ⭐⭐⭐ المسار الأساسي (٩ نوفمبر ٢٠٢٦)
+     📌 ⭐ المعرفة الأساسية: `register('/sw.js')` لو رجعت بنجاح ⇒
+        المتصفح **استبدل** أي Service Worker كان مسجّل في نفس النطاق
+        (التسجيل واحد لكل scope — السكربت بيتحدّث) ⇒ الـSW القديم
+        مبقاش له حق يعترض أي تنقّل ⇒ ⭐ يبقى مسح الكاش **آمن ١٠٠٪**.
+        ⇒ ومن هنا: مسح الكاش + reload ⇒ الصفحة بتفتح من الشبكة.
+     📌 والأمان مضاعف: المفتاح نفسه بيمسح الكاش ويلغي تسجيل نفسه. */
+  var stepSafe = function () {
+    clearCaches();
+    setTimeout(reload, 700);
+  };
+  /* ⭐⭐⭐ المسار البديل
+     📌 لو تعذّر تسجيل المفتاح (شبكة ضعيفة / SW مرفوض) ⇒ ما نمسحش
+        الكاش والـSW القديم لسه ماسك (ده = شاشة بيضا).
+     ✅ `?clean=1` — الـSW القديم نفسه (٢٩ أكتوبر) **بيعدّي** الطلب
+        للشبكة ويلغي تسجيل نفسه ⇒ الصفحة بتفتح + النطاق ينضف.
+        ⭐ والسيرفر كمان بيضيف `Clear-Site-Data` على الرابط ده. */
+  var stepFallback = function () {
+    try {
+      var p = location.pathname || '/';
+      location.replace(p + (p.indexOf('?') === -1 ? '?' : '&') + 'clean=1&t=' + Date.now());
+      return;
+    } catch (e) { }
+    stepSafe();
+  };
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.register) {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then(function () { setTimeout(stepSafe, 500); })
+        .catch(function () { stepFallback(); });
+    } else {
+      stepFallback();
     }
-  }catch(e){}
-  try{ window.location.reload(); }catch(e){}
+  } catch (e) { stepFallback(); }
+  /* ⭐ شبكة أمان: بعد ٣٫٥ ثانية لو ماحصلش حاجة ⇒ المسار الآمن
+     ⛔ ممنوع نمسح الكاش والـSW القديم لسه ماسك ⇒ ده سبب البيضا. */
+  setTimeout(function () { if (!done) stepFallback(); }, 3500);
 };
 
 function check(){

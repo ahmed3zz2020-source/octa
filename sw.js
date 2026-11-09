@@ -29,6 +29,12 @@ self.addEventListener('activate', function (e) {
         return caches.delete(k);
       }));
     }).then(function () {
+      /* ⭐⭐⭐ ٩ نوفمبر ٢٠٢٦ — «ادّعاء» الصفحة الحالية
+         📌 ليش؟ عشان لما المفتاح ده يتسجّل، هو يبقى ماسك الصفحة
+            فوراً ⇒ نقدر نمسح الكاش بأمان (من غير ما الـSW القديم
+            يفضل ماسك ويرد بصفحة فاضية = شاشة بيضا). */
+      return self.clients.claim().catch(function () { });
+    }).then(function () {
       /* ⛔ إلغاء تسجيل نفسه ⇒ رجعنا لوضع المتصفح العادي */
       return self.registration.unregister();
     }).catch(function () { })

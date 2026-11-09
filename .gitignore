@@ -24,3 +24,10 @@ admin/users.json
 admin/users-*.json
 admin/data.json
 version.json
+
+# ⭐ مجلد الاختبار المحلي (نسخة من dist لمجلد جديد بسبب stale file handles)
+dist_local/
+
+# ⭐ بايثون كاش
+__pycache__/
+*.pyc

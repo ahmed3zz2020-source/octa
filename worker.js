@@ -417,7 +417,27 @@ const OCTA_KILLER_JS = [
   '}catch(e){}})();'
 ].join('\n');
 
-export default {
+/* ⭐⭐⭐ ٩ نوفمبر ٢٠٢٦ — «مفتاح إطفاء» Service Worker (نسخة الـSW)
+   📌 ⛔ مفيش fetch handler إطلاقاً ⇒ كل الطلبات بتعدّي للشبكة عادي.
+   📌 الهدف: يبقى هو آخر Service Worker مسجّل ⇒ القديم (٢٩ أكتوبر)
+      يبقى مش قادر يعترض أي تنقّل ⇒ الشاشة البيضاء تروح.
+   📌 ومن ثمّ يلغي نفسه + يمسح الكاش ⇒ رجوع كامل لوضع المتصفح العادي.
+   📌 `skipWaiting` + `clients.claim` ⇒ يسري فوراً من أول تنقّل بعده. */
+const OCTA_SW_KILLER_JS = [
+  '/* ⛔ OCTA — مفتاح الإطفاء (٩ نوفمبر ٢٠٢٦) */',
+  "self.addEventListener('install', function (e) { self.skipWaiting(); e.waitUntil(Promise.resolve()); });",
+  "self.addEventListener('activate', function (e) {",
+  '  e.waitUntil(',
+  '    caches.keys()',
+  '      .then(function (ks) { ks.forEach(function (k) { try { caches.delete(k); } catch (err) {} }); })',
+  '      .then(function () { return self.clients.claim(); })',
+  '      .then(function () { return self.registration.unregister(); })',
+  '      .catch(function () {})',
+  '  );',
+  '});',
+  "self.addEventListener('fetch', function (e) { /* ⛔ لا تدخّل — خلّي الشبكة */ });"
+].join('\n');
+
   /* ══════════════════════════════════════════════════════════════
    🛡️ ⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ هيدرات الأمان على كل رد
    ────────────────────────────────────────────────────────────────
@@ -431,6 +451,7 @@ export default {
    📌 📌 ⛌⛌⛌ (الـworker بيرد الأول ⇒ هو اللي بيمسك الرد).
    📌 ✅ الحل: غلاف واحد على كل رد — مفيش استثناء ممكن ينسى.
    ══════════════════════════════════════════════════════════════ */
+export default {
   async fetch(request, env, ctx) {
     let res;
     try {
@@ -471,6 +492,21 @@ export default {
         const cu = new URL(request.url);
         if (cu.searchParams.get('clean') === '1') {
           const ct = h.get('Content-Type') || '';
+          /* ⭐⭐⭐ ٩ نوفمبر ٢٠٢٦ — رجّعنا هيدر التنظيف!
+             📌 السبب: الكتلة كانت **ميتة** (بيحسب `ct` وبيرميه) من
+                ٣٠ أكتوبر ⇒ رابط النجاة `/?clean=1` ما بيعملش حاجة.
+             📌 الأثر: الـService Worker القديم (٢٩ أكتوبر) بيفضل ماسك
+                النطاق ⇒ شاشة بيضا للأبد في التطبيق المثبّت.
+             ✅ الحل: Clear-Site-Data بيمسح الكاش + localStorage +
+                الـService Workers + الكوكيز ⇒ رجوع كامل لنظافة.
+             ⛔ كروم بيتجاهل الهيدر في الأجزاء الفرعية ⇒ لازم navigation
+                (ولذلك الرابط لازم يتفتح في تبويب جديد). */
+          if (ct.indexOf('text/html') === 0) {
+            /* ⛔ بنمسح «cache» + «storage» بس — **مش** «cookies»!
+               📌 الكوكي ده جلسة الدخول ⇒ لو مسحناه المستخدم اتطلّع
+                  من حسابه بعد أي تنظيف. الكاش والـlocalStorage كفاية. */
+            h.set('Clear-Site-Data', '"cache", "storage"');
+          }
         }
       } catch (e) { }
       /* ⭐ وضع الاختبار البطيء (?slowtest=1) ⇒ كوكي مؤقّت
@@ -531,6 +567,25 @@ async function handle(request, env, ctx) {
       headers: {
         'Content-Type': 'application/javascript; charset=utf-8',
         'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+      }
+    });
+  }
+
+  /* ⭐⭐⭐ ٩ نوفمبر ٢٠٢٦ — ⭐ `/sw.js` = «مفتاح الإطفاء» متاح دائماً
+     📌 المشكلة: في الإنتاج `/sw.js` كان **404** ⇒ أي Service Worker
+        قديم (٢٩ أكتوبر) مش بيقدر يتحدّث ولا يتشال ⇒ التطبيق المثبّت
+        بيفضل شات أبيض للأبد.
+     ✅ الحل: السيرفر يخدم نفس الـkiller دايماً (ما فيه fetch handler
+        ⇒ كل طلب يعدّي للشبكة) + no-store عشان المتصفح ياخد الجديد.
+     📌 ولأن الـkiller بيلغي نفسه، ده مش بيضيف أي Service Worker
+        جديد — بيقتل القديم بس. */
+  if (url.pathname === '/sw.js') {
+    return new Response(OCTA_SW_KILLER_JS, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Service-Worker-Allowed': '/'
       }
     });
   }
