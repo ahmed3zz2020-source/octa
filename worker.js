@@ -307,6 +307,26 @@ function hasSession(request) {
   return false;
 }
 
+/* ════════════════════════════════════════════════════════════════
+ 🌍 روابط المشاركة (Open Graph) — بتتظبط حسب الدومين
+ ────────────────────────────────────────────────────────────────
+ 📌 ٩ نوفمبر ٢٠٢٦ — نفس ملفات HTML بتتخدم على المعاينة
+    (octa-preview.ahmed3zz2020.workers.dev) وعلى الإنتاج
+    (octashares.com).
+ 📌 ⛔ رابط og:image المطلق الثابت ⇒ كارت المشاركة على
+    المعاينة بيبان مكسور (لما حد يبعت رابط المعاينة).
+ 📌 ✅ الحل: نستبدل نطاق الإنتاج بنطاق الطلب الحالي ⇒
+    كل دومين بيبعت صورته الصح (و الإنتاج بيفضل زي ما هو).
+ ════════════════════════════════════════════════════════════════ */
+function withSiteOrigin(html, origin) {
+  try {
+    if (!origin) return html;
+    return String(html)
+      .replace(/https:\/\/octashares\.com\/assets\//g, origin + '/assets/')
+      .replace(/https:\/\/octashares\.com\//g, origin + '/');
+  } catch (e) { return html; }
+}
+
 
 /* ════════════════════════════════════════════════════════════════
  🔄 ⭐ ٢٥ أكتوبر ٢٠٢٦ — fetch من الـAssets بدون كاش
@@ -1191,7 +1211,9 @@ async function handle(request, env, ctx) {
         if (gate && gate.status < 400) {
           const h = new Headers(gate.headers);
           h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-          return new Response(gate.body, { status: 200, headers: h });
+          /* 🌍 روابط المشاركة (OG) ⇒ نطاق الدومين الحالي */
+          const gateHtml = withSiteOrigin(await gate.text(), url.origin);
+          return new Response(gateHtml, { status: 200, headers: h });
         }
       } catch (e) { }
     }
@@ -1241,7 +1263,9 @@ async function handle(request, env, ctx) {
           if (!request.headers.get('X-OCTA-Cleared-' + WANT_CLEAR)) {
           }
           ih.set('ETag', '"' + Date.now() + '"');
-          return new Response(idx.body, { status: 200, headers: ih });
+          /* 🌍 روابط المشاركة (OG) ⇒ نطاق الدومين الحالي */
+          const idxHtml = withSiteOrigin(await idx.text(), url.origin);
+          return new Response(idxHtml, { status: 200, headers: ih });
         }
       } catch (e) { }
     }
@@ -1364,7 +1388,25 @@ async function handle(request, env, ctx) {
           const h = new Headers(res.headers);
           h.delete('Cache-Control');
           h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-          return new Response(res.body, { status: 200, headers: h });
+          /* 🌍 روابط المشاركة (OG) ⇒ نطاق الدومين الحالي */
+          const pageHtml = withSiteOrigin(await res.text(), url.origin);
+          return new Response(pageHtml, { status: 200, headers: h });
+        }
+      } catch (e) { }
+    }
+
+    /* 🌍 آخر حالة: طلب HTML مباشر (مثل /index.html) ⇒ نظبط روابط المشاركة كمان */
+    if (/\.html?$/i.test(url.pathname)) {
+      try {
+        const res = await env.ASSETS.fetch(request);
+        if (res && res.status < 400) {
+          const ct = res.headers.get('Content-Type') || '';
+          if (ct.indexOf('text/html') === 0) {
+            const h = new Headers(res.headers);
+            const pageHtml = withSiteOrigin(await res.text(), url.origin);
+            return new Response(pageHtml, { status: 200, headers: h });
+          }
+          return res;
         }
       } catch (e) { }
     }
