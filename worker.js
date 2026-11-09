@@ -451,6 +451,9 @@ const OCTA_SW_KILLER_JS = [
    📌 📌 ⛌⛌⛌ (الـworker بيرد الأول ⇒ هو اللي بيمسك الرد).
    📌 ✅ الحل: غلاف واحد على كل رد — مفيش استثناء ممكن ينسى.
    ══════════════════════════════════════════════════════════════ */
+/* ⭐ جسر هالان (بورصة مصر) — عمق السوق + الإعلانات */
+import { halanDepth, halanMergeDividends, halanToken, halanEvents, halanTool } from './halan-bridge.js';
+
 export default {
   async fetch(request, env, ctx) {
     let res;
@@ -1146,6 +1149,39 @@ async function handle(request, env, ctx) {
     }
 
     /* 1) proxy للـAPI (نفس origin عشان نتفادى CORP same-site) */
+    /* ══════════ ⭐ هالان (بورصة مصر) — ٩ نوفمبر ٢٠٢٦ ══════════
+       📌 ① /api/obdepth/<code> ⇒ عمق السوق الحقيقي.
+       📌   الباك بيرجّع 503 no_key (محتاج EGX_LIVE_KEY) ⇒ هنا بنجيبه من هالان.
+       📌 ② /api/dividends ⇒ بندمج إعلانات هالان مع المصدر الحالي.
+       📌 ⛔ التوكن في أسرار الـWorker + KV — مش في الكود ولا في المتصفح.
+       📌 ⛔ بيانات بسوق عامة — مفيش أي مسار للمحفظة أو الأوامر. */
+    if (url.pathname.startsWith('/api/obdepth/')) {
+      try {
+        const d = await halanDepth(env, url.pathname.split('/').pop());
+        if (d) {
+          return new Response(JSON.stringify({ ok: true, cached: false, source: 'halan', data: d }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=120' }
+          });
+        }
+      } catch (e) { }
+      /* ⛔ مفيش بيانات من هالان ⇒ نكمّل عادي للـAPI (المصدر القديم) */
+    }
+    if (url.pathname === '/api/dividends') {
+      try {
+        const upTarget = API + url.pathname + url.search;
+        const up = await fetchApi(upTarget, { method: request.method, headers: buildHeaders(request) });
+        const upTxt = await up.text();
+        const merged = await halanMergeDividends(env, upTxt);
+        const out = new Headers();
+        out.set('Content-Type', 'application/json');
+        out.set('Cache-Control', 'public, max-age=300');
+        const scUp = up.headers.get('Set-Cookie');
+        if (scUp) out.set('Set-Cookie', scUp);
+        return new Response(JSON.stringify(merged), { status: up.status, headers: out });
+      } catch (e) { /* ⛔ fallback: يكمّل عادي للـAPI */ }
+    }
+
     if (url.pathname.startsWith('/api/')) {
       /* ⛔⛔ الجسور بتاعت المعاينة (tvscan/tvcandles) **ما بتروحلش**
          ⛌   للـAPI الميت — لو حصل خطأ جواها (أو نشر جديد لسه
