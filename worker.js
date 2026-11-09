@@ -556,21 +556,9 @@ export default {
         (e && e.message) || 'unknown');
     }
 
-    /* ⭐ هالان — تجديد كاش الأحداث: بس في كرون الـ٣٠ دقيقة (مش كل ٥ دقايق)
-       ⇐ عشان ما نضغطش على مصدر هالان (النداءات بتاخد وقت + ريت ليميت). */
-    if (!event || event.cron !== '*/30 * * * *') return;
-    /* ══════════ ⭐ هالان — تجديد كاش الأحداث (كل ٣٠ دقيقة) ══════════
-       📌 ٩ نوفمبر ٢٠٢٦ — ليش كرون مش waitUntil: Cloudflare بيلغي مهام
-       📌   waitUntil بعد ٣٠ ثانية ⇒ التسخين في الخلفية كان بيتقتل ⇒
-       📌   الكاش ما كانش بيتملّى ⇒ صفحة الأحداث بتجمّد (شاشة أبيض).
-       📌 الكрон ده هو اللي بيملّي الكاش ⇒ مسار الطلب دايماً سريع. */
-    try {
-      const ev = await halanEvents(env, { force: true });
-      console.log('[HALAN] cron refreshed events=' + ((ev.events || []).length)
-        + ' isins=' + Object.keys(ev.isinOf || {}).length);
-    } catch (e) {
-      console.warn('[HALAN] cron failed: ' + String(e && e.message || e));
-    }
+    /* ⭐ هالان — كرون تجديد الكاش Lives في عامل منفصل (halan-feed)
+       ⇐ عشان ما يحجبش طلبات الموقع (isolate واحد = طلبات بتقف).
+       ⇐ هنا الكرون بيعمل ping بس (سريع) ⇐ والـKASH بيتملّى من العامل التاني. */
   }
 };
 
@@ -1164,6 +1152,20 @@ async function handle(request, env, ctx) {
       }
     }
 
+    /* ⭐ نقطة فحص: افتحها على موبايلك وقولّي النتيجة */
+    if (url.pathname === '/api/halan/status') {
+      const st = await (async () => { try { return await env.HALAN_KV.get('halan_state_v1', 'json'); } catch (e) { return null; } })();
+      const ev = await (async () => { try { return await env.HALAN_KV.get('halan_events_v1', 'json'); } catch (e) { return null; } })();
+      return new Response(JSON.stringify({
+        ok: true, worker: 'octa-preview',
+        tokenCached: !!(st && st.access),
+        tokenAgeMin: st && st.at ? Math.round((Date.now() - st.at) / 60000) : null,
+        events: (ev && ev.events || []).length,
+        isins: ev ? Object.keys(ev.isinOf || {}).length : 0,
+        eventsAgeMin: ev && ev.at ? Math.round((Date.now() - ev.at) / 60000) : null,
+        now: new Date().toISOString(),
+      }, null, 1), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+    }
     /* 1) proxy للـAPI (نفس origin عشان نتفادى CORP same-site) */
     /* ══════════ ⭐ هالان (بورصة مصر) — ٩ نوفمبر ٢٠٢٦ ══════════
        📌 ① /api/obdepth/<code> ⇒ عمق السوق الحقيقي.

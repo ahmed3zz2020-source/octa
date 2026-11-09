@@ -30,7 +30,11 @@ function tvGraveyard() {
     g = document.createElement('div');
     g.id = 'octaTvGraveyard';
     g.setAttribute('aria-hidden', 'true');
-    g.style.cssText = 'position:absolute;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none';
+    /* ⭐ ٩ نوفمبر ٢٠٢٦ — الإصلاح: كانت المقبرة offscreen أفقياً (left:-9999px)
+   ⇒ في RTL بتوسّع عرض الصفحة ٩٩٩٩ بكسل ⇒ Chrome بيوسّع الـlayout viewport
+   ⇒ innerWidth = ١٥٦٠ بدل ٣٩٠ ⇒ التطبيق بيظهر مصغّر + شريط أسود على الجنب.
+   ✅ الحل: نخبيها **عمودياً** مش أفقياً ⇒ صفر تمدد أفقي. */
+    g.style.cssText = 'position:absolute;left:0;top:-9999px;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none';
     (document.body || document.documentElement).appendChild(g);
   }
   return g;

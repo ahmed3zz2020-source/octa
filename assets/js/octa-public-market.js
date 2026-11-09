@@ -186,7 +186,9 @@
       sel.value = 'all';
       S.sect = 'all';
     }
-  }
+  
+  try { if (typeof window.__pmBootDone === 'function') window.__pmBootDone(); } catch (e) { }
+}
 
   function setMk(mk) {
     S.mk = mk; S.shown = 40; S.q = ''; S.sect = 'all'; S.chg = 'all';
