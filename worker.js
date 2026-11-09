@@ -555,6 +555,22 @@ export default {
       console.log('[keepalive]', new Date().toISOString(), 'err',
         (e && e.message) || 'unknown');
     }
+
+    /* ⭐ هالان — تجديد كاش الأحداث: بس في كرون الـ٣٠ دقيقة (مش كل ٥ دقايق)
+       ⇐ عشان ما نضغطش على مصدر هالان (النداءات بتاخد وقت + ريت ليميت). */
+    if (!event || event.cron !== '*/30 * * * *') return;
+    /* ══════════ ⭐ هالان — تجديد كاش الأحداث (كل ٣٠ دقيقة) ══════════
+       📌 ٩ نوفمبر ٢٠٢٦ — ليش كرون مش waitUntil: Cloudflare بيلغي مهام
+       📌   waitUntil بعد ٣٠ ثانية ⇒ التسخين في الخلفية كان بيتقتل ⇒
+       📌   الكاش ما كانش بيتملّى ⇒ صفحة الأحداث بتجمّد (شاشة أبيض).
+       📌 الكрон ده هو اللي بيملّي الكاش ⇒ مسار الطلب دايماً سريع. */
+    try {
+      const ev = await halanEvents(env, { force: true });
+      console.log('[HALAN] cron refreshed events=' + ((ev.events || []).length)
+        + ' isins=' + Object.keys(ev.isinOf || {}).length);
+    } catch (e) {
+      console.warn('[HALAN] cron failed: ' + String(e && e.message || e));
+    }
   }
 };
 

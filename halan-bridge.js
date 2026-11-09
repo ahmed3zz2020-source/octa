@@ -19,8 +19,11 @@ async function kvGet(env, key) {
   catch (e) { return null; }
 }
 async function kvPut(env, key, val) {
-  try { if (!env || !env.HALAN_KV) return; await env.HALAN_KV.put(key, JSON.stringify(val)); }
-  catch (e) { }
+  try {
+    if (!env || !env.HALAN_KV) { console.warn('[HALAN] no KV binding'); return false; }
+    await env.HALAN_KV.put(key, JSON.stringify(val));
+    return true;
+  } catch (e) { console.warn('[HALAN] kvPut failed: ' + String(e && e.message || e)); return false; }
 }
 
 /* ─────────── OAuth (تجديد + حفظ التوكن المتبدّل) ─────────── */
@@ -60,6 +63,7 @@ async function halanTool(env, name, args) {
   try {
     const r = await fetch(HALAN_MCP_URL, {
       method: 'POST',
+      signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(9000) : undefined,
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json, text/event-stream',
@@ -128,15 +132,19 @@ function halanStatus(dateStr) {
 }
 
 /* ─────────── الأحداث (إعلانات + أخبار) + خريطة الأرقام ─────────── */
-async function halanEvents(env) {
+async function halanEvents(env, opts) {
+  const force = !!(opts && opts.force);
   const cached = await kvGet(env, HALAN_EVENTS_KEY);
-  if (cached && cached.at && (Date.now() - cached.at) < EVENTS_TTL_MS) return cached;
+  if (!force && cached && cached.at && (Date.now() - cached.at) < EVENTS_TTL_MS) return cached;
   const events = [];
   const isinOf = {};
   const seen = {};
   for (const tool of ['list_bulletins', 'list_news']) {
-    for (let page = 1; page <= 12; page++) {
-      const res = await halanTool(env, tool, { pageNumber: page, pageSize: 100 });
+    for (let page = 1; page <= 8; page++) {
+      /* ⭐ كل صفحة لوحدها: لو واحدة فشلت نكمل الباقي (مش نخسر كله) */
+      let res = null;
+      try { res = await halanTool(env, tool, { pageNumber: page, pageSize: 100 }); }
+      catch (e) { console.warn('[HALAN] ' + tool + ' p' + page + ' failed: ' + String(e && e.message || e)); continue; }
       const items = (res && res.items) || [];
       if (!items.length) break;
       for (const it of items) {
@@ -169,7 +177,9 @@ async function halanEvents(env) {
     }
   }
   const out = { at: Date.now(), events, isinOf };
-  await kvPut(env, HALAN_EVENTS_KEY, out);
+  console.log('[HALAN] fetched events=' + events.length + ' isins=' + Object.keys(isinOf).length);
+  const okPut = await kvPut(env, HALAN_EVENTS_KEY, out);
+  console.log('[HALAN] kv put -> ' + (okPut === false ? 'FAILED' : 'ok'));
   return out;
 }
 
@@ -190,23 +200,32 @@ function halanLevels(raw) {
   return out;
 }
 
+async function halanIsinFor(env, sym) {
+  /* ⭐ رقم السهم: من كاش الأحداث لو موجود، وإلا بحث مباشر (نداء واحد · سريع).
+     ⛔ ما بنجيبش كل الأحداث هنا — ده بياخد دقيقة وبيجمّد الصفحة. */
+  const cached = await kvGet(env, HALAN_EVENTS_KEY);
+  const fromMap = cached && cached.isinOf && cached.isinOf[sym];
+  if (fromMap) return fromMap;
+  try {
+    const sr = await halanTool(env, 'search_symbols', { query: sym, pageSize: 8 });
+    for (const it of ((sr && sr.items) || [])) {
+      const reu = String(it.reuters || '').toUpperCase();
+      if (it.isin && (reu === sym + '.CA' || reu.split('.')[0] === sym)) {
+        try {
+          if (cached && cached.isinOf) { cached.isinOf[sym] = it.isin; await kvPut(env, HALAN_EVENTS_KEY, cached); }
+        } catch (e) { }
+        return it.isin;
+      }
+    }
+  } catch (e) { }
+  return null;
+}
+
 async function halanDepth(env, code) {
   if (!env || !env.HALAN_MCP_REFRESH_TOKEN) return null;
   const sym = String(code || '').toUpperCase();
   if (!/^[A-Z0-9.]{1,12}$/.test(sym)) return null;
-  const ev = await halanEvents(env);
-  let isin = (ev.isinOf || {})[sym];
-  if (!isin) {
-    /* ⭐ السهم مش في آخر الإعلانات ⇒ نبحث عنه (نداء واحد) ونحفظه */
-    try {
-      const sr = await halanTool(env, 'search_symbols', { query: sym, pageSize: 8 });
-      for (const it of ((sr && sr.items) || [])) {
-        const reu = String(it.reuters || '').toUpperCase();
-        if (it.isin && (reu === sym + '.CA' || reu.split('.')[0] === sym)) { isin = it.isin; break; }
-      }
-      if (isin) { ev.isinOf = ev.isinOf || {}; ev.isinOf[sym] = isin; }
-    } catch (e) { }
-  }
+  const isin = await halanIsinFor(env, sym);
   if (!isin) return null;
   const bb = await halanTool(env, 'get_best_bid_ask', { isin });
   const q = await halanTool(env, 'get_stock_quote', { isin });
@@ -235,13 +254,23 @@ async function halanDepth(env, code) {
 }
 
 /* ─────────── دمج الإعلانات مع المصدر الحالي ─────────── */
-export async function halanMergeDividends(env, upstream) {
+export async function halanMergeDividends(env, upstream, ctx) {
   let data = {};
   try { data = upstream && typeof upstream === 'object' ? upstream : JSON.parse(upstream); } catch (e) { data = {}; }
   const acts = Array.isArray(data.actions) ? data.actions.slice() : [];
   if (!env || !env.HALAN_MCP_REFRESH_TOKEN) return data;
+  /* ⭐⭐⭐ الكاش بارد ⇒ نرجّع الأصلي **فوراً** ونحدّث في الخلفية.
+     ⛔ قبل كده الطلب كان بيستنى ١٢ صفحة MCP (≈٩٠ ثانية) ⇒ الشاشة كانت بتجمّد ⇒ أبيض. */
+  const cached = await kvGet(env, HALAN_EVENTS_KEY);
+  const fresh = cached && cached.at && (Date.now() - cached.at) < EVENTS_TTL_MS && (cached.events || []).length;
+  if (!fresh) {
+    const warm = (async () => { try { await halanEvents(env); } catch (e) { } })();
+    if (ctx && typeof ctx.waitUntil === 'function') { try { ctx.waitUntil(warm); } catch (e) { } }
+    else warm.catch(() => { });
+    return data;
+  }
   let ev;
-  try { ev = await halanEvents(env); } catch (e) { return data; }
+  try { ev = cached; } catch (e) { return data; }
   const seen = {};
   for (const a of acts) {
     const k = (a.code || '') + '|' + (a.kind || '') + '|' + (a.date || '');
