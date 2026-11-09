@@ -1205,6 +1205,31 @@ async function handle(request, env, ctx) {
     const GATE_ON = !(env && env.OCTA_GATE === 'off');
     const isGatePage = GATE_ON && GATE_PAGES.indexOf(url.pathname) !== -1;
     if (isGatePage && !hasSession(request)) {
+      /* ════════════════════════════════════════════════════════════
+      🌍 ٩ نوفمبر ٢٠٢٦ — ⭐ الواجهة العامة = فلتر السوق
+      ────────────────────────────────────────────────────────────────
+      📌 قرار المالك: «فلتر السوق هو اللي يظهر للعامة — وأي حاجة
+         تانية تطلب تسجيل دخول».
+      📌 ⛔ قبل كده: الزائر المجهول كان بيشوف صفحة تسجيل دخول
+         (١٤٩ حرف) ⇒ ويطلع من الموقع فوراً.
+      📌 ✅ الحل: نقدّم صفحة market.html (فلتر أسعار حي لكل الأسواق)
+         للزائر المجهول ⇒ وهو نفسه الموقع اللي جوجل هيفهرسه.
+      📌 صفحة الدخول نفسها بتفضل متاحة على /gate.html (منها التسجيل).
+      📌 ⛔ صفحة market.html فيها **بيانات عامة فقط** (أسعار · أسماء ·
+         قطاعات) — مفيش قرار OCTA ولا درجة ولا محفظة.
+      ════════════════════════════════════════════════════════════ */
+      try {
+        const pubUrl = new URL('/market.html', url);
+        const pub = await env.ASSETS.fetch(new Request(pubUrl.toString(), request));
+        if (pub && pub.status < 400) {
+          const h = new Headers(pub.headers);
+          h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+          /* 🌍 روابط المشاركة (OG) ⇒ نطاق الدومين الحالي */
+          const pubHtml = withSiteOrigin(await pub.text(), url.origin);
+          return new Response(pubHtml, { status: 200, headers: h });
+        }
+      } catch (e) { }
+      /* ⛔ احتياطي: لو market.html مش موجودة ⇒ صفحة الدخول زي الأول */
       try {
         const gateUrl = new URL('/gate.html', url);
         const gate = await env.ASSETS.fetch(new Request(gateUrl.toString(), request));
@@ -1299,6 +1324,19 @@ async function handle(request, env, ctx) {
       '/compare', '/radar', '/smartmoney', '/money', '/news', '/academy', '/watchlist',
       '/search', '/calc', '/bestpick', '/radar-stock'];
     if (SPA_ROUTES.indexOf(url.pathname) !== -1) {
+      /* 🌍 الزائر المجهول على /markets ⇒ صفحة الفلتر العامة (مش التطبيق) */
+      if (!hasSession(request) && (url.pathname === '/markets' || url.pathname === '/stocks')) {
+        try {
+          const pubUrl = new URL('/market.html', url);
+          const pub = await env.ASSETS.fetch(new Request(pubUrl.toString(), request));
+          if (pub && pub.status < 400) {
+            const ph = new Headers(pub.headers);
+            ph.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+            const pubHtml = withSiteOrigin(await pub.text(), url.origin);
+            return new Response(pubHtml, { status: 200, headers: ph });
+          }
+        } catch (e) { }
+      }
       const res = await assetsFresh(env, new Request(new URL('/index.html', url), request));
       const h = new Headers(res.headers);
       h.delete('Cache-Control'); h.delete('Pragma'); h.delete('Expires');

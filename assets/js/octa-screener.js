@@ -278,7 +278,11 @@
   return { t: 'بيع قوي', cls: 'ssell' };
   }
 
-  const SEC_AR = {
+  /* ⭐ ٩ نوفمبر ٢٠٢٦ — المصدر صار window.OCTA_SEC_AR (assets/js/octa-sectors.js)
+     عشان الصفحة العامة تستخدم نفس الخريطة ⭐ (نسخة احتياطية هنا ⇒ مفيش كسر). */
+  const SEC_AR = (typeof window !== 'undefined' && window.OCTA_SEC_AR)
+    ? window.OCTA_SEC_AR
+    : {
   'Finance': 'مالية', 'Bank': 'بنوك', 'Banks': 'بنوك', 'Financial Services': 'خدمات مالية',
   'Process Industries': 'صناعات عملية', 'Consumer Non-Durables': 'سلع استهلاكية',
   'Consumer Durables': 'سلع معمّرة', 'Health Technology': 'رعاية صحية',
@@ -293,7 +297,7 @@
   'Internet': 'إنترنت', 'Media': 'إعلام', 'Insurance': 'تأمين',
   'Biotechnology': 'بيوتكولوجيا', 'Pharmaceuticals': 'أدوية',
   'Medical Devices': 'أجهزة طبية', 'Auto Components': 'قطع غيار'
-  };
+    };
   function sectorAr(s) {
   if (s.sectorAr) return s.sectorAr;
   const raw = s.sector || 'عام';

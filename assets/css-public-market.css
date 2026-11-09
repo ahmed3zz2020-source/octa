@@ -1,0 +1,158 @@
+/* ════════════════════════════════════════════════════════════════
+   🌍 صفحة الفلتر العام — ستايل خاص
+   ────────────────────────────────────────────────────────────────
+   📌 ٩ نوفمبر ٢٠٢٦ — الواجهة العامة للموقع (زائر بلا تسجيل).
+   📌 بتستخدم نظام الألوان نفسه (octa-tokens.css) ⇒ نفس هوية
+      المنتج بالظبط — بس صفحات أخف (من غير التطبيق كله).
+   ════════════════════════════════════════════════════════════════ */
+
+.pm-body {
+  background: var(--pri);
+  color: var(--txt);
+  font-family: 'Tajawal', 'Cairo', system-ui, sans-serif;
+  min-height: 100vh;
+  padding-bottom: 40px;
+}
+
+/* ═══ الهيدر ═══ */
+.pm-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 14px 16px;
+  background: var(--pri2); border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 50;
+}
+.pm-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; min-width: 0; flex: 0 0 auto; }
+.pm-lg { display: inline; }
+.pm-sm { display: none; }
+.pm-logo { width: 34px; height: 34px; border-radius: 9px; }
+.pm-name { font-size: 22px; font-weight: 900; letter-spacing: 3px; color: var(--gold); }
+.pm-nav { display: flex; gap: 8px; }
+
+.pm-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 9px 14px; border-radius: 12px; font-size: 14px; font-weight: 700;
+  text-decoration: none; border: 1px solid var(--line2); color: var(--txt);
+  background: var(--wash); white-space: nowrap;
+}
+.pm-btn-gold { background: var(--gold); color: #14202e; border-color: transparent; font-weight: 800; }
+.pm-btn-ghost { background: transparent; }
+
+/* ═══ الهيرو ═══ */
+.pm-hero { padding: 26px 16px 6px; max-width: 1100px; margin: 0 auto; }
+.pm-h1 {
+  font-size: 25px; font-weight: 900; line-height: 1.4; margin: 0 0 10px;
+}
+.pm-sub { font-size: 15px; color: var(--muted); line-height: 1.8; margin: 0 0 20px; }
+.pm-sub strong { color: var(--gold); }
+
+/* ═══ تبويبات الأسواق ═══ */
+.pm-mk { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 14px; }
+.pm-mk button {
+  flex: 0 0 auto; padding: 10px 16px; border-radius: 999px;
+  border: 1px solid var(--line2); background: var(--pri2); color: var(--txt);
+  font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer;
+}
+.pm-mk button.on { background: var(--gold); color: #14202e; border-color: transparent; font-weight: 800; }
+
+/* ═══ الأدوات ═══ */
+.pm-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.pm-input {
+  flex: 1 1 180px; min-width: 0; padding: 11px 13px; border-radius: 12px;
+  border: 1px solid var(--line2); background: var(--pri2); color: var(--txt);
+  font-size: 15px; font-family: inherit;
+}
+.pm-input::placeholder { color: var(--dim); }
+.pm-sel { flex: 1 1 140px; min-width: 130px; }
+#pmSort { flex: 0 1 175px; }
+.pm-chg { display: flex; gap: 6px; }
+.pm-chip {
+  padding: 10px 13px; border-radius: 999px; border: 1px solid var(--line2);
+  background: var(--pri2); color: var(--muted); font-size: 13px; font-weight: 700;
+  font-family: inherit; cursor: pointer;
+}
+.pm-chip.on { background: var(--goldBg); color: var(--gold); border-color: var(--goldLine); }
+
+/* ═══ النتائج ═══ */
+.pm-main { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+.pm-count { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.pm-rows { display: grid; gap: 8px; }
+
+.pm-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center; gap: 10px;
+  padding: 12px 14px; border-radius: 14px;
+  background: var(--pri2); border: 1px solid var(--line);
+}
+.pm-row-main { min-width: 0; }
+.pm-row-code { font-size: 12px; color: var(--muted); font-weight: 700; }
+.pm-row-name {
+  font-size: 15px; font-weight: 700; margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pm-row-sect { font-size: 12px; color: var(--dim); margin-top: 3px; }
+.pm-row-num { text-align: left; }
+.pm-row-price { font-size: 16px; font-weight: 800; direction: ltr; text-align: right; }
+.pm-row-chg { font-size: 13px; font-weight: 800; margin-top: 2px; }
+.pm-row-mc { font-size: 11px; color: var(--dim); margin-top: 3px; }
+
+.pm-up { color: #16c79a; }
+.pm-down { color: #ff6b5b; }
+.pm-na { color: var(--dim); }
+
+.pm-more {
+  display: block; width: 100%; margin: 16px 0 0; padding: 13px;
+  border-radius: 14px; border: 1px solid var(--goldLine);
+  background: var(--goldBg); color: var(--gold);
+  font-size: 15px; font-weight: 800; font-family: inherit; cursor: pointer;
+}
+.pm-empty {
+  text-align: center; padding: 40px 16px; color: var(--muted);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.pm-empty b { color: var(--txt); font-size: 16px; }
+
+/* ═══ جوّا OCTA ═══ */
+.pm-inside { max-width: 1100px; margin: 26px auto 0; padding: 0 16px; }
+.pm-h2 { font-size: 19px; font-weight: 800; margin: 0 0 14px; }
+.pm-axes { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
+.pm-axes span {
+  font-size: 13px; font-weight: 700; padding: 8px 13px; border-radius: 999px;
+  background: var(--pri2); border: 1px solid var(--line2); color: var(--txt);
+}
+.pm-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+.pm-list li {
+  font-size: 14px; color: var(--muted); line-height: 1.7;
+  padding: 12px 14px; border-radius: 12px; background: var(--pri2); border: 1px solid var(--line);
+}
+.pm-list b { color: var(--txt); }
+
+/* ═══ الدعوة للتسجيل ═══ */
+.pm-cta {
+  max-width: 1100px; margin: 26px auto 0; padding: 18px 16px;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 14px; border-radius: 18px;
+  background: linear-gradient(135deg, var(--pri3), var(--pri2));
+  border: 1px solid var(--goldLine);
+}
+.pm-cta-txt { display: flex; flex-direction: column; gap: 6px; }
+.pm-cta-txt b { font-size: 16px; }
+.pm-cta-txt span { font-size: 13px; color: var(--muted); }
+
+.pm-foot {
+  max-width: 1100px; margin: 22px auto 0; padding: 16px;
+  display: flex; flex-direction: column; gap: 6px;
+  border-top: 1px solid var(--line);
+  font-size: 12px; color: var(--dim);
+}
+
+@media (max-width: 420px) {
+  .pm-h1 { font-size: 21px; }
+  .pm-lg { display: none; }
+  .pm-sm { display: inline; }
+  .pm-head { padding: 12px 12px; gap: 8px; }
+  .pm-logo { width: 30px; height: 30px; }
+  .pm-nav .pm-btn { padding: 8px 11px; font-size: 13px; }
+  .pm-row { grid-template-columns: 1fr auto; }
+  .pm-row-mc { display: none; }
+}

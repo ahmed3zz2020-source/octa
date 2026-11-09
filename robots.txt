@@ -1,0 +1,15 @@
+# robots.txt — OCTA
+# ⭐ الصفحة العامة (فلتر السوق) هي اللي بتتفهرس — التطبيق نفسه
+#   (بعد الدخول) عليه noindex في index.html ⇒ مش هيتفهرس.
+User-agent: *
+Allow: /$
+Allow: /market.html
+Allow: /markets
+Allow: /stocks
+Disallow: /api/
+Disallow: /admin
+Disallow: /gate.html
+Disallow: /reset.html
+Disallow: /chart.html
+
+Sitemap: https://octashares.com/sitemap.xml

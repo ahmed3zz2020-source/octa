@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a1929">
+<title>OCTA — فلتر البورصة: أسعار لحظية لمصر والسعودية والإمارات وأمريكا</title>
+<meta name="description" content="فلتر أسهم مجاني: ابحث في ٢٩٧ سهم مصري + السعودية والإمارات وأمريكا بالاسم أو الرمز، ورتّب بالسعر أو التغيّر أو القيمة السوقية. التحليل الكامل وقرار OCTA بعد تسجيل الدخول.">
+<link rel="icon" href="/assets/octa-logo.png">
+<link rel="apple-touch-icon" href="/assets/icon-192.png">
+<link rel="manifest" href="/manifest.json">
+
+<!-- 🌍 كارت المشاركة -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OCTA">
+<meta property="og:locale" content="ar_EG">
+<meta property="og:title" content="OCTA — فلتر البورصة: أسعار لحظية لكل سهم">
+<meta property="og:description" content="مصر · السعودية · الإمارات · أمريكا — ابحث ورتّب كل الأسهم بالاسم أو الرمز. التحليل الكامل وقرار OCTA بعد تسجيل الدخول.">
+<meta property="og:url" content="https://octashares.com/">
+<meta property="og:image" content="https://octashares.com/assets/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="OCTA — فلتر البورصة: أسعار لحظية لكل سهم">
+<meta name="twitter:description" content="مصر · السعودية · الإمارات · أمريكا — فلتر أسهم مجاني بالاسم أو الرمز.">
+<meta name="twitter:image" content="https://octashares.com/assets/og-cover.jpg">
+
+<link rel="stylesheet" href="/assets/octa-fonts.css?v=202611090031">
+<link rel="stylesheet" href="/assets/octa-tokens.css?v=202611090031">
+<link rel="stylesheet" href="/assets/octa.css?v=202611090031">
+<link rel="stylesheet" href="/assets/css-public-market.css?v=202611090031">
+
+<!-- 🐙 بيانات عامة فقط (بدون جلسة) -->
+<!-- 🏷️ خريطة القطاعات (نفس ملف التطبيق) -->
+<script src="/assets/js/octa-sectors.js?v=202611090031"></script>
+<script src="/assets/js/octa-egx-names.js?v=202611090031"></script>
+<script src="/assets/js/octa-mk-scan.js?v=202611090031"></script>
+</head>
+<body class="pm-body">
+
+<!-- ═══ الهيدر ═══ -->
+<header class="pm-head">
+  <a class="pm-brand" href="/">
+    <img src="/assets/octa-logo.png" alt="OCTA" class="pm-logo">
+    <span class="pm-name">OCTA</span>
+  </a>
+  <nav class="pm-nav">
+    <a class="pm-btn pm-btn-ghost" href="/gate.html"><span class="pm-lg">تسجيل الدخول</span><span class="pm-sm">دخول</span></a>
+    <a class="pm-btn pm-btn-gold" href="/gate.html">إعمل حساب مجاناً</a>
+  </nav>
+</header>
+
+<!-- ═══ الهيرو ═══ -->
+<section class="pm-hero">
+  <h1 class="pm-h1">فلتر البورصة — أسعار لحظية لكل سهم في مصر والسعودية والإمارات وأمريكا</h1>
+  <p class="pm-sub">
+    ابحث بالاسم أو الرمز ورتّب بالسعر أو نسبة التغيّر أو القيمة السوقية.
+    التحليل الكامل بثمانية محاور و<strong>قرار OCTA</strong> بعد تسجيل الدخول.
+  </p>
+
+  <!-- ═══ تبويبات الأسواق ═══ -->
+  <div class="pm-mk" id="pmMk" role="tablist" aria-label="أسواق البورصة"></div>
+
+  <!-- ═══ أدوات الفلترة ═══ -->
+  <div class="pm-tools">
+    <input id="pmQ" class="pm-input" type="search" inputmode="search"
+           placeholder="ابحث بالاسم أو الرمز…" autocomplete="off" aria-label="ابحث عن سهم">
+    <select id="pmSect" class="pm-input pm-sel" aria-label="القطاع"></select>
+    <select id="pmSort" class="pm-input pm-sel" aria-label="الترتيب">
+      <option value="mc">الأعلى قيمة سوقية</option>
+      <option value="change">الأعلى تغيّر</option>
+      <option value="price">الأعلى سعر</option>
+      <option value="name">الاسم (أ-ي)</option>
+      <option value="vol">الأعلى تداول</option>
+    </select>
+    <div class="pm-chg" role="group" aria-label="اتجاه التغيّر">
+      <button class="pm-chip on" data-chg="all">الكل</button>
+      <button class="pm-chip" data-chg="up">▲ صاعد</button>
+      <button class="pm-chip" data-chg="down">▼ هابط</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ الدعوة للتسجيل ═══ -->
+<section class="pm-cta">
+  <div class="pm-cta-txt">
+    <b>🔒 التحليل الكامل وقرار OCTA بعد تسجيل الدخول</b>
+    <span>٨ محاور تحليل · كارت قرار لكل سهم · فلتر المؤشرات · رادار يومي · محفظة وتنبيهات</span>
+  </div>
+  <a class="pm-btn pm-btn-gold" href="/gate.html">ادخل أو اعمل حساب</a>
+</section>
+
+<!-- ═══ النتائج ═══ -->
+<main class="pm-main">
+  <div class="pm-count" id="pmCount">…</div>
+  <div class="pm-rows" id="pmRows"></div>
+  <button class="pm-more" id="pmMore" hidden>عرض المزيد</button>
+  <div class="pm-empty" id="pmEmpty" hidden>
+    <b>مفيش نتائج مطابقة</b>
+    <span>جرّب تغيّر البحث أو احذف الفلتر.</span>
+  </div>
+</main>
+
+<!-- ═══ جوّا OCTA (بعد الدخول) ═══ -->
+<section class="pm-inside">
+  <h2 class="pm-h2">جوا OCTA — ٨ أذرع بتحلّل السهم من كل زاوية</h2>
+  <div class="pm-axes">
+    <span>📊 السوق</span><span>📈 الفني</span><span>🏛️ الأساسي</span><span>💧 السيولة</span>
+    <span>📰 الأخبار</span><span>🎭 المعنويات</span><span>🛡️ المخاطر</span><span>⭐ الفرص</span>
+  </div>
+  <ul class="pm-list">
+    <li><b>كارت قرار لكل سهم</b> — قرار واحد واضح مع سبب القرار، مش أرقام ملخبطة.</li>
+    <li><b>فلتر المؤشرات</b> — صفّي البورصة بالأساسيات والزخم والمخاطرة في ضغطة.</li>
+    <li><b>رادار يومي</b> — أفضل الفرص كل يوم + تنبيهات على اللي بتتابعها.</li>
+  </ul>
+</section>
+
+<footer class="pm-foot">
+  <span>OCTA — منصة البورصة المصرية الذكية</span>
+  <span>الأسعار من مصادر السوق العامة · التحليل والقرار بعد الدخول</span>
+</footer>
+
+<script src="/assets/js/octa-public-market.js?v=202611090031"></script>
+</body>
+</html>
