@@ -12,6 +12,47 @@ try {
   document.documentElement.setAttribute('data-octa-boot', '1');
 } catch (e) { }
 
+/* ════════════════════════════════════════════════════════════
+   🪦 مقبرة سكربتات TradingView (٩ نوفمبر ٢٠٢٦)
+   ────────────────────────────────────────────────────────────
+   📌 المشكلة: سكربت TradingView بيقرأ `document.currentScript.parentNode`
+      ويلفّق الـwidget جوه. لو شِلنا السكربت (أو فرّغنا الحاوية
+      بـinnerHTML='') ⇒ الـparentNode بيبقى null ⇒ TradingView
+      يعمل querySelector على null ⇒ TypeError ظاهر في الكونسول
+      («Cannot read properties of null»).
+   ✅ الحل: لو سكربت TradingView لسه شغّال، هنقّله لمقبرة مخفية
+      موجودة في الـDOM ⇒ الـparentNode مابقاش null والـwidget
+      القديم بيرسم في حاوية مستخبية (مفيش أي تسريب بصري).
+   ⛔ القاعدة: متحذفش سكربت TradingView — انقله. */
+function tvGraveyard() {
+  var g = document.getElementById('octaTvGraveyard');
+  if (!g) {
+    g = document.createElement('div');
+    g.id = 'octaTvGraveyard';
+    g.setAttribute('aria-hidden', 'true');
+    g.style.cssText = 'position:absolute;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none';
+    (document.body || document.documentElement).appendChild(g);
+  }
+  return g;
+}
+
+/* ⭐ تفريغ حاوية TradingView من غير ما نُتيِم سكربت شغّال */
+function emptyTvBox(el) {
+  if (!el) return;
+  try {
+    var grave = tvGraveyard();
+    var kids = Array.prototype.slice.call(el.childNodes);
+    for (var i = 0; i < kids.length; i++) {
+      var k = kids[i];
+      if (k.nodeType === 1 && k.tagName === 'SCRIPT' && /tradingview\.com/.test(k.src || '')) {
+        grave.appendChild(k); /* ⭐ النقل: الـparentNode بيفضل موجود */
+      } else {
+        el.removeChild(k);
+      }
+    }
+  } catch (e) { }
+}
+
 /* ============ OCTA v20 — Egyptian Stock Intelligence ============ */
 
 const STOCKS = [
@@ -2217,7 +2258,11 @@ function runCompare() {
 // ============ COMPARE + TRADINGVIEW ============
 function updateCompareTVWidgets(stocks) {
   // تنظيف الـ widgets القديمة
-  document.querySelectorAll('script[data-cmp-tv]').forEach(s => s.remove());
+  /* ⭐ ننقل السكربتات للمقبرة مش بنحذفها ( TradingView بيحتاج الـparentNode ) */
+  try {
+    var gv2 = tvGraveyard();
+    document.querySelectorAll('script[data-cmp-tv]').forEach(function (s) { try { gv2.appendChild(s); } catch (e) { } });
+  } catch (e) { }
 
   stocks.forEach((stock, i) => {
   const idx = i + 1;
@@ -2229,7 +2274,7 @@ function updateCompareTVWidgets(stocks) {
 
   const container = document.getElementById(`cmp-tv-${idx}`);
   if (!container) return;
-  container.innerHTML = '';
+  emptyTvBox(container);   /* ⭐ تفريغ آمن (من غير تيتيم سكربت TradingView شغّال) */
 
   setTimeout(() => {
   const script = document.createElement('script');
@@ -2874,7 +2919,7 @@ function injectWidget(elementId, scriptFile, config, dataKey) {
         return;
       } catch (e) { }
     }
-    el.innerHTML = '';
+    emptyTvBox(el);   /* ⭐ من غير ما نُتيِم سكربت TradingView شغّال */
     const script = document.createElement('script');
     script.src = 'https://s3.tradingview.com/external-embedding/' + scriptFile;
     script.async = true;
@@ -3176,9 +3221,13 @@ function loadEngineTVWidgets(symbol) {
   // Clean previous
   ['engine-tv-symbol-info', 'engine-tv-tech-analysis', 'engine-tv-advanced-chart'].forEach(id => {
   const el = document.getElementById(id);
-  if (el) el.innerHTML = '';
+  if (el) emptyTvBox(el);   /* ⭐ تفريغ آمن (من غير تيتيم سكربت شغّال) */
   });
-  document.querySelectorAll('script[data-engine-tv]').forEach(s => s.remove());
+  /* ⭐ ننقل السكربتات للمقبرة مش بنحذفها ( TradingView بيحتاج الـparentNode ) */
+  try {
+    var gv = tvGraveyard();
+    document.querySelectorAll('script[data-engine-tv]').forEach(function (s) { try { gv.appendChild(s); } catch (e) { } });
+  } catch (e) { }
 
   // Mini Symbol Overview widget (السعر + الشارت + التغير)
   setTimeout(() => injectEngineWidget('engine-tv-symbol-info', 'embed-widget-mini-symbol-overview.js', {
@@ -3376,7 +3425,7 @@ function injectEngineWidget(elementId, scriptFile, config, dataKey) {
     📌 تحميل سكربت TradingView) ⇒ null error في الكونسول. */
     try {
     if (!el.isConnected) return;
-    el.innerHTML = '';
+    emptyTvBox(el);   /* ⭐ من غير ما نُتيِم سكربت TradingView شغّال */
     const script = document.createElement('script');
     script.src = 'https://s3.tradingview.com/external-embedding/' + scriptFile;
     script.async = true;
