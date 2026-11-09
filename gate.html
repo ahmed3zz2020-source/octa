@@ -40,9 +40,9 @@
 
   ⚠️ بعد ما يسجّل دخول ⇒ بنحوّله على التطبيق.
   ═══════════════════════════════════════════════════════════════ -->
-<link rel="stylesheet" href="assets/octa-fonts.css?v=202611090519">
-<link rel="stylesheet" href="assets/octa-tokens.css?v=202611090519">
-<link rel="stylesheet" href="assets/css-gate.css?v=202611090519">
+<link rel="stylesheet" href="assets/octa-fonts.css?v=202611090629">
+<link rel="stylesheet" href="assets/octa-tokens.css?v=202611090629">
+<link rel="stylesheet" href="assets/css-gate.css?v=202611090629">
 <link rel="icon" href="assets/octa-logo.png">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="assets/icon-192.png">
@@ -65,6 +65,27 @@
   </div>
 </div>
 
+<script id="octaSwGuard">
+/* ⭐⭐⭐ ٩ نوفمبر ٢٠٢٦ — «مفتاح إطفاء» Service Worker (تسجيل مبكر)
+   📌 السبب: التطبيق المثبّت (WebAPK) كان بيفتح **شاشة بيضا** بعد
+     «تحديث دلوقتي» (الـSW القديم كان ماسك والكاش اتمسح).
+   ✅ الحل: نسجّل `/sw.js` (مفيش fetch handler ⇒ كل الطلبات بتعدّي
+     للشبكة) **بس لو فيه SW فعلي** ⇒ الـSW القديم يتستبدل من أول فتح
+     ⇒ وبعدها المفتاح بيلغي نفسه ويمسح الكاش ⇒ وضع المتصفح العادي.
+   📌 لازم في **كل** الصفحات — حتى بوابة الدخول ⭐ (لو البوابة
+     مش بتتحمّل ⇒ المستخدم مش هيقدر يدخل خالص!). */
+(function () {
+  try {
+    if (!('serviceWorker' in navigator)) return;
+    if (window.__octaSwGuardDone) return;
+    window.__octaSwGuardDone = 1;
+    navigator.serviceWorker.getRegistrations().then(function (rs) {
+      if (!rs || !rs.length) return;
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () { });
+    }).catch(function () { });
+  } catch (e) { }
+})();
+</script>
 <script>
   /* ⛔ صفحة البوابة: بعد الدخول بنحوّل على التطبيق
      (الـWorker سيبعت التطبيق كمان — الكوكي بقى موجود).
@@ -94,11 +115,11 @@
     octaGateReady(function () { location.replace('/'); });
   };
 </script>
-<script src="assets/js/octa-api.js?v=202611090519"></script>
-<script src="assets/js/octa-auth.js?v=202611090519"></script>
-<script src="assets/js/octa-gate.js?v=202611090519"></script>
-<script src="assets/js/octa-back.js?v=202611090519"></script>
+<script src="assets/js/octa-api.js?v=202611090629"></script>
+<script src="assets/js/octa-auth.js?v=202611090629"></script>
+<script src="assets/js/octa-gate.js?v=202611090629"></script>
+<script src="assets/js/octa-back.js?v=202611090629"></script>
 
-<script src="assets/js/octa-sw.js?v=202611090519"></script>
+<script src="assets/js/octa-sw.js?v=202611090629"></script>
 </body>
 </html>

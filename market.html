@@ -32,6 +32,27 @@
 
 <!-- 🐙 بيانات عامة فقط (بدون جلسة) -->
 <!-- 🏷️ خريطة القطاعات (نفس ملف التطبيق) -->
+<script id="octaSwGuard">
+/* ⭐⭐⭐ ٩ نوفمبر ٢٠٢٦ — «مفتاح إطفاء» Service Worker (تسجيل مبكر)
+   📌 السبب: التطبيق المثبّت (WebAPK) كان بيفتح **شاشة بيضا** بعد
+     «تحديث دلوقتي» (الـSW القديم كان ماسك والكاش اتمسح).
+   ✅ الحل: نسجّل `/sw.js` (مفيش fetch handler ⇒ كل الطلبات بتعدّي
+     للشبكة) **بس لو فيه SW فعلي** ⇒ الـSW القديم يتستبدل من أول فتح
+     ⇒ وبعدها المفتاح بيلغي نفسه ويمسح الكاش ⇒ وضع المتصفح العادي.
+   📌 لازم في **كل** الصفحات — حتى بوابة الدخول ⭐ (لو البوابة
+     مش بتتحمّل ⇒ المستخدم مش هيقدر يدخل خالص!). */
+(function () {
+  try {
+    if (!('serviceWorker' in navigator)) return;
+    if (window.__octaSwGuardDone) return;
+    window.__octaSwGuardDone = 1;
+    navigator.serviceWorker.getRegistrations().then(function (rs) {
+      if (!rs || !rs.length) return;
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () { });
+    }).catch(function () { });
+  } catch (e) { }
+})();
+</script>
 <script src="/assets/js/octa-sectors.js?v=202611090031"></script>
 <script src="/assets/js/octa-egx-names.js?v=202611090031"></script>
 <script src="/assets/js/octa-mk-scan.js?v=202611090031"></script>
