@@ -1305,7 +1305,9 @@ async function handle(request, env, ctx) {
       h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
       h.set('Pragma', 'no-cache'); h.set('Expires', '0');
       h.set('ETag', '"' + Date.now() + '"');
-      return new Response(res.body, { status: 200, headers: h });
+      /* 🌍 روابط المشاركة (OG) ⇒ نطاق الدومين الحالي */
+      const spaHtml = withSiteOrigin(await res.text(), url.origin);
+      return new Response(spaHtml, { status: 200, headers: h });
     }
     if (/\.(html?)$/.test(url.pathname) || url.pathname === '/' || url.pathname === '/index.html') {
       const res = await assetsFresh(env, request);
@@ -1329,8 +1331,12 @@ async function handle(request, env, ctx) {
       try {
       const WANT = '202610250945';
       } catch (e) { }
-      /* 🧹 رابط التنظيف (?clean=1) ⇒ مسح كل حاجة للموقع */
-      return new Response(res.body, { status: res.status, headers: h });
+      /* 🌍 روابط المشاركة (OG) ⇒ نطاق الدومين الحالي
+         📌 (٩ نوفمبر ٢٠٢٦ — ⭐ الكود ده كان نايم: المسار ده بيخدم
+         كل صفحات HTML قبل بلوك الـ.html ⇒ روابط المشاركة كانت
+         بتطلع بنطاق الإنتاج على المعاينة.) */
+      const pageHtml = withSiteOrigin(await res.text(), url.origin);
+      return new Response(pageHtml, { status: res.status, headers: h });
     }
     if (/\.(js|mjs|css)$/.test(url.pathname)) {
       const res = await assetsFresh(env, request);
@@ -1395,21 +1401,9 @@ async function handle(request, env, ctx) {
       } catch (e) { }
     }
 
-    /* 🌍 آخر حالة: طلب HTML مباشر (مثل /index.html) ⇒ نظبط روابط المشاركة كمان */
-    if (/\.html?$/i.test(url.pathname)) {
-      try {
-        const res = await env.ASSETS.fetch(request);
-        if (res && res.status < 400) {
-          const ct = res.headers.get('Content-Type') || '';
-          if (ct.indexOf('text/html') === 0) {
-            const h = new Headers(res.headers);
-            const pageHtml = withSiteOrigin(await res.text(), url.origin);
-            return new Response(pageHtml, { status: 200, headers: h });
-          }
-          return res;
-        }
-      } catch (e) { }
-    }
+    /* ⛔ ملاحظة (٩ نوفمبر ٢٠٢٦): بلوك «أي HTML» اتشال من هنا —
+       المسار الأعلى (سطر ١٣١٠) بيسخدم كل *.html وبيظبط روابط المشاركة
+       ⇒ الكود هنا كان ميّت (لا بيترنّش أبداً). */
 
     return env.ASSETS.fetch(request);
 }
