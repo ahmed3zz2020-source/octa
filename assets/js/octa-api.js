@@ -171,6 +171,43 @@
   return window.OCTA_DIRECT + s.slice(i);
   }
 
+  /* ════════════════════════════════════════════════════════════════
+   * ⭐⭐⭐ ٩ نوفمبر ٢٠٢٦ — ⭐⭐⭐ منع الطلبات المكرّرة (in-flight)
+   * ────────────────────────────────────────────────────────────────
+   * 📌 القياس (متصفح موبايل · ٣٩٠ بكسل · أول تحميل):
+   *   ١٠١ طلب · ١.٧ ميجا · ٦.٥ ثانية
+   *   ⇒ /api/prices اتطلب **مرتين** (٨٠ ك.ب كل مرة)
+   *   ⇒ /api/rank?limit=400 اتطلب **مرتين**
+   * 📌 ⭐ السبب: كذا كود بطلب نفس الداتا في نفس اللحظة.
+   * 📌 ✅ الحل: لو اتنين GET على نفس المسار راحوا مع بعض ⇒
+   *   يتشاركوا نفس الرد (طلب واحد على الشبكة).
+   * 📌 📌 لازم كل مستهلك ياخد **نسخة** من الـbody
+   *   (الـResponse بيتقرا مرة واحدة بس — التانية كانت هتفشل).
+   * 📌 📌 المسارات المسمحوح فيها الدمج محدودة (قائمة أدناه)
+   *   ⇒ أي طلب تاني (صور·ملفات·CSV) بيمشي زي ما هو.
+   * ════════════════════════════════════════════════════════════════ */
+  const OCTA_DEDUPE_PATHS = ['/api/prices', '/api/rank', '/api/data_full',
+                             '/api/quot', '/api/dividends', '/api/stocks',
+                             '/api/engine-weights', '/api/ticker'];
+  const OCTA_INFLIGHT = {};
+
+  function _dedupeOk(s) {
+    for (let i = 0; i < OCTA_DEDUPE_PATHS.length; i++) {
+      if (s.indexOf(OCTA_DEDUPE_PATHS[i]) >= 0) return true;
+    }
+    return false;
+  }
+  /* ⭐ المفتاح = المسار + المعاملات، من غير الـcache-buster (_=) */
+  function _inflightKey(s) {
+    try {
+      return String(s)
+        .replace(/([?&])_=[0-9]+/g, '$1')
+        .replace(/[?&]+$/, '')
+        .replace(/\?&/, '?')
+        .replace(/&&+/g, '&');
+    } catch (e) { return String(s); }
+  }
+
   /* 🩺 شغّل على السيرفر التاني لو الرئيسي واقع */
   const ORIG = ORIG_FETCH;
   window.fetch = function (url, opts) {
@@ -181,6 +218,96 @@
   if (s.indexOf('/api/') === -1) return ORIG.apply(this, arguments);
 
   const opt = _withToken(s, opts);
+
+  /* ⭐⭐⭐ الدمج: طلبات GET المتطابقة في نفس اللحظة ⇒ طلب واحد */
+  let method = 'GET';
+  try { method = String((opt && opt.method) || 'GET').toUpperCase(); } catch (e) { }
+  if (method === 'GET' && _dedupeOk(s)) {
+    const key = _inflightKey(s);
+    let rec = OCTA_INFLIGHT[key];
+    if (!rec) {
+      /* ⭐ الطلب المشترك مالهوش signal بتاع مستهلك واحد
+         (لو اتأخر مستهلك، الطلب مابيتشالش من الباقي). */
+      const o2 = Object.assign({}, opt);
+      delete o2.signal;
+      let ctrl = null, timer = null;
+      if (typeof AbortController !== 'undefined') {
+        ctrl = new AbortController();
+        o2.signal = ctrl.signal;
+        timer = setTimeout(function () { try { ctrl.abort(); } catch (e) { } }, 20000);
+      }
+      const p = ORIG.call(this, s, o2)
+        .then(function (r) {
+          if (r.status >= 500) window.OCTAServer.failover();
+          const hs = [];
+          try { r.headers.forEach(function (v, k) { hs.push([k, v]); }); } catch (e) { }
+          const ct = (r.headers && r.headers.get) ? (r.headers.get('Content-Type') || '') : '';
+          return r.text().then(function (body) {
+            return { status: r.status, hs: hs, ct: ct, body: body };
+          });
+        })
+        .catch(function (e) {
+          const nu = _directUrl(s);
+          if (nu === s) throw e;
+          window.OCTAServer.failover();
+          try { console.warn('[OCTA]_primary failed — trying direct API'); } catch (x) { }
+          return ORIG.call(window, nu, _withToken(nu, opts)).then(function (r) {
+            const hs = [];
+            try { r.headers.forEach(function (v, k) { hs.push([k, v]); }); } catch (e) { }
+            return r.text().then(function (body) {
+              return { status: r.status, hs: hs, ct: (r.headers.get('Content-Type') || ''), body: body };
+            });
+          });
+        })
+        .then(function (out) {
+          if (timer) clearTimeout(timer);
+          delete OCTA_INFLIGHT[key];
+          return out;
+        }, function (err) {
+          if (timer) clearTimeout(timer);
+          delete OCTA_INFLIGHT[key];
+          throw err;
+        });
+      rec = OCTA_INFLIGHT[key] = { p: p };
+    }
+    /* ⭐ كل مستخدم ياخد Response جديدة (الجسم بيتقرا مرة واحدة) */
+    const mkResp = function (out) {
+      try {
+        const hd = {};
+        for (let i = 0; i < out.hs.length; i++) hd[out.hs[i][0]] = out.hs[i][1];
+        if (!hd['Content-Type'] && out.ct) hd['Content-Type'] = out.ct;
+        return new Response(out.body, { status: out.status, headers: hd });
+      } catch (e) {
+        return new Response(out.body, { status: 200 });
+      }
+    };
+    const pResp = rec.p.then(mkResp);
+    /* ⭐⭐ مهلة المستهلك (٧ ثواني في fetchRetry) لازم تفضل شغّالة:
+       لو المستعمل ده اتأخر ⇒ هو بس اللي يفشل — والطلب المشترك
+       يكمل عشان الباقي. */
+    if (opt && opt.signal) {
+      return new Promise(function (resolve, reject) {
+        let done = false;
+        const onAbort = function () {
+          if (done) return; done = true;
+          try { reject(new Error('انتهت المهلة')); } catch (e) { }
+        };
+        try {
+          if (opt.signal.aborted) { onAbort(); return; }
+          if (opt.signal.addEventListener) opt.signal.addEventListener('abort', onAbort, { once: true });
+        } catch (e) { }
+        pResp.then(function (r) {
+          if (done) return; done = true;
+          try { if (opt.signal.removeEventListener) opt.signal.removeEventListener('abort', onAbort); } catch (e) { }
+          resolve(r);
+        }, function (e) {
+          if (done) return; done = true;
+          reject(e);
+        });
+      });
+    }
+    return pResp;
+  }
 
   return ORIG.call(this, s, opt)
   .then(function (r) {
@@ -234,7 +361,15 @@
  ════════════════════════════════════════════════════════════════ */
 var OCTA_CACHE = {};        /* url(من غير query) → {t, body, ct} */
 var OCTA_CACHE_TTL = 20000; /* ٢٠ ثانية — كفاية للتجربة، ومنع للتكرار */
-var OCTA_CACHE_PATHS = ['/api/intelligence/', '/api/explain/', '/api/technical/'];
+var OCTA_CACHE_PATHS = ['/api/intelligence/', '/api/explain/', '/api/technical/',
+                        /* ⭐⭐ ٩ نوفمبر ٢٠٢٦ — طلب مكرّر (مقيس):
+                           /api/engine-weights اتطلب ٥ مرات ⇒ ٥ من الـ٦
+                           اتصالات المتوازية بتروح لطلب واحد.
+                           📌 ⛔ ما نضيفش /api/rank هنا: مفتاح الكاش
+                           بيشيل الـquery ⇒ limit=252 وlimit=400 هياخدوا
+                           نفس الرد (خطأ!). الرتب بتتدمج لحظياً بس
+                           (في الـdedupe) من غير كاش زمني. */
+                        '/api/engine-weights'];
 
 function _octaCacheKey(s) {
   try {
