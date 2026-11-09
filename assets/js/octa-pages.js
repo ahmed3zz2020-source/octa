@@ -110,7 +110,7 @@ function openTradingView(code, name) {
   holder.innerHTML = '';
   /* ✅ 19 أكتوبر 2026 — شارت TradingView واحد (tv-shim.js).
      ⛌ القديم: s3.tradingview.com/external-embedding/... → widget
-        بيتولد ناقص ويفضل فاضي (∅) — نفس المشكلة في كل места. */
+        بيتولد ناقص ويفضل فاضي (∅) — نفس المشكلة في كل مكان. */
   try {
     window.OCTA_TV.whenSized(holder, function () {
       window.OCTA_TV.mount(holder, { symbol: cfg.symbol, interval: '1D' });
@@ -312,7 +312,7 @@ async function openIntel(code) {
      📌 المسار القديم (intelPage) بيعرض التحليل **٦٥,٠٠٠px تحت** الشاشة:
      📌   السبب: CSS فيه `.page { display:none !important }` ⇒ الـinline
      📌   `style.display='none'` في openIntel **مابيكسرش** الـ!important
-     📌   ⇒ صفحة الأسهم فضل�� ظاهرة والتحليل اتفتح تحت ٦٥ ألف بكسل.
+     📌   ⇒ صفحة الأسهم فضلت ظاهرة والتحليل اتفتح تحت ٦٥ ألف بكسل.
      📌 ✅ الحل: نوجّه كل المسارات للصفحة الحديثة (stockPage) — صفحة واحدة.
      📌   fallback للقديم بس لو openStock فشل. */
   if (typeof openStock === 'function') {
@@ -5007,6 +5007,27 @@ function icRows(list, valKey) {
   }
 
   function doKill() {
+  /* ════════════════════════════════════════════════════════════
+     ⛔⛔⛔ ٩ نوفمبر ٢٠٢٦ — الإصلاح الجذري (اتقاس مش تخمين)
+     ────────────────────────────────────────────────────────────
+     📌 العَرَض: skribتات بتفصل (octa-studio / octa-setups /
+        octa-zones / octa-challenges) ⇒ الـglobals بتاعتها
+        undefined والصفحة «مش موجودة» للمستخدم.
+     📌 السبب الجذري (مقيس في المتصفح):
+        · الـparser لسه بيكمّل تحليل الـHTML (readyState='loading')
+        · الـbody اتغيّر (rescueToolPages ⇒ insertBefore + remove)
+        · نقطة إدراج الـparser كانت جوّه #homeHidden ⇒ اتفصلت
+        · ⇒ كل <script> بعدها اتحمّل (200 OK) بس **ما اتنفّذش**
+     📌 ليه بيحصل على المستخدم؟ لأن `setTimeout(doKill, 200)`
+        بيضرب أثناء التحميل على شبكة بطيئة (٣G في مصر).
+        على شبكة سريعة بالـtimeout بيجي بعد ما التحليل يخلص.
+     ✅ الحل: ما نقبلش نعدّل الـDOM غير لما التحليل يخلص.
+        doKill بتستنى DOMContentLoaded لوحدها.
+     ════════════════════════════════════════════════════════════ */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', doKill);
+    return;
+  }
   const old = document.getElementById('homeHidden');
   if (old && !old.dataset.killed) {
   old.dataset.killed = '1';

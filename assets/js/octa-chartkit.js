@@ -135,7 +135,21 @@
   function mount(box, rows, opts) {
     if (!box) return Promise.reject(new Error('no box'));
     opts = opts || {};
+    /* ⛔⛔ البوكس بيتنضّف قبل الرسم: lightcharts بيعمل append للرسم الجديد
+       ⇒ لو اتنادى mount مرتين على نفس البوكس (زي الاستوديو: الشموع +
+       رسومات المستخدم) ⇒ رسومتين فوق بعض والأرقام بتتلبّس. */
+    try { if (box.innerHTML) box.innerHTML = ''; } catch (e) { }
+    /* ⭐⭐⭐ حاجز التكرار (٩ نوفمبر ٢٠٢٦) — سبب «رسمة فوق رسمة»
+       📌 المشكلة: mount بيتنادى مرتين بسرعة (الشموع + رسومات المستخدم)
+          ⇒ الاتنين بيستنوا نفس load() ⇒ لما يخلصوا الاتنين يرسموا
+          ⇒ ١٢ كانفس في البوكس والأرقام بتتلبّس.
+       ✅ الحل: عدّاد على البوكس — اللي بييجي بعد الأحدث يلغي نفسه.
+          (نفس فكرة "cancel" في الكود.async) */
+    var gen = (box.__octaMountGen || 0) + 1;
+    box.__octaMountGen = gen;
     return load().then(function (L) {
+      /* ⛔ اتلغى — فيه رسم أحدث ⇒ متارسمش */
+      if (box.__octaMountGen !== gen) return null;
       /* ⛔⛔ البوكس هو المرجع: ارتفاعه = ارتفاع الشارت بالظبط.
          قبل كده كان الشارت أطول من البوكس ⇒ الـpane بتاع الحجم كان
          يسرّب فوق الكروت اللي تحته (الشكل مش متناسق). */
@@ -170,6 +184,10 @@
         return { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close };
       }));
       chart.__octaSeries = cs;
+      /* ⭐ الشارت نفسه متاح على البوكس (للقياس والاختبار)
+         + onChart callback للصفحات اللي محتاجة تتكلم معاه. */
+      try { box.__octaChart = chart; } catch (e) { }
+      if (typeof opts.onChart === 'function') { try { opts.onChart(chart); } catch (e) { } }
       /* ⭐ المتوسطات المتحركة (السياق الفني) — ٢٠ و٥٠ */
       chart.__octaEma = [];
       if (opts.emas && opts.emas.length && L.LineSeries) {
@@ -334,8 +352,13 @@
       var w = box.clientWidth, h = box.clientHeight;
       if (!w || !h) return;
       var dpr = (window.devicePixelRatio || 1);
-      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
-      cv.style.width = w + 'px'; cv.style.height = h + 'px';
+      /* ⭐ إعادة تحجيم الكانفس بتفرّغه ⇒ نعملها بس لو المقاس اتغيّر
+         ( كانت بتتفرّغ ٦٠ مرة في الثانية أثناء التمرير ). */
+      var cw = Math.round(w * dpr), ch = Math.round(h * dpr);
+      if (cv.width !== cw || cv.height !== ch) {
+        cv.width = cw; cv.height = ch;
+        cv.style.width = w + 'px'; cv.style.height = h + 'px';
+      }
       var g = cv.getContext('2d');
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, w, h);
@@ -418,6 +441,51 @@
     try {
       ts.subscribeVisibleLogicalRangeChange(function () { draw(); });
     } catch (e) { }
+    /* ══════════════════════════════════════════════════════════
+       ⭐⭐⭐⭐ إصلاح: الدعوم/المقاومات كانت بتنفصل عن الشموع
+       ──────────────────────────────────────────────────────────
+       🔴 العطل: تمرير **محور الأسعار** (الأسعار على اليمين) كان
+          بيحرّك الشموع بس الدعوم/المقاومات بتفضل واقفه في مكانها
+          ⇒ خط منفصل عن الشموع (أكتر في «التحديات» و«المناطق»).
+       📌 السبب الجذري: مكتبة lightweight-charts ماعندهاش اشتراك
+          لتغيّر **نطاق السعر** — `subscribeVisibleLogicalRangeChange`
+          بتغطي الوقت بس ⇒ كنا بنرسم مرّة واحدة وخلاص.
+       ✅ الحل: نراقب إحداثي سعر مرجعي كل فريم؛ لمّا يتحرك (تمرير
+          أو تكبير أو إعادة تحجيم) ⇒ نعيد رسم الـoverlay ⇒ الخطوط
+          تفضل ملزومة بالشموع على طول.
+       ⛔ الحلقة بتقف: لو الشارت اتشال من الصفحة، أو الصفحة مخفية
+          (عشان ما نستنزفش البطارية في الموبايل).
+       ══════════════════════════════════════════════════════════ */
+    var refPrice = null, refY = null;
+    try {
+      var lgRef = (opts && opts.lines) || [];
+      for (var ri = 0; ri < lgRef.length; ri++) {
+        if (lgRef[ri] && lgRef[ri].price != null && isFinite(lgRef[ri].price)) { refPrice = lgRef[ri].price; break; }
+      }
+      if (refPrice == null && opts && opts.pattern) {
+        var pp = opts.pattern;
+        if (pp.entry != null && isFinite(pp.entry)) refPrice = pp.entry;
+        else if (pp.zone_high != null && isFinite(pp.zone_high)) refPrice = pp.zone_high;
+        else if (pp.zone_low != null && isFinite(pp.zone_low)) refPrice = pp.zone_low;
+      }
+    } catch (e) { }
+    function watchScale() {
+      try {
+        if (!box.isConnected) return;                       /* الشارت اتشال ⇒ نوقف */
+        if (typeof document !== 'undefined' && document.hidden) {
+          requestAnimationFrame(watchScale); return;         /* الصفحة مخفية ⇒ نؤجّل */
+        }
+        if (refPrice != null) {
+          var y = priceY(refPrice);
+          if (y != null && isFinite(y)) {
+            if (refY == null) refY = y;
+            else if (Math.abs(y - refY) > 0.01) { refY = y; draw(); }
+          }
+        }
+      } catch (e) { }
+      requestAnimationFrame(watchScale);
+    }
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(watchScale);
     try {
       if (typeof window !== 'undefined') {
         window.addEventListener('resize', function () { draw(); });

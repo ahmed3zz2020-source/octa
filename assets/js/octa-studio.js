@@ -15,7 +15,9 @@
     mine: [],
     public: [],
     tab: 'mine',
-    chartLib: null
+    chartLib: null,
+    /* 🗺️ طبقات الخريطة السعرية (المستخدم يقدر يقفل أي طبقة) */
+    layers: { levels: true, zones: true, fib: false }
   };
 
   function $(id) { return document.getElementById(id); }
@@ -111,24 +113,71 @@
       });
   }
 
+  /* ══════════ الرسم ══════════ */
+  /* 🗺️ خريطة البنية السعرية: مستويات + مناطق + جدول احترافي.
+     📌 كل الأرقام محسوبة من شموع السهم نفسها (octa-sr.js). */
+  var MY_COL = { private: '#a855f7', public: '#38bdf8' };
   function draw() {
     var box = $('stChart');
     if (!box) return;
-    var lines = S.mine.map(function (d) {
+    /* 📌 رسومات المستخدم (بنفسجي = خاصك · أزرق = مشترك) */
+    var mine = S.mine.map(function (d) {
       return {
         price: d.price,
-        color: d.visibility === 'public' ? '#22c55e' : '#d4af37',
-        title: (d.kind === 'zone' ? 'منطقة ' : '') + fmtPrice(d.price)
+        color: (d.visibility === 'public') ? MY_COL.public : MY_COL.private,
+        style: 0, width: 2,
+        title: (d.kind === 'zone' ? 'منطقتك ' : 'مستواك ') + fmtPrice(d.price)
       };
     });
+    var an = null;
+    try {
+      if (window.OCTASR && S.rows.length) an = window.OCTASR.analyze(S.rows, {});
+    } catch (e) { an = null; }
+    /* ⭐ التحليل متخزّن في S ⇒ متاح للقياس والاختبار
+       (window.OCTAStudio.state.sr) — من غير ده الاختبار
+       بيقارن بقائمة فاضية وبيقول «✅» من غير ما ي checking. */
+    S.sr = an;
+    var lines = [];
+    if (an && S.layers.levels && window.OCTASR) {
+      lines = lines.concat(window.OCTASR.toLines(an, { fib: S.layers.fib }));
+    }
+    lines = lines.concat(mine);
+    var opts = { lines: lines, volume: true, height: 320 };
+    if (an && S.layers.zones && window.OCTASR) {
+      opts.extraDraw = window.OCTASR.zoneDraw(an, S.rows, {});
+    }
+    /* 📌 الـlegend: ألوان الخريطة + رسومات المستخدم (تحت الشارت) */
+    var legend = [];
+    if (an && S.layers.levels) {
+      legend.push({ label: 'دعم', color: '#22c55e', soft: true });
+      legend.push({ label: 'مقاومة', color: '#ef4444', soft: true });
+    }
+    for (var mi = 0; mi < S.mine.length; mi++) {
+      legend.push({
+        label: (S.mine[mi].kind === 'zone' ? 'منطقتك' : 'مستواك') +
+          (S.mine[mi].visibility === 'public' ? ' (مشترك)' : ''),
+        price: S.mine[mi].price,
+        color: (S.mine[mi].visibility === 'public') ? MY_COL.public : MY_COL.private
+      });
+    }
+    opts.legend = legend;
     if (window.OCTAChartKit) {
-      window.OCTAChartKit.mount(box, S.rows, { lines: lines, volume: true })
+      window.OCTAChartKit.mount(box, S.rows, opts)
         .catch(function () {
           box.innerHTML = '<div class="su-empty">مكتبة الرسم مش متاحة</div>';
         });
     } else {
       box.innerHTML = '<div class="su-empty">مكتبة الرسم مش متاحة</div>';
     }
+    renderSR(an);
+  }
+
+  /* 📌 الجدول الاحترافي تحت الشارت */
+  function renderSR(an) {
+    var host = $('stSr');
+    if (!host) return;
+    if (!an || !an.ok || !window.OCTASR) { host.innerHTML = ''; return; }
+    host.innerHTML = window.OCTASR.tableHTML(an, {});
   }
 
   function loadMine() {
@@ -259,8 +308,21 @@
       if (box) box.innerHTML = '<div class="su-empty">اختار سهم من فوق</div>';
       S.code = ''; S.rows = []; S.mine = [];
       var t = $('stTitle'); if (t) t.textContent = 'اختار سهم';
+      var sr = $('stSr'); if (sr) sr.innerHTML = '';
       renderList();
     });
+    /* 🗺️ مفاتيح الطبقات (مستويات/مناطق/فيبوناتشي) */
+    var lvs = [['stLvLevels', 'levels'], ['stLvZones', 'zones'], ['stLvFib', 'fib']];
+    for (var li = 0; li < lvs.length; li++) {
+      (function (id, key) {
+        var el = $(id);
+        if (!el) return;
+        el.addEventListener('change', function () {
+          S.layers[key] = !!el.checked;
+          if (S.rows.length) draw();
+        });
+      })(lvs[li][0], lvs[li][1]);
+    }
   }
 
   function toggleTabs() {
@@ -285,20 +347,23 @@
 
   function init() {
     if (!$('stList')) return;
-    bind();
-    toggleTabs();
+    try { bind(); toggleTabs(); } catch (e) { console.error('[studio] init', e); }
     loadPublic();
   }
+
+  /* ⭐⭐ ٩ نوفمبر ٢٠٢٦ — الـglobal يتعرّف **قبل** init.
+     لو init() رمى استثناء ⇒ الـglobal كان بيضيع والصفحة
+     «مش موجودة» من غير أي رسالة. دلوقتي الـglobal موجود دايماً
+     والاستثناء بيتسجّل (assert+repr) بدل ما يختفي بصمت. */
+  window.OCTAStudio = {
+    loadCode: loadCode,
+    state: S,
+    _test: { renderList: renderList, nameOf: nameOf, fmtPrice: fmtPrice }
+  };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
-
-  window.OCTAStudio = {
-    loadCode: loadCode,
-    state: S,
-    _test: { renderList: renderList, nameOf: nameOf, fmtPrice: fmtPrice }
-  };
 })();
