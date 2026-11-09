@@ -451,9 +451,6 @@ const OCTA_SW_KILLER_JS = [
    📌 📌 ⛌⛌⛌ (الـworker بيرد الأول ⇒ هو اللي بيمسك الرد).
    📌 ✅ الحل: غلاف واحد على كل رد — مفيش استثناء ممكن ينسى.
    ══════════════════════════════════════════════════════════════ */
-/* ⭐ جسر هالان (بورصة مصر) — عمق السوق + الإعلانات */
-import { halanDepth, halanMergeDividends, halanToken, halanEvents, halanTool } from './halan-bridge.js';
-
 export default {
   async fetch(request, env, ctx) {
     let res;
@@ -1174,8 +1171,15 @@ async function handle(request, env, ctx) {
        📌 ⛔ التوكن في أسرار الـWorker + KV — مش في الكود ولا في المتصفح.
        📌 ⛔ بيانات بسوق عامة — مفيش أي مسار للمحفظة أو الأوامر. */
     if (url.pathname.startsWith('/api/obdepth/')) {
+      /* ⭐ عمق السوق من هالان — **قراءة KV بس** (صفر نداءات MCP في مسار الطلب
+         ⇒ صفر حجب للـisolate ⇒ مفيش شاشة بيضا). العامل halan-feed بيملّي الـKV. */
       try {
-        const d = await halanDepth(env, url.pathname.split('/').pop());
+        const code = url.pathname.split('/').pop().toUpperCase();
+        const dk = await env.HALAN_KV.get('halan_depth_v1', 'json');
+        const dd = dk && dk.depth && dk.depth[code];
+        const d = dd ? { bids: dd.bids || [], asks: dd.asks || [], trades: [], last: dd.last,
+                         spread_pct: dd.spread_pct, lastClose: dd.lastClose,
+                         volume: dd.volume, value_today: dd.value_today } : null;
         if (d) {
           return new Response(JSON.stringify({ ok: true, cached: false, source: 'halan', data: d }), {
             status: 200,
@@ -1190,7 +1194,39 @@ async function handle(request, env, ctx) {
         const upTarget = API + url.pathname + url.search;
         const up = await fetchApi(upTarget, { method: request.method, headers: buildHeaders(request) });
         const upTxt = await up.text();
-        const merged = await halanMergeDividends(env, upTxt);
+        let merged;
+        try { merged = JSON.parse(upTxt); } catch (e) { merged = { actions: [] }; }
+        try {
+          const ek = await env.HALAN_KV.get('halan_events_v1', 'json');
+          const evs = (ek && ek.events) || [];
+          if (evs.length) {
+            const acts = Array.isArray(merged.actions) ? merged.actions : [];
+            const seen = {};
+            for (const a of acts) {
+              seen[(a.code || '') + '|' + (a.kind || '') + '|' + (a.date || '')] = 1;
+              seen[(a.code || '') + '|' + (a.date || '')] = 1;
+            }
+            let added = 0;
+            for (const e of evs) {
+              const k1 = e.code + '|' + e.kind + '|' + e.date;
+              const k2 = e.code + '|' + e.date;
+              if (seen[k1] || seen[k2]) continue;
+              seen[k1] = 1; seen[k2] = 1;
+              acts.push({
+                code: e.code, id: e.code + '|' + e.kind + '|' + (e.date || ''),
+                kind: e.kind, kindAr: e.kindAr, mode: e.mode,
+                date: e.date, distributionDate: e.date, recordDate: e.date,
+                headline: e.headline, value: null, ratio: null, currency: null,
+                yieldPct: null, lastClose: null, nameAr: null, nameEn: null,
+                sector: null, status: e.status, source: 'halan',
+              });
+              added++;
+            }
+            acts.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+            merged.actions = acts;
+            merged.halanEvents = added;
+          }
+        } catch (e) { }
         const out = new Headers();
         out.set('Content-Type', 'application/json');
         out.set('Cache-Control', 'public, max-age=300');
