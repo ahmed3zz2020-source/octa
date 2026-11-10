@@ -1053,6 +1053,44 @@ async function handle(request, env, ctx) {
       }
     }
 
+    /* ════════════════════════════════════════════════════════════════
+       ⭐⭐⭐ محور الأخبار — كل الأسهم (endpoint مفتوح للاختبار)
+       ────────────────────────────────────────────────────────────────
+       📌 بيرجّع لكل سهم: درجة المحور · عدد الأحداث · الأهمية · المصدر
+       📌 المصدر = foudalens (الباك) + هالان (المroker MCP) — مدمجين
+       ════════════════════════════════════════════════════════════════ */
+    if (url.pathname === '/api/halan/axis') {
+      try {
+        const ek = await env.HALAN_KV.get('halan_events_v1', 'json');
+        const halanByCode = eventsByCode(ek);
+        const codes = Object.keys(halanByCode).sort();
+        const out = [];
+        for (const code of codes) {
+          const he = halanByCode[code];
+          const news = newsEngine(he);
+          out.push({
+            code: code,
+            axis: news.score,
+            events: news.events_count,
+            materiality: news.materiality,
+            headline: news.headline,
+            has_news: news.has_news,
+            source: 'halan',
+          });
+        }
+        return new Response(JSON.stringify({
+          ok: true,
+          count: out.length,
+          updatedAt: ek && ek.at ? new Date(ek.at).toISOString() : null,
+          source: 'بورصة هالان (Halan Borsa) — إعلانات وأخبار الشركات',
+          axes: out,
+        }, null, 1), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=120' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: String(e && e.message || e) }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
     if (url.pathname === '/api/rss') {
       const rss = (url.searchParams.get('url') || '').trim();
       if (!rss) {
