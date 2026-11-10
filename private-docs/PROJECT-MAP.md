@@ -185,7 +185,8 @@ cd /workspace/octa5
 npm run build                               # لازم قبل كل deploy
 git add -A && git commit -m "..."
 git push origin main
-npx wrangler deploy --config wrangler.jsonc  # Cloudflare
+bash tools/deploy.sh preview                     # المعاينة (افتراضي)
+PUBLISH_PROD="ارفع على الدومين" bash tools/deploy.sh prod   # الإنتاج
 ```
 
 ---

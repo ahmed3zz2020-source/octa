@@ -35,6 +35,10 @@
 const API = 'https://octa-prices-production-4ccb.up.railway.app';
 const TRIES = 3;
 
+/* ⭐ محرك محور الأخبار (هالان) — نسخة مطابقة 1:1 من news_engine في الباك.
+   📌 الاختبار: tools/test-halan-news.js ⇒ 182/182 مطابقة. */
+import { newsEngine, mergeEvents, eventsByCode } from './halan-news.js';
+
 /* ══════════════════════════════════════════════════════════════
    ⭐ جسر سكانر TradingView — للفلتر (Smart Money)
    ──────────────────────────────────────────────────────────────
@@ -538,7 +542,7 @@ export default {
    📌   ⭐ read-only: بيقرا /api/health بس (لا يكتب ولا يعدّل).
    📌   ⭐ بيفوق الـisolate بتاع الـWorker كمان (بيمنع cold start ليه هو).
    📌
-   📌 التفعيل: في wrangler-preview.jsonc (معاينة) وwrangler.jsonc (إنتاج):
+   📌 التفعيل: في wrangler.jsonc (معاينة) وwrangler-prod.jsonc (إنتاج):
    📌   "triggers": { "crons": [cron كل ٥ دقايق] }
    */
   async scheduled(event, env, ctx) {
@@ -1234,6 +1238,94 @@ async function handle(request, env, ctx) {
         if (scUp) out.set('Set-Cookie', scUp);
         return new Response(JSON.stringify(merged), { status: up.status, headers: out });
       } catch (e) { /* ⛔ fallback: يكمّل عادي للـAPI */ }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       ⭐⭐⭐ محور الأخبار الحقيقي (هالان) — ١٠ نوفمبر ٢٠٢٦
+       ────────────────────────────────────────────────────────────────
+       📌 المشكلة: الباك بيرجّع «45» ثابت لكل سهم مفيش عندو أحداث في
+          مصدره (foudalens) ⇒ 220 من 287 سهم محور الأخبار بتاعهم وهمي.
+          ⛔ «45» دي مش رقم مخترع — هي قاعدة الباك نفسها
+             (update_prices.py: news_engine → "مفيش أخبار ⇒ 45").
+          ⛔ والباك مش شايف أحداث هالان أصلاً ⇒ الملف
+             (data/halan_events.json) مش موجود عنده.
+
+       📌 الحل: نحسب محور الأخبار هنا بنفس معادلة الباك **بالحرف**
+          (نسخة مطابقة 1:1 · halan-news.js) ونمدجه مع أحداث هالان.
+          ⭐ الاختبار: tools/test-halan-news.js ⇒ 182/182 مطابقة
+             مع news_engine الحقيقي من كود الباك.
+
+       📌 ليه هنا مش في الباك؟ نشر الباك محتاج صلاحية كتابة على
+          ريبو octa-prices (التوكن الحالي مقيّد على ريبو octa بس)
+          ⇒ الباك هيشوف نفس النتيجة لما الـpatch يتنشر.
+
+       📌 ⛔ مفيش نداء MCP في مسار الطلب (قراءة KV بس) ⇒ صفر تجميد.
+       ════════════════════════════════════════════════════════════════ */
+    if (url.pathname.startsWith('/api/news/') || url.pathname.startsWith('/api/intelligence/')) {
+      const isNews = url.pathname.startsWith('/api/news/');
+      try {
+        const upTarget = API + url.pathname + url.search;
+        const up = await fetchApi(upTarget, { method: request.method, headers: buildHeaders(request) });
+        const upTxt = await up.text();
+        let upJson;
+        try { upJson = JSON.parse(upTxt); } catch (e) { upJson = {}; }
+
+        /* ⛔ الباك بيرجّع 401/404 ⇒ نسيب الرد زي ما هو */
+        if (!upJson || upJson.error) {
+          return new Response(upTxt, { status: up.status, headers: up.headers });
+        }
+
+        const code = String(upJson.code || url.pathname.split('/').pop() || '').toUpperCase();
+        const ek = await env.HALAN_KV.get('halan_events_v1', 'json');
+        const halanByCode = eventsByCode(ek);
+        const halanEvents = halanByCode[code] || [];
+
+        /* 📌 أحداث الباك: من الرد نفسه (فودالنس) — نفس الشكل */
+        const backendRaw = (isNews && upJson.news && Array.isArray(upJson.news.events))
+          ? upJson.news.events
+          : ((upJson.news_engine && Array.isArray(upJson.news_engine.events))
+            ? upJson.news_engine.events : []);
+        const backendEvents = backendRaw.map(e => ({
+          kind: e.kind, kindAr: e.kindAr, headline: e.headline,
+          date: e.date, value: (e.value === undefined ? undefined : e.value),
+        }));
+
+        const merged = mergeEvents(backendEvents, halanEvents);
+        const news = newsEngine(merged);
+
+        /* ⭐ التغطية: هل فيه حدث حقيقي؟ (هالان أضاف أحداث جديدة) */
+        const addedHalan = Math.max(0, merged.length - backendEvents.length);
+        if (isNews) {
+          upJson.news = news;
+        } else {
+          /* 📌 /api/intelligence ⇒ news_engine (مش news) */
+          upJson.news_engine = news;
+        }
+        upJson.newsSource = addedHalan > 0 ? 'halan' : 'backend';
+        upJson.halanEvents = addedHalan;
+        /* ⭐ المحاور (axes) — الباك بيرجّعها من اللقطة (45 فيها).
+           ⛔ بنحدّثها بنفس القيمة الجديدة ⇒ الأذرع في الواجهة تعرض الرقم الحقيقي. */
+        if (upJson.axes && typeof upJson.axes === 'object') {
+          upJson.axes.news = news.score;
+        }
+        /* 📌 محور الأخبار متاح كـendpoint مستقل كمان (للاختبار) */
+        if (url.searchParams.get('axis') === '1') {
+          upJson.axis = { code, news: news.score, events: news.events_count,
+                          materiality: news.materiality, source: upJson.newsSource };
+        }
+
+        const out = new Headers();
+        out.set('Content-Type', 'application/json');
+        /* 📌 intelligence محمي (يتطلب جلسة) ⇒ private. news عام ⇒ public.
+           ⛔ خلّيناها private في الحالتين (أأمن، والعميل بيجيبه بجلسة). */
+        out.set('Cache-Control', 'private, max-age=120');
+        const scUp = up.headers.get('Set-Cookie');
+        if (scUp) out.set('Set-Cookie', scUp);
+        return new Response(JSON.stringify(upJson), { status: up.status, headers: out });
+      } catch (e) {
+        console.warn('[HALAN-NEWS] fallback:', String(e && e.message || e));
+        /* ⛔ fallback: نكمّل عادي للـAPI (أفضل من رد غلط) */
+      }
     }
 
     if (url.pathname.startsWith('/api/')) {

@@ -116,13 +116,13 @@ npm run build
 # فحص الصيغة
 node --check assets/js/*.js
 
-# نشر على المعاينة
-NODE_OPTIONS="--dns-result-order=ipv4first" \
-  npx --yes wrangler@4.151.1 deploy --config wrangler-preview.jsonc
+# ⭐ نشر على المعاينة (الأمان أولاً · الافتراضي)
+bash tools/deploy.sh preview
+#   ⛔ أو `npm run deploy` (بقى = معاينة)
 
-# نشر على الإنتاج (⛔ محتاج موافقة!)
-NODE_OPTIONS="--dns-result-order=ipv4first" \
-  npx --yes wrangler@4.151.1 deploy
+# ⭐ نشر على الإنتاج (⛔⛔ محتاج العبارة الصريحة!)
+PUBLISH_PROD="ارفع على الدومين" bash tools/deploy.sh prod
+#   ⛔ أو `npm run deploy:prod` (بيقفل من غير العبارة)
 
 # الباك: git push بيكفي (Railway auto-deploy)
 cd /workspace/octa-prices && git add -A && git commit -m "..." && git push origin HEAD:main
@@ -139,6 +139,15 @@ python3 tools/devserver.py 8811
 
 ### النشر
 - ❌ **ما تنشرش على الإنتاج من غير «ارفع على الدومين»** — حرفياً
+- ⛔ **⛔⛔⛔ ما تشغّلش `wrangler deploy` من غير `--config`** — ده اللي سبب
+   الغلطة يوم ٩ نوفمبر:
+  - `npm run deploy` كان = `npm run build:strict && wrangler deploy` (**بلا --config**)
+  - ⇒ wrangler بياخد `wrangler.jsonc` تلقائياً ⇒ واسمه **`octa` = الإنتاج!**
+  - ⇒ ٤ نشرات متتالية على الإنتاج (22:42:23 · 22:42:26 · 22:42:28 · 22:42:30)
+    والمعاينة أول نشر لها كان 22:45:37 ⇒ الطلب كان «انشر المعاينة» واللي نزل إنتاج.
+  - ✅ **الحل النهائي:** `bash tools/deploy.sh preview` (الافتراضي) و
+    `PUBLISH_PROD="ارفع على الدومين" bash tools/deploy.sh prod` للإنتاج.
+    السكربت بيقفل الإنتاج من غير العبارة، وبيفحص بعد النشر وبيتراجع لو فشل.
 - ❌ **ما تستخدمش `wrangler@3.x`** — بيفشل 503. استخدم **4.151.1**
 - ❌ **ما تنساش `NODE_OPTIONS="--dns-result-order=ipv4first"`** — بيفشل
 

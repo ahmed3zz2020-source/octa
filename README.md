@@ -107,7 +107,8 @@ octashares.com اتحدث
 ```
 octa5/
 ├── index.html               ← الصفحة الرئيسية (50 KB)
-├── wrangler.jsonc           ← إعدادات Cloudflare
+├── wrangler.jsonc           ← إعدادات المعاينة (الافتراضي · آمن)
+├── wrangler-prod.jsonc      ← إعدادات الإنتاج (لازم --config صريح)
 ├── package.json             ← أوامر البناء
 ├── DEPLOY.md                ← دليل النشر
 │

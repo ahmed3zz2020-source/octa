@@ -39,7 +39,7 @@ export CLOUDFLARE_API_TOKEN="التوكن"
 npm run build
 
 # 3) نشر
-npx wrangler deploy --config wrangler.jsonc
+PUBLISH_PROD="ارفع على الدومين" bash tools/deploy.sh prod
 ```
 
 ---
