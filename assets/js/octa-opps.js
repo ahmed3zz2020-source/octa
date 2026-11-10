@@ -288,7 +288,7 @@
     if (refs.length) {
       var src = refs.map(function (r) {
         return '<div class="opps-src-item"><b>' + esc(r.source || '—') + '</b>'
-          + '<span>' + esc(r.as_of || '—') + '</span>'
+          + '<span>' + esc(r.as_of ? fmtDateAr(r.as_of) : '—') + '</span>'
           + (r.status ? '<span class="opps-src-st">' + esc(r.status) + '</span>' : '')
           + '</div>';
       }).join('');
@@ -367,7 +367,7 @@
       + '<div class="opps-src">' + (S.data && S.data.summary && S.data.summary.sources
         ? S.data.summary.sources.map(function (x) {
           return '<div class="opps-src-item"><b>' + esc(x.source || '') + '</b><span>'
-            + esc(x.as_of || '') + '</span></div>';
+            + esc(x.as_of ? fmtDateAr(x.as_of) : '') + '</span></div>';
         }).join('') : '') + '</div></div>';
 
     h += '<div class="opps-critcard-sec"><b>رقم إصدار نموذج التقييم</b>'
@@ -388,7 +388,7 @@
     h += sumItem('مؤهَّل', num(sum.eligible !== undefined ? sum.eligible : sum.total_eligible));
     h += sumItem('معروض', num(sum.shown));
     h += sumItem('آخر تحديث', sum.last_update ? fmtTime(sum.last_update) : '—');
-    h += sumItem('نطاق البيانات', sum.data_from ? ('من ' + sum.data_from) : '—');
+    h += sumItem('نطاق البيانات', sum.data_from ? ('من ' + fmtDateAr(sum.data_from)) : '—');
     h += '</div>';
     return h;
   }
@@ -396,12 +396,31 @@
     return '<div class="opps-sum-item"><span class="opps-sum-k">' + esc(k)
       + '</span><span class="opps-sum-v">' + esc(v) + '</span></div>';
   }
+  /* ⭐ التواريخ بالعربي وبأرقام عربية-هندية (زي باقي الواجهة) */
+  var AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+                   'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  function arNum(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/[0-9]/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'.charAt(d); });
+  }
+  function fmtDateAr(ts) {
+    var m = String(ts || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+    if (!m) return String(ts || '—');
+    var mo = parseInt(m[2], 10);
+    var out = arNum(m[3]).replace(/^٠/, '') + ' ' + (AR_MONTHS[mo - 1] || m[2]) + ' ' + arNum(m[1]);
+    if (m[4]) {
+      var hh = parseInt(m[4], 10);
+      var h12 = hh % 12; if (h12 === 0) h12 = 12;
+      out += ' · ' + arNum(h12) + ':' + arNum(m[5]) + ' ' + (hh < 12 ? 'ص' : 'م');
+    }
+    return out;
+  }
   function fmtTime(ts) {
     try {
       var d = new Date(ts);
-      if (isNaN(d.getTime())) return String(ts).slice(0, 16).replace('T', ' ');
-      return d.toISOString().slice(0, 16).replace('T', ' ');
-    } catch (e) { return '—'; }
+      if (isNaN(d.getTime())) return fmtDateAr(ts);
+      return fmtDateAr(d.toISOString());
+    } catch (e) { return fmtDateAr(ts); }
   }
 
   /* ─────────── التبويبات ─────────── */
