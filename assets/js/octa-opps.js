@@ -245,19 +245,28 @@
       if (has(plan, 'entry_zone')) {
         cells.push(kv('منطقة الدخول', num(plan.entry_zone[0]) + ' – ' + num(plan.entry_zone[1])));
       }
-      if (has(plan, 'entry_label')) cells.push(kv('قاعدة الدخول', plan.entry_label));
+      if (has(plan, 'entry_label')) cells.push(kv('قاعدة الدخول', arText(plan.entry_label)));
       if (has(plan, 'stop')) cells.push(kv('وقف الخسارة', num(plan.stop)));
       if (has(plan, 'target1')) cells.push(kv('هدف قريب', num(plan.target1)));
       if (has(plan, 'target2')) cells.push(kv('هدف بعيد', num(plan.target2)));
       if (has(plan, 'rr1')) cells.push(kv('العائد/المخاطرة للهدف القريب', num(plan.rr1) + ':١'));
       if (has(plan, 'rr2')) cells.push(kv('العائد/المخاطرة للهدف البعيد', num(plan.rr2) + ':١'));
       if (has(plan, 'horizon')) cells.push(kv('المدة المستهدفة', plan.horizon));
-      if (has(plan, 'target_note')) cells.push(kv('ملاحظة الهدف', plan.target_note));
-      if (has(plan, 'invalidation')) {
-        cells.push(kv('إبطال الفرضية', (plan.invalidation || []).join(' · ')));
+      if (has(plan, 'target_note')) cells.push(kv('ملاحظة الهدف', arText(plan.target_note)));
+      /* ⭐ التواريخ/الشروط: الباك بيرجّعها بأسماء مختلفة ⇒ بنقرأ الكل. */
+      var inval = plan.invalidation || plan.invalidation_ar || [];
+      if (inval.length) cells.push(kv('إبطال الفرضية', arText(inval.join(' · '))));
+      if (has(plan, 'max_drawdown_pct')) {
+        cells.push(kv('أقصى تراجع متوقّع',
+          num(plan.max_drawdown_pct) + '٪' + (plan.max_drawdown_source_ar
+            ? ' (' + arText(plan.max_drawdown_source_ar) + ')' : '')));
       }
-      if (has(plan, 'risk_limit')) cells.push(kv('حد المخاطرة', plan.risk_limit));
-      h += sec('خطة التعامل', grid(cells));
+      if (has(plan, 'fair_value_upside_pct')) {
+        cells.push(kv('المساحة للقيمة المقدَّرة', num(plan.fair_value_upside_pct) + '٪'));
+      }
+      if (has(plan, 'risk_limit')) cells.push(kv('حد المخاطرة', arText(plan.risk_limit)));
+      if (has(plan, 'note_ar')) cells.push(kv('ملاحظة الخطة', arText(plan.note_ar)));
+      if (cells.length) h += sec('خطة التعامل', grid(cells));
     }
 
     /* هـ — المخاطر */
@@ -289,15 +298,30 @@
       h += sec('تفسير الدرجة', rows);
     }
 
-    /* ز — البيانات والمراجع */
+    /* ز — البيانات ومصادرها (بلغة مفهومة — بدون مصطلحات إنجليزية) */
     if (refs.length) {
-      var src = refs.map(function (r) {
-        return '<div class="opps-src-item"><b>' + esc(r.source || '—') + '</b>'
-          + '<span>' + esc(r.as_of ? fmtDateAr(r.as_of) : '—') + '</span>'
-          + (r.status ? '<span class="opps-src-st">' + esc(r.status) + '</span>' : '')
+      /* ⭐ نجمّع نفس المصدر في سطر واحد (المصدر + الحالة) */
+      var groups = {};
+      refs.forEach(function (r) {
+        var info = sourceAr(r);
+        var key = info.name + '|' + info.badge;
+        if (!groups[key]) groups[key] = { info: info, n: 0, as_of: '' };
+        groups[key].n += r.field ? String(r.field).split(',').length : 0;
+        if (!groups[key].as_of && r.as_of) groups[key].as_of = r.as_of;
+      });
+      var src = Object.keys(groups).map(function (k) {
+        var g = groups[k];
+        return '<div class="opps-src-item"><b>' + esc(g.info.name) + '</b>'
+          + '<span>' + esc(g.info.what) + '</span>'
+          + '<span>' + esc(g.as_of ? fmtDateAr(g.as_of) : '—')
+          + (g.n ? ' · ' + num(g.n) + ' حقل مستخدم' : '') + '</span>'
+          + (g.info.badge ? '<span class="opps-src-st">' + esc(g.info.badge) + '</span>' : '')
           + '</div>';
       }).join('');
-      h += sec('البيانات والمراجع', src);
+      h += sec('البيانات ومصادرها',
+        src + '<p class="opps-src-note">كل رقم في هذه البطاقة جاي من مصدر واحد من دول، '
+        + 'ومعه تاريخه. الحقول اللي ناقصة اتشالت من الدرجة وعنوانها مكتوب تحت '
+        + '(«معايير بدون بيانات كافية»).</p>');
     }
 
     /* البيانات الناقصة */
@@ -310,6 +334,28 @@
     return h;
   }
 
+  /* ⭐ ترجمة المصادر والحالات لسان مفهوم — من غير jargon. */
+  function sourceAr(r) {
+    var st = String(r.status || '').toLowerCase();
+    var src = String(r.source || '').toLowerCase();
+    if (src === 'derived' || st === 'derived') {
+      return { name: 'حساب داخل OCTA', what: 'قيم محسوبة من الأرقام الأصلية (متوسطات · مضاعفات · ترجيحات)',
+               badge: 'محسوب' };
+    }
+    if (st === 'delayed') {
+      return { name: 'أسعار ومؤشرات السوق', what: 'السعر · نسبة التغير · القوة النسبية · المتوسطات · المدى الحقيقي · الدعم والمقاومة',
+               badge: 'محدّث كل ١٥ دقيقة' };
+    }
+    if (st === 'historical') {
+      return { name: 'قوائم مالية منشورة', what: 'النمو · الربحية · المديونية · التدفق النقدي · التوزيعات',
+               badge: 'تاريخي' };
+    }
+    if (src.indexOf('scanner') >= 0 || src.indexOf('tradingview') >= 0) {
+      return { name: 'بيانات السوق', what: 'السعر · المؤشرات الفنية · الأساسيات', badge: '' };
+    }
+    return { name: r.source || 'مصدر بيانات', what: '', badge: st === 'live' ? 'حيّ الآن' : '' };
+  }
+
   function sec(title, body) {
     if (!body) return '';
     return '<div class="opps-detail-sec"><div class="opps-detail-h">' + esc(title) + '</div>'
@@ -318,6 +364,19 @@
   function kv(k, v) {
     return '<div class="opps-plan-cell"><div class="opps-plan-k">' + esc(k)
       + '</div><div class="opps-plan-v">' + esc(v) + '</div></div>';
+  }
+  /* ⭐ الأرقام جوّه الجُمل العربية (من الباك) ⇒ تتحوّل لأرقام عربية-هندية
+     عشان تبقى زي باقي الواجهة. */
+  function arText(s) {
+    if (s === null || s === undefined) return '';
+    return String(s).replace(/[0-9]+(?:\.[0-9]+)?/g, function (n) {
+      var parts = n.split('.');
+      var out = parts[0].replace(/[0-9]/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'.charAt(d); });
+      if (parts.length > 1) {
+        out += '٫' + parts[1].replace(/[0-9]/g, function (d) { return '٠١٢٣٤٥٦٧٨٩'.charAt(d); });
+      }
+      return out;
+    });
   }
   function grid(cells) {
     return '<div class="opps-plan-grid">' + cells.join('') + '</div>';
@@ -549,31 +608,49 @@
     h += summaryHTML(sum);
     h += toolbarHTML();
 
-    var items = filteredItems();
-    var shown = Math.min(items.length, Math.min(S.shown, MAX_SHOWN));
-    if (!items.length) {
-      h += '<div class="opps-empty"><b>لا توجد حاليًا فرص تستوفي جميع شروط هذه الاستراتيجية</b>';
-      if (S.q || S.sector || S.risk) {
-        h += '<p>جرّب تشيل الفلتر أو تبحث بكلمة تانية.</p>';
-      } else if (sum.note_ar) {
-        h += '<p>' + esc(sum.note_ar) + '</p>';
-      }
-      h += '</div>';
-    } else {
-      h += '<div class="opps-list">';
-      for (var i = 0; i < shown; i++) h += cardHTML(items[i], i);
-      h += '</div>';
-      if (items.length > shown) {
-        h += '<button class="opps-btn opps-more" onclick="window.__oppsMore()">عرض المزيد ('
-          + num(items.length - shown) + ' إضافية)</button>';
-      }
-    }
+    h += '<div class="opps-results">' + resultsHTML() + '</div>';
 
     var st = strategyByKey(S.key);
     if (st) h += criteriaCardHTML(st);
 
     h += '</div>';
     box.innerHTML = h;
+  }
+
+  /* ⭐⭐ نتائج البحث/الفلاتر — مستقلة عشان نرسمها لوحدها.
+     ⛔ ليش؟ لأن إعادة رسم الذراع كله كانت بتعمل input جديد ⇒
+        المؤشر بيروح و«إعادة ترتيب الحروف» بتحصل (خصوصاً عربي).
+        ⭐ دلوقتي: البحث والفلاتر ⇒ رسم القائمة بس، والـinput بيفضل زي ما هو. */
+  function resultsHTML() {
+    var items = filteredItems();
+    var shown = Math.min(items.length, Math.min(S.shown, MAX_SHOWN));
+    var h = '';
+    if (!items.length) {
+      h += '<div class="opps-empty"><b>لا توجد حاليًا فرص تستوفي جميع شروط هذه الاستراتيجية</b>';
+      if (S.q || S.sector || S.risk) {
+        h += '<p>جرّب تشيل الفلتر أو تبحث بكلمة تانية.</p>';
+      } else if (S.data && S.data.summary && S.data.summary.note_ar) {
+        h += '<p>' + esc(S.data.summary.note_ar) + '</p>';
+      }
+      h += '</div>';
+      return h;
+    }
+    h += '<div class="opps-list">';
+    for (var i = 0; i < shown; i++) h += cardHTML(items[i], i);
+    h += '</div>';
+    if (items.length > shown) {
+      h += '<button class="opps-btn opps-more" onclick="window.__oppsMore()">عرض المزيد ('
+        + num(items.length - shown) + ' إضافية)</button>';
+    }
+    return h;
+  }
+
+  /* رسم جزء النتائج بس (بحث · فلاتر · ترتيب) — من غير ما نلمس الـinput */
+  function renderResultsOnly(box) {
+    if (!box) return;
+    var holder = box.querySelector('.opps-results');
+    if (!holder) { render(box); return; }
+    holder.innerHTML = resultsHTML();
   }
 
   /* ─────────── التحميل ─────────── */
@@ -647,13 +724,13 @@
   };
   window.__oppsSearch = function (v) {
     S.q = v || '';
-    render(document.getElementById('armBody') || null);
-    var el = document.getElementById('oppsSearch');
-    if (el && document.activeElement !== el) { try { el.focus(); } catch (e) { } }
+    /* ⛔⛔ نرسم النتائج بس — الـinput مايتلمسش (مش بنعمل element جديد)
+       ⇒ المؤشر يفضل مكانه والحروف ماتتغلبش. */
+    renderResultsOnly(document.getElementById('armBody') || null);
   };
-  window.__oppsSort = function (v) { S.sort = v || 'score'; render(document.getElementById('armBody') || null); };
-  window.__oppsSector = function (v) { S.sector = v || ''; render(document.getElementById('armBody') || null); };
-  window.__oppsRisk = function (v) { S.risk = v || ''; render(document.getElementById('armBody') || null); };
+  window.__oppsSort = function (v) { S.sort = v || 'score'; renderResultsOnly(document.getElementById('armBody') || null); };
+  window.__oppsSector = function (v) { S.sector = v || ''; renderResultsOnly(document.getElementById('armBody') || null); };
+  window.__oppsRisk = function (v) { S.risk = v || ''; renderResultsOnly(document.getElementById('armBody') || null); };
   window.__oppsReload = function () {
     S.error = ''; S.loading = false;
     var box = document.getElementById('armBody');
