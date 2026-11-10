@@ -2904,6 +2904,14 @@ async function armPortfolio(box) {
 
 /* ══════ ⑧ الفرص — أعمل إيه ══════ */
 async function armOpportunity(box) {
+  /* ⭐ OPP-001 (١٠ نوفمبر ٢٠٢٦) — الفلتر رقم ٨ بقى محرّك الفرص بتسع استراتيجيات.
+     ⛔ التنفيذ كله في assets/js/octa-opps.js (ملف مستقل) — عشان ماتفرقش
+        صفحة ٢١٨ كيلوبايت، ولأن الفلتر ده هيتطوّر كتير.
+     ⛔ لو الملف مش محمّل ⇒ بنرجع للكود القديم تحت (fallback). */
+  if (typeof window.renderOppsArm === 'function') {
+    window.renderOppsArm(box);
+    return;
+  }
   /* ⛔ نفس كلام armPortfolio — /api/ranking محمي دلوقتي */
   if (!octaHasToken()) {
   box.innerHTML = '<div class="opps-loading">سجّل دخولك عشان تشوف الفرص</div>';
