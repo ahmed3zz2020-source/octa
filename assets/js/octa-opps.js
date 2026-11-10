@@ -46,8 +46,19 @@
   }
 
   function fetchJSON(url) {
-    if (typeof octaFetch === 'function') return octaFetch(url).then(function (r) { return r.json(); });
-    return fetch(url).then(function (r) { return r.json(); });
+    var p = (typeof octaFetch === 'function') ? octaFetch(url) : fetch(url);
+    return p.then(function (r) {
+      var st = (r && r.status) ? r.status : 0;
+      if (st === 401 || st === 403) {
+        throw new Error('انتهت الجلسة — سجّل دخولك تاني');
+      }
+      if (st >= 400) {
+        throw new Error('الخادم رجّع خطأ ' + st + ' — أعد المحاولة بعد قليل');
+      }
+      return r.json().catch(function () {
+        throw new Error('رد غير مفهوم من الخادم — أعد المحاولة بعد قليل');
+      });
+    });
   }
 
   function strategyByKey(key) {
@@ -448,6 +459,11 @@
   }
 
   /* ─────────── الرسم ─────────── */
+  function errorHTML() {
+    return '<div class="opps-error"><b>مش قادرين نجيب الفرص دلوقتي</b><p>' + esc(S.error || 'خطأ غير متوقع') + '</p>'
+      + '<button class="opps-btn" onclick="window.__oppsReload()">إعادة المحاولة</button></div>';
+  }
+
   function render(box) {
     if (!box) return;
     var h = '<div class="opps-wrap">';
@@ -455,8 +471,11 @@
       + '<div><div class="opps-hero-t">محرّك الفرص</div>'
       + '<div class="opps-hero-s">٩ استراتيجيات · كل سهم ليه سبب قابل للفحص</div></div></div>';
 
+    /* ⛔⛔ لازم الخطأ يتشال قبل التحميل — لو حصل خطأ في تحميل
+       الاستراتيجيات نفسه، «بنحمّل» كانت هتفضل شغالة للأبد
+       والمستخدم مش هيعرف إن في مشكلة. */
     if (!S.strategies.length) {
-      h += '<div class="opps-loading">⏳ بنحمّل الاستراتيجيات…</div>';
+      h += S.error ? errorHTML() : '<div class="opps-loading">⏳ بنحمّل الاستراتيجيات…</div>';
       box.innerHTML = h;
       return;
     }
@@ -469,8 +488,7 @@
       return;
     }
     if (S.error) {
-      h += '<div class="opps-error"><b>مش قادرين نجيب الفرص دلوقتي</b><p>' + esc(S.error) + '</p>'
-        + '<button class="opps-btn" onclick="window.__oppsReload()">إعادة المحاولة</button></div>';
+      h += errorHTML();
       box.innerHTML = h;
       return;
     }
@@ -552,6 +570,7 @@
       return loadList();
     }).catch(function (e) {
       S.error = (e && e.message) ? e.message : 'خطأ غير متوقع';
+      S.loading = false;
       render(box);
     });
   }
@@ -586,7 +605,13 @@
   window.__oppsSort = function (v) { S.sort = v || 'score'; render(document.getElementById('armBody') || null); };
   window.__oppsSector = function (v) { S.sector = v || ''; render(document.getElementById('armBody') || null); };
   window.__oppsRisk = function (v) { S.risk = v || ''; render(document.getElementById('armBody') || null); };
-  window.__oppsReload = function () { loadList(); };
+  window.__oppsReload = function () {
+    S.error = ''; S.loading = false;
+    var box = document.getElementById('armBody');
+    /* لو الاستراتيجيات نفسها لم تُحمَّل ⇒ إعادة تحميل كاملة */
+    if (!S.strategies.length) { renderOppsArm(box); return; }
+    loadList();
+  };
 
   window.renderOppsArm = renderOppsArm;
 })();
