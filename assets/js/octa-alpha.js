@@ -14,6 +14,7 @@
     critOpen: false,     /* كارت التفسير */
     labOpen: false,      /* لوحة المختبر */
     notifOpen: false,    /* مركز الإشعارات */
+    mapSel: null,       /* السهم المختار في الخريطة */
     lab: null,
     alerts: null,
     decisions: null,
@@ -44,6 +45,11 @@
     return ar(s);
   }
   function pct(v) { return (v === null || v === undefined) ? '—' : num(v, 1) + '٪'; }
+  /* ⭐ نسبة بإشارة ⇒ داخل <bdi> عشان الـ«-» والـ«٪» ما يتقلبوش في العربي */
+  function signedPct(v) {
+    if (v === null || v === undefined) return '—';
+    return (v >= 0 ? '+' : '') + num(v, 1) + '٪';
+  }
   function money(v) {
     if (v === null || v === undefined) return '—';
     return ar(Math.round(parseFloat(v)).toLocaleString('en-US')) + ' ج.م';
@@ -165,16 +171,20 @@
     var lastUpd = (perf && perf.performance && perf.performance.last_update) || null;
 
     var h = '<div class="alpha-board">';
+    var nSec = Object.keys(d.sector_weights || {}).length;
     h += kpi('قيمة المحفظة', money(total), 'رأس المال ' + money(sum.capital), 'base');
     h += kpi('العائد الكلي', (ret === null || ret === undefined) ? '—' : (ret >= 0 ? '+' : '') + pct(ret),
-      'من يوم التأسيس', (ret >= 0 ? 'up' : 'down'));
-    h += kpi('أداء EGX30', bench === null || bench === undefined ? '—' : (bench >= 0 ? '+' : '') + pct(bench),
-      'بيانات غير كافية بعد', '');
-    h += kpi('فرق الأداء', active === null || active === undefined ? '—' : (active >= 0 ? '+' : '') + pct(active),
-      'فرق الأداء عن المؤشر', (active >= 0 ? 'up' : 'down'));
+      'من يوم بداية المحفظة', (ret >= 0 ? 'up' : 'down'));
+    h += kpi('أداء مؤشر البورصة', bench === null || bench === undefined ? '—' : (bench >= 0 ? '+' : '') + pct(bench),
+      'محتاج تاريخ أطول', '');
+    h += kpi('فرق الأداء عن المؤشر', active === null || active === undefined ? '—' : (active >= 0 ? '+' : '') + pct(active),
+      'هل المحفظة أحسن من البورصة؟', (active >= 0 ? 'up' : 'down'));
     h += kpi('عدد الأسهم', ar(d.n_positions) + ' من ' + ar(d.target_positions),
       'كاش ' + num(d.cash_pct, 2) + '٪', '');
-    h += kpi('تركيز أعلى ٣', pct(risk.top3_concentration_pct), 'مؤشر هرنهايندال ' + num(risk.herfindahl_pct, 0), '');
+    /* ⭐ «تركيز أعلى ٣» ⇒ phrasing واضح: نصيب أكبر ٣ أسهم
+       (ومش رقم مؤشر تقني على السطح) */
+    h += kpi('نصيب أكبر ٣ أسهم', pct(risk.top3_concentration_pct), 'من فلوس المحفظة', '');
+    h += kpi('عدد القطاعات', ar(nSec) + ' قطاع', 'التوزيع مش متركّز', '');
     h += kpi('تذبذب المحفظة', pct(risk.portfolio_volatility_pct), 'سنوي (من الشموع اليومية)', '');
     h += kpi('تاريخ التأسيس', created ? fmtDate(created) : '—', 'آخر تحديث ' + (lastUpd ? fmtDate(lastUpd) : '—'), '');
     h += '</div>';
@@ -242,13 +252,15 @@
       rows.push(['الكمية', ar(live ? live.qty : p.qty) + ' سهم']);
       rows.push(['سعر الدخول', num(live ? live.entry_price : p.entry_price, 2) + ' ج.م']);
       rows.push(['السعر الحالي', num(live ? live.price : p.price, 2) + ' ج.م']);
-      if (pnl !== null) rows.push(['الربح/الخسارة غير المحققة', (pnl >= 0 ? '+' : '') + pct(pnl)]);
+      if (pnl !== null) rows.push(['الربح/الخسارة غير المحققة', signedPct(pnl)]);
       rows.push(['قيمة المركز', money(live ? live.value : p.value)]);
       rows.push(['درجة المخاطرة', pct(p.risk_score)]);
       rows.push(['متوسط الارتباط بالمحفظة', p.avg_correlation !== undefined && p.avg_correlation !== null ? num(p.avg_correlation, 2) : '—']);
 
       h += '<div class="alpha-kv">' + rows.map(function (r) {
-        return '<div class="alpha-kv-r"><span>' + esc(r[0]) + '</span><b>' + esc(r[1]) + '</b></div>';
+        /* ⭐ <bdi> حوالين القيمة ⇒ الـ«-» والـ«٪» في مكانهم الصح */
+        return '<div class="alpha-kv-r"><span>' + esc(r[0]) + '</span><b><bdi>'
+          + esc(r[1]) + '</bdi></b></div>';
       }).join('') + '</div>';
 
       /* ⭐ معايير المحفظة */
@@ -302,7 +314,7 @@
         + '<td>' + pct(p.weight) + '</td>'
         + '<td>' + num(live.entry_price !== undefined ? live.entry_price : p.entry_price, 2) + '</td>'
         + '<td>' + num(live.price !== undefined ? live.price : p.price, 2) + '</td>'
-        + '<td class="' + cls + '">' + (pnl === null || pnl === undefined ? '—' : (pnl >= 0 ? '+' : '') + pct(pnl)) + '</td>'
+        + '<td class="' + cls + '"><bdi>' + signedPct(pnl) + '</bdi></td>'
         + '<td>' + money(live.value !== undefined ? live.value : p.value) + '</td>'
         + '<td>' + num(p.portfolio_score, 1) + '</td>'
         + '<td>' + pct(p.risk_score) + '</td>'
@@ -312,41 +324,155 @@
     return h;
   }
 
-  /* ─────────── خريطة المحفظة (Treemap مبسّط) ─────────── */
+  /* ─────────── الخريطة: Treemap حقيقي (مربّعات متناسبة مع الوزن) ─────────── */
   function mapHTML(d) {
     var pos = (d.positions || []).slice();
-    var total = pos.reduce(function (a, p) { return a + (p.weight || 0); }, 0) || 1;
-    /* ⭐ ترتيب تنازلي + توزيع على صفوف (Treemap مبسّط) */
+    if (!pos.length) {
+      return '<div class="alpha-empty">مفيش مراكز لعرضها.</div>';
+    }
+    /* ⭐ الترتيب: الأكبر وزناً الأول (زي أي Treemap) */
     pos.sort(function (a, b) { return (b.weight || 0) - (a.weight || 0); });
+    var W = 340, H = 232;
+    var cells = squarify(pos, 0, 0, W, H);
     var h = '<div class="alpha-map">';
-    /* صف ١: أكبر ٣ */
-    var rowA = pos.slice(0, 3), rowB = pos.slice(3);
-    h += mapRow(rowA, total, 'big');
-    h += mapRow(rowB, total, 'small');
-    h += '</div>';
-    h += '<div class="alpha-map-legend">المساحة = الوزن في المحفظة · اللون = التقييم · الرقم = التقييم';
-    h += '<span class="alpha-legend-item"><i class="lg-hi"></i>٧٥+</span>'
-      + '<span class="alpha-legend-item"><i class="lg-mid"></i>٦٠-٧٥</span>'
-      + '<span class="alpha-legend-item"><i class="lg-lo"></i>أقل من ٦٠</span></div>';
-    return h;
-  }
-
-  function mapRow(items, total, kind) {
-    var h = '<div class="alpha-map-row ' + kind + '">';
-    items.forEach(function (p) {
+    h += '<svg class="alpha-map-svg" viewBox="0 0 ' + W + ' ' + H + '" '
+      + 'preserveAspectRatio="xMidYMid meet" role="img" aria-label="خريطة أوزان المحفظة">';
+    cells.forEach(function (c) {
+      var p = c.item;
       var sc = p.portfolio_score || 0;
-      var cls = sc >= 75 ? 'hi' : (sc >= 60 ? 'mid' : 'lo');
-      h += '<div class="alpha-map-cell ' + cls + '" style="flex:' + Math.max(0.4, p.weight || 1) + '" '
-        + 'onclick="window.__alphaToggle(\'' + esc(p.code) + '\')">'
-        + '<b>' + esc(p.code) + '</b>'
-        + '<span>' + pct(p.weight) + '</span>'
-        + '<small>' + num(sc, 0) + '</small>'
-        + '</div>';
+      var fill = sc >= 75 ? '#15803d' : (sc >= 60 ? '#6d28d9' : '#b45309');
+      var sel = (S.mapSel === p.code) ? ' sel' : '';
+      var big = (c.w >= 74 && c.h >= 44);
+      var mid = (c.w >= 46 && c.h >= 30);
+      h += '<g class="alpha-mcell' + sel + '" onclick="window.__alphaMapPick(\'' + esc(p.code) + '\')">';
+      h += '<title>' + esc(p.code + ' — ' + (p.name || '') + ' — الوزن ' + pct(p.weight)
+        + ' — التقييم ' + num(sc, 1)) + '</title>';
+      h += '<rect x="' + c.x.toFixed(1) + '" y="' + c.y.toFixed(1) + '" width="' + c.w.toFixed(1)
+        + '" height="' + c.h.toFixed(1) + '" fill="' + fill + '"/>';
+      var cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+      if (big) {
+        h += '<text class="mc-code" x="' + cx.toFixed(1) + '" y="' + (cy - 12).toFixed(1) + '" text-anchor="middle">' + esc(p.code) + '</text>';
+        h += '<text class="mc-w" x="' + cx.toFixed(1) + '" y="' + (cy + 4).toFixed(1) + '" text-anchor="middle">' + pct(p.weight) + '</text>';
+        h += '<text class="mc-sc" x="' + cx.toFixed(1) + '" y="' + (cy + 18).toFixed(1) + '" text-anchor="middle">تقييم ' + num(sc, 0) + '</text>';
+      } else if (mid) {
+        h += '<text class="mc-code" x="' + cx.toFixed(1) + '" y="' + (cy - 2).toFixed(1) + '" text-anchor="middle">' + esc(p.code) + '</text>';
+        h += '<text class="mc-w" x="' + cx.toFixed(1) + '" y="' + (cy + 12).toFixed(1) + '" text-anchor="middle">' + pct(p.weight) + '</text>';
+      } else {
+        h += '<text class="mc-code" x="' + cx.toFixed(1) + '" y="' + (cy + 3).toFixed(1) + '" text-anchor="middle">' + esc(p.code) + '</text>';
+      }
+      h += '</g>';
     });
-    h += '</div>';
+    h += '</svg>';
+    h += '<div class="alpha-map-legend">'
+      + '<span>مساحة المربع = نصيب السهم من المحفظة</span>'
+      + '<span class="alpha-legend-item"><i class="lg-hi"></i>تقييم ٧٥+</span>'
+      + '<span class="alpha-legend-item"><i class="lg-mid"></i>٦٠-٧٥</span>'
+      + '<span class="alpha-legend-item"><i class="lg-lo"></i>أقل من ٦٠</span>'
+      + '</div></div>';
+    /* ⭐ لوحة التفاصيل (بتظهر عند الضغط على مربع) */
+    h += mapDetailHTML(d);
     return h;
   }
 
+  /* ⭐ خوارزمية الـsquarified: مربّعات متناسبة مع الوزن (مش مجرد flex)
+     المرجع: Bruls, Huizing & van Wijk (2000) */
+  function squarify(items, x, y, w, h) {
+    var out = [];
+    var list = items.slice();
+    var total = 0;
+    list.forEach(function (p) { total += (p.weight || 0); });
+    if (!total || !(w > 0) || !(h > 0)) return out;
+    var scale = (w * h) / total;          /* المساحة لكل وحدة وزن */
+    var rect = { x: x, y: y, w: w, h: h };
+    var row = [], rowSum = 0;
+
+    function worst(rowItems, rSum, side) {
+      var minA = Infinity;
+      for (var i = 0; i < rowItems.length; i++) {
+        var a = (rowItems[i].weight || 0) * scale;
+        if (a < minA) minA = a;
+      }
+      var sum = rSum * scale;
+      var s1 = minA * side * side;
+      var s2 = sum * sum;
+      if (!(s1 > 0) || !(s2 > 0)) return Infinity;
+      return Math.max(s2 / s1, s1 / s2);
+    }
+
+    function flushRow(vert) {
+      if (!row.length) return;
+      var sum = rowSum * scale;                       /* مساحة الصف */
+      var stackLen = vert ? rect.h : rect.w;          /* اتجاه الرصف */
+      var thick = stackLen > 0 ? sum / stackLen : 0;  /* سُمك الصف */
+      var used = 0;
+      for (var i = 0; i < row.length; i++) {
+        var it = row[i];
+        var area = (it.weight || 0) * scale;
+        var len = thick > 0 ? area / thick : 0;       /* طول المربع */
+        if (vert) {
+          out.push({ item: it, x: rect.x, y: rect.y + used, w: thick, h: len });
+        } else {
+          out.push({ item: it, x: rect.x + used, y: rect.y, w: len, h: thick });
+        }
+        used += len;
+      }
+      if (vert) { rect.x += thick; rect.w -= thick; }
+      else { rect.y += thick; rect.h -= thick; }
+      row = []; rowSum = 0;
+    }
+
+    while (list.length) {
+      var it = list.shift();
+      var wgt = it.weight || 0;
+      if (!row.length) { row = [it]; rowSum = wgt; continue; }
+      var side = Math.min(rect.w, rect.h);
+      var newSum = rowSum + wgt;
+      if (worst(row.concat([it]), newSum, side) <= worst(row, rowSum, side)) {
+        row.push(it); rowSum = newSum;
+      } else {
+        flushRow(rect.w >= rect.h);
+        row = [it]; rowSum = wgt;
+      }
+    }
+    if (row.length) flushRow(rect.w >= rect.h);
+    return out;
+  }
+
+  /* ─────────── لوحة تفاصيل السهم (من الخريطة) ─────────── */
+  function mapDetailHTML(d) {
+    var code = S.mapSel;
+    if (!code) return '';
+    var p = null;
+    (d.positions || []).forEach(function (x) { if (x.code === code) p = x; });
+    if (!p) return '';
+    var sum = (d.summary && d.summary.positions) || [];
+    var live = null;
+    sum.forEach(function (s) { if (s.code === code) live = s; });
+    var pnl = live ? live.pnl_pct : null;
+    var rows = [
+      ['الكمية', ar(live ? live.qty : p.qty) + ' سهم'],
+      ['سعر الدخول', num(live ? live.entry_price : p.entry_price, 2) + ' ج.م'],
+      ['السعر الحالي', num(live ? live.price : p.price, 2) + ' ج.م'],
+      ['الربح/الخسارة غير المحققة', signedPct(pnl)],
+      ['الوزن في المحفظة', pct(p.weight)],
+      ['القطاع', p.sector || '—'],
+      ['درجة المخاطرة', pct(p.risk_score)],
+      ['متوسط الارتباط بالمحفظة', (p.avg_correlation === null || p.avg_correlation === undefined) ? '—' : num(p.avg_correlation, 2)],
+      ['دوره في المحفظة', p.role_ar || '—']
+    ];
+    var h = '<div class="alpha-mdetail">';
+    h += '<div class="alpha-mdetail-h"><b>' + esc(p.code) + '</b>'
+      + '<span>' + esc(p.name || '') + '</span>'
+      + '<button class="alpha-mdetail-x" onclick="window.__alphaMapPick(null)">✕</button></div>';
+    h += '<div class="alpha-kv">' + rows.map(function (r) {
+      return '<div class="alpha-kv-r"><span>' + esc(r[0]) + '</span><b><bdi>'
+        + esc(r[1]) + '</bdi></b></div>';
+    }).join('') + '</div>';
+    h += '<button class="alpha-mdetail-go" onclick="window.__alphaGoCard(\'' + esc(p.code) + '\')">'
+      + 'افتح التحليل الكامل لهذا السهم ←</button>';
+    h += '</div>';
+    return h;
+  }
 
   /* ─────────── لوحة الأداء التفصيلية (فترات + منحنى) ─────────── */
   function perfHTML(perf) {
@@ -408,7 +534,6 @@
     if (max - min < 1e-9) { max = min + 1; }
     var n = points.length;
     var d = '', dB = '';
-    var bx = points[0].benchmark;
     var bmin = null, bmax = null;
     points.forEach(function (p) {
       if (p.benchmark === null || p.benchmark === undefined) return;
@@ -426,8 +551,8 @@
       }
     });
     return '<div class="alpha-curve"><svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">'
-      + (dB ? '<path d="' + dB + '" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3"/>' : '')
-      + '<path d="' + d + '" fill="none" stroke="#8b5cf6" stroke-width="2"/>'
+      + (dB ? '<path d="' + dB + '" fill="none" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4 3"/>' : '')
+      + '<path d="' + d + '" fill="none" stroke="#7c3aed" stroke-width="2"/>'
       + '</svg><div class="alpha-curve-l">'
       + '<span><i class="cv-p"></i>المحفظة</span>'
       + (dB ? '<span><i class="cv-b"></i>المؤشر</span>' : '')
@@ -503,10 +628,8 @@
       var errs = (lab.errors && lab.errors.summary) ? lab.errors.summary : [];
       h += '<div class="alpha-lab-hd">إصدار النموذج: <b>' + esc(lab.model_version || '—') + '</b></div>';
       h += '<div class="alpha-muted">' + esc(lab.data_sufficiency_ar || '') + '</div>';
-      /* البطل */
       h += '<div class="alpha-lab-box"><b>النموذج المعتمد</b><span>' + esc(ch.version || '—') + '</span>'
         + '<small>' + esc(ch.status_ar || '') + '</small></div>';
-      /* المتحدّي */
       var chs = lab.challengers || [];
       if (chs.length) {
         chs.forEach(function (c) {
@@ -516,7 +639,6 @@
       } else {
         h += '<div class="alpha-muted">مفيش متحدّي شغّال دلوقتي.</div>';
       }
-      /* الأخطاء */
       if (errs.length) {
         h += '<div class="alpha-lab-sub">تصنيف الأخطاء</div><div class="alpha-errs">';
         errs.forEach(function (e) {
@@ -527,7 +649,6 @@
       } else {
         h += '<div class="alpha-muted">مفيش صفقات مغلقة نصنّفها بعد.</div>';
       }
-      /* Walk-forward */
       h += '<div class="alpha-lab-sub">الاختبار على فترات (Walk-forward)</div>';
       if (wf.ok) {
         h += '<div class="alpha-muted">'
@@ -570,8 +691,12 @@
       h += explainBlock('إزاي اتحدد الوزن', 'الوزن = درجة المحفظة محوّلة خطياً (٥٪-١٥٪) مع تطبيع ⇒ المجموع ١٠٠٪ والكاش الباقي.');
       h += explainBlock('توزيع القطاعات', 'الحدّ الأقصى ' + pct((d.limits || {}).sector_cap) + ' لكل قطاع · والمجموعة الاقتصادية ' + pct((d.limits || {}).economic_group_cap) + '. التوزيع الحالي: '
         + Object.keys(d.sector_weights || {}).map(function (k) { return k + ' ' + pct(d.sector_weights[k]); }).join(' · '));
+      h += explainBlock('نصيب أكبر ٣ أسهم', 'الثلاثة الكبار بياخدوا ' + pct(risk.top3_concentration_pct)
+        + ' من فلوس المحفظة — يعني لو وزنهم كله كان في سهم واحد، المحفظة كانت أأمن. '
+        + 'مؤشر تشتّت التوزيع (هرنهايندال) = ' + num(risk.herfindahl_pct, 0)
+        + ' من ١٠٬٠٠٠ ⇒ كل ما الرقم أقل، التوزيع أعدل.');
       h += explainBlock('الارتباط والمخاطرة', 'الارتباط من الشموع اليومية · تذبذب المحفظة ' + pct(risk.portfolio_volatility_pct)
-        + ' · تركيز أعلى ٣ ' + pct(risk.top3_concentration_pct) + ' · مساهمة الخطر الأعلى: '
+        + ' · نصيب أكبر ٣ ' + pct(risk.top3_concentration_pct) + ' · مساهمة الخطر الأعلى: '
         + ((risk.margin_risk_contribution || [])[0] ? (risk.margin_risk_contribution[0].code + ' ' + pct(risk.margin_risk_contribution[0].risk_contribution_pct)) : '—'));
       h += explainBlock('السيولة النقدية', pct(d.cash_pct) + ' نقد · والسبب: ' + (d.n_positions < d.target_positions ? 'مفيش أسهم مؤهلة أكتر.' : 'الأوراق كلها مؤهلة — بس الكاش بيحمي من تعبئة المراكز.'));
       h += explainBlock('سياسة إعادة التوازن', 'مراجعة دورية + إعادة توازن لو الوزن خرج عن شريط ' + pct((d.limits || {}).min_weight ? 4 : 4) + ' — وبلا تغيير يومي.');
@@ -611,6 +736,34 @@
   };
   window.__alphaToggleCrit = function () { S.critOpen = !S.critOpen; render(); };
   window.__alphaToggleNotif = function () { S.notifOpen = !S.notifOpen; render(); };
+  /* ⭐ الضغط على مربع في الخريطة ⇒ يفتح تفاصيل السهم تحته */
+  window.__alphaMapPick = function (code) {
+    S.mapSel = code || null;
+    render();
+    if (code) {
+      try {
+        var el = document.querySelector('.alpha-mdetail');
+        if (el && el.scrollIntoView) {
+          var r = el.getBoundingClientRect();
+          if (r.top < 8 || r.top > (window.innerHeight * 0.6)) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      } catch (e) { }
+    }
+  };
+  /* ⭐ تحويل لعرض الكروت وفتح كارت السهم */
+  window.__alphaGoCard = function (code) {
+    S.view = 'cards';
+    S.open[code] = true;
+    render();
+    try {
+      var el = document.querySelector('.alpha-card[data-code="' + code + '"]');
+      if (el && el.scrollIntoView) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } catch (e) { }
+  };
   window.__alphaToggleLab = function () { S.labOpen = !S.labOpen; render(); };
 
   window.renderAlphaArm = function (box) {
