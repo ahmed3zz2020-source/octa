@@ -245,17 +245,17 @@
       if (has(plan, 'entry_zone')) {
         cells.push(kv('منطقة الدخول', num(plan.entry_zone[0]) + ' – ' + num(plan.entry_zone[1])));
       }
-      if (has(plan, 'entry_label')) cells.push(kv('قاعدة الدخول', arText(plan.entry_label)));
+      if (has(plan, 'entry_label')) cells.push(kv('قاعدة الدخول', arText(plan.entry_label), true));
       if (has(plan, 'stop')) cells.push(kv('وقف الخسارة', num(plan.stop)));
       if (has(plan, 'target1')) cells.push(kv('هدف قريب', num(plan.target1)));
       if (has(plan, 'target2')) cells.push(kv('هدف بعيد', num(plan.target2)));
       if (has(plan, 'rr1')) cells.push(kv('العائد/المخاطرة للهدف القريب', num(plan.rr1) + ':١'));
       if (has(plan, 'rr2')) cells.push(kv('العائد/المخاطرة للهدف البعيد', num(plan.rr2) + ':١'));
       if (has(plan, 'horizon')) cells.push(kv('المدة المستهدفة', plan.horizon));
-      if (has(plan, 'target_note')) cells.push(kv('ملاحظة الهدف', arText(plan.target_note)));
+      if (has(plan, 'target_note')) cells.push(kv('ملاحظة الهدف', arText(plan.target_note), true));
       /* ⭐ التواريخ/الشروط: الباك بيرجّعها بأسماء مختلفة ⇒ بنقرأ الكل. */
       var inval = plan.invalidation || plan.invalidation_ar || [];
-      if (inval.length) cells.push(kv('إبطال الفرضية', arText(inval.join(' · '))));
+      if (inval.length) cells.push(kv('إبطال الفرضية', arText(inval.join(' · ')), true));
       if (has(plan, 'max_drawdown_pct')) {
         cells.push(kv('أقصى تراجع متوقّع',
           num(plan.max_drawdown_pct) + '٪' + (plan.max_drawdown_source_ar
@@ -264,8 +264,8 @@
       if (has(plan, 'fair_value_upside_pct')) {
         cells.push(kv('المساحة للقيمة المقدَّرة', num(plan.fair_value_upside_pct) + '٪'));
       }
-      if (has(plan, 'risk_limit')) cells.push(kv('حد المخاطرة', arText(plan.risk_limit)));
-      if (has(plan, 'note_ar')) cells.push(kv('ملاحظة الخطة', arText(plan.note_ar)));
+      if (has(plan, 'risk_limit')) cells.push(kv('حد المخاطرة', arText(plan.risk_limit), true));
+      if (has(plan, 'note_ar')) cells.push(kv('ملاحظة الخطة', arText(plan.note_ar), true));
       if (cells.length) h += sec('خطة التعامل', grid(cells));
     }
 
@@ -361,8 +361,9 @@
     return '<div class="opps-detail-sec"><div class="opps-detail-h">' + esc(title) + '</div>'
       + '<div class="opps-detail-b">' + body + '</div></div>';
   }
-  function kv(k, v) {
-    return '<div class="opps-plan-cell"><div class="opps-plan-k">' + esc(k)
+  function kv(k, v, wide) {
+    return '<div class="opps-plan-cell' + (wide ? ' is-wide' : '') + '">'
+      + '<div class="opps-plan-k">' + esc(k)
       + '</div><div class="opps-plan-v">' + esc(v) + '</div></div>';
   }
   /* ⭐ الأرقام جوّه الجُمل العربية (من الباك) ⇒ تتحوّل لأرقام عربية-هندية
@@ -711,8 +712,25 @@
     loadList();
   };
   window.__oppsToggle = function (code) {
-    S.open[code] = !S.open[code];
-    render(document.getElementById('armBody') || null);
+    var wasOpen = !!S.open[code];
+    S.open[code] = !wasOpen;
+    /* ⛔⛔ إعادة رسم الذراع كله كانت بتعمل قفزة لآخر الصفحة
+       (لأن الـDOM كله اتبدّل والصفحة غيّرت ارتفاعها).
+       ⭐ دلوقتي: رسم النتائج بس + تمرير سلس للكارت اللي اتفتح. */
+    renderResultsOnly(document.getElementById('armBody') || null);
+    if (!wasOpen) {
+      /* ⭐ نمرّر للكارت **بس** لو مش باين — عشان ما يحصلش قفزة
+         والكارت مفتوح بالفعل في الشاشة (مفيش حركة عندها). */
+      try {
+        var card = document.querySelector('.opps-card[data-code="' + code + '"]');
+        if (card && card.scrollIntoView) {
+          var r = card.getBoundingClientRect();
+          if (r.top < 8 || r.top > (window.innerHeight * 0.55)) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      } catch (e) { }
+    }
   };
   window.__oppsToggleCrit = function () {
     S.open['__crit'] = !S.open['__crit'];
