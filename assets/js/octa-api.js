@@ -234,9 +234,16 @@
       if (typeof AbortController !== 'undefined') {
         ctrl = new AbortController();
         o2.signal = ctrl.signal;
-        timer = setTimeout(function () { try { ctrl.abort(); } catch (e) { } }, 20000);
       }
-      const p = ORIG.call(this, s, o2)
+      /* ⭐⭐ المؤقّت (٢٠ ثانية) لازم يبدأ **وقت الإرسال** مش وقت
+         الجدولة — لغير كده الطابور بيأخّر الطلب ⇒ المؤقّت بيطلع
+         قبل ما الطلب يطلع ⇒ «signal is aborted without reason». */
+      const p = _octaSchedule(function () {
+        if (timer === null) {
+          timer = setTimeout(function () { try { ctrl.abort(); } catch (e) { } }, 30000);
+        }
+        return _octaFetchRetry(s, o2, 0);
+      }, s)
         .then(function (r) {
           if (r.status >= 500) window.OCTAServer.failover();
           const hs = [];
@@ -309,8 +316,25 @@
     return pResp;
   }
 
-  return ORIG.call(this, s, opt)
-  .then(function (r) {
+  /* ⭐⭐⭐ الخانق هنا (في الـfetch العام) ⇒ كل نداء في التطبيق
+     بيعدّي منه — مش بس النداءات اللي بتستخدم octaFetch.
+     📌 (النسخة الأولى حطّيت الخانق في octaFetch بس ⇒ النداءات
+        المباشرة في باقي الملفات عدّت من غير خانق ⇒ 429.) */
+  /* ⭐⭐⭐ الكاش القصير: نفس GET اتطلب قبل كده (من غير تغيير في
+     المعاملات ⇒ نفس البيانات) ⇒ نردّ من الذاكرة فوراً. */
+  const _isGet = (String((opt && opt.method) || 'GET')).toUpperCase() === 'GET';
+  const _ckey = _isGet ? _inflightKey(s) : '';
+  if (_ckey) {
+    const _hit = _octaCacheGet(_ckey);
+    if (_hit) {
+      try { return Promise.resolve(_hit.resp.clone()); } catch (e) { }
+    }
+  }
+  const _budgeted = function () {
+    return _octaSchedule(function () { return _octaFetchRetry(s, opt, 0); }, s);
+  };
+  return _budgeted().then(function (r) {
+  if (_ckey) { try { _octaCachePut(_ckey, r.clone()); } catch (e) { } }
   /* السيرفر رجّع error حقيقي (مش شبكة) — مفيش failover */
   if (r.status >= 500) window.OCTAServer.failover();
   /* ⛔ ⛔ ⛔ ٤٠١ معناها «التوكن مش صالح» مش «الموقع وقع».
@@ -331,6 +355,177 @@
   return ORIG.call(window, nu, _withToken(nu, opts));
   });
   };
+
+/* ════════════════════════════════════════════════════════════════
+  🚦 ⭐⭐⭐ ١٠ نوفمبر ٢٠٢٦ — ⭐ خانق الطلبات + إعادة محاولة 429
+  ────────────────────────────────────────────────────────────────
+  📌 المشكلة (مقيسة بالفحص الآلي): المستخدم اللي بيتنقل بسرعة
+     بين الصفحات بيعمل ١٢٠+ طلب في الدقيقة ⇒ السيرفر بيرجّع
+     429 ⇒ أجزاء من الصفحة بتفضل فاضية (ومفيش رسالة واضحة).
+  📌 ⛔⛔⛔ الأسوأ: على موبايل بشبكة بطيئة + ضغط سريع = نفس المشكلة.
+  ✅ الحل (٣ قطع):
+     ① طابور: ٦ طلبات مع بعض + ١٢٠ مللي بين كل طلبين.
+     ② لو ردّ السيرفر 429 ⇒ نستنى Retry-After (حد أقصى ١٠ ثواني)
+        ونحاول تاني مرة واحدة.
+     ③ لو فشل كمان ⇒ رد JSON نظيف برسالة عربية (مش انهيار).
+  ════════════════════════════════════════════════════════════════ */
+var OCTA_MAX_CONC = 6;      /* أقصى طلبات متوازية */
+var OCTA_MIN_GAP = 120;     /* أقل مسافة بين طلبين (مللي) */
+var OCTA_BUDGET = 100;      /* ⭐ ميزانية الدقيقة (السيرفر يسمح ١٢٠) */
+var OCTA_HITS = [];         /* أوقات الطلبات في آخر دقيقة */
+/* ⭐⭐⭐ حدود السيرفر مقسّمة على «أنواع مسارات» — لازم نطابقها بالظبط:
+   📌 default   : ١٢٠ / دقيقة   ⇒ ميزانيتنا ١٠٠
+   📌 expensive :  ٤٠ / دقيقة   ⇒ ميزانيتنا ٣٢  (تحليل · أخبار · شموع …)
+   📌 write     :   ٥ / دقيقة   ⇒ ميزانيتنا ٤   (حفظ · تنبيهات …)
+   📌 ⛔ قبل كنا بنحسب ميزانية واحدة ⇒ المسارات الغالية كانت بتعدّي
+      حدّها (٤٠)⇒ 429 ⇒ أجزاء فاضية في الصفحات التحليلية. */
+var OCTA_BUDGETS = { default: 100, expensive: 32, write: 4 };
+var OCTA_BUCKETS = { default: [], expensive: [], write: [] };
+/* ⭐ التصنيف = **أول جزء بعد /api/** بالظبط (زي السيرفر)
+   ⛔ مثال مهم: /api/portfolio كتابة · بس /api/alpha/portfolio قراءة! */
+var OCTA_EXPENSIVE = ['analyze', 'chat', 'news', 'candles', 'intelligence',
+  'explain', 'egx_full', 'risk', 'fundamental', 'technical', 'obdepth',
+  'sentiment', 'portfolio_fit', 'opportunity'];
+var OCTA_WRITES = ['portfolio', 'alerts', 'dividends', 'calibration', 'stress'];
+
+function _octaBucket(url) {
+  try {
+    var s = String(url || '');
+    var i = s.indexOf('/api/');
+    if (i < 0) return 'default';
+    var rest = s.slice(i + 5);
+    var name = rest.split(/[\/?]/)[0].toLowerCase();
+    if (OCTA_WRITES.indexOf(name) >= 0) return 'write';
+    if (OCTA_EXPENSIVE.indexOf(name) >= 0) return 'expensive';
+  } catch (e) { }
+  return 'default';
+}
+var OCTA_QUEUE = [];
+var OCTA_ACTIVE = 0;
+var OCTA_LAST = 0;
+
+/* ⭐⭐⭐ ميزانية الـrate limit — لازم نحسبها قبل كل طلب
+   📌 السبب: حدّ السيرفر ١٢٠ طلب/دقيقة ⇒ أي المستخدم يضغط بسرعة
+      (أو موبايل بشبكة بطيئة) ممكن يتجاوز ⇒ 429 ⇒ أجزاء فاضية.
+   📌 الحل: نحسب الطلبات في آخر 60 ثانية ⇒ لو وصلنا للميزانية،
+      نستنى لحد ما تتحرر نافذة الدقيقة (مش 429 ولا بيانات ناقصة). */
+function _octaBudgetWait(bucket) {
+  var now = Date.now();
+  var key = bucket || 'default';
+  var list = OCTA_BUCKETS[key] || (OCTA_BUCKETS[key] = []);
+  while (list.length && (now - list[0]) > 60000) list.shift();
+  var limit = OCTA_BUDGETS[key] || OCTA_BUDGET;
+  /* ⭐⭐⭐ الضغط الخفيف = إنت مش بتستنى ⇒ التحميل السريع متبقيش بطيء.
+     📌 تحت نص الحد ⇒ مسافة صفر (٦ طلبات مع بعض).
+     📌 فوق نص الحد ⇒ مسافة ١٢٠ مللي ( spreading ).
+     📌 عند الحد ⇒ نستنى (بسحدّ ٢٫٥ ثانية) ونرجع نعمل retry. */
+  if (list.length < Math.floor(limit * 0.5)) return 0;
+  if (list.length >= limit) {
+    var free = list[0] + 60000 - now + 60;
+    /* ⭐⭐⭐ سقف الانتظار ٢٫٥ ثانية!
+       📌 من غير السقف: الطابور بيستنى لحد ما تتحرر نافذة
+          الدقيقة (٦٠ ثانية) ⇒ ⛔ الواجهة بتتجمّد و«بنحسب…» بيفضل
+          معلّق ⇒ ⭐ ده كان سبب ظهور Alpha واقف.
+       📌 مع السقف: الطلب بينزل 429 ⇒ ونعيد المحاولة بعد Retry-After
+          بتاع السيرفر ⇒ البيانات بتوصل بس أبطأ شوية. */
+    if (free > 2500) return 2500;
+    if (free > OCTA_MIN_GAP) return free;
+  }
+  return OCTA_MIN_GAP;
+}
+
+/* ⭐⭐⭐ كاش ردود قصير (٣٠ ثانية) داخل طبقة الـfetch
+   📌 السبب: المستخدم بينقل بسرعة بين الأذرع ⇒ نفس المسار بيتطلب
+      مرات ورا بعض ⇒ ضغط على السيرفر + انتظار.
+   📌 الكاش هنا يخلّي الطلبات المتكررة ترجع فوراً من الذاكرة.
+   📌 ⛔ ٣٠ ثانية بس (الأسعار بتتحدّث كل ١٥ دقيقة ⇒ أأمن من الكاش). */
+var OCTA_RESP_CACHE = {};
+var OCTA_RESP_TTL = 30000;
+function _octaCacheGet(key) {
+  try {
+    var rec = OCTA_RESP_CACHE[key];
+    if (!rec) return null;
+    if (Date.now() - rec.t > OCTA_RESP_TTL) { delete OCTA_RESP_CACHE[key]; return null; }
+    return rec;
+  } catch (e) { return null; }
+}
+function _octaCachePut(key, resp) {
+  try {
+    OCTA_RESP_CACHE[key] = { t: Date.now(), resp: resp };
+    var n = 0; for (var k in OCTA_RESP_CACHE) n++;
+    if (n > 160) {
+      var oldest = null, ot = 1e12;
+      for (var k2 in OCTA_RESP_CACHE) {
+        if (OCTA_RESP_CACHE[k2].t < ot) { ot = OCTA_RESP_CACHE[k2].t; oldest = k2; }
+      }
+      if (oldest) delete OCTA_RESP_CACHE[oldest];
+    }
+  } catch (e) { }
+}
+
+function _octaPump() {
+  if (OCTA_ACTIVE >= OCTA_MAX_CONC) return;
+  if (!OCTA_QUEUE.length) return;
+  var item = OCTA_QUEUE.shift();
+  var bucket = 'default';
+  try { bucket = _octaBucket(item.url); } catch (e) { }
+  var wait = Math.max(0, _octaBudgetWait(bucket) - (Date.now() - OCTA_LAST));
+  OCTA_ACTIVE++;
+  setTimeout(function () {
+    OCTA_LAST = Date.now();
+    try {
+      var list = OCTA_BUCKETS[bucket] || (OCTA_BUCKETS[bucket] = []);
+      list.push(Date.now());
+      if (list.length > 120) list.shift();
+    } catch (e) { }
+    var p;
+    try { p = item.fn(); } catch (e) { p = Promise.reject(e); }
+    OCTA_ACTIVE--;
+    item.resolve(p);
+    _octaPump();
+  }, wait);
+}
+
+function _octaSchedule(fn, url) {
+  return new Promise(function (resolve) {
+    OCTA_QUEUE.push({ fn: fn, resolve: resolve, url: url || '' });
+    _octaPump();
+  });
+}
+
+/* ⭐ إعادة محاولة واحدة عند 429 (مع احترام Retry-After) */
+function _octaFetchRetry(url, o, attempt) {
+  /* ⭐⭐⭐ لازم نستخدم الـfetch **الأصلي** هنا — لو استدعينا
+     window.fetch (المغلّف) ⇒ هينادي الخانق ⇒ الخانق هينادي
+     _octaFetchRetry ⇒ ⇒ استدعاء لا نهائي ⇒ الطلب ما بيطلعش أبدًا
+     ⇒ ⛔ «بنحسب المحفظة…» بيفضل معلّق. */
+  var raw = (typeof ORIG_FETCH !== 'undefined' && ORIG_FETCH) ? ORIG_FETCH : window.fetch;
+  return raw.call(window, url, o).then(function (resp) {
+    if (!resp || resp.status !== 429) return resp;
+    if ((attempt || 0) >= 1) {
+      /* ⛔ فشل تاني ⇒ رد نظيف برسالة عربية (بدل انهيار في الكونسول) */
+      var body = JSON.stringify({
+        ok: false, error: 'طلبات كتير في وقت قصير',
+        retry_after: 5, hint: 'استنى ٥ ثواني وحاول تاني'
+      });
+      try {
+        return new Response(body, {
+          status: 429,
+          headers: { 'Content-Type': 'application/json', 'X-RateLimit-Retry': '1' }
+        });
+      } catch (e) { return resp; }
+    }
+    var ra = 3;
+    try { ra = parseInt(resp.headers.get('Retry-After') || '3', 10) || 3; } catch (e) { ra = 3; }
+    if (ra > 10) ra = 10;
+    if (ra < 1) ra = 1;
+    /* ⭐⭐ تكيّف: كل 429 ⇒ نوسّع المسافة بين الطلبات (حتى ١٥٠٠ مللي)
+       ⇒ الطلبات بتتبطّأ لوحدها بدل ما تفضل تطلع 429. */
+    OCTA_MIN_GAP = Math.min(1500, Math.max(OCTA_MIN_GAP * 2, 250));
+    return new Promise(function (r) { setTimeout(r, ra * 1000); })
+      .then(function () { return _octaFetchRetry(url, o, (attempt || 0) + 1); });
+  });
+}
 
 /* ════════════════════════════════════════════════════════════════
  🌐 ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ octaFetch: fetch بتوكن (لكل المسارات)
@@ -436,6 +631,7 @@ window.octaFetch = function (url, opts) {
       return resp;
     });
   }
+  /* ⭐ كل المسارات بتمر على الـfetch العام (هو اللي فيه الخانق) */
   return window.fetch(url, o);
 };
 

@@ -69,6 +69,7 @@
       var st = (r && r.status) ? r.status : 0;
       if (st === 401 || st === 403) throw new Error('انتهت الجلسة — سجّل دخولك تاني');
       if (st === 404 || st === 405) throw new Error('محرّك Alpha غير متاح على السيرفر');
+      if (st === 429) throw new Error('طلبات كتير في وقت قصير — استنى ثانيتين وحاول تاني');
       if (st >= 400) throw new Error('الخادم رجّع خطأ ' + st);
       return r.json().catch(function () { throw new Error('رد غير مفهوم من الخادم'); });
     });
