@@ -5360,6 +5360,16 @@ body.sb-open .sb-scrim { display: block; }
 .sb-x:hover { border-color: var(--gold); color: var(--gold); }
 
 /* ── التنقّل ── */
+/* ⭐⭐⭐ بحث في القائمة الجانبية (١٠ نوفمبر ٢٠٢٦) */
+.sb-search { padding: 10px 10px 2px; }
+.sb-search input {
+  width: 100%; padding: 9px 12px; border-radius: 11px;
+  border: 1px solid var(--line); background: var(--wash);
+  color: var(--txt); font-family: inherit; font-size: .82rem;
+}
+.sb-search input:focus { outline: none; border-color: rgba(212,175,55,.5); }
+.sb-search input::placeholder { color: var(--muted); }
+
 .sb-nav {
   flex: 1 1 auto;
   overflow-y: auto;

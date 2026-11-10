@@ -1595,6 +1595,7 @@ async function handle(request, env, ctx) {
     */
     /* ⭐ كل المسارات دي بتقابل TOOL_PAGES في octa-core.js */
     const SPA_ROUTES = ['/markets', '/stocks', '/tools', '/engine', '/arms', '/filters',
+      '/newsaxis',
       '/filter', '/best', '/screener', '/dividends', '/octasearch', '/verdict', '/pick',
       '/compare', '/radar', '/smartmoney', '/money', '/news', '/academy', '/watchlist',
       '/search', '/calc', '/bestpick', '/radar-stock'];

@@ -732,7 +732,9 @@ async function cardEGX(code,row){
   (has?'<div class="mflag grn"><span>📢</span><span><b>فيه أحداث.</b> '+esc(NW.headline||'')+'</div>'
   :'<div class="mflag gold"><span>😐</span><span>'+esc(NW.headline||NW.note||'لا توجد أحداث معلنة')+'</div>')+
   (NW.score!=null?'<div style="font-size:.72rem;color:var(--muted);margin-top:7px">درجة الأخبار: '+
-  Math.round(NW.score)+'/100 · materiality: '+esc(String(NW.materiality||'—'))+'</div>':'')+
+  Math.round(NW.score)+'/100 · materiality: '+esc(String(NW.materiality||'—'))+
+  ' · <a href="#newsaxis" onclick="switchPage(\'newsaxis\');return false;" '+
+  'style="color:var(--gold);font-weight:800">كل الأسهم ←</a></div>':'')+
   '</div>';
   }
 

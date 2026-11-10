@@ -19,7 +19,7 @@
  { id:'g1', n:'القرارات', i:'🎯', tools:['decide','verdict','bestpick'] },
  { id:'g2', n:'المقارنة والبحث', i:'⚖️', tools:['compare'] },
  { id:'g3', n:'أدوات', i:'🧮', tools:['calc'] },
- { id:'g4', n:'محتوى', i:'📰', tools:['news','academy'] },
+ { id:'g4', n:'محتوى', i:'📰', tools:['news','newsaxis','academy'] },
  ];
 
  /* ⛌ الافتراضي كان مقفول — أول مرة المستخدم بيفتح الموقع
@@ -115,7 +115,15 @@ let OPEN = localStorage.getItem('octa_sidebar') === '1';
  '<div class="sb-brand"><b>OCTA</b><i>اخطبوط 5</i></div>' +
  '<button class="sb-x" onclick="sbToggle()">✕</button>' +
  '</div>' +
- '<nav class="sb-nav">' + html + '</nav>' +
+ /* ⭐⭐⭐ بحث في القائمة (١٠ نوفمبر ٢٠٢٦)
+    📌 السبب: الشريط طويل (٢٤ زر) ⇒ المستخدم بيدوّر على الأداة ومش
+       لاقيها (خصوصاً أداة جديدة). ⛔ البحث بيخفي غير المطابق فوراً.
+    📌 ⛔ مفيش فلترة للـDOM (الكود القديم كان بيحذف) ⇒ بنخفي بس. */
+ '<div class="sb-search">' +
+ '<input type="search" id="sbSearch" placeholder="🔍 دوّر على أداة…" ' +
+ 'oninput="sbFilter(this.value)" autocomplete="off" />' +
+ '</div>' +
+ '<nav class="sb-nav" id="sbNav">' + html + '</nav>' +
  '<div class="sb-foot">' +
  '<button class="sb-acc" onclick="OCTAAuth.show(\'login\')">👤 حسابي</button>' +
  /* ⛔⛔ البصمة  لازم المستخدم يلغيها  لو مش عايزها.
@@ -153,6 +161,42 @@ let OPEN = localStorage.getItem('octa_sidebar') === '1';
 
  /* ⭐ إعادة بناء القائمة (لما سياق السوق يتغير) */
  window.sbRebuild = function () { try { build(); } catch (e) {} };
+
+ /* ⭐ فلترة القائمة بالبحث — نخفي غير المطابق (مش بنحذف) */
+ window.sbFilter = function (q) {
+  try {
+   var s = String(q || '').trim().toLowerCase();
+   var nav = document.getElementById('sbNav');
+   if (!nav) return;
+   var groups = Array.prototype.slice.call(nav.querySelectorAll('.sg-h'));
+   var btns = Array.prototype.slice.call(nav.querySelectorAll('.sb-i'));
+   btns.forEach(function (b) {
+    var txt = (b.innerText || '').toLowerCase();
+    var hit = !s || txt.indexOf(s) >= 0;
+    b.style.display = hit ? '' : 'none';
+   });
+   /* ⛔ العناوين: نخفي المجموعة لو مفيش تحتها زر ظاهر */
+   groups.forEach(function (g) {
+    var nxt = g.nextElementSibling, any = false;
+    while (nxt && !nxt.classList.contains('sg-h')) {
+     if (nxt.classList.contains('sb-i') && nxt.style.display !== 'none') any = true;
+     nxt = nxt.nextElementSibling;
+    }
+    g.style.display = any ? '' : 'none';
+   });
+   /* ⛔ لو مفيش نتيجة ⇒ رسالة واضحة (مش صفحة فاضية) */
+   var none = !btns.some(function (b) { return b.style.display !== 'none'; });
+   var msg = document.getElementById('sbNoRes');
+   if (!msg) {
+    msg = document.createElement('div');
+    msg.id = 'sbNoRes';
+    msg.style.cssText = 'padding:14px 10px;font-size:.78rem;color:var(--muted);text-align:center';
+    nav.parentNode.insertBefore(msg, nav);
+   }
+   msg.textContent = none ? ('🔍 مفيش أداة اسمها «' + String(q || '').trim() + '»') : '';
+   msg.style.display = none ? '' : 'none';
+  } catch (e) {}
+ };
 
  window.sbToggle = function () {
  OPEN = !OPEN;

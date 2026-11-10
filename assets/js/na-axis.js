@@ -112,8 +112,14 @@ function naRender() {
   }
 
   const src = document.getElementById('naSrc');
-  if (src) src.innerHTML = '📡 المصدر: <b>' + naEsc(NA_DATA.source || 'بورصة هالان') + '</b> · ' +
-    all.length + ' سهم · التحديث كل 30 دقيقة';
+  if (src) src.innerHTML =
+    '📡 المصدر: <b>' + naEsc(NA_DATA.source || 'بورصة هالان') + '</b> · ' +
+    all.length + ' سهم · التحديث كل 30 دقيقة' +
+    '<br>🔗 <b>بورصة هالان</b> ← ' +
+    '<b>عامل البيانات (halan-feed)</b> ← <b>Cloudflare KV</b> ← ' +
+    '<b>محرك OCTA</b> (المحور ده داخل النتيجة — وزنه 5%)' +
+    '<br>⏱️ آخر تحديث: ' + (NA_DATA.updatedAt ? naEsc(NA_DATA.updatedAt) : '—') +
+    ' · التحديث كل 30 دقيقة';
 }
 
 /* ⭐ أزرار الفلترة والترتيب */
