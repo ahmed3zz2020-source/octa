@@ -53,11 +53,24 @@
   } catch (e) { }
 })();
 </script>
-<script src="/assets/js/octa-sectors.js?v=202611090031"></script>
-<script src="/assets/js/octa-egx-names.js?v=202611090031"></script>
-<script src="/assets/js/octa-mk-scan.js?v=202611090031"></script>
+<script defer src="/assets/js/octa-sectors.js?v=202611090031"></script>
+<script defer src="/assets/js/octa-egx-names.js?v=202611090031"></script>
+<script defer src="/assets/js/octa-mk-scan.js?v=202611090031"></script>
 </head>
 <body class="pm-body">
+
+<!-- ⭐ ٩ نوفمبر ٢٠٢٦ — ⭐ شاشة تحميل فورية: كانت الصفحة بتفضل **أبيض**
+     لحد ما الشبكة تجيب ٤٠٠ كيلوبايت CSS ⇒ على موبايل ضعيف = دقيقة+.
+     📌 الحل: الـHTML بيعرض الهيكل فوراً (مش بيستنى أي JS)، والشاشة دي بتختفي
+        أول ما البيانات تخلص. ولو الشبكة وقعت ⇒ المستخدم يشوف رسالة بدل أبيض. -->
+<div id="pmBoot" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+     flex-direction:column;gap:12px;background:#0a1929;color:#e8eef6;z-index:60;font-family:system-ui,sans-serif">
+  <div style="width:34px;height:34px;border:3px solid #2a3b52;border-top-color:#f5c518;border-radius:50%;
+       animation:pmSpin .9s linear infinite"></div>
+  <div style="font-size:15px;font-weight:700">⏳ بنحدّث الأسعار…</div>
+  <div id="pmBootMsg" style="font-size:12px;color:#8fa3bd;text-align:center;padding:0 24px"></div>
+</div>
+<style>@keyframes pmSpin{to{transform:rotate(360deg)}}</style>
 
 <!-- ═══ الهيدر ═══ -->
 <header class="pm-head">
@@ -141,6 +154,38 @@
   <span>الأسعار من مصادر السوق العامة · التحليل والقرار بعد الدخول</span>
 </footer>
 
-<script src="/assets/js/octa-public-market.js?v=202611090031"></script>
+<script defer src="/assets/js/octa-public-market.js?v=202611090031"></script>
+<!-- ⭐ إخفاء شاشة التحميل: أول ما البيانات ترسم، أو بعد ٢٠ ثانية رسالة صريحة -->
+<script>
+(function () {
+  var boot = document.getElementById('pmBoot');
+  var msg = document.getElementById('pmBootMsg');
+  function hide() { if (boot && boot.parentNode) boot.parentNode.removeChild(boot); }
+  /* ⭐⭐ ما نخفيش التحميل قبل ما البيانات تيجي فعلاً
+     ⇐ كان بيختفي بعد ٢٫٥ ثانية ⇒ الشاشة بترجع أبيض لحد ما الـAPI يرد. */
+  window.__pmBootDone = function () { try { hide(); } catch (e) { } };
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      var rows = document.querySelectorAll('#pmRows tr, .pm-row, table tbody tr');
+      if (rows && rows.length) { hide(); return; }
+      var t = setInterval(function () {
+        var r2 = document.querySelectorAll('#pmRows tr, .pm-row, table tbody tr');
+        if (r2 && r2.length) { clearInterval(t); hide(); }
+      }, 700);
+      setTimeout(function () { clearInterval(t); }, 60000);
+    }, 3000);
+  });
+  setTimeout(function () {
+    if (boot && msg) {
+      msg.innerHTML = 'الشبكة بطيئة — البيانات هتظهر تلقائياً أول ما توصل.<br>لو فاضل أبيض، اعمل إعادة تحميل للصفحة.';
+      var d = document.createElement('div');
+      d.style.cssText = 'margin-top:10px;font-size:13px;color:#f5c518;text-decoration:underline;cursor:pointer';
+      d.textContent = 'إعادة تحميل';
+      d.onclick = function () { location.reload(true); };
+      msg.appendChild(d);
+    }
+  }, 20000);
+})();
+</script>
 </body>
 </html>

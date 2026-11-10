@@ -7758,3 +7758,15 @@ body.light .sc2-preset.on {
 body.light .sc2-fix:hover {
   color: var(--pri4);
 }
+
+
+/* ══════════ OCTA_MOBILE_CLIP ══════════
+   ⭐ ٩ نوفمبر ٢٠٢٦ — إصلاح «الشاشة السوداء على جنب التطبيق» في الموبايل.
+   📌 العَرَض: التطبيق بيظهر مصغّر (عرض ١٥٦٠ بدل ٣٩٠) مع شريط أسود.
+   📌 السبب: عنصر واحد بيفيض أفقياً ⇒ Chrome بيوسّع الـlayout viewport (ICB)
+     ⇒ window.innerWidth = ١٥٦٠ ⇒ التطبيق كله بيتقفل بره الشاشة.
+   📌 الحل: قصّ التمدد الأفقي على مستوى الـroot (clip مش hidden ⇒ الـsticky
+     بيفضل شغّال) + الجداول الم wide بت-scroll جوه wrappers بتاعها.
+   📌 الفحص: window.innerWidth لازم يساوي clientWidth (٣٩٠). */
+html { overflow-x: clip; }
+body { overflow-x: clip; }
