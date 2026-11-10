@@ -799,7 +799,7 @@ async function loadEarlyOpps(force) {
   '<span class="opp-early-tag">' + (s.stage || 'فرصة مبكرة') + '</span>' +
   '<div class="opp-code-2">' + s.code + '</div>' +
   '<div class="opp-name-2">' + (s.name || '') + '</div>' +
-  '<div class="opp-score-2">' + (s.score ?? 0).toFixed(0) + '<small>/100</small></div>' +
+  '<div class="opp-score-2">' + ((s.score > 0) ? (s.score.toFixed(0) + '<small>/100</small>') : '—') + '</div>' +
   '<div class="opp-name-2" style="margin-top:5px">فني ' + (s.technical_score ?? 0).toFixed(0) + ' · نهائي ' + (s.final_score ?? 0).toFixed(0) + '</div>' +
   '</div>'
   ).join('');
@@ -1019,7 +1019,7 @@ function renderDashboard(d) {
 
   '<div class="dash-grid" style="grid-template-columns:1fr 1fr">' +
   '<div class="why-box"><div class="dash-h">🎯 توزيع القرارات</div>' +
-  dist(d.decisions || {}, {'إشارة إيجابية':'buy','شراء':'buy','إشارة محايدة':'hold','إشارة سلبية':'sell','إشارة سلبية':'sell'}) + '</div>' +
+  dist(d.decisions || {}, {'إشارة إيجابية':'buy','شراء':'buy','إشارة محايدة':'hold','إشارة سلبية':'sell'}) + '</div>' +
   '<div class="why-box"><div class="dash-h">⚠️ توزيع المخاطر</div>' +
   dist(d.risk_levels || {}, {'منخفض':'low','متوسط':'mid','مرتفع':'high','مرتفع جداً':'vhigh'}) + '</div>' +
   '</div>' +
@@ -1336,7 +1336,7 @@ const ARM_MAP = {
   opportunity: {
   n: 'الفرص', icon: '🎯', color: '#f59e0b',
   q: 'أعمل إيه دلوقتي؟',
-  lead: 'الفرص المبكرة • ٧ استراتيجيات • أفضل الفرص • التفسير الكامل',
+  lead: '٩ استراتيجيات • درجة من ١٠٠ مع سبب واضح • خطة التعامل والمخاطر',
   pages: [], panel: 'opportunity'
   }
 };
@@ -2904,6 +2904,22 @@ async function armPortfolio(box) {
 
 /* ══════ ⑧ الفرص — أعمل إيه ══════ */
 async function armOpportunity(box) {
+  /* ⭐ OPP-001 (١٠ نوفمبر ٢٠٢٦) — الفلتر رقم ٨ بقى محرّك الفرص بتسع استراتيجيات.
+     ⛔ التنفيذ كله في assets/js/octa-opps.js (ملف مستقل) — عشان ماتفرقش
+        صفحة ٢١٨ كيلوبايت، ولأن الفلتر ده هيتطوّر كتير.
+     ⛔ لو الملف مش محمّل ⇒ بنرجع للكود القديم تحت (fallback). */
+  if (typeof window.renderOppsArm === 'function') {
+    window.renderOppsArm(box);
+    return;
+  }
+  return armOpportunityLegacy(box);
+}
+
+/* ⛔⛔⛔ النسخة القديمة من الفلتر — بقت **fallback** بس.
+   ⭐ ليش؟ لأن المحرّك الجديد لسه ما اتنشرش على الباك ⇒ لو ما كانش
+      في fallback، الفلتر رقم ٨ في المعاينة كان هيبقى «ميت»
+      (كان بيعرض فرص حقيقية قبل كده). ⛔ الموقع ما ينكسرش. */
+async function armOpportunityLegacy(box) {
   /* ⛔ نفس كلام armPortfolio — /api/ranking محمي دلوقتي */
   if (!octaHasToken()) {
   box.innerHTML = '<div class="opps-loading">سجّل دخولك عشان تشوف الفرص</div>';
@@ -2924,7 +2940,7 @@ async function armOpportunity(box) {
   <span class="opp-early-tag">${s.stage||'مبكرة'}</span>
   <div class="opp-code-2">${s.code}</div>
   <div class="opp-name-2">${(s.name||'').slice(0,16)}</div>
-  <div class="opp-score-2">${(s.opportunity||0).toFixed(0)}<small>/100</small></div>
+  <div class="opp-score-2">${(s.opportunity>0)?((s.opportunity||0).toFixed(0)+'<small>/100</small>'):'—'}</div>
   </div>`).join('') + '</div>'
   : '<div class="opps-loading">لا توجد فرص مبكرة — راقب الأخبار الرسمية</div>') +
   '</div>' +
@@ -2945,6 +2961,9 @@ async function armOpportunity(box) {
   '<div style="font-size:.8rem;color:var(--muted);margin-top:8px">افتح أي سهم واستخدم أزرار الاستراتيجيات لتغيير طريقة التقييم</div>' +
   '</div>';
 }
+/* ⭐ بن-export النسخة القديمة ⇒ محرّك الفرص الجديد يستخدمها لما
+   الـAPI لسه ما اتنشرش (fallback بدل رسالة خطأ). */
+window.__oppsLegacy = armOpportunityLegacy;
 
 /* ══════════ الوضع الليلي/النهاري ══════════ */
 function toggleTheme() {

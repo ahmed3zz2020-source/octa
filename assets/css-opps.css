@@ -1,0 +1,1336 @@
+/* ═══════════════════════════════════════════════════════════════
+   🎯 OCTA — فلتر الفرص (رقم ٨) — ورقة تنسيق مستقلة
+   ───────────────────────────────────────────────────────────────
+   📌 الملف ده لوحده: assets/css-opps.css
+      ما بيلمسش assets/octa.css ولا أي ملف تاني.
+   📌 كل الألوان من نظام الـ tokens الموجود في المشروع
+      (assets/octa-tokens.css) — مفيش hex مكتوب جوّه أي قاعدة.
+   📌 RTL دايماً: كل المسافات بـ margin-inline / padding-inline
+      و inset-inline — مفيش left/right.
+   📌 موبايل-أول: ٣٩٠px الأساس · التابلت (٧٠٠px+) بعده.
+   📌 الأرقام كلها font-variant-numeric: tabular-nums.
+
+   📌 عقد الكلاسات (قسم ٤ من وثيقة الواجهة):
+      .opps-wrap .opps-summary .opps-sum-item .opps-sum-k .opps-sum-v
+      .opps-tabs .opps-tab(.on) .opps-tab-i .opps-tab-n .opps-tabs-sep
+      .opps-toolbar .opps-search .opps-filters .opps-chip(.on) .opps-sort
+      .opps-list .opps-card(.open) .opps-card-hd .opps-card-code .opps-card-name
+      .opps-score .opps-score-v .opps-score-l .opps-badge-row .opps-badge
+      .opps-badge--risk .opps-badge--data .opps-badge--state
+      .opps-badge--horizon .opps-badge--flag
+      .opps-reasons .opps-reason
+      .opps-detail .opps-detail-sec .opps-detail-h .opps-detail-b
+      .opps-plan-grid .opps-plan-cell .opps-plan-k .opps-plan-v
+      .opps-crit .opps-crit-bar .opps-crit-bar>i .opps-crit-k .opps-crit-v
+      .opps-crit-empty
+      .opps-empty .opps-loading .opps-error .opps-stale .opps-foot
+      .opps-critcard .opps-critcard-hd .opps-critcard-ico .opps-critcard-bd
+      .opps-critcard-sec .opps-critcard-tbl
+      .opps-src .opps-src-item .opps-limits
+
+   📌 كلاسات إضافية بتستخدمها الجافاسكربت (مغطّاة هنا كمان):
+      .opps-hero .opps-hero-ico .opps-hero-t .opps-hero-s
+      .opps-card-sector .opps-card-foot .opps-price .opps-chg .opps-toggle
+      .opps-btn .opps-more .opps-filters-sep .opps-list-plain
+      .opps-crit-note .opps-crit-w .opps-crit.is-missing
+      .opps-critcard-t .opps-critcard-arrow .opps-critcard-hint
+      .opps-src-st .opps-missing-note
+
+   📌 خطّافات اختيارية للجافاسكربت (مش إجبارية — الشكل الأساسي
+      شغّال من غيرها):
+      • تدرّج الدرجة : .opps-score[data-level="hi|mid|lo"]
+                       أو .opps-score--hi / --mid / --lo / --na
+      • مستوى المخاطرة: .opps-badge--risk[data-risk="hi|md|lo"]
+      • حالة البيانات  : .opps-badge--data[data-quality="low|mid|hi"]
+      • حالة السهم     : .opps-badge--state[data-state="watch|ready|blocked"]
+      • حالة المصدر    : .opps-sum-item[data-status="ok|warn|err"]
+   ═══════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════
+   🎨 الرموز (tokens) — كلها مشتقة من رموز المشروع
+   ───────────────────────────────────────────────────────────────
+   📌 مفيش لون جديد جوّه القواعد — كل حاجة var().
+   📌 النسخة الفاتحة بتاعتها تحت (body.light + data-theme).
+   📌 نفس منطق css-gold.css: توكِنات محلية للوحدة + نسخة نهارية.
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  /* لون التمييز — ذهبي المشروع */
+  --opps-ac:       var(--gold);       /* تعبئة الأشرطة والمؤشرات */
+  --opps-ac-text:  var(--gold);       /* نص مميّز — داكن: تباين ٧٫٧ */
+  --opps-ac-soft:  var(--goldBg);     /* خلفية ناعمة */
+  --opps-ac-line:  var(--goldLine);   /* حدود ناعمة */
+  --opps-ac-fill:  var(--gold);       /* تعبئة صلبة */
+  --opps-ac-ink:   var(--pri4);       /* نص فوق التعبئة الصلبة */
+
+  /* ألوان الحالة — لكل واحدة نسخة فاتحة صح */
+  --opps-err:      var(--dn2);        /* خطأ — ٥٫١ فوق الكارت */
+  --opps-ok:       var(--up);         /* تمام — ٧٫١ */
+  --opps-warn:     var(--warn);       /* تحذير / بيانات قديمة */
+  --opps-warn-ink: var(--warn);       /* نص التحذير (مظبوط في النهاري) */
+  --opps-err-soft: var(--dnSoft);
+  --opps-ok-soft:  var(--upSoft);
+  --opps-warn-soft:var(--warnSoft);
+
+  /* مسار الأشرطة */
+  --opps-track:    var(--pri4);
+  /* عرض تعبئة شريط المعيار — الجافاسكربت بيملاه inline (نسبة %) */
+  --opps-w:        0%;
+
+  /* مسافات الوحدة */
+  --opps-gap:      var(--s3);
+  --opps-gap-lg:   var(--s4);
+}
+
+/* ── النسخة الفاتحة ──
+   📌 التوكنز في assets/octa-tokens.css بتغيّر لوحدها مع الثيم،
+      فكل اللي محتاجه هنا هو الحالتين اللي ما بيوصلوش لنص
+      صغير فوق خلفية ملوّنة (الذهبي ٠٩أ٧ب١٨ = ٤٫٠ بس). */
+body.light,
+:root[data-theme="light"] {
+  --opps-ac-text:  var(--gold3);      /* ٦ب٥٤١٠ = تباين ٧٫٢ على الأبيض */
+  --opps-ac-fill:  var(--gold3);      /* تعبئة صلبة غامقة */
+  --opps-ac-ink:   var(--white);      /* أبيض على ٦ب٥٤١٠ = تباين ٧٫٢ */
+  --opps-err:      var(--dn);         /* ب٩١c١c = تباين ٦٫٥ */
+  /* ⛔ نص التحذير في النهاري: الكهرماني الفاتح على خلفيته ٤٫٣٨ بس
+     — فنغمّقه شوية (مش لون جديد، مزيج من رموز موجودة). نفس منطق
+     css-gold.css. */
+  --opps-warn-ink: color-mix(in srgb, var(--warn) 82%, var(--txt));
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ① الحاوية + ترويسة الوحدة
+   ═══════════════════════════════════════════════════════════════ */
+.opps-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opps-gap-lg);
+  width: 100%;
+  max-width: 1000px;
+  margin-inline: auto;
+  padding-block: 4px 28px;
+  min-width: 0;                    /* ⛔ بيسمح للأبناء يتكمّموا جوّه */
+  font-variant-numeric: tabular-nums;
+  direction: rtl;
+  text-align: start;
+  unicode-bidi: isolate;
+}
+
+/* ⛔ الـhtml والـbody عندهم overflow-x: clip في assets/octa.css
+   (سطر ١٤ و ٢٤) — ما بنكرّرهاش هنا عشان ما نكسرش الـsticky. */
+
+.opps-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--pri2);
+  border: 1px solid var(--line);
+  border-radius: var(--r3);
+}
+.opps-hero-ico {
+  flex: none;
+  font-size: 1.6rem;
+  line-height: 1;
+}
+.opps-hero-t {
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--opps-ac-text);
+}
+.opps-hero-s {
+  margin-top: 2px;
+  font-size: .78rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ② شريط الملخص — (مفحوص / مؤهّل / معروض / آخر تحديث / مدى البيانات)
+   ═══════════════════════════════════════════════════════════════ */
+.opps-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(98px, 1fr));
+  gap: 8px;
+  padding: 10px;
+  background: var(--pri3);
+  border: 1px solid var(--line);
+  border-radius: var(--r3);
+}
+
+.opps-sum-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 11px;
+  background: var(--pri2);
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+}
+
+.opps-sum-k {
+  font-size: .68rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.opps-sum-v {
+  font-size: .95rem;
+  font-weight: 800;
+  line-height: 1.35;
+  color: var(--txt);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* حالة المصدر (خطّافات) */
+.opps-sum-item[data-status="ok"]   .opps-sum-v { color: var(--opps-ok); }
+.opps-sum-item[data-status="warn"] .opps-sum-v { color: var(--opps-warn-ink); }
+.opps-sum-item[data-status="err"]  .opps-sum-v { color: var(--opps-err); }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ③ شريط الاستراتيجيات التسع — تمرير أفقي
+   ───────────────────────────────────────────────────────────────
+   📌 ٩ تابات: ما بتترصّش على الموبايل — بتتمرّر أفقياً.
+   📌 الترتيب من اليمين لليسار تلقائياً (الـflex في صفحة RTL).
+   📌 التاب النشط بيتمرّر ليه (scrollIntoView) + snap اختياري.
+   ═══════════════════════════════════════════════════════════════ */
+.opps-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;   /* ⛔ السحب ميفوتش للصفحة */
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 16px;
+  scrollbar-width: none;
+}
+.opps-tabs::-webkit-scrollbar { display: none; }
+
+.opps-tab {
+  flex: 0 0 auto;
+  scroll-snap-align: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;                 /* ⛔ هدف لمس مريح */
+  padding: 8px 14px;
+  border-radius: var(--rfull);
+  background: var(--pri2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: .82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--t1), border-color var(--t1), color var(--t1);
+}
+.opps-tab:hover { border-color: var(--line2); color: var(--txt); }
+.opps-tab:focus-visible { outline: 2px solid var(--opps-ac); outline-offset: 2px; }
+
+.opps-tab.on {
+  background: var(--opps-ac-soft);
+  border-color: var(--opps-ac);
+  color: var(--opps-ac-text);
+  font-weight: 800;
+}
+
+.opps-tab-i {
+  flex: none;
+  font-size: 1rem;
+  line-height: 1;
+  font-style: normal;
+  opacity: .9;
+}
+.opps-tab.on .opps-tab-i { opacity: 1; }
+
+/* 📌 اسم الاستراتيجية (مش رقم) — يرث خط التاب */
+.opps-tab-n {
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: 1.3;
+  color: inherit;
+}
+
+/* فاصل خفيف بين المجموعتين — مش تاب */
+.opps-tabs-sep {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 1px;
+  height: 22px;
+  margin-inline: 4px;
+  background: var(--line2);
+  border-radius: 1px;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ④ شريط الأدوات — بحث + ترتيب + شرائح الفلاتر
+   ═══════════════════════════════════════════════════════════════ */
+.opps-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* ── البحث (input) ── */
+.opps-search {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+input.opps-search {
+  display: block;
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: var(--r2);
+  border: 1px solid var(--line2);
+  background: var(--pri2);
+  color: var(--txt);
+  font-family: inherit;
+  font-size: .88rem;
+  font-weight: 600;
+  transition: border-color var(--t1), box-shadow var(--t1);
+}
+input.opps-search::placeholder { color: var(--muted); }
+input.opps-search:focus {
+  outline: none;
+  border-color: var(--opps-ac);
+  box-shadow: 0 0 0 3px var(--opps-ac-soft);
+}
+input.opps-search::-webkit-search-cancel-button { filter: grayscale(.6); }
+
+/* ── الترتيب ── */
+.opps-sort {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 9px 12px;
+  border-radius: var(--r2);
+  border: 1px solid var(--line2);
+  background: var(--pri2);
+  color: var(--txt);
+  font-family: inherit;
+  font-size: .8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color var(--t1), color var(--t1);
+}
+.opps-sort:hover { border-color: var(--opps-ac); color: var(--opps-ac-text); }
+.opps-sort:focus-visible { outline: 2px solid var(--opps-ac); outline-offset: 2px; }
+select.opps-sort { padding-inline-end: 26px; }
+
+/* ── صف الفلاتر الاختيارية ── */
+.opps-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.opps-filters-sep {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 1px;
+  margin: 2px 4px;
+  background: var(--line2);
+  border-radius: 1px;
+}
+
+/* ── الشرائح ── */
+.opps-chip {
+  flex: 0 0 auto;
+  min-height: 36px;
+  max-width: 100%;
+  padding: 6px 12px;
+  border-radius: var(--rfull);
+  background: var(--pri3);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: .74rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background var(--t1), border-color var(--t1), color var(--t1);
+}
+.opps-chip:hover { border-color: var(--line2); color: var(--txt); }
+.opps-chip:focus-visible { outline: 2px solid var(--opps-ac); outline-offset: 2px; }
+
+.opps-chip.on {
+  background: var(--opps-ac-soft);
+  border-color: var(--opps-ac);
+  color: var(--opps-ac-text);
+}
+
+/* ── أزرار عامة (إعادة المحاولة · عرض المزيد) ── */
+.opps-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: var(--r2);
+  border: 1px solid var(--line2);
+  background: var(--pri3);
+  color: var(--txt);
+  font-family: inherit;
+  font-size: .8rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background var(--t1), border-color var(--t1), color var(--t1);
+}
+.opps-btn:hover { border-color: var(--opps-ac); color: var(--opps-ac-text); }
+.opps-btn:focus-visible { outline: 2px solid var(--opps-ac); outline-offset: 2px; }
+
+.opps-more {
+  display: flex;
+  width: 100%;
+  margin-top: 10px;
+  border-style: dashed;
+  background: transparent;
+  color: var(--muted);
+}
+.opps-more:hover { background: var(--wash); }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ⑤ قائمة الفرص + كارت السهم
+   ═══════════════════════════════════════════════════════════════ */
+.opps-list {
+  display: grid;
+  grid-template-columns: 1fr;          /* ٣٩٠px: عمود واحد */
+  gap: 10px;
+  min-width: 0;
+}
+
+.opps-card {
+  min-width: 0;
+  background: var(--pri2);
+  border: 1px solid var(--line);
+  border-radius: var(--r3);
+  overflow: hidden;
+  transition: border-color var(--t1), box-shadow var(--t1);
+}
+.opps-card.open {
+  border-color: var(--opps-ac);
+  box-shadow: var(--sh2);
+}
+.opps-card.open .opps-card-code b { color: var(--opps-ac-text); }
+
+/* ── رأس الكارت ── */
+.opps-card-hd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 12px 13px 10px;
+  min-width: 0;
+}
+.opps-card-hd > * { min-width: 0; }
+
+/* ── هوية السهم: الرمز + الاسم + القطاع ── */
+.opps-card-code {
+  flex: 1 1 140px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  direction: rtl;                     /* ⛔ اللاتيني معزول جوه الـb */
+}
+.opps-card-code b {
+  display: block;
+  direction: ltr;                     /* ⛔ الرمز لاتيني جوّه صفحة RTL */
+  unicode-bidi: isolate;
+  font-size: .92rem;
+  font-weight: 800;
+  letter-spacing: .4px;
+  color: var(--txt);
+  font-variant-numeric: tabular-nums;
+}
+
+.opps-card-name {
+  display: block;
+  max-width: 100%;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opps-card-sector {
+  display: inline-block;
+  max-width: 100%;
+  padding: 1px 7px;
+  border-radius: var(--rfull);
+  background: var(--pri3);
+  border: 1px solid var(--line);
+  font-size: .64rem;
+  font-weight: 700;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── الدرجة ── */
+.opps-score {
+  flex: 0 0 auto;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 56px;
+  margin-inline-start: auto;
+  padding: 6px 9px;
+  border-radius: var(--r2);
+  background: var(--opps-ac-soft);
+  border: 1px solid var(--opps-ac-line);
+}
+.opps-score-v {
+  font-size: 1.22rem;
+  font-weight: 900;
+  line-height: 1.1;
+  color: var(--opps-ac-text);
+  font-variant-numeric: tabular-nums;
+}
+.opps-score-l {
+  font-size: .6rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* تدرّج الدرجة — مقيد (مش قوس قزح): ذهبي / ذهبي ناعم / محايد / فاضي */
+.opps-score--mid, .opps-score[data-level="mid"] {
+  background: var(--opps-ac-soft);
+  border-color: var(--opps-ac-line);
+}
+.opps-score--hi, .opps-score[data-level="hi"] {
+  border-color: var(--opps-ac);
+  background: var(--opps-ac-soft);
+}
+.opps-score--lo, .opps-score[data-level="lo"] {
+  background: var(--pri3);
+  border-color: var(--line2);
+}
+.opps-score--lo .opps-score-v,
+.opps-score[data-level="lo"] .opps-score-v { color: var(--muted); }
+.opps-score--na, .opps-score[data-level="na"] {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--line2);
+}
+.opps-score--na .opps-score-v,
+.opps-score[data-level="na"] .opps-score-v { color: var(--muted); }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ⑥ الشارات — مخاطرة / بيانات / حالة / مدة / تنبيه
+   ═══════════════════════════════════════════════════════════════ */
+.opps-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0 13px 10px;
+  min-width: 0;
+}
+
+.opps-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border-radius: var(--rfull);
+  background: var(--pri3);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.opps-badge--risk {
+  background: var(--opps-warn-soft);
+  border-color: color-mix(in srgb, var(--opps-warn) 34%, transparent);
+  color: var(--opps-warn-ink);
+}
+.opps-badge--risk[data-risk="hi"] {
+  background: var(--opps-err-soft);
+  border-color: color-mix(in srgb, var(--opps-err) 38%, transparent);
+  color: var(--opps-err);
+}
+.opps-badge--risk[data-risk="lo"] {
+  background: var(--opps-ok-soft);
+  border-color: color-mix(in srgb, var(--opps-ok) 34%, transparent);
+  color: var(--opps-ok);
+}
+
+.opps-badge--data {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--line2);
+  color: var(--muted);
+}
+.opps-badge--data[data-quality="low"] {
+  background: var(--opps-warn-soft);
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--opps-warn) 30%, transparent);
+  color: var(--opps-warn-ink);
+}
+.opps-badge--data[data-quality="hi"] {
+  background: var(--opps-ok-soft);
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--opps-ok) 30%, transparent);
+  color: var(--opps-ok);
+}
+
+.opps-badge--state {
+  background: var(--opps-ac-soft);
+  border-color: var(--opps-ac-line);
+  color: var(--opps-ac-text);
+}
+.opps-badge--state[data-state="blocked"] {
+  background: var(--opps-err-soft);
+  border-color: color-mix(in srgb, var(--opps-err) 34%, transparent);
+  color: var(--opps-err);
+}
+
+.opps-badge--horizon {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--line2);
+  color: var(--muted);
+}
+
+.opps-badge--flag {
+  background: var(--opps-warn-soft);
+  border-color: color-mix(in srgb, var(--opps-warn) 30%, transparent);
+  color: var(--opps-warn-ink);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ⑦ الأسباب (٣ سطور سريعة)
+   ═══════════════════════════════════════════════════════════════ */
+.opps-reasons {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 13px 8px;
+  min-width: 0;
+}
+
+.opps-reason {
+  position: relative;
+  padding-inline-start: 14px;
+  font-size: .78rem;
+  line-height: 1.65;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.opps-reason::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 3px;
+  top: .62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--opps-ac);
+  opacity: .7;
+}
+
+/* قائمة بسيطة (المخاطر · شروط القبول · حدود التحليل) */
+.opps-list-plain {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+}
+.opps-list-plain li {
+  position: relative;
+  padding-inline-start: 14px;
+  font-size: .79rem;
+  line-height: 1.85;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.opps-list-plain li::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 3px;
+  top: .72em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--opps-ac);
+  opacity: .6;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ⑧ تذييل الكارت — السعر + التغير + زرار الفتح
+   ═══════════════════════════════════════════════════════════════ */
+.opps-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 0 13px 12px;
+  min-width: 0;
+}
+
+.opps-price {
+  font-size: .82rem;
+  font-weight: 800;
+  color: var(--txt);
+  font-variant-numeric: tabular-nums;
+}
+
+.opps-chg {
+  padding: 2px 9px;
+  border-radius: var(--rfull);
+  font-size: .72rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.opps-chg.up {
+  background: var(--opps-ok-soft);
+  color: var(--opps-ok);
+}
+.opps-chg.down {
+  background: var(--opps-err-soft);
+  color: var(--opps-err);
+}
+
+.opps-toggle {
+  margin-inline-start: auto;
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: var(--r2);
+  border: 1px solid var(--opps-ac-line);
+  background: var(--opps-ac-soft);
+  color: var(--opps-ac-text);
+  font-family: inherit;
+  font-size: .78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--t1), border-color var(--t1);
+}
+.opps-toggle:hover { border-color: var(--opps-ac); }
+.opps-toggle:focus-visible { outline: 2px solid var(--opps-ac); outline-offset: 2px; }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ⑨ التفاصيل القابلة للفتح (لكل كارت)
+   ───────────────────────────────────────────────────────────────
+   📌 الفتح: max-height + transition (وأنيميشن عند التركيب لأن
+      الجافاسكربت بيعيد الرسم من الصفر).
+   ═══════════════════════════════════════════════════════════════ */
+.opps-detail {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  border-top: 1px solid transparent;
+  transition: max-height .3s cubic-bezier(.4, 0, .2, 1), opacity .2s ease,
+              border-color .2s ease;
+}
+.opps-card.open .opps-detail {
+  max-height: 2600px;
+  opacity: 1;
+  border-top-color: var(--line);
+  animation: oppsReveal .3s cubic-bezier(.4, 0, .2, 1) both;
+}
+/* ⛔ إشارات فتح احتياطية — لو الجافاسكربت فتح بالـaria أو بكلاس
+   على التفاصيل نفسها بدل كلاس .open على الكارت. */
+.opps-detail.open,
+.opps-card-hd[aria-expanded="true"] ~ .opps-detail,
+.opps-card:has(.opps-card-hd[aria-expanded="true"]) .opps-detail {
+  max-height: 2600px;
+  opacity: 1;
+  border-top-color: var(--line);
+  animation: oppsReveal .3s cubic-bezier(.4, 0, .2, 1) both;
+}
+
+@keyframes oppsReveal {
+  from { max-height: 0; opacity: 0; }
+  to   { max-height: 2600px; opacity: 1; }
+}
+
+.opps-detail-sec { padding: 12px 13px 0; }
+.opps-detail-sec:last-child { padding-bottom: 13px; }
+
+.opps-detail-h {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 7px;
+  font-size: .8rem;
+  font-weight: 800;
+  line-height: 1.5;
+  color: var(--opps-ac-text);
+}
+.opps-detail-h::before {
+  content: '';
+  flex: none;
+  width: 3px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--opps-ac-line);
+}
+
+.opps-detail-b {
+  font-size: .8rem;
+  line-height: 1.85;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.opps-detail-b p { margin: 0 0 6px; }
+.opps-detail-b p:last-child { margin-bottom: 0; }
+.opps-detail-b ul, .opps-detail-b ol {
+  margin: 4px 0 0;
+  padding-inline-start: 18px;
+}
+.opps-detail-b li { margin-bottom: 3px; }
+.opps-detail-b li::marker { color: var(--opps-ac); }
+.opps-detail-b b, .opps-detail-b strong { color: var(--txt); font-weight: 700; }
+
+/* ── شبكة خطة التداول ── */
+.opps-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 8px;
+}
+
+.opps-plan-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 11px;
+  background: var(--pri3);
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+}
+.opps-plan-k {
+  font-size: .67rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.opps-plan-v {
+  font-size: .88rem;
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--txt);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* ── ملاحظة المعايير الناقصة ── */
+.opps-missing-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r2);
+  background: var(--opps-warn-soft);
+  border: 1px solid color-mix(in srgb, var(--opps-warn) 30%, transparent);
+  font-size: .78rem;
+  line-height: 1.8;
+  color: var(--muted);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ⑩ تفصيل المعايير — أشرطة التقدّم
+   ───────────────────────────────────────────────────────────────
+   📌 ترتيب العرض: الاسم + القيمة في سطر، والشريط تحتها.
+   📌 معيار ناقص (.is-missing / .opps-crit-empty) ≠ درجة صفر.
+      الناقص: نص باهت + مسار متقطّع + من غير تعبئة.
+      الدرجة صفر: مسار متصل + من غير تعبئة.
+   ═══════════════════════════════════════════════════════════════ */
+.opps-crit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.opps-crit:last-child { border-bottom: none; }
+
+.opps-crit-k {
+  order: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--txt);
+  overflow-wrap: anywhere;
+}
+
+.opps-crit-v {
+  order: 2;
+  flex: 0 0 auto;
+  font-size: .76rem;
+  font-weight: 800;
+  color: var(--opps-ac-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.opps-crit-bar {
+  order: 3;
+  flex: 1 1 100%;
+  height: 7px;
+  border-radius: var(--rfull);
+  background: var(--opps-track);
+  overflow: hidden;
+}
+.opps-crit-bar > i {
+  display: block;
+  height: 100%;
+  width: var(--opps-w, 0%);
+  border-radius: var(--rfull);
+  background: var(--opps-ac);
+  transition: width .3s ease;
+}
+
+.opps-crit-w {
+  font-size: .7rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.opps-crit-note {
+  order: 4;
+  flex: 1 1 100%;
+  font-size: .72rem;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+/* ── المعيار الناقص ── */
+.opps-crit-empty,
+.opps-crit.is-missing { color: var(--muted); }
+.opps-crit-empty .opps-crit-k,
+.opps-crit-empty .opps-crit-v,
+.opps-crit.is-missing .opps-crit-k,
+.opps-crit.is-missing .opps-crit-v {
+  color: var(--muted);
+  font-weight: 600;
+}
+.opps-crit.is-missing .opps-crit-bar,
+.opps-crit-empty .opps-crit-bar,
+.opps-crit-bar.opps-crit-empty {
+  background: transparent;
+  border: 1px dashed var(--line2);
+  height: 7px;
+}
+.opps-crit.is-missing .opps-crit-bar > i,
+.opps-crit-empty .opps-crit-bar > i,
+.opps-crit-bar.opps-crit-empty > i { background: transparent; }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ⑪ الحالات — تحميل / فاضي / خطأ / بيانات قديمة
+   ═══════════════════════════════════════════════════════════════ */
+.opps-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 26px 14px;
+  text-align: center;
+  font-size: .84rem;
+  font-weight: 600;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.opps-loading::before {
+  content: '';
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--line2);
+  border-top-color: var(--opps-ac);
+  animation: oppsSpin .8s linear infinite;
+}
+@keyframes oppsSpin { to { transform: rotate(360deg); } }
+
+.opps-empty {
+  padding: 30px 18px;
+  text-align: center;
+  background: var(--pri2);
+  border: 1px dashed var(--line2);
+  border-radius: var(--r3);
+  color: var(--muted);
+  font-size: .84rem;
+  font-weight: 600;
+  line-height: 1.85;
+}
+.opps-empty b { color: var(--txt); font-weight: 800; }
+.opps-empty p { margin: 6px 0 0; }
+
+.opps-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 14px 15px;
+  border-radius: var(--r3);
+  background: var(--opps-err-soft);
+  border: 1px solid color-mix(in srgb, var(--opps-err) 36%, transparent);
+  color: var(--opps-err);
+  font-size: .82rem;
+  font-weight: 700;
+  line-height: 1.75;
+}
+.opps-error b { font-weight: 800; }
+.opps-error p { margin: 0; flex: 1 1 200px; color: var(--opps-err); }
+.opps-error .opps-btn {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--opps-err) 46%, transparent);
+  color: var(--opps-err);
+}
+.opps-error .opps-btn:hover { background: var(--opps-err-soft); }
+
+.opps-stale {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 13px;
+  border-radius: var(--r2);
+  background: var(--opps-warn-soft);
+  border: 1px solid color-mix(in srgb, var(--opps-warn) 32%, transparent);
+  color: var(--opps-warn-ink);
+  font-size: .78rem;
+  font-weight: 700;
+  line-height: 1.7;
+}
+.opps-stale span { color: var(--muted); font-weight: 500; }
+
+.opps-foot {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  font-size: .72rem;
+  line-height: 1.9;
+  color: var(--muted);
+}
+.opps-foot b { color: var(--txt); font-weight: 700; }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ⑫ كارت «كيف اختار OCTA هذه الفرص؟» — أكورديون
+   ───────────────────────────────────────────────────────────────
+   📌 مافيش overlay ولا modal — بيتمدد جوّه الصفحة.
+   📌 الحركة: max-height + transition (+ أنيميشن عند التركيب لأن
+      الجافاسكربت بيعيد الرسم من الصفر).
+   📌 الفتح متحكّم فيه aria-expanded على الهيدر (button) + كلاس
+      .open على الكارت.
+   📌 السهم (opps-critcard-arrow) بيدور مع الفتح.
+   ═══════════════════════════════════════════════════════════════ */
+.opps-critcard {
+  margin-top: 4px;
+  background: var(--pri2);
+  border: 1px solid var(--line);
+  border-radius: var(--r3);
+  overflow: hidden;
+}
+
+.opps-critcard-hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 14px;
+  background: none;
+  border: 0;
+  color: var(--txt);
+  font-family: inherit;
+  font-size: .86rem;
+  font-weight: 800;
+  line-height: 1.5;
+  text-align: start;
+  cursor: pointer;
+  transition: background var(--t1);
+}
+.opps-critcard-hd:hover { background: var(--wash); }
+.opps-critcard-hd:focus-visible { outline: 2px solid var(--opps-ac); outline-offset: -2px; }
+
+.opps-critcard-ico {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--opps-ac-soft);
+  border: 1px solid var(--opps-ac-line);
+  color: var(--opps-ac-text);
+  font-size: .84rem;
+  line-height: 1;
+}
+
+.opps-critcard-t {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: .86rem;
+  font-weight: 800;
+  line-height: 1.5;
+  color: var(--txt);
+}
+
+/* ⛔ السهم — بيدور مع الفتح */
+.opps-critcard-arrow {
+  flex: none;
+  margin-inline-start: auto;
+  font-size: .95rem;
+  line-height: 1;
+  color: var(--opps-ac-text);
+  transition: transform var(--t2);
+}
+.opps-critcard-hd[aria-expanded="true"] .opps-critcard-arrow,
+.opps-critcard.open .opps-critcard-arrow { transform: rotate(180deg); }
+
+.opps-critcard-bd {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  padding-inline: 14px;
+  transition: max-height .32s cubic-bezier(.4, 0, .2, 1), opacity .22s ease,
+              padding .3s ease;
+}
+/* الفتح — بأي من الطرق (aria-expanded أو كلاس open) */
+.opps-critcard-hd[aria-expanded="true"] ~ .opps-critcard-bd,
+.opps-critcard[aria-expanded="true"] .opps-critcard-bd,
+.opps-critcard-bd.open,
+.opps-critcard.open .opps-critcard-bd {
+  max-height: 3200px;
+  opacity: 1;
+  padding-block: 2px 16px;
+  animation: oppsCritOpen .32s cubic-bezier(.4, 0, .2, 1) both;
+}
+/* احتياطي: لو الـbody مش ابن مباشر للـheader */
+.opps-critcard:has(.opps-critcard-hd[aria-expanded="true"]) .opps-critcard-bd {
+  max-height: 3200px;
+  opacity: 1;
+  padding-block: 2px 16px;
+  animation: oppsCritOpen .32s cubic-bezier(.4, 0, .2, 1) both;
+}
+@keyframes oppsCritOpen {
+  from { max-height: 0; opacity: 0; }
+  to   { max-height: 3200px; opacity: 1; }
+}
+
+/* ── الأقسام جوّه الكارت ── */
+.opps-critcard-sec {
+  margin-bottom: 15px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+}
+.opps-critcard-sec:first-child { padding-top: 0; border-top: 0; }
+.opps-critcard-sec:last-child { margin-bottom: 0; }
+
+.opps-critcard-sec b,
+.opps-critcard-sec strong {
+  display: block;
+  margin: 0 0 6px;
+  font-size: .82rem;
+  font-weight: 800;
+  line-height: 1.6;
+  color: var(--opps-ac-text);
+}
+.opps-critcard-sec p,
+.opps-critcard-sec li {
+  font-size: .79rem;
+  line-height: 1.9;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.opps-critcard-sec p { margin: 0 0 6px; }
+.opps-critcard-sec .opps-list-plain li::marker { color: var(--opps-ac); }
+
+/* ── جدول المعايير والأوزان ── */
+.opps-critcard-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .76rem;
+  font-variant-numeric: tabular-nums;
+}
+.opps-critcard-tbl th,
+.opps-critcard-tbl td {
+  padding: 7px 8px;
+  text-align: start;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.opps-critcard-tbl th {
+  font-size: .7rem;
+  font-weight: 800;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.opps-critcard-tbl td { color: var(--txt); }
+.opps-critcard-tbl tr:last-child td { border-bottom: none; }
+.opps-critcard-tbl td:last-child,
+.opps-critcard-tbl th:last-child { text-align: end; }
+
+.opps-critcard-hint {
+  margin-top: 2px;
+  font-size: .68rem;
+  line-height: 1.6;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* ── مصادر البيانات ── */
+.opps-src {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.opps-src-item {
+  flex: 1 1 150px;
+  min-width: 0;
+  padding: 9px 11px;
+  background: var(--pri3);
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+  font-size: .73rem;
+  line-height: 1.7;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.opps-src-item b {
+  display: block;
+  margin-bottom: 2px;
+  font-size: .76rem;
+  font-weight: 800;
+  color: var(--txt);
+}
+.opps-src-item span { display: block; }
+
+.opps-src-st {
+  display: inline-block !important;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: var(--rfull);
+  background: var(--pri4);
+  border: 1px solid var(--line);
+  font-size: .64rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* ── حدود التحليل ── */
+.opps-limits {
+  padding: 12px 14px;
+  border-radius: var(--r2);
+  background: var(--opps-warn-soft);
+  border: 1px solid color-mix(in srgb, var(--opps-warn) 30%, transparent);
+  font-size: .78rem;
+  line-height: 1.9;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.opps-limits b,
+.opps-limits strong { color: var(--opps-warn-ink); font-weight: 800; }
+.opps-limits .opps-list-plain li::before { background: var(--opps-warn-ink); opacity: .8; }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ⑬ التابلت (٧٠٠px+) — الكروت بعمودين والملخص بصف أوسع
+   ═══════════════════════════════════════════════════════════════ */
+@media (min-width: 700px) {
+  .opps-list { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .opps-summary { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+  .opps-toolbar { gap: 10px; }
+  input.opps-search { flex: 1 1 220px; }
+  .opps-card-hd { padding: 14px 15px 10px; }
+  .opps-badge-row,
+  .opps-reasons,
+  .opps-card-foot { padding-inline: 15px; }
+  .opps-detail-sec { padding-inline: 15px; }
+  .opps-critcard-hd { padding: 16px 18px; }
+  .opps-critcard-bd { padding-inline: 18px; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ⑭ الحركة المخفّضة — من غير أنيميشن
+   ═══════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .opps-critcard-bd,
+  .opps-detail,
+  .opps-critcard-arrow,
+  .opps-crit-bar > i,
+  .opps-tab,
+  .opps-chip,
+  .opps-card,
+  .opps-sort,
+  .opps-toggle,
+  .opps-btn,
+  input.opps-search {
+    transition: none !important;
+    animation: none !important;
+  }
+  .opps-loading::before { animation: none; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ⑮ طباعة
+   ═══════════════════════════════════════════════════════════════ */
+@media print {
+  .opps-tabs,
+  .opps-toolbar,
+  .opps-toggle,
+  .opps-more,
+  .opps-critcard-arrow { display: none !important; }
+  .opps-card,
+  .opps-critcard { border-color: var(--muted); box-shadow: none; }
+  .opps-detail,
+  .opps-critcard-bd {
+    max-height: none !important;
+    opacity: 1 !important;
+    animation: none !important;
+  }
+}
