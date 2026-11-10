@@ -262,6 +262,74 @@ async function fetchApi(target, init) {
    ⛌ النتيجة: أي مسار محمي كان بيرجّع 401 دايماً لما يمر
    ⛌ من الـworker.
    ═══════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+  📸 لقطة محرّك الفرص — للمعاينة بس (مش الإنتاج)
+  ────────────────────────────────────────────────────────────────
+  📌 ليش؟ محرّك الفرص (OPP-001) لسه ما اتنشرش على الباك
+     ⇒ /api/opp/* بيرجّع 405 ⇒ الفلتر رقم ٨ كان هيبقى ميت
+     على المعاينة (وكان بيعرض فرص حقيقية قبل كده).
+  ⛔⛔ القاعدة: الأولوية دايماً للباك الحيّ. اللقطة fallback بس،
+     وبتتشال من الإنتاج بالكامل (OCTA_OPP_SNAPSHOT مش مفعّل هناك).
+  ⛔ والملف نفسه (data/opp_snapshot.json) مش بيننسخ في بناء الإنتاج.
+*/
+let _oppSnap = null;
+let _oppSnapAt = 0;
+const OPP_SNAP_TTL = 10 * 60 * 1000;
+
+async function oppSnapshot(url, request, env) {
+  if (!_oppSnap || (Date.now() - _oppSnapAt) > OPP_SNAP_TTL) {
+    try {
+      const r = await env.ASSETS.fetch(new Request(
+        new URL('/data/opp_snapshot.json', url.origin).toString()));
+      if (r && r.status < 400) {
+        _oppSnap = await r.json();
+        _oppSnapAt = Date.now();
+      }
+    } catch (e) { }
+  }
+  if (!_oppSnap) {
+    return new Response(JSON.stringify({ ok: false, error: 'snapshot-missing' }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } });
+  }
+  const snap = _oppSnap;
+  const path = url.pathname;
+  const note = { snapshot: true, generated_at: snap.generated_at,
+                 model_version: snap.model_version, note_ar: snap.note_ar };
+  let body = null;
+  if (path === '/api/opp/strategies') {
+    body = { ok: true, strategies: snap.strategies, model_version: snap.model_version, ...note };
+  } else {
+    const m = path.match(/^\/api\/opp\/(list|detail|explain)\/([^/]+)(?:\/([^/]+))?/);
+    if (m) {
+      const kind = m[1], key = m[2], code = m[3];
+      const lst = (snap.lists || {})[key];
+      if (!lst) {
+        body = { ok: false, error: 'unknown-strategy', ...note };
+      } else if (kind === 'list') {
+        body = { ok: true, strategy: key, summary: lst.summary, items: lst.items, ...note };
+      } else {
+        const it = (lst.items || []).find(x => String(x.code) === String(code));
+        if (!it) {
+          body = { ok: false, error: 'not-found', ...note };
+        } else if (kind === 'detail') {
+          body = { ok: true, strategy: key, code: code, item: it, explain: it.criteria || [], ...note };
+        } else {
+          body = { ok: true, strategy: key, code: code,
+                   criteria: it.criteria || [], missing: it.missing || [], ...note };
+        }
+      }
+    }
+  }
+  if (!body) {
+    return new Response(JSON.stringify({ ok: false, error: 'no-snapshot-route' }),
+      { status: 404, headers: { 'Content-Type': 'application/json' } });
+  }
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+  });
+}
+
 function buildHeaders(request) {
   const h = new Headers();
   h.set('Accept', 'application/json');
@@ -1147,6 +1215,25 @@ async function handle(request, env, ctx) {
 
     /* 1) proxy للـAPI (نفس origin عشان نتفادى CORP same-site) */
     if (url.pathname.startsWith('/api/')) {
+      /* ⭐⭐ محرّك الفرص (OPP-001) — الباك الحيّ الأول، واللقطة fallback.
+         ⛔ في الإنتاج الـOCTA_OPP_SNAPSHOT مش مفعّل ⇒ السلوك القديم
+            (proxy بس) — يعني ما فيش أي تغيير على الإنتاج. */
+      if (url.pathname.startsWith('/api/opp/') && env && env.OCTA_OPP_SNAPSHOT === 'on') {
+        try {
+          const live = await fetch(API + url.pathname + url.search,
+            { method: 'GET', headers: buildHeaders(request) });
+          if (live && live.status === 200) {
+            const ct = (live.headers.get('content-type') || '');
+            if (ct.indexOf('json') >= 0) {
+              return new Response(live.body, {
+                status: 200,
+                headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+              });
+            }
+          }
+        } catch (e) { }
+        return await oppSnapshot(url, request, env);
+      }
       /* ⛔⛔ الجسور بتاعت المعاينة (tvscan/tvcandles) **ما بتروحلش**
          ⛌   للـAPI الميت — لو حصل خطأ جواها (أو نشر جديد لسه
          ⛌   بيتملّد) كانت بيروحوا للباك (Railway) ⇒ 405/503 HTML

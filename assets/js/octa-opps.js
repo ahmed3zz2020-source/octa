@@ -53,7 +53,9 @@
         throw new Error('انتهت الجلسة — سجّل دخولك تاني');
       }
       if (st === 404 || st === 405) {
-        throw new Error('محرّك الفرص غير متاح على السيرفر — يمكن يكون لسه ما اتنشرش');
+        var e1 = new Error('محرّك الفرص غير متاح على السيرفر — يمكن يكون لسه ما اتنشرش');
+        e1.__oppNotPublished = true;
+        throw e1;
       }
       if (st >= 400) {
         throw new Error('الخادم رجّع خطأ ' + st + ' — أعد المحاولة بعد قليل');
@@ -481,6 +483,29 @@
   }
 
   /* ─────────── الرسم ─────────── */
+  /* ⭐⭐ fallback: لو المحرّك الجديد لسه ما اتنشرش على الباك
+     ⇒ نرجع للنسخة القديمة من الفلتر (اللي كانت شغّالة) بدل
+     رسالة خطأ. ⛔ الموقع ماينكسرش والمستخدم بيشوف فرص حقيقية. */
+  function legacyFallback(box, msg) {
+    if (typeof window.__oppsLegacy !== 'function') {
+      S.error = msg; S.loading = false; render(box); return;
+    }
+    try {
+      Promise.resolve(window.__oppsLegacy(box)).then(function () {
+        var note = document.createElement('div');
+        note.className = 'opps-stale';
+        note.textContent = '⚠️ محرّك الفرص الجديد (٩ استراتيجيات) لسه ما اتنشرش على السيرفر — '
+          + 'بتعرض النسخة القديمة مؤقتاً. جرّب تاني بعد النشر.';
+        if (box && box.firstChild) box.insertBefore(note, box.firstChild);
+        else if (box) box.appendChild(note);
+      }).catch(function () {
+        S.error = msg; S.loading = false; render(box);
+      });
+    } catch (e) {
+      S.error = msg; S.loading = false; render(box);
+    }
+  }
+
   function errorHTML() {
     return '<div class="opps-error"><b>مش قادرين نجيب الفرص دلوقتي</b><p>' + esc(S.error || 'خطأ غير متوقع') + '</p>'
       + '<button class="opps-btn" onclick="window.__oppsReload()">إعادة المحاولة</button></div>';
@@ -575,6 +600,7 @@
     }).catch(function (e) {
       S.loading = false;
       S.error = (e && e.message) ? e.message : 'خطأ غير متوقع';
+      if (e && e.__oppNotPublished) { legacyFallback(document.getElementById('armBody') || null, S.error); return; }
       render(document.getElementById('armBody') || null);
     });
   }
@@ -593,6 +619,7 @@
     }).catch(function (e) {
       S.error = (e && e.message) ? e.message : 'خطأ غير متوقع';
       S.loading = false;
+      if (e && e.__oppNotPublished) { legacyFallback(box, S.error); return; }
       render(box);
     });
   }

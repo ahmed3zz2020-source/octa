@@ -799,7 +799,7 @@ async function loadEarlyOpps(force) {
   '<span class="opp-early-tag">' + (s.stage || 'فرصة مبكرة') + '</span>' +
   '<div class="opp-code-2">' + s.code + '</div>' +
   '<div class="opp-name-2">' + (s.name || '') + '</div>' +
-  '<div class="opp-score-2">' + (s.score ?? 0).toFixed(0) + '<small>/100</small></div>' +
+  '<div class="opp-score-2">' + ((s.score > 0) ? (s.score.toFixed(0) + '<small>/100</small>') : '—') + '</div>' +
   '<div class="opp-name-2" style="margin-top:5px">فني ' + (s.technical_score ?? 0).toFixed(0) + ' · نهائي ' + (s.final_score ?? 0).toFixed(0) + '</div>' +
   '</div>'
   ).join('');
@@ -2912,6 +2912,14 @@ async function armOpportunity(box) {
     window.renderOppsArm(box);
     return;
   }
+  return armOpportunityLegacy(box);
+}
+
+/* ⛔⛔⛔ النسخة القديمة من الفلتر — بقت **fallback** بس.
+   ⭐ ليش؟ لأن المحرّك الجديد لسه ما اتنشرش على الباك ⇒ لو ما كانش
+      في fallback، الفلتر رقم ٨ في المعاينة كان هيبقى «ميت»
+      (كان بيعرض فرص حقيقية قبل كده). ⛔ الموقع ما ينكسرش. */
+async function armOpportunityLegacy(box) {
   /* ⛔ نفس كلام armPortfolio — /api/ranking محمي دلوقتي */
   if (!octaHasToken()) {
   box.innerHTML = '<div class="opps-loading">سجّل دخولك عشان تشوف الفرص</div>';
@@ -2932,7 +2940,7 @@ async function armOpportunity(box) {
   <span class="opp-early-tag">${s.stage||'مبكرة'}</span>
   <div class="opp-code-2">${s.code}</div>
   <div class="opp-name-2">${(s.name||'').slice(0,16)}</div>
-  <div class="opp-score-2">${(s.opportunity||0).toFixed(0)}<small>/100</small></div>
+  <div class="opp-score-2">${(s.opportunity>0)?((s.opportunity||0).toFixed(0)+'<small>/100</small>'):'—'}</div>
   </div>`).join('') + '</div>'
   : '<div class="opps-loading">لا توجد فرص مبكرة — راقب الأخبار الرسمية</div>') +
   '</div>' +
@@ -2953,6 +2961,9 @@ async function armOpportunity(box) {
   '<div style="font-size:.8rem;color:var(--muted);margin-top:8px">افتح أي سهم واستخدم أزرار الاستراتيجيات لتغيير طريقة التقييم</div>' +
   '</div>';
 }
+/* ⭐ بن-export النسخة القديمة ⇒ محرّك الفرص الجديد يستخدمها لما
+   الـAPI لسه ما اتنشرش (fallback بدل رسالة خطأ). */
+window.__oppsLegacy = armOpportunityLegacy;
 
 /* ══════════ الوضع الليلي/النهاري ══════════ */
 function toggleTheme() {
