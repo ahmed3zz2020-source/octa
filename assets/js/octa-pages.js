@@ -1019,7 +1019,7 @@ function renderDashboard(d) {
 
   '<div class="dash-grid" style="grid-template-columns:1fr 1fr">' +
   '<div class="why-box"><div class="dash-h">🎯 توزيع القرارات</div>' +
-  dist(d.decisions || {}, {'إشارة إيجابية':'buy','شراء':'buy','إشارة محايدة':'hold','إشارة سلبية':'sell','إشارة سلبية':'sell'}) + '</div>' +
+  dist(d.decisions || {}, {'إشارة إيجابية':'buy','شراء':'buy','إشارة محايدة':'hold','إشارة سلبية':'sell'}) + '</div>' +
   '<div class="why-box"><div class="dash-h">⚠️ توزيع المخاطر</div>' +
   dist(d.risk_levels || {}, {'منخفض':'low','متوسط':'mid','مرتفع':'high','مرتفع جداً':'vhigh'}) + '</div>' +
   '</div>' +
@@ -1336,7 +1336,7 @@ const ARM_MAP = {
   opportunity: {
   n: 'الفرص', icon: '🎯', color: '#f59e0b',
   q: 'أعمل إيه دلوقتي؟',
-  lead: 'الفرص المبكرة • ٧ استراتيجيات • أفضل الفرص • التفسير الكامل',
+  lead: '٩ استراتيجيات • درجة من ١٠٠ مع سبب واضح • خطة التعامل والمخاطر',
   pages: [], panel: 'opportunity'
   }
 };
