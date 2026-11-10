@@ -678,6 +678,7 @@
   function explainHTML(d) {
     var risk = d.risk || {};
     var groups = d.economic_group_weights || {};
+    var nSec = Object.keys(d.sector_weights || {}).length;
     var h = '<div class="alpha-critcard' + (S.critOpen ? ' open' : '') + '">';
     h += '<button class="alpha-critcard-hd" onclick="window.__alphaToggleCrit()" aria-expanded="'
       + (S.critOpen ? 'true' : 'false') + '">'
@@ -701,12 +702,12 @@
         + Object.keys(d.sector_weights || {}).map(function (k) { return k + ' ' + pct(d.sector_weights[k]); }).join(' · '));
       h += explainBlock('نصيب أكبر ٣ أسهم', 'الثلاثة الكبار بياخدوا ' + pct(risk.top3_concentration_pct)
         + ' من فلوس المحفظة — يعني لو وزنهم كله كان في سهم واحد، المحفظة كانت أأمن. '
-        + 'مؤشر تشتّت التوزيع (هرنهايندال) = ' + num(risk.herfindahl_pct, 0)
-        + ' من ١٠٬٠٠٠ ⇒ كل ما الرقم أقل، التوزيع أعدل.');
+        + 'والباقي موزّع على ' + ar(nSec) + ' قطاعات مختلفة، ومفيش قطاع واحد بياخد أكتر من '
+        + pct((d.limits || {}).sector_cap) + '.');
       h += explainBlock('الارتباط والمخاطرة', 'الارتباط من الشموع اليومية · تذبذب المحفظة ' + pct(risk.portfolio_volatility_pct)
-        + ' · نصيب أكبر ٣ ' + pct(risk.top3_concentration_pct) + ' · مساهمة الخطر الأعلى: '
+        + ' · نصيب أكبر ٣: ' + pct(risk.top3_concentration_pct) + ' · مساهمة الخطر الأعلى: '
         + ((risk.margin_risk_contribution || [])[0] ? (risk.margin_risk_contribution[0].code + ' ' + pct(risk.margin_risk_contribution[0].risk_contribution_pct)) : '—'));
-      h += explainBlock('السيولة النقدية', pct(d.cash_pct) + ' نقد · والسبب: ' + (d.n_positions < d.target_positions ? 'مفيش أسهم مؤهلة أكتر.' : 'الأوراق كلها مؤهلة — بس الكاش بيحمي من تعبئة المراكز.'));
+      h += explainBlock('السيولة النقدية', num(d.cash_pct, 2) + '٪ نقد · والسبب: ' + (d.n_positions < d.target_positions ? 'مفيش أسهم مؤهلة أكتر.' : 'الأوراق كلها مؤهلة — بس الكاش بيحمي من تعبئة المراكز.'));
       h += explainBlock('سياسة إعادة التوازن', 'مراجعة دورية + إعادة توازن لو الوزن خرج عن شريط ' + pct((d.limits || {}).min_weight ? 4 : 4) + ' — وبلا تغيير يومي.');
       h += explainBlock('جني الأرباح وإبطال الفرضية', 'جني جزئي عند ٢٥٪ · إنهاء المركز عند وقف الخسارة أو إبطال الفرضية · وحد أدنى لمدة الاحتفاظ قبل أي تغيير.');
       h += explainBlock('متى بنستبدل سهم', 'تحسّن لازم يتعدّى حد الأهمية + مفيش استبدال ثم رجوع فوري + حد للتداول في الربع.');
