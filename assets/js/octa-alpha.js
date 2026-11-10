@@ -14,6 +14,8 @@
     critOpen: false,     /* كارت التفسير */
     labOpen: false,      /* لوحة المختبر */
     notifOpen: false,    /* مركز الإشعارات */
+    perfOpen: false,     /* الأداء مقابل المؤشر (مقفول افتراضياً) */
+    decOpen: false,      /* سجل القرارات (مقفول افتراضياً) */
     mapSel: null,       /* السهم المختار في الخريطة */
     lab: null,
     alerts: null,
@@ -477,7 +479,9 @@
   /* ─────────── لوحة الأداء التفصيلية (فترات + منحنى) ─────────── */
   function perfHTML(perf) {
     var h = '<div class="alpha-sec">';
-    h += '<div class="alpha-sec-h">📈 الأداء مقابل المؤشر</div>';
+    h += '<div class="alpha-sec-h" onclick="window.__alphaTogglePerf()">📈 الأداء مقابل المؤشر'
+      + ' <span class="alpha-arrow">' + (S.perfOpen ? '▴' : '▾') + '</span></div>';
+    if (!S.perfOpen) { h += '</div>'; return h; }
     if (!perf || !perf.performance) {
       h += '<div class="alpha-muted">بيانات الأداء غير متاحة دلوقتي.</div></div>';
       return h;
@@ -594,7 +598,9 @@
     var list = (dec && dec.decisions) ? dec.decisions : [];
     var props = (dec && dec.proposals && dec.proposals.actions) ? dec.proposals.actions : [];
     var h = '<div class="alpha-sec">';
-    h += '<div class="alpha-sec-h">🧾 سجل القرارات</div>';
+    h += '<div class="alpha-sec-h" onclick="window.__alphaToggleDec()">🧾 سجل القرارات'
+      + ' <span class="alpha-arrow">' + (S.decOpen ? '▴' : '▾') + '</span></div>';
+    if (!S.decOpen) { h += '</div>'; return h; }
     if (props.length) {
       h += '<div class="alpha-props">';
       props.slice(0, 5).forEach(function (p) {
@@ -686,7 +692,9 @@
       h += explainBlock('معايير التقييم', (d.criteria || []).map(function (c) {
         return c.label_ar + ' ' + num(c.weight, 0) + '٪';
       }).join(' · '));
-      h += explainBlock('ليه الأسهم دي بالتحديد', 'لأنها بتجمّع أفضل نتيجة على معايير المحفظة الستة + تنويع مقبول مع 나머ى المراكز.');
+      h += explainBlock('ليه الأسهم دي بالتحديد', 'لأنها بتجمّع أفضل نتيجة على معايير المحفظة السبعة '
+        + '(جودة · تقييم · فني · سيولة · محفزات · عائد مقابل مخاطرة · تنويع)، '
+        + 'وكمان بتنسجم مع باقي أسهم المحفظة من ناحية التنويع.');
       h += explainBlock('ليه مش أعلى تقييم', 'لأن الاختيار للمحفظة مش للسهم: سهم ممتاز لوحده ممكن يضيف تركيز قطاعي أو ارتباط عالي — فبيتقصّ.');
       h += explainBlock('إزاي اتحدد الوزن', 'الوزن = درجة المحفظة محوّلة خطياً (٥٪-١٥٪) مع تطبيع ⇒ المجموع ١٠٠٪ والكاش الباقي.');
       h += explainBlock('توزيع القطاعات', 'الحدّ الأقصى ' + pct((d.limits || {}).sector_cap) + ' لكل قطاع · والمجموعة الاقتصادية ' + pct((d.limits || {}).economic_group_cap) + '. التوزيع الحالي: '
@@ -765,6 +773,8 @@
     } catch (e) { }
   };
   window.__alphaToggleLab = function () { S.labOpen = !S.labOpen; render(); };
+  window.__alphaTogglePerf = function () { S.perfOpen = !S.perfOpen; render(); };
+  window.__alphaToggleDec = function () { S.decOpen = !S.decOpen; render(); };
 
   window.renderAlphaArm = function (box) {
     if (box) box.innerHTML = '<div class="alpha-wrap"><div class="opps-loading">⏳ بنحسب المحفظة…</div></div>';
