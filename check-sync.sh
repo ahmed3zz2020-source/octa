@@ -27,7 +27,34 @@ echo "  فحص المزامنة — $(date '+%Y-%m-%d %H:%M')"
 echo "═══════════════════════════════════════════════════════"
 
 curl -sfL --compressed --max-time 60 -A "$UA" "$BASE/" -o "$TMP/index.html" || { echo "❌ الموقع مش راد — استنى"; exit 1; }
-FILES=$(grep -o 'assets/[a-zA-Z0-9/._-]*\.\(js\|css\)' "$TMP/index.html" | sort -u)
+
+# ⛔⛔⛔ (١٠ نوفمبر ٢٠٢٦) إصلاح نقطة كاذبة في الحارس:
+#   جذر الموقع "/" بقى بيقدّم market.html (الصفحة العامة) مش index.html
+#   (التطبيق) ⇒ كان الحارس بيقارن ٤ ملفات من الصفحة العامة بس
+#   ⇒ كان بيقول "كل حاجة مظبوطة" والتطبيق فيه فروق حقيقية!
+#   ✅ الحل: قائمة الأصول تُؤخذ من index.html في GitHub (كل الـ٤٧ سكربت)
+#      مش من الجذر المنشور.
+FILES=""
+if [ -n "$GITHUB_TOKEN" ]; then
+  curl -sfL --max-time 30 -A "$UA" -H "Authorization: Bearer $GITHUB_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/$REPO/contents/index.html?ref=main" \
+    | python3 -c "
+import json,sys,base64
+try:
+    d=json.load(sys.stdin)
+    sys.stdout.buffer.write(base64.b64decode(d['content']))
+except Exception:
+    pass
+" > "$TMP/gh_index"
+fi
+[ -s "$TMP/gh_index" ] || curl -sfL --max-time 30 -A "$UA" \
+  "https://raw.githubusercontent.com/$REPO/main/index.html" -o "$TMP/gh_index"
+if [ -s "$TMP/gh_index" ]; then
+  FILES=$(grep -o 'assets/[a-zA-Z0-9/._-]*\.\(js\|css\)' "$TMP/gh_index" | sort -u)
+fi
+[ -n "$FILES" ] || FILES=$(grep -o 'assets/[a-zA-Z0-9/._-]*\.\(js\|css\)' "$TMP/index.html" | sort -u)
+echo "  📦 أصول مفحوصة: $(echo "$FILES" | wc -w)"
 
 DRIFT=0
 LOST=0
