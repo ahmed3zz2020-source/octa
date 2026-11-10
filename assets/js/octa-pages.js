@@ -2855,6 +2855,14 @@ async function armPortfolio(box) {
   box.innerHTML = '<div class="opps-loading">سجّل دخولك عشان تشوف محفظتك</div>';
   return;
   }
+  /* ⭐ OCTA Alpha (OPP-002C · ١٠ نوفمبر ٢٠٢٦) — قسم «المحفظة الذكية» فوق
+     محفظتك الخاصة. ⛔ محفظتك الأصلية بتفضل زي ما هي تحت.
+     التنفيذ في assets/js/octa-alpha.js (ملف مستقل). */
+  box.innerHTML = '<div id="alphaSlot"><div class="opps-loading">⏳ بنحسب المحفظة…</div></div>'
+                + '<div id="userPfSlot"></div>';
+  const userSlot = document.getElementById('userPfSlot');
+  try { if (typeof renderAlphaArm === 'function') renderAlphaArm(document.getElementById('alphaSlot')); }
+  catch(e) { const a = document.getElementById('alphaSlot'); if (a) a.innerHTML = ''; }
   const [pf, d] = await Promise.all([
   octaFetch(OCTA_API + '/api/portfolio').then(r=>r.json()).catch(()=>({})),
   octaFetch(OCTA_API + '/api/rank?limit=20').then(r=>r.json()).catch(()=>({results:[]})),
@@ -2862,7 +2870,7 @@ async function armPortfolio(box) {
   const rows = (d.results||[]);
   const hold = pf.holdings || {};
 
-  box.innerHTML =
+  userSlot.innerHTML =
   '<div class="ic-grid" style="--ac:#8b5cf6">' +
   ic('💼', 'محفظتي', 'أسهمك وتوزيعك الحالي',
   `<span>${pf.count||0} سهم</span><span>${(pf.total_value||0).toLocaleString('en-US',{maximumFractionDigits:0})} ج.م</span>`,

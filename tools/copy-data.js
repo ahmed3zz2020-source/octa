@@ -32,8 +32,10 @@ const keepStatic = process.env.OCTA_STATIC_MARKETS !== '0';
       تبقى داتا عامة من غير توكن (نفس المشكلة اللي قفلناها
       في data_markets.js).
    ⛔ فالمعاينة بس: OCTA_OPP_SNAPSHOT=1 npm run build:strict */
-const PREVIEW_ONLY = ['opp_snapshot.json'];
+const PREVIEW_ONLY = ['opp_snapshot.json', 'alpha_snapshot.json'];
 const keepSnapshot = process.env.OCTA_OPP_SNAPSHOT === '1';
+/* ⛔⛔ لقطة OCTA Alpha (OPP-002) — معاينة بس (نفس القاعدة). */
+const keepAlpha = process.env.OCTA_ALPHA_SNAPSHOT === '1';
 
 if (!fs.existsSync(SRC)) {
   console.log('  ℹ️  مفيش مجلد data — اتخطّى');
@@ -49,7 +51,8 @@ for (const f of fs.readdirSync(SRC)) {
     skipped++;
     continue;
   }
-  if (PREVIEW_ONLY.indexOf(f) !== -1 && !keepSnapshot) {
+  const isAlpha = (f === 'alpha_snapshot.json');
+  if (PREVIEW_ONLY.indexOf(f) !== -1 && !keepSnapshot && !(isAlpha && keepAlpha)) {
     console.log('  🔒 مش منسوخ (معاينة بس): ' + f);
     skipped++;
     continue;

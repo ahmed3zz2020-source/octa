@@ -330,6 +330,69 @@ async function oppSnapshot(url, request, env) {
   });
 }
 
+/* ═══════════════════════════════════════════════════════════════
+  🐙 لقطة OCTA Alpha — المحفظة الذكية (OPP-002) — للمعاينة بس
+  ────────────────────────────────────────────────────────────────
+  📌 نفس منطق محرّك الفرص: الباك الحيّ الأول، واللقطة fallback.
+  ⛔ في الإنتاج OCTA_ALPHA_SNAPSHOT مش مفعّل ⇒ صفر تسرّب.
+*/
+let _alphaSnap = null;
+let _alphaSnapAt = 0;
+const ALPHA_SNAP_TTL = 10 * 60 * 1000;
+
+async function alphaSnapshot(url, request, env) {
+  if (!_alphaSnap || (Date.now() - _alphaSnapAt) > ALPHA_SNAP_TTL) {
+    try {
+      const r = await env.ASSETS.fetch(new Request(
+        new URL('/data/alpha_snapshot.json', url.origin).toString()));
+      if (r && r.status < 400) {
+        _alphaSnap = await r.json();
+        _alphaSnapAt = Date.now();
+      }
+    } catch (e) { }
+  }
+  if (!_alphaSnap) {
+    return new Response(JSON.stringify({ ok: false, error: 'snapshot-missing' }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } });
+  }
+  const snap = _alphaSnap;
+  const path = url.pathname;
+  const note = { snapshot: true, generated_at: snap.generated_at,
+                 model_version: snap.model_version, note_ar: snap.note_ar };
+  let body = null;
+  if (path === '/api/alpha/portfolio') {
+    body = { ok: true, portfolio: snap, ...note };
+  } else if (path === '/api/alpha/performance') {
+    /* ⭐ مفيش تاريخ تقييمات حقيقي غير نقطة التأسيس ⇒ فترات ناقصة.
+       ⛔ بنصرّح بدل ما نخترع أرقام. */
+    const vals = (snap.ledger && snap.ledger.valuations) || [];
+    const periods = {};
+    ['30d', '90d', '183d', '365d'].forEach(function (k) {
+      periods[k] = { ok: false, note_ar: 'البيانات الفعلية غير كافية لهذه المدة.' };
+    });
+    periods.since_inception = { ok: vals.length >= 2,
+      note_ar: vals.length >= 2 ? null : 'محتاج تاريخ تقييمات أكتر من نقطة واحدة.' };
+    body = { ok: true,
+      performance: { periods: periods, has_data: vals.length >= 2,
+        last_update: snap.generated_at, notes_ar: ['التاريخ الفعلي لسلسلة التقييمات لسه قصير — الأرقام الفعلية هتبان مع الوقت.'] },
+      ...note };
+  } else if (path === '/api/alpha/decisions') {
+    body = { ok: true, decisions: snap.decisions || [], ...note };
+  } else if (path === '/api/alpha/alerts') {
+    body = { ok: true, alerts: [], enabled: false, ...note };
+  } else if (path === '/api/alpha/lab') {
+    body = { ok: true, lab: { champion: snap.model_version, challengers: [], errors: {}, closed: false }, ...note };
+  }
+  if (!body) {
+    return new Response(JSON.stringify({ ok: false, error: 'no-snapshot-route' }),
+      { status: 404, headers: { 'Content-Type': 'application/json' } });
+  }
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+  });
+}
+
 function buildHeaders(request) {
   const h = new Headers();
   h.set('Accept', 'application/json');
@@ -1233,6 +1296,23 @@ async function handle(request, env, ctx) {
           }
         } catch (e) { }
         return await oppSnapshot(url, request, env);
+      }
+      /* ⭐⭐ OCTA Alpha (OPP-002) — نفس المنطق: الباك الحيّ الأول. */
+      if (url.pathname.startsWith('/api/alpha/') && env && env.OCTA_ALPHA_SNAPSHOT === 'on') {
+        try {
+          const live = await fetch(API + url.pathname + url.search,
+            { method: 'GET', headers: buildHeaders(request) });
+          if (live && live.status === 200) {
+            const ct = (live.headers.get('content-type') || '');
+            if (ct.indexOf('json') >= 0) {
+              return new Response(live.body, {
+                status: 200,
+                headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+              });
+            }
+          }
+        } catch (e) { }
+        return await alphaSnapshot(url, request, env);
       }
       /* ⛔⛔ الجسور بتاعت المعاينة (tvscan/tvcandles) **ما بتروحلش**
          ⛌   للـAPI الميت — لو حصل خطأ جواها (أو نشر جديد لسه
