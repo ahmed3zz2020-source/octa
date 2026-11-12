@@ -9,6 +9,8 @@
     "build:secure": "OCTA_STATIC_MARKETS=0 npm run build",
     "build:strict": "OCTA_STATIC_MARKETS=0 npm run build",
     "deploy": "npm run build:strict && wrangler deploy",
+    "deploy:preview": "bash tools/predeploy-check.sh && npm run build:strict && wrangler deploy --config wrangler-preview.jsonc",
+    "predeploy:check": "bash tools/predeploy-check.sh",
     "dev": "wrangler dev",
     "check:dist": "node tools/check-dist.js"
   },

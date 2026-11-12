@@ -415,11 +415,10 @@ function _octaBudgetWait(bucket) {
   var list = OCTA_BUCKETS[key] || (OCTA_BUCKETS[key] = []);
   while (list.length && (now - list[0]) > 60000) list.shift();
   var limit = OCTA_BUDGETS[key] || OCTA_BUDGET;
-  /* ⭐⭐⭐ الضغط الخفيف = إنت مش بتستنى ⇒ التحميل السريع متبقيش بطيء.
-     📌 تحت نص الحد ⇒ مسافة صفر (٦ طلبات مع بعض).
-     📌 فوق نص الحد ⇒ مسافة ١٢٠ مللي ( spreading ).
-     📌 عند الحد ⇒ نستنى (بسحدّ ٢٫٥ ثانية) ونرجع نعمل retry. */
-  if (list.length < Math.floor(limit * 0.5)) return 0;
+  /* ⭐⭐⭐ مسافة ثابتة ١٢٠ مللي بين الطلبات (تقليل الـburst)
+     📌 ⛔ تجربة: خليها صفر تحت نص الحد ⇒ التحميل أسرع، بس
+        الفحص الآلي رجّع 429 ⇒ الرجوع للمسافة الثابتة.
+     📌 عند الحد ⇒ نستنى (بسقف ٢٫٥ ثانية) ونرجع نعمل retry. */
   if (list.length >= limit) {
     var free = list[0] + 60000 - now + 60;
     /* ⭐⭐⭐ سقف الانتظار ٢٫٥ ثانية!
