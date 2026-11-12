@@ -39,6 +39,20 @@ function read(p) {
   catch (e) { return ''; }
 }
 
+/* ⓪⭐ بصمة البناء في حارس النشر (١٢ نوفمبر ٢٠٢٦) */
+console.log('\n▸ فحص بصمة البناء (ضد النسخة القديمة)');
+const depSh = read('tools/deploy.sh');
+ok(/LOCAL_BUILD/.test(depSh) && /LIVE_BUILD/.test(depSh),
+  'حارس النشر بيقرأ ختم البناء (محلي + مخدوم)');
+ok(/BUILD = 'v=\[0-9\]\+'/i.test(depSh) || /BUILD = 'v=/.test(depSh),
+  'حارس النشر بيطابق ختم البناء');
+ok(depSh.indexOf('LOCAL_BUILD') < depSh.indexOf('LIVE_BUILD') ||
+   depSh.indexOf('LIVE_BUILD') > 0,
+  'مقارنة الختم موجودة في الحارس');
+const idxHtml = read('index.html');
+ok(/BUILD = 'v=[0-9]+'/.test(idxHtml),
+  'index.html فيه ختم بناء (للمقارنة)');
+
 /* ⓪ الملفات الأساسية موجودة */
 console.log('\n▸ الملفات الأساسية');
 ok(fs.existsSync(path.join(ROOT, 'tools/deploy.sh')), 'tools/deploy.sh موجود');

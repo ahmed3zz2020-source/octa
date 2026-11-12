@@ -214,6 +214,37 @@ if [ "$HTML_CODE" = "200" ]; then
   fi
 fi
 
+# ══════════════════════════════════════════════════════════════════════
+# ⭐⭐⭐ بصمة البناء (١٢ نوفمبر ٢٠٢٦) — ⭐ الدرس من حادثة النسخة القديمة
+# ───────────────────────────────────────────────────────────���──────────
+# 📌 المشكلة: المعاينة كانت بتقدّم **نسخة أقدم** (من غير page-newsaxis)
+#   ⇒ الـفحص القديم مرّ لأنه شاف «الموقع بيرد 200» بس!
+#   ⛔ ⇒ http 200 مش دليل إن النسخة الصح متخدمة.
+# ✅ الحل: نقارن **ختم البناء** (BUILD = 'v=YYYYMMDDHHMM') جوّه الـHTML
+#   المحلي باللي اتخدم فعلاً ⇒ لو مختلف ⇒ نسخة قديمة ⇒ تراجع.
+# 📌 (الختم موجود في index.html و gate.html — بيتحدّث مع كل build)
+# ══════════════════════════════════════════════════════════════════════
+LOCAL_BUILD=$(grep -oE "BUILD = 'v=[0-9]+'" index.html 2>/dev/null | head -1 | grep -oE "v=[0-9]+")
+if [ -n "$LOCAL_BUILD" ]; then
+  # ⭐ الزائر المجهول بياخد market.html (مفيهوش ختم) ⇒ نجرّب
+  #   مسارات SPA (دي بتخدم index.html للجميع) لحد ما نلاقي الختم.
+  LIVE_BUILD=""
+  for BP in /tools /engine /filters /newsaxis; do
+    LIVE_BUILD=$(curl -s --max-time 25 -A 'Mozilla/5.0 (X11; Linux x86_64) octa-deploy-check' \
+      "$CHECK_URL$BP" | grep -oE "BUILD = 'v=[0-9]+'" | head -1 | grep -oE "v=[0-9]+" || true)
+    [ -n "$LIVE_BUILD" ] && break
+  done
+  if [ -z "$LIVE_BUILD" ]; then
+    echo "  ${R}✗ متقدرتش أقرأ ختم البناء من الصفحة المخدومة${N}"
+    FAILED=1
+  elif [ "$LIVE_BUILD" != "$LOCAL_BUILD" ]; then
+    echo "  ${R}✗ النسخة المخدومة قديمة (ختم البناء $LIVE_BUILD ≠ المحلي $LOCAL_BUILD)${N}"
+    FAILED=1
+  else
+    echo "  ✓ بصمة البناء مطابقة ($LOCAL_BUILD)"
+  fi
+fi
+
 if [ "$FAILED" != "0" ]; then
   echo ""
   echo "${R}╔══════════════════════════════════════════════════════╗${N}"
