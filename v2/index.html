@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0a1929">
+<title>OCTA V2 — أول مسار (نسخة تجريبية معزولة)</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./assets/css/v2.css">
+</head>
+<body class="v2-body">
+
+<header class="v2-topbar">
+  <div class="v2-topbar__row">
+    <div class="v2-brand">
+      <span class="v2-brand__mark">V2</span>
+      <span class="v2-brand__name">OCTA — النسخة الثانية</span>
+    </div>
+    <div class="v2-nav" role="navigation">
+      <a href="#/market" class="v2-nav__link" data-nav="market" data-testid="nav-market">السوق</a>
+      <a href="#/compare" class="v2-nav__link" data-nav="compare" data-testid="nav-compare">
+        المقارنة <span class="v2-nav__count" id="v2-compare-count" data-testid="compare-count">٠/٣</span>
+      </a>
+    </div>
+  </div>
+  <p class="v2-topbar__tag" id="v2-build-tag">نسخة تجريبية محلية — لا تتصل بأي خدمة إنتاج</p>
+</header>
+
+<div class="v2-alert" id="v2-alert" data-testid="limit-alert" hidden></div>
+
+<main id="v2-app" class="v2-app" data-testid="app-root"></main>
+
+<footer class="v2-footer">
+  <p class="v2-footer__line">⚠️ واجهة تجريبية معزولة — كل الأرقام هنا مُصنَّعة داخل الحزمة، ولا يوجد أي اتصال بسعر حقيقي أو حساب أو تيليجرام.</p>
+  <p class="v2-footer__line">العقد: <code>v2-contract.js</code> · المزوّد: <code>v2-mock-provider.js</code> · الحماية: <code>v2-netguard.js</code></p>
+</footer>
+
+<script src="./assets/js/v2-netguard.js"></script>
+<script type="module" src="./assets/js/v2-app.js"></script>
+</body>
+</html>

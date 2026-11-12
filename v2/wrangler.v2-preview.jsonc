@@ -1,0 +1,19 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  /* ⛔⛔⛔ ملف نشر V2 — مستقل تمامًا عن الإنتاج والمعاينة.
+     ⛔⛔⛔ ممنوع استخدامه للإنتاج أو للمعاينة الحالية.
+     📌 الهدف: معاينة ثالثة برابط خاص (workers.dev) — راجع v2/README.md
+     📌 المسار: assets فقط بلا worker.js ⇒ لا يوجد مسار /api/* ولا Railway
+     📌 ولا أسرار ولا KV ولا cron ولا تسجيل دخول ولا تيليجرام. */
+  "account_id": "74e046678adabf0706024b97b205882b",
+  "name": "octa-v2-preview",
+  "compatibility_date": "2026-10-10",
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+  "observability": {
+    "enabled": false
+  }
+}

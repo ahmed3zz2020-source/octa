@@ -38,3 +38,6 @@ __pycache__/
 # 📌 تتولّد بـ:  cd ../octa-prices && python3 tools/opp_snapshot.py
 data/opp_snapshot.json
 data/alpha_snapshot.json
+
+# V2 (فرع مستقل)
+v2/dist/
