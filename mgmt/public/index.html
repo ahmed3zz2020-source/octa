@@ -380,6 +380,20 @@ footer{margin-top:44px;padding:20px 0;border-top:1px solid var(--line);color:var
   .dwrow .nm{min-width:70px;max-width:92px;font-size:11.5px}
   .hint{font-size:11px}
 }
+
+/* ═══ 🆕 خريطة النشاط (٧ أيام × ٢٤ ساعة) ═══ */
+.heat{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;margin:8px 0 4px}
+.heat i{aspect-ratio:1;border-radius:3px;background:rgba(255,255,255,.05);display:block}
+.heat i[data-l="1"]{background:rgba(74,158,255,.30)}
+.heat i[data-l="2"]{background:rgba(74,158,255,.55)}
+.heat i[data-l="3"]{background:rgba(212,175,55,.75)}
+.heat i[data-l="4"]{background:#f4d03f}
+.heatlbl{display:flex;justify-content:space-between;color:var(--dim2);font-size:10px;font-weight:700;margin-top:3px}
+.daystrip{display:flex;gap:2px;margin:6px 0 2px;flex-wrap:wrap}
+.daystrip i{width:13px;height:13px;border-radius:3px;background:rgba(255,255,255,.06);display:block}
+.daystrip i[data-l="1"]{background:rgba(22,199,154,.45)}
+.daystrip i[data-l="2"]{background:rgba(22,199,154,.75)}
+.daystrip i[data-l="3"]{background:#16c79a}
 </style>
 </head>
 <body>
@@ -1147,6 +1161,50 @@ function renderBrowse(){
   box.innerHTML = html;
 }
 
+
+/* ══ 🆕 خريطة نشاط المستخدم (أسبوع × ساعة + آخر ٣٠ يوم) ══ */
+function userHeat(u){
+  var grid = {}, days = {}, DAY = 86400, CAIRO = 7200;
+  function bump(ts){ grid[ts] = 1; }
+  (u.logins || []).forEach(function(l){ bump(l.t); });
+  var br = (DASH.browse || {})[u.uid];
+  if (br && br.events) br.events.forEach(function(e){ bump(e.ts); });
+  var now = Math.floor(Date.now()/1000);
+  var wk = {}, dm = {};
+  Object.keys(grid).forEach(function(ts){
+    ts = parseInt(ts, 10);
+    var d = new Date((ts + CAIRO) * 1000);
+    var dow = d.getUTCDay(), hr = d.getUTCHours();
+    wk[dow + '_' + hr] = (wk[dow + '_' + hr] || 0) + 1;
+    var dayKey = Math.floor((ts + CAIRO) / DAY);
+    dm[dayKey] = (dm[dayKey] || 0) + 1;
+  });
+  var maxW = 1, maxD = 1;
+  for (var k in wk) if (wk[k] > maxW) maxW = wk[k];
+  for (var k2 in dm) if (dm[k2] > maxD) maxD = dm[k2];
+  var cells = '';
+  for (var dow2 = 0; dow2 < 7; dow2++){
+    for (var hr2 = 0; hr2 < 24; hr2++){
+      var n = wk[dow2 + '_' + hr2] || 0;
+      var lv = n === 0 ? 0 : (n / maxW > .66 ? 4 : n / maxW > .33 ? 3 : n / maxW > .12 ? 2 : 1);
+      cells += '<i data-l="' + lv + '" title="' + ['أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'][dow2] + ' ' + hr2 + ':00 → ' + n + '"></i>';
+    }
+  }
+  var days2 = '';
+  var today = Math.floor((now + CAIRO) / DAY);
+  for (var i = 29; i >= 0; i--){
+    var dk = today - i;
+    var c = dm[dk] || 0;
+    var l2 = c === 0 ? 0 : (c / maxD > .66 ? 3 : c / maxD > .3 ? 2 : 1);
+    var dd = new Date(dk * DAY);
+    days2 += '<i data-l="' + l2 + '" title="' + dd.toISOString().slice(0, 10) + ' → ' + c + '"></i>';
+  }
+  return '<div class="heat">' + cells + '</div>'
+    + '<div class="heatlbl"><span>أحد</span><span>إثنين</span><span>ثلاثاء</span><span>أربعاء</span><span>خميس</span><span>جمعة</span><span>سبت</span></div>'
+    + '<div class="sh-note" style="margin-top:12px">آخر ٣٠ يوم</div>'
+    + '<div class="daystrip">' + days2 + '</div>';
+}
+
 /* ══ 🆕 ورقة المستخدم ══ */
 function openUser(uid){
   var u = null;
@@ -1191,6 +1249,11 @@ function openUser(uid){
       + '<b style="color:var(--gold2)">' + u.sessions + '</b> جلسات، '
       + '<b style="color:var(--gold2)">' + (u.dwell_total ? hm(u.dwell_total) : '—') + '</b> وقت على الموقع.</div>';
   }
+
+  /* ── خريطة النشاط ── */
+  html += '<div class="sh-h">🕐 بييجي إمتى</div>';
+  html += '<div class="sh-note">كل مربع = ساعة في يوم · كل نقطة = يوم · كل ما اللون أقوى زاد النشاط</div>';
+  html += userHeat(u);
 
   /* ── الجلسات ── */
   if (u.srows && u.srows.length){
@@ -1253,6 +1316,13 @@ function setView(v){
 /* ══ تشغيل ══ */
 function renderAll(){ DASH.browse = computeBrowse(); kpis(); renderUsers(); renderTL(); renderDev(); renderBehavior(); renderPages(); renderFunnel(); renderGaps(); renderRaw(); renderBrowse(); renderCards(); }
 document.addEventListener('DOMContentLoaded', ()=>{
+  /* 🆕 ربط البحث + تبديل العرض + Escape (١٤ نوفمبر) */
+  var us = document.getElementById('uSearch');
+  if (us) us.addEventListener('input', function(){ DASH.ufilter = us.value; renderCards(); renderUsers(); });
+  try { var _v = localStorage.getItem('octa_mgmt_view'); if (_v) setView(_v); } catch (e) {}
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape'){ closeSheet(); closeM(); }
+  });
   $('#gen').textContent = 'توليد: ' + D.generated + ' · لقطة: ' + (D.snapshot||'—');
   $('#footSnap').textContent = 'لقطة ' + (D.snapshot||'—');
   ['fUser','fVia','fNew'].forEach(id=>{ const el=document.getElementById(id); el.addEventListener('input',renderTL); el.addEventListener('change',renderTL); });
