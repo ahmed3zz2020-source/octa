@@ -419,3 +419,41 @@ test('⑭ كلاسات CSS الجديدة موجودة في assets/octa.css', ()
       assert.ok(css.indexOf(c) >= 0, '⛔ كلاس CSS ناقص: ' + c);
     });
 });
+
+/* ══════════════════════════════════════════════════════════════
+   ⑮ 🪟 تدوس على الكارت ⇒ تفتح نافذة فيها ✕ (طلب المالك ١٤ نوفمبر)
+   ──────────────────────────────────────────────────────────────
+   📌 كان: تدوس على الكارت ⇒ التفاصيل بتطلع في **آخر الصفحة**
+     ⇒ لازم أنزل بال.Scroll عشان أشوفها.
+   📌 المطلوب: تدوس على الكارت ⇒ تفتح **نافذة** فيها ✕ فوق
+     وبتديك نفس البيانات + الكود نفسه ما بيعملش حاجة.
+   ══════════════════════════════════════════════════════════════ */
+test('⑮ الكارت كله بيفتح النافذة (والكود ما بيعملش حاجة)', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'assets/js/octa-techfilter.js'), 'utf8');
+  /* ⭐ الكارت = onclick على techDetail */
+  assert.match(src, /class="tf-card" onclick="techDetail\(/,
+    '⛔ الكارت نفسه لازم يكون قابل للدوس (يفتح النافذة)');
+  /* ⭐ الكود = يوقف الطرقان (ما يفتحش صفحة السهم ولا النافذة) */
+  assert.match(src, /class="tf-card-code" onclick="event\.stopPropagation\(\)"/,
+    '⛔ الكود لازم مايعملش حاجة');
+  assert.ok(src.indexOf('tf-card-code" onclick="openStock(') < 0,
+    '⛔ الكود لسه بيفتح صفحة السهم');
+  /* ⭐ زرار الإكس + فتح/إغلاق */
+  assert.match(src, /function techOpenModal\(/, 'مفيش دالة فتح النافذة');
+  assert.match(src, /function techCloseModal\(/, 'مفيش دالة قفل النافذة');
+  assert.match(src, /window\.techCloseModal = techCloseModal/, 'زرار الإكس مش متصدّر');
+  assert.match(src, /tf-modal-close/, 'مفيش زرار ✕');
+});
+
+test('⑯ كلاس CSS النافذة موجودة + الداتا بتتحط في مكانين بطلب واحد', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'assets/octa.css'), 'utf8');
+  ['.tf-modal', '.tf-modal-box', '.tf-modal-head', '.tf-modal-close', '.tf-modal-title']
+    .forEach(function (c) {
+      assert.ok(css.indexOf(c) >= 0, '⛔ كلاس CSS ناقص: ' + c);
+    });
+  const src = fs.readFileSync(path.join(ROOT, 'assets/js/octa-techfilter.js'), 'utf8');
+  assert.match(src, /if \(mBody\)[\s\S]{0,120}mBody\.innerHTML = h;/,
+    '⛔ نفس البيانات لازم تتحط في النافذة');
+  assert.match(src, /if \(host\)[\s\S]{0,120}host\.innerHTML = h;/,
+    '⛔ آخر الصفحة لازم يفضل شغّال (السكروول)');
+});

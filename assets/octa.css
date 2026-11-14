@@ -2912,6 +2912,30 @@
     background:rgba(212,175,55,.09); border:1px solid rgba(212,175,55,.35); }
   .tf-btn:hover { background:rgba(212,175,55,.17); }
   .tf-metric b i { font-style:normal; }
+  /* ⭐ الكارت كله قابل للدوس ⇒ يفتح النافذة (طلب المالك ١٤ نوفمبر) */
+  .tf-card { cursor:pointer; }
+  .tf-card:active { transform:scale(.995); }
+  /* ⭐⭐⭐ نافذة التحليل الفني الكامل (صفحة مستقلة فيها ✕ فوق) */
+  .tf-modal { display:none; position:fixed; inset:0; z-index:9999;
+    background:rgba(3,9,17,.96); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .tf-modal.open { display:block; }
+  .tf-modal-box { min-height:100%; max-width:760px; margin:0 auto; padding:12px 12px 60px; }
+  .tf-modal-head { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:12px;
+    padding:10px 0 12px; margin-bottom:4px;
+    background:linear-gradient(180deg, rgba(3,9,17,.99) 76%, transparent); }
+  .tf-modal-title { font:900 1.16rem/1.3 system-ui, sans-serif; color:var(--gold); }
+  .tf-modal-sub { font:400 .78rem/1.5 system-ui, sans-serif; color:var(--muted); margin-top:2px; }
+  .tf-modal-sub b { color:var(--txt); }
+  .tf-modal-close { flex:0 0 auto; width:40px; height:40px; border-radius:12px;
+    border:1px solid var(--line); background:rgba(255,255,255,.05); color:var(--txt);
+    font:700 1.05rem system-ui, sans-serif; cursor:pointer; }
+  .tf-modal-close:hover { border-color:var(--red2); color:var(--red2); }
+  @media (max-width:640px) {
+    .tf-modal-title { font-size:1rem; }
+    .tf-modal-box { padding:10px 10px 50px; }
+    .tf-modal-close { width:36px; height:36px; }
+  }
   /* ❓ كارت الشرح */
   .flt-help { margin-bottom:18px; }
   .flt-help-h { display:flex; align-items:center; justify-content:space-between; gap:10px;

@@ -466,9 +466,12 @@
         : '<div class="tf-card-crit">' + (c.pass >= 5 ? '✅' : c.pass >= 3 ? '🟡' : '⛔') + ' عدّى '
           + c.pass + ' من ' + c.have + ' معيار'
           + (c.have < c.items.length ? ' · 📌 ناقص ' + (c.items.length - c.have) : '') + '</div>';
-      h += '<div class="tf-card">'
+      h += '<div class="tf-card" onclick="techDetail(\'' + v.code + '\')">'
         + '<div class="tf-card-top">'
-        + '<div><b class="tf-card-code" onclick="openStock(\'' + v.code + '\')">' + v.code + '</b>'
+        /* ⛔ الكود: ما بيعملش حاجة (طلب المالك: «مش هادوس على السهم
+           ما بيحصلش فيه أي حاجة») ⇒ بنوقف الطرقان عشان ما تفتحش
+           صفحة السهم ولا النافذة. */
+        + '<div><b class="tf-card-code" onclick="event.stopPropagation()">' + v.code + '</b>'
         + '<div class="tf-card-name">' + tEsc((v.name || '').slice(0, 26)) + ' · ' + tEsc(v.sector) + '</div></div>'
         + '<div class="tf-card-score"><span class="flt-safe s' + (r.m >= 65 ? 'hi' : r.m >= 45 ? 'md' : 'lo') + '">'
         + r.m.toFixed(0) + '</span>' + med + '</div>'
@@ -476,7 +479,7 @@
         + '<div class="tf-metrics">' + m + '</div>'
         + crit
         + '<div class="tf-why">' + tEsc(r.why) + '</div>'
-        + '<button class="tf-btn" onclick="techDetail(\'' + v.code + '\')">🔎 التحليل الفني الكامل</button>'
+        + '<button class="tf-btn" onclick="event.stopPropagation();techDetail(\'' + v.code + '\')">🔎 التحليل الفني الكامل</button>'
         + '</div>';
     });
     h += '</div>';
@@ -601,16 +604,87 @@
   }
 
   /* ═══════════ تفصيل السهم (من محرك الـAPI نفسه) ═══════════ */
+  /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ نافذة مستقلة للتفاصيل
+     📌 طلب المالك: «لما أدوس على الكارت تفتحلي صفحة جديدة يكون فيها
+     علامة إكس فوق ويكون فيها البيانات اللي بتكتب تحت» — لأن
+     التفاصيل كانت بتطلع في **آخر الصفحة** ⇒ لازم أنزل بال.Scroll.
+     📌 ✅ الحل: نافذة كاملة الشاشة (زي «قرار اليوم») فيها ✕ فوق،
+     وبتعرض **نفس البيانات** بالظبط.
+     📌 ⚠️ الداتا بتتجيب **مرة واحدة** وبتتحط في النافذة + في آخر
+     الصفحة (اللي كان شغّال) ⇒ مفيش طلب زيادة. */
+  var MODAL_ID = 'techModal';
+  function modalEl() {
+    var m = document.getElementById(MODAL_ID);
+    if (m) return m;
+    m = document.createElement('div');
+    m.id = MODAL_ID;
+    m.className = 'tf-modal';
+    m.setAttribute('role', 'dialog');
+    m.setAttribute('aria-label', 'التحليل الفني الكامل');
+    m.innerHTML = '<div class="tf-modal-box">'
+      + '<div class="tf-modal-head">'
+      + '<button class="tf-modal-close" type="button" onclick="techCloseModal()" aria-label="اقفل">✕</button>'
+      + '<div><div class="tf-modal-title" id="techModalTitle">🔎 التحليل الفني الكامل</div>'
+      + '<div class="tf-modal-sub" id="techModalSub">—</div></div>'
+      + '</div>'
+      + '<div id="techModalBody"></div>'
+      + '</div>';
+    m.addEventListener('click', function (e) {
+      /* ⛔ الضغط على الخلفية (مش جوه الـbox) ⇒ يقفل */
+      if (e.target === m) techCloseModal();
+    });
+    document.body.appendChild(m);
+    return m;
+  }
+  function techCloseModal() {
+    var m = document.getElementById(MODAL_ID);
+    if (m) { m.classList.remove('open'); m.style.display = 'none'; }
+    try { document.body.style.overflow = ''; } catch (e) { }
+    /* ⭐ نرجّع سكرول الصفحة لمكانه (المستخدم كان تحت) */
+    try { if (TS._scrollY) window.scrollTo(0, TS._scrollY); } catch (e) { }
+    TS._scrollY = 0;
+  }
+  function techOpenModal(code) {
+    var m = modalEl();
+    TS.detail = code;
+    try { TS._scrollY = window.scrollY || window.pageYOffset || 0; } catch (e) { TS._scrollY = 0; }
+    var title = document.getElementById('techModalTitle');
+    var sub = document.getElementById('techModalSub');
+    var body = document.getElementById('techModalBody');
+    if (title) title.innerHTML = '🔎 التحليل الفني الكامل — ' + tEsc(code);
+    if (sub) sub.textContent = 'بنجيب البيانات…';
+    if (body) body.innerHTML = '<div class="flt-loading" style="padding:14px;text-align:center;color:var(--muted)">⏳ بنجيب التحليل الفني الكامل…</div>';
+    m.classList.add('open');
+    m.style.display = 'block';
+    try { document.body.style.overflow = 'hidden'; } catch (e) { }
+    loadDetail(code);
+  }
+  /* ⛔ زر الإكس / Escape ⇒ يقفل النافذة
+     📌 ⛔ محاط بـguard: بيئة الاختبار (DOM مصغّر) مفيش
+     addEventListener ⇒ ما نكسرش تحميل الملف. */
+  try {
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' || e.key === 'Esc') {
+      var m = document.getElementById(MODAL_ID);
+      if (m && m.classList.contains('open')) techCloseModal();
+    }
+  });
+  }
+  } catch (e) { }
+
   function loadDetail(code) {
     var host = document.getElementById('techDetailHost');
-    if (!host) return;
+    var mBody = document.getElementById('techModalBody');
     TS.detail = code;
-    host.innerHTML = '<div class="flt-loading" style="padding:14px;text-align:center;color:var(--muted)">⏳ بنجيب التحليل الفني الكامل…</div>';
+    if (host) host.innerHTML = '<div class="flt-loading" style="padding:14px;text-align:center;color:var(--muted)">⏳ بنجيب التحليل الفني الكامل…</div>';
     var url = (typeof OCTA_API !== 'undefined' ? OCTA_API : '') + '/api/technical/' + encodeURIComponent(code);
     var p = (typeof octaFetch === 'function') ? octaFetch(url) : fetch(url, { credentials: 'include' });
     p.then(function (r) { return r.json(); }).then(function (j) {
       if (!j || !j.technical) {
-        host.innerHTML = '<div class="flt-empty">⛔ التحليل الفني غير متاح لهذا السهم</div>';
+        var msg = '<div class="flt-empty">⛔ التحليل الفني غير متاح لهذا السهم</div>';
+        if (host) host.innerHTML = msg;
+        if (mBody) mBody.innerHTML = msg;
         return;
       }
       var t = j.technical, b = t.breakdown || {};
@@ -667,9 +741,21 @@
       }
       h += '<div class="flt-h-warn">⛔ التحليل الفني بيقولك السهم بيتحرك إزاي — مش بيقولك اشتري. '
         + 'القرار قرارك.</div>';
-      host.innerHTML = h;
+      /* ⭐ نفس المحتوى في النافذة + في آخر الصفحة (طلب واحد بس) */
+      if (host) host.innerHTML = h;
+      if (mBody) {
+        mBody.innerHTML = h;
+        var mt = document.getElementById('techModalTitle');
+        var ms = document.getElementById('techModalSub');
+        if (mt) mt.innerHTML = '🔎 التحليل الفني الكامل — ' + tEsc(j.name || code);
+        if (ms) ms.innerHTML = 'النتيجة <b>' + tNum(t.score, 1) + '</b>/100 · ' + tEsc(t.signal || '—')
+          + ' · ثقة البيانات <b>' + tNum(t.confidence, 0) + '٪</b>'
+          + (t.atr_pct != null ? ' · تذبذب <b>' + tNum(t.atr_pct, 1) + '٪</b>' : '');
+      }
     }).catch(function (e) {
-      host.innerHTML = '<div class="flt-empty">⛔ تعذر تحميل التحليل (' + tEsc(e && e.message ? e.message : 'خطأ') + ')</div>';
+      var emsg = '<div class="flt-empty">⛔ تعذر تحميل التحليل (' + tEsc(e && e.message ? e.message : 'خطأ') + ')</div>';
+      if (host) host.innerHTML = emsg;
+      if (mBody) mBody.innerHTML = emsg;
     });
   }
 
@@ -688,7 +774,8 @@
     renderAll();
   }
   function helpToggle() { TS.help = !TS.help; renderAll(); }
-  function detail(code) { loadDetail(code); }
+  /* ⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ فتح النافذة (مش بس آخر الصفحة) */
+  function detail(code) { techOpenModal(code); }
 
   /* 🎯 كل الحاويات المعروضة (الذراع + تبويب الفلاتر) */
   var HOSTS = [];
@@ -739,4 +826,5 @@
   window.techReset = reset;
   window.techHelpToggle = helpToggle;
   window.techDetail = detail;
+  window.techCloseModal = techCloseModal;
 })();
