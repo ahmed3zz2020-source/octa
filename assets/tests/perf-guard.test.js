@@ -91,6 +91,6 @@ test('مسارات التحديث ما تتكاشش', () => {
 /* ═══ 4) الصفحة الرئيسية ما تستناش الداتا الكبيرة ═══ */
 test('الصفحة الرئيسية بتستخدم /api/rank بدل data_full', () => {
   const s = read('assets/js/octa-app.js');
-  assert.ok(s.indexOf("/api/rank?limit=252") >= 0,
+  assert.ok(s.indexOf("/api/rank?limit=400") >= 0,
     'الصفحة الرئيسية لازم تاخد الدرجات من /api/rank');
 });

@@ -3773,7 +3773,10 @@ function dvVal(x){
 }
 /* سعر السهم اللحظي من سجل البورصة */
 function dvLivePrice(code){
-  const s = (typeof OS_DB !== 'undefined') ? OS_DB.find(x => x.code === code) : null;
+  /* ⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ الأولوية للمصدر الخفيف (DV_LIGHT)
+     📌 عشان ما نضطرش نحمّل السجل الكامل (٤٢٣ ك.ب) عشان سعر واحد. */
+  const light = (typeof DV_LIGHT !== 'undefined' && DV_LIGHT) ? DV_LIGHT[code] : null;
+  const s = light || ((typeof OS_DB !== 'undefined') ? OS_DB.find(x => x.code === code) : null);
   if (!s || !s.price) return null;
   const v = Number(s.price);
   /* ⭐ قيد مؤقت (0.10 / 1.00) مش سعر تداول حقيقي — ما ينفعش نعرضه */
@@ -4212,10 +4215,14 @@ function ipoTeaser(){
   '</div>';
 }
 
-/* ⭐ الأكواد اللي مش في سجل البورصة عندنا = أكواد جديدة */
+/* ⭐ الأكواد اللي مش في سجل البورصة عندنا = أكواد جديدة
+   ⭐ ١٤ نوفمبر ٢٠٢٦ — نستخدم المصدر الخفيف (DV_LIGHT) لو متاح
+   ⇒ ما نضطرش نحمّل السجل الكامل (٤٢٣ ك.ب) عشان لوحة صغيرة. */
 function ipoNewCodes(){
   if (!IPO_DATA || !Array.isArray(IPO_DATA)) return [];
-  const known = (typeof OS_DB !== 'undefined') ? OS_DB.map(s => s.code) : [];
+  const light = (typeof DV_LIGHT !== 'undefined' && DV_LIGHT) ? Object.keys(DV_LIGHT) : null;
+  const known = light && light.length ? light
+      : ((typeof OS_DB !== 'undefined') ? OS_DB.map(s => s.code) : []);
   if (!known.length) return [];
   return IPO_DATA.filter(x => x.code && known.indexOf(x.code) < 0);
 }
@@ -4285,14 +4292,46 @@ async function dvLoad(){
   if (!r.ok) throw new Error('HTTP ' + r.status);
   DV_DATA = await r.json();
   dvRender();
-  /* نحمّل سجل الأسعار بالتوازي عشان نحسب السعر اللحظي ونسبة التوزيع */
-  try { if (typeof octaLoadDB === 'function') { await octaLoadDB(); dvRender(); } } catch(e){}
+  /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ من غير السجل الكامل (٤٢٣ ك.ب!)
+     📌 السبب (مقيس): كارت التوزيعات كان بيستنى `octaLoadDB`
+     ⇒ /api/data_full (٤٢٣ ك.ب!) كان بيتحمّل مع **كل** زيارة ⛔
+     ⇒ ده كان أكبر طلب في الصفحة الرئيسية.
+     📌 ✅ الحل: مناكب ناخد **قائمة الرتب** الخفيفة (/api/rank) —
+     فيها السعر اللحظي + الأكواد ⇒ نفس المعلومة بحجم أصغر بكتير.
+     📌 ⚠️ لو فشلت ⇒ نرجع للسلوك القديم (octaLoadDB) زي ما كان. */
+  try { await dvLoadLight(); dvRender(); }
+  catch (e) {
+    try { if (typeof octaLoadDB === 'function') { await octaLoadDB(); dvRender(); } } catch (e2) { }
+  }
   if (typeof ipoScan === 'function') ipoScan();
   } catch(e) {
   const b = document.getElementById('dvList');
   if (b) b.innerHTML = '<div class="dv-empty">⚠️ تعذر تحميل البيانات: ' + (e.message||'') + '<br>جرّب تحديث الصفحة.</div>';
   }
   DV_LOADING = false;
+}
+
+/* ⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ قائمة خفيفة: الأكواد + الأسعار الحيّة
+   📌 من /api/rank?limit=400 (١٤٠ ك.ب) بدل /api/data_full (٤٢٣ ك.ب)
+   📌 بتستخدَم في: سعر السهم اللحظي في كارت التوزيعات + كشف
+      الأكواد الجديدة في لوحة الطروحات. */
+let DV_LIGHT = null;
+async function dvLoadLight(){
+  if (DV_LIGHT) return DV_LIGHT;
+  const res = await octaFetch(OCTA_API + '/api/rank?limit=400');
+  if (!res || !res.ok) throw new Error('HTTP ' + (res ? res.status : '?'));
+  const j = await res.json();
+  const rows = (j && j.results) || [];
+  const map = {};
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || !r.code) continue;
+    map[r.code] = { code: r.code, name: r.name || r.code, price: Number(r.price || 0),
+                    change: Number(r.change || 0), sector: r.sector || '—' };
+  }
+  DV_LIGHT = map;
+  try { window.OS_LIGHT = DV_LIGHT; } catch (e) { }
+  return DV_LIGHT;
 }
 
 function renderStockPage() {

@@ -238,7 +238,7 @@ async function loadEgypt(){
   if ((typeof OS_DB === 'undefined' || !OS_DB || !OS_DB.length)) {
     let rows = [];
     try {
-      const rj = await fetchRetry(B + '/api/rank?limit=252')
+      const rj = await fetchRetry(B + '/api/rank?limit=400')
         .then(r => r.json()).catch(() => null);
       rows = (rj && rj.results) || [];
     } catch (e) { }
