@@ -698,6 +698,12 @@ function octaPageInit(id) {
   if (id === 'best'   && typeof fzBestInit==='function') fzBestInit();
   }, 40);
   if (id === 'pick') setTimeout(async ()=>{ if (typeof octaLoadDB==='function'){ try{ await octaLoadDB(); }catch(e){} } if (typeof pickInit==='function') pickInit(); }, 150);
+  /* 🐙 فلتر الأذرع — إعادة رسم بدون ما نreset الاختيار
+     📌 ١٤ نوفمبر ٢٠٢٦: الأذرع بقت تقرأ الطبقة الحية ⇒ أول فتح
+        بيحمّل /api/markets (٨٥٠ ك.ب) ⇒ لازم إعادة رسم بعد ما يوصل. */
+  if (id === 'arms' && window.OCTAArmsFilter && typeof window.OCTAArmsFilter.refresh === 'function') {
+  setTimeout(()=>{ try { window.OCTAArmsFilter.refresh(); } catch(e){ console.warn('arms:', e.message); } }, 120);
+  }
   if (id === 'dividends' && typeof dvLoad === 'function') dvLoad();
   if (id === 'newsaxis' && typeof naLoad === 'function') naLoad();
   if (id === 'octasearch') {
@@ -1627,6 +1633,46 @@ async function octaLoadDB(){
 }
 
 function octaEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   ⭐⭐ OCTALiveMarkets — مصدر واحد لطبقة السوق الحية (المحرك الحيّ)
+   ══════════════════════════════════════════════════════════════════════
+   📌 ١٤ نوفمبر ٢٠٢٦: صفحتان محتاجين نفس الداتا الحية
+      (/api/markets?market=egypt ≈ 850 ك.ب خام):
+         ① ذراع «الفني» (octa-techfilter.js)
+         ② فلتر الأذرع (octa-armsfilter.js)
+      ⇒ طلب واحدCached على مستوى الصفحة (مش تحميل مزدوج).
+
+   📌⛔ ليه الداتا الحية بالذات؟ لأن /api/data_full (السجل) قديم
+      (٩ أكتوبر) ⇒ أي محور يبني عليه بيبقى رقم من 5 أسابيع.
+   📌 نفس الداتا دي اللي بتتغذّى منها الدرجة النهائية ⇒ الفلتر
+      والكارت بيقولوا نفس الرقم.
+   ══════════════════════════════════════════════════════════════════════ */
+window.OCTALiveMarkets = function () {
+  if (window.__octaLiveMk) return window.__octaLiveMk;
+  var api = (typeof OCTA_API !== 'undefined') ? OCTA_API : '';
+  var f = (typeof octaFetch === 'function')
+    ? octaFetch(api + '/api/markets?market=egypt')
+    : fetch(api + '/api/markets?market=egypt', { credentials: 'include' });
+  window.__octaLiveMk = f.then(function (r) { return r.json(); }).then(function (j) {
+    var rows = (j && (j.egypt || (j.markets && j.markets.egypt))) || (j && j.rows) || [];
+    var map = {}, ts = '';
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (!r || !r.code) continue;
+      map[r.code] = r;
+      if (!ts && r.ts) ts = String(r.ts);
+    }
+    return { ok: true, map: map, ts: ts, n: rows.length };
+  }).catch(function (e) {
+    return { ok: false, map: {}, ts: '', n: 0, err: (e && e.message) ? String(e.message) : 'الطلب فشل' };
+  });
+  return window.__octaLiveMk;
+};
+
+/* ⭐ إعادة تحميل الطبقة الحية (زرار «تحديث») */
+window.OCTALiveMarketsReset = function () { window.__octaLiveMk = null; };
+
 function octaCol(v){ return v>0?'var(--sec)':(v<0?'var(--red2)':'var(--muted)'); }
 
 async function octaInit(){

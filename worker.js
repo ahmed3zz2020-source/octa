@@ -37,7 +37,7 @@ const TRIES = 3;
 
 /* ⭐ محرك محور الأخبار (هالان) — نسخة مطابقة 1:1 من news_engine في الباك.
    📌 الاختبار: tools/test-halan-news.js ⇒ 182/182 مطابقة. */
-import { newsEngine, mergeEvents, eventsByCode } from './halan-news.js';
+import { newsEngine, mergeEvents, eventsByCode, parseHalaText } from './halan-news.js';
 
 /* ══════════════════════════════════════════════════════════════
    ⭐ جسر سكانر TradingView — للفلتر (Smart Money)
@@ -1240,12 +1240,17 @@ async function handle(request, env, ctx) {
         for (const code of codes) {
           const he = halanByCode[code];
           const news = newsEngine(he);
+          /* ⭐ عنوان + نص الخبر — النص الخام كان بيتعرض زي ما هو
+             («العنوان : اسم الشركة ...») ⇒ المستخدم مش شايف الخبر. */
+          const txt = parseHalaText(news.headline);
           out.push({
             code: code,
             axis: news.score,
             events: news.events_count,
             materiality: news.materiality,
             headline: news.headline,
+            title: txt.title,
+            body: txt.body,
             has_news: news.has_news,
             source: 'halan',
           });
@@ -1254,7 +1259,7 @@ async function handle(request, env, ctx) {
           ok: true,
           count: out.length,
           updatedAt: ek && ek.at ? new Date(ek.at).toISOString() : null,
-          source: 'بورصة هالان (Halan Borsa) — إعلانات وأخبار الشركات',
+          source: 'إعلانات البورصة الرسمية',
           axes: out,
         }, null, 1), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=120' } });
       } catch (e) {

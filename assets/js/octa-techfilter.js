@@ -64,10 +64,26 @@
   }
 
   /* ─────────── قراءة الداتا الحية ─────────── */
+  /* ⭐ ١٤ نوفمبر ٢٠٢٦ — الطلب بقا مشترك مع «فلتر الأذرع»
+     ( octa-core.js → OCTALiveMarkets ) ⇒ تحميل واحد مش اتنين. */
   function loadLive() {
     if (LIVE) return Promise.resolve(LIVE);
     if (LIVE_STATE === 'loading') return Promise.resolve(null);
     LIVE_STATE = 'loading';
+    if (typeof window.OCTALiveMarkets === 'function') {
+      return window.OCTALiveMarkets().then(function (res) {
+        if (!res || !res.ok) {
+          LIVE_STATE = 'error';
+          LIVE_ERR = (res && res.err) ? res.err : 'الطلب فشل';
+          LIVE = null;
+          return null;
+        }
+        LIVE = res.map;
+        if (res.ts) LIVE_TS = res.ts;
+        LIVE_STATE = 'ok';
+        return LIVE;
+      });
+    }
     var api = (typeof OCTA_API !== 'undefined') ? OCTA_API : '';
     var f = (typeof octaFetch === 'function')
       ? octaFetch(api + '/api/markets?market=egypt')

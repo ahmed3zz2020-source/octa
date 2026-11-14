@@ -22,19 +22,97 @@
   return s[k];
   }
 
+  /* ═══ الطبقة الحية (المحرك الحيّ) ═══
+  📌⭐ ١٤ نوفمبر ٢٠٢٦ — إصلاح جوهري:
+     ① «التقييم» كان بيعرض **حجم التداول** (الحقل v في السجل ده
+        الحجم مش درجة!) ⇒ أرقام زي ٤٦٤٢٧٢٢١٤٧ مش ليها معنى.
+        دلوقتي = درجة تقييم ٠-١٠٠ من مضاعف الربحية والقيمة الدفترية
+        (نفس «محور التقييم ١٥٪» في نور ⇒ رقم واحد في كل مكان).
+     ② باقي المحاور كانت بتقرأ السجل القديم (٩ أكتوبر) بينما
+        «المجموع» من اليوم ⇒ «الفرق» كان رقم مش ليه معنى.
+        دلوقتي كل محور من نفس اللحظة (/api/markets?market=egypt).
+     📌 لو الطلب فشل ⇒ بنرجع للسجل ونقول للمستخدم إن الأرقام قديمة. */
+  var LIVE = null;         /* code → صف حي */
+  var LIVE_STATE = 'idle'; /* idle | loading | ok | error */
+  var LIVE_ERR = '';
+  var LIVE_TS = '';
+  var VAL_CACHE = {};      /* كود ← درجة التقييم */
+
+  function num(v) {
+  if (v === null || v === undefined || v === '') return null;
+  var n = Number(v);
+  return isFinite(n) ? n : null;
+  }
+
+  function liveRow(code) { return LIVE ? LIVE[code] : null; }
+
+  /* ⭐ درجة المحور من الطبقة الحية — لو مش موجودة ⇒ السجل */
+  function axLive(s, axisKey, oldKey) {
+  var L = liveRow(s.code);
+  if (L && L.all_axes && L.all_axes[axisKey] != null) return L.all_axes[axisKey];
+  var old = ax(s, oldKey);
+  return old == null ? null : old;
+  }
+
+  /* ⭐ المضاعف (ربحية/دفترية) محدّث على السعر الحالي:
+     الأرباح والقيمة الدفترية دورية · السعر يومي ⇒ نعدّل المضاعف
+     بنسبة تغيّر السعر. (المقاس: كومى — ٥٫٩٩ ⇒ ٦٫١٩ = نفس النسبة.) */
+  function scaledMult(s, v) {
+  var x = num(v);
+  if (x == null) return null;
+  var pOld = num(s.p), pNow = num(s.price);
+  if (pOld && pNow && pOld > 0) return x * (pNow / pOld);
+  return x;
+  }
+
+  /* ⭐ درجة التقييم (٠-١٠٠) — نفس جداول «محور التقييم» في نور */
+  function valScore(s) {
+  if (VAL_CACHE[s.code] !== undefined) return VAL_CACHE[s.code];
+  var out = null;
+  if (typeof nzAxisScore === 'function') {
+  try {
+  var L = liveRow(s.code);
+  var rec = s;
+  if (L) {
+  rec = Object.assign({}, s, {
+  pe: num(L.pe) != null ? num(L.pe) : scaledMult(s, s.pe),
+  pb: num(L.pb) != null ? num(L.pb) : scaledMult(s, s.pb),
+  price: num(L.price) != null ? num(L.price) : num(s.price)
+  });
+  }
+  var r = nzAxisScore(rec);
+  if (r && r.axes) {
+  for (var i = 0; i < r.axes.length; i++) {
+  if (r.axes[i].id === 'val' && r.axes[i].have > 0) { out = r.axes[i].mean; break; }
+  }
+  }
+  } catch (e) { out = null; }
+  }
+  VAL_CACHE[s.code] = out;
+  return out;
+  }
+
+  /* ⭐ نسبة القسيمة — من الطبقة الحية لو موجودة */
+  function liveDy(s) {
+  var L = liveRow(s.code);
+  if (L && num(L.div_yield) != null) return num(L.div_yield);
+  return num(s.dy);
+  }
+
   var ARMS8 = [
   { id: 'total', ic: '🐙', n: 'المجموع', d: 'تقييم OCTA الكامل',
-  get: function (s) { return s.score; }, src: 'المحركات الخمسة كلها' },
+  get: function (s) { return num(s.score); }, src: 'محاور المحرك كلها', inTotal: true },
   { id: 'q', ic: '💰', n: 'الأساسي', d: 'جودة الشركة من جوه',
-  get: function (s) { return ax(s, 'q'); }, src: 'أرباح وعوائد ونسب' },
+  get: function (s) { return axLive(s, 'fundamental', 'q'); }, src: 'أرباح وعوائد ونسب', inTotal: true },
   { id: 'v', ic: '🏷️', n: 'التقييم', d: 'السهم غالي ولا رخيص',
-  get: function (s) { return ax(s, 'v'); }, src: 'مضاعف الربحية والقيمة الدفترية' },
+  get: function (s) { return valScore(s); }, src: 'مضاعف الربحية والقيمة الدفترية', derived: true },
   { id: 'm', ic: '📈', n: 'الفني', d: 'حركة السعر والزخم',
-  get: function (s) { return ax(s, 'm'); }, src: 'مؤشرات فنية من الرسم البياني' },
+  get: function (s) { return axLive(s, 'technical', 'm'); }, src: 'مؤشرات فنية من الرسم البياني', inTotal: true },
   { id: 'lq', ic: '💧', n: 'السيولة', d: 'تقدر تبيع بدري ولا لأ',
-  get: function (s) { return ax(s, 'lq'); }, src: 'حجم التداول ونسبته' },
+  get: function (s) { return axLive(s, 'liquidity', 'lq'); }, src: 'حجم التداول ونسبته', inTotal: true },
   { id: 'sf', ic: '🛡️', n: 'الأمان', d: 'السهم بيتزنق قد إيه',
-  get: function (s) { return ax(s, 'sf'); }, src: 'بيتا · دين · تقلب · أكبر هبوط · شارپ' },
+  get: function (s) { var v = num(s.safety); if (v != null) return v; var o = ax(s, 'sf'); return o == null ? null : o; },
+  src: 'بيتا · دين · تقلب · أكبر هبوط · شارپ', inTotal: true },
   /* ↓ الاتنين دول مش من محرك الخمسة — محسوبين من بيانات تاريخية حقيقية.
   كل واحد فيهم بيقول التغطية بتاعته بوضوح. */
   { id: 'risk', ic: '⚠️', n: 'المخاطرة', d: 'التذبذب وأكبر هبوط',
@@ -43,7 +121,7 @@
   get: function (s) { return ARM_DIV[s.code]; }, src: 'نسبة التوزيع من بيانات البورصة', derived: true,
   /* ⚠ صفر توزيع مش «بيانات» — السهم ده مش بيوزّع أصلاً
   ولازم المستخدم يشوف العدد ده مش في الحسبة. */
-  has: function (s) { return ARM_DIV[s.code] != null && (s.dy || 0) > 0; } }
+  has: function (s) { return ARM_DIV[s.code] != null && liveDy(s) > 0; } }
   ];
 
   /* ── نتيجتين مشتقة ── */
@@ -81,7 +159,7 @@
   /* ⛌ المخاطرة مش هنا — buildRisk3 هي اللي بتحسبها من 3 مؤشرات.
   كانت بتتكتب هنا وبتتمسح بعدها، والنتيجة كانت شاربي لوحدها. */
   Object.keys(bySector).forEach(function (sec) {
-  pctRank(bySector[sec], function (s) { return (s.dy || 0); }, 1);
+  pctRank(bySector[sec], function (s) { return liveDy(s) || 0; }, 1);
   });
   }
 
@@ -148,6 +226,41 @@
   buildRisk3();
   }
 
+  /* ═══ تحميل الطبقة الحية — مرة واحدة في الصفحة ═══
+  ⛔ متحمّلش ٨٥٠ ك.ب قبل ما المستخدم يفتح صفحة الأذرع فعلاً. */
+  function ensureLive() {
+  if (LIVE_STATE !== 'idle') return;
+  if (!armsVisible()) return;
+  LIVE_STATE = 'loading';
+  if (typeof window.OCTALiveMarkets !== 'function') {
+  LIVE_STATE = 'error';
+  LIVE_ERR = 'مصدر البيانات الحية غير متاح';
+  return;
+  }
+  window.OCTALiveMarkets().then(function (res) {
+  if (res && res.ok) {
+  LIVE = res.map; LIVE_TS = res.ts || ''; LIVE_STATE = 'ok';
+  } else {
+  LIVE = null; LIVE_STATE = 'error'; LIVE_ERR = (res && res.err) || 'الطلب فشل';
+  }
+  /* ⭐ أعد الرسم بالبيانات الحية — بس لو الصفحة لسه مفتوحة */
+  if (!armsVisible()) return;
+  if (AF.sel) renderDetail(); else renderPage();
+  });
+  }
+
+  /* ⭐ ملاحظة مصدر الأرقام (بيظهر بس لو الطبقة الحية مش متاحة) */
+  function liveNote() {
+  if (LIVE_STATE === 'error') {
+  return '<div class="af-warn">⚠️ مقدرتش أجيب المحاور الحية (' + esc(LIVE_ERR || 'الطلب فشل') +
+  ') — الأرقام المعروضة من سجل ٩ أكتوبر، فمتحسبش عليها قرار. جرّب زرار «تحديث».</div>';
+  }
+  if (LIVE_TS) {
+  return '<div class="af-legend">🕒 أرقام المحاور من نفس لحظة المحرك: ' + esc(String(LIVE_TS).slice(0, 16).replace('T', ' ')) + '</div>';
+  }
+  return '';
+  }
+
   /* ═══ التغطية ═══ */
   function coverage(arm) {
   ensureBuilt();
@@ -163,10 +276,17 @@
   function renderPage() {
   var host = document.getElementById('armsList');
   if (!host) return;
+  ensureLive();
   ensureBuilt();
   lastN = OS_DB.length;
 
   if (AF.sel) return renderDetail();
+
+  /* ⭐ الداتا الحية لسه جاية ⇒ ننتظر بدل ما نعرض أرقام من ٥ أسابيع */
+  if (LIVE_STATE === 'loading') {
+  host.innerHTML = '<div class="af-empty">⏳ جاري تحميل المحاور الحية…</div>';
+  return;
+  }
 
   var priced = OS_DB.filter(function (s) { return s.price > 0; }).length;
   var h = '';
@@ -193,7 +313,8 @@
   'واللي كان اخد وزنه اتوزّع على المحاور الحقيقية. ولو محور ناقص لمصدره ⇒ ' +
   'المحور كله بيتشال والوزن بيتحسب على الموجود بس — مفيش رقم مخترع.' +
   '</div>';
-  h += '<div class="af-i-n">👆 اختار ذراع عشان تشوف الأسهم مرتبة بيها — الدرجة دي <b>نفس الرقم</b> اللي دخل في المجموع، مش حساب تاني.</div>';
+  h += '<div class="af-i-n">👆 اختار ذراع عشان تشوف الأسهم مرتبة بيها — الدرجة دي <b>نفس رقم المحرك الحيّ</b>، مش حساب تاني. ' +
+  'والمحاور التلاتة التانية (التقييم · المخاطرة · التوزيعات) محسوبة من بيانات تانية، ومش جزء من الدرجة النهائية.</div>';
   h += '</div>';
 
   h += aboutBox();
@@ -287,6 +408,8 @@
   h += '<div class="af-note2">💡 <b>التغطية</b> بتقول لك كام سهم عنده بيانات للذراع ده فعلاً. ' +
   'اللي مالوش بيانات مش بيتردب بصفر — بيتشال من الحسبة ويُحسب لك.</div>';
 
+  h += liveNote();
+
   h += '</div></div>';
   return h;
   }
@@ -294,6 +417,22 @@
   /* ═══ التفاصيل ═══ */
   function renderDetail() {
   var arm = ARMS8.filter(function (a) { return a.id === AF.arm; })[0] || ARMS8[0];
+  ensureLive();
+
+  /* ⭐ الداتا الحية لسه جاية ⇒ شريط الرجوع + انتظار (من غير أرقام قديمة) */
+  if (LIVE_STATE === 'loading') {
+  document.getElementById('armsList').innerHTML =
+  '<div class="af-bar">' +
+  '<button type="button" class="af-bb" data-af="back">→ كل الأذرع</button>' +
+  '<div class="af-bar-r">' +
+  '<span class="af-tm">' + esc(AF.tstamp || '—') + '</span>' +
+  '<button type="button" class="af-xb" data-af="close" aria-label="اخرج من الفلتر">✕</button>' +
+  '</div></div>' +
+  '<div class="af-empty">⏳ جاري تحميل المحاور الحية…</div>';
+  bind();
+  return;
+  }
+
   var rows = OS_DB.filter(function (s) {
   if (s.price <= 0) return false;
   if (AF.sector !== 'all' && (s.sectorEn || s.sector) !== AF.sector) return false;
@@ -338,18 +477,21 @@
 
   h += '<div class="af-wrap"><table class="af-t"><thead><tr>' +
   '<th>#</th><th>السهم</th><th>القطاع</th>' +
-  '<th>' + arm.n + '</th><th>المجموع</th><th>الفرق</th><th>السعر</th><th>تغير</th>' +
+  '<th>' + arm.n + ' <span class="af-th-u">من 100</span></th>' +
+  '<th>المجموع <span class="af-th-u">من 100</span></th>' +
+  '<th>الفرق</th><th>السعر</th><th>تغير</th>' +
   '</tr></thead><tbody>';
   shown.slice(0, 120).forEach(function (s, i) {
-  var av = arm.get(s), tv = s.score || 0, d = Math.round(av - tv);
+  var av = arm.get(s), tv = num(s.score) || 0, d = Math.round(av - tv);
   h += '<tr data-afcode="' + s.code + '">' +
   '<td class="af-i">' + (i + 1) + '</td>' +
   '<td><b>' + esc(s.code) + '</b><span class="af-nm">' + esc(s.name || '') + '</span></td>' +
   '<td class="af-sc">' + esc(s.sectorAr || s.sector || '—') + '</td>' +
-  '<td><b class="af-v' + (av >= 70 ? ' hi' : av >= 50 ? ' mid' : ' lo') + '">' + Math.round(av) +
-  (av > 100 ? '<i class="af-over" title="الدرجة دي عدّت 100 قبل خصم المخاطرة">↑</i>' : '') + '</b></td>' +
+  '<td><b class="af-v' + (av >= 70 ? ' hi' : av >= 50 ? ' mid' : ' lo') + '">' + Math.round(av) + '</b></td>' +
   '<td class="af-tot">' + Math.round(tv) + '</td>' +
-  '<td class="af-d' + (d > 0 ? ' up' : d < 0 ? ' dn' : '') + '">' + (d > 0 ? '+' : '') + d + '</td>' +
+  (arm.inTotal
+  ? '<td class="af-d' + (d > 0 ? ' up' : d < 0 ? ' dn' : '') + '">' + (d > 0 ? '+' : '') + d + '</td>'
+  : '<td class="af-d na">—</td>') +
   '<td class="af-n">' + (s.price || 0).toFixed(2) + '</td>' +
   '<td class="af-c' + ((s.change || 0) >= 0 ? ' up' : ' dn') + '">' +
   ((s.change || 0) >= 0 ? '▲ ' : '▼ ') + Math.abs(s.change || 0).toFixed(2) + '%</td>' +
@@ -358,8 +500,18 @@
   h += '</tbody></table>';
   if (shown.length > 120) h += '<div class="af-more">📊 بيعرض أول 120 من ' + shown.length + ' سهم — ضيّق الفلتر عشان تشوف الباقي</div>';
   h += '</div>';
-  h += '<div class="af-legend"><b>↑</b> = الدرجة عدّت 100. ده بيحصل في <b>20 حالة</b> من 1480 قراءة — المحرك بيطلع أعلى من 100 قبل ما خصم المخاطرة والثقة يوصّل المجموع لـ 100. مش خطأ في الفلتر، و<b>المجموع النهائي مابعديش 100</b>.</div>';
-  h += '<div class="af-legend"><b>الفرق</b> = درجة ' + arm.n + ' ناقص درجة المجموع. كل ما الرقم أعلى، السهم ده قوي في الذراع ده بس ضعيف في الباقي.</div>';
+  /* ⭐ الشرح — بلدي: كل الأرقام درجات من ٠ لـ ١٠٠، والفرق معناها إيه */
+  h += '<div class="af-legend">📊 <b>كل الأرقام درجات من ٠ لـ ١٠٠</b> — «' + arm.n +
+  '» = درجة السهم في الذراع ده، و«المجموع» = درجته النهائية في محرك OCTA.</div>';
+  if (arm.inTotal) {
+  h += '<div class="af-legend">➖ <b>الفرق</b> = درجة «' + arm.n +
+  '» ناقص درجة المجموع (بالنقاط). كل ما الرقم أعلى، السهم ده قوي في الذراع ده بس ضعيف في الباقي.</div>';
+  } else {
+  h += '<div class="af-legend">➖ <b>الفرق</b> معندهاش معنى هنا — «' + arm.n +
+  '» محور محسوب من بيانات تانية (مش داخل في المجموع)، فمفيش رقم ناقصه نقارنه بيه.</div>';
+  }
+  h += '<div class="af-legend">💡 الدرجة الأعلى في الذراع مش معناها «الأفضل استثمار» — الذراع بيغيّر <b>نظرك</b> بس، مش الدرجة النهائية.</div>';
+  h += liveNote();
 
   document.getElementById('armsList').innerHTML = h;
   bind();
@@ -385,6 +537,9 @@
   /* octaLoadDB بيرجّع فوراً لو البيانات جاهزة — فنجبر تحميل جديد */
   try { if (typeof EGX_DB !== 'undefined') EGX_DB = null; } catch (e) { }
   try { if (typeof OS_READY !== 'undefined') OS_READY = false; } catch (e) { }
+  /* ⭐ الطبقة الحية كمان — إعادة تحميل كاملة */
+  try { if (typeof window.OCTALiveMarketsReset === 'function') window.OCTALiveMarketsReset(); } catch (e) { }
+  LIVE = null; LIVE_STATE = 'idle'; VAL_CACHE = {};
   var pr = (typeof octaLoadDB === 'function') ? octaLoadDB : null;
   if (!pr) return done(false);
   try {
@@ -467,8 +622,21 @@
   AF.built = false; AF.sel = null; AF.arm = 'total'; AF.min = 0;
   renderPage();
   },
+  /* ⭐ إعادة رسم بدون ما نreset الاختيار (لما المستخدم يفتح الصفحة تاني) */
+  refresh: function () {
+  if (AF.sel) renderDetail(); else renderPage();
+  },
   arms: ARMS8,
-  coverage: coverage
+  coverage: coverage,
+  /* 🧪 خطّاف الاختبار (زي الفلتر الفني) */
+  _t: {
+  setLive: function (map) { LIVE = map; LIVE_STATE = 'ok'; VAL_CACHE = {}; },
+  valScore: valScore,
+  axLive: axLive,
+  scaledMult: scaledMult,
+  liveDy: liveDy,
+  arms: ARMS8
+  }
   };
 
   /* شيل الفلتر القديم لو موجود — الأذرع بقت صفحة تحليل مش كروت */

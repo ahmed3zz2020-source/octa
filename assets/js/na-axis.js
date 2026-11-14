@@ -36,6 +36,26 @@ function naAxisColor(v) {
   return '#8b9eb0';
 }
 
+/* ⭐⭐ عنوان الخبر ونصّه (١٤ نوفمبر ٢٠٢٦ — طلب المالك)
+   📌 قبل كده الكارت كان بيعرض النص الخام:
+      «العنوان : اسم الشركة (ADCI.CA) - قرار لجنة القيد ...»
+      ⇒ المستخدم مش شايف الخبر نفسه، وكمان فيه اسم الشركة مرتين.
+   📌 دلوقتي: العنوان (نوع الحدث) + نص الإعلان (مضمون الإعلان).
+   📌 العنوان/body بييجوا من العامل (parseHalaText) — ولو الـAPI
+      قديم ⇒ نشيل لابل «العنوان :» على الأقل (fallback بسيط). */
+function naNewsTitle(a) {
+  let t = String(a.title || '').trim();
+  if (!t) t = String(a.headline || '').trim().replace(/^العنوان\s*[::\-–—]\s*/, '').trim();
+  return t || '—';
+}
+
+function naNewsBody(a) {
+  let b = String(a.body || '').trim();
+  if (!b) return '';
+  if (b.length > 170) b = b.slice(0, 170).trim() + '…';
+  return b;
+}
+
 async function naLoad() {
   if (NA_DATA || NA_LOADING) { if (NA_DATA) naRender(); return; }
   NA_LOADING = true;
@@ -81,7 +101,15 @@ function naRender() {
   rows.sort((a, b) => NA_SORT === 'desc' ? (b.axis - a.axis) : (a.axis - b.axis));
 
   const h = document.getElementById('naSecH');
-  if (h) h.innerHTML = '📋 كل الأسهم <span class="dv-s">' + rows.length + ' سهم</span>';
+  if (h) {
+    /* ⭐ عنوان القائمة يقول الفلتر الحالي — قبل كده كان يقول «كل الأسهم»
+       وفي كل مرة والفلتر شغّال ⇒ الرقم مش بيطابق اللي فوق. */
+    const flab = NA_FILTER === 'all' ? 'كل الأسهم'
+      : (NA_FILTER === 'critical' ? 'أحداث حرجة'
+        : NA_FILTER === 'high' ? 'أهمية عالية'
+          : NA_FILTER === 'medium' ? 'أهمية متوسطة' : 'أهمية منخفضة');
+    h.innerHTML = '📋 ' + flab + ' <span class="dv-s">' + rows.length + ' سهم</span>';
+  }
 
   const box = document.getElementById('naList');
   if (!box) return;
@@ -91,12 +119,15 @@ function naRender() {
     box.innerHTML = rows.map(function (a) {
       const m = naMatLabel(a.materiality);
       const col = naAxisColor(a.axis);
-      const hl = String(a.headline || '').slice(0, 150);
+      /* ⭐ الخبر نفسه: العنوان + نص الإعلان (مش اسم الشركة) */
+      const title = naNewsTitle(a);
+      const body = naNewsBody(a);
       /* ⭐ بنستخدم كلاسات dv-i1 / dv-i2 / dv-i3 الموجودة في الـCSS */
       return '<div class="dv-item">' +
         '<div class="dv-i1">' +
         '<div class="dv-code">' + naEsc(a.code) + '</div>' +
-        '<div class="dv-name">' + (hl ? naEsc(hl) : '—') + '</div>' +
+        '<div class="dv-head">' + naEsc(title) + '</div>' +
+        (body ? '<div class="dv-body">' + naEsc(body) + '</div>' : '') +
         '</div>' +
         '<div class="dv-i2">' +
         '<div class="dv-val" style="color:' + col + '">' + naEsc(a.axis) + '</div>' +
@@ -105,7 +136,6 @@ function naRender() {
         '<div class="dv-i3">' +
         '<span class="dv-tag k">' + m.t + '</span>' +
         '<span class="dv-tag up">' + naEsc(a.events) + ' حدث</span>' +
-        '<span class="dv-tag">بورصة هالان</span>' +
         '</div>' +
         '</div>';
     }).join('');
@@ -113,14 +143,9 @@ function naRender() {
 
   const src = document.getElementById('naSrc');
   if (src) src.innerHTML =
-    '📡 المصدر: <b>' + naEsc(NA_DATA.source || 'بورصة هالان') + '</b> · ' +
-    all.length + ' سهم · التحديث كل 30 دقيقة' +
-    '<br>🔗 <b>بورصة هالان</b> ← ' +
-    '<b>عامل البيانات (halan-feed)</b> ← <b>Cloudflare KV</b>' +
-    '<br>ℹ️ <b>الرقم هنا = درجة محور الأخبار محسوبة من إعلانات هالان.</b>' +
-    '<br>🔎 محور الأخبار جوّه <b>كارت القرار</b> بيحسب من إعلانات البورصة الرسمية' +
-    '(foudalens) — ونحتاج نوحّد المصدرين عشان يبقى رقم واحد في كل مكان.' +
-    '<br>⏱️ آخر تحديث: ' + (NA_DATA.updatedAt ? naEsc(NA_DATA.updatedAt) : '—') +
+    'ℹ️ <b>الرقم = درجة محور الأخبار</b> — بيتحسب من عدد أحداث الشركة المعلنة وأهميتها.' +
+    '<br>⚠️ الحدث الحرج بيخصم ١٨ نقطة · والتوزيعات وأرباح الأسهم ليها أعلى وزن.' +
+    '<br>🗓️ آخر تحديث: ' + (NA_DATA.updatedAt ? naEsc(NA_DATA.updatedAt) : '—') +
     ' · التحديث كل 30 دقيقة';
 }
 
