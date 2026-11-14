@@ -442,6 +442,26 @@ function buildHeaders(request) {
    ⛌ ⇒ لو الكوكي forged ⇒ الـworker هيقدّم التطبيق… والباك
    ⛌   هيرفض كل طلب بيانات (401). يعني: مفيش تسريب.
    ═══════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+  🔐 ١٤ نوفمبر ٢٠٢٦ — المسارات العامة (اللي بتقبل زائر من غير جلسة)
+  ──────────────────────────────────────────────────────────────
+  ⭐ غير المسارات دي ⇒ 401 «تسجيل الدخول مطلوب».
+  📌 صفحة السوق العامة (market.html) بتطلب /api/quotes بس — فهي
+     شغالة زي ما هي. وكل التحليل والقرار بقى محمي.
+  ══════════════════════════════════════════════════════════════ */
+function isPublicApi(path) {
+  if (!path) return false;
+  /* ⛔ OPTIONS (preflight) — مافيش كوكي ⇒ لازم يعدّي */
+  if (path === '/api/health') return true;
+  if (path === '/api/track') return true;          /* التتبّع لازم يفضل مفتوح */
+  if (path.indexOf('/api/auth/') === 0) return true; /* التوثيق (تسجيل/دخول/كود) */
+  if (path === '/api/quotes') return true;          /* صفحة السوق العامة */
+  if (path.indexOf('/api/logos') === 0) return true;
+  if (path.indexOf('/api/tvlogo/') === 0) return true;
+  if (path.indexOf('/api/tvlogo') === 0) return true;
+  return false;
+}
+
 function hasSession(request) {
   try {
     const c = request.headers.get('Cookie') || '';
@@ -1544,6 +1564,28 @@ async function handle(request, env, ctx) {
     }
 
     if (url.pathname.startsWith('/api/')) {
+      /* ⛔⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐ بوابة الـAPI: التحليل والقرار
+         محميين.session مطلوب.
+         📌 القياس قبل التغيير: /api/explain/COMI و/api/opportunity/COMI
+            و/api/risk/COMI و/api/sentiment/COMI كانوا 200 لغير المسجّلين.
+         📌 المعيار: نفس كوكي البوابة (octa_token) — الباك بيفحصه كمان.
+         ⛔ OPTIONS (preflight) بيعدّي عشان الكوكي مش بيوصل معاه. */
+      if (request.method !== 'OPTIONS' && !isPublicApi(url.pathname)
+        && !hasSession(request)) {
+        return new Response(JSON.stringify({
+          ok: false,
+          error: 'تسجيل الدخول مطلوب',
+          hint: 'سجّل دخول أو اعمل حساب من البوابة، وبعدها افتح تاني',
+          code: 'auth_required'
+        }), {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'no-store',
+            'X-OCTA-Auth': 'required'
+          }
+        });
+      }
       /* ⭐⭐ محرّك الفرص (OPP-001) — الباك الحيّ الأول، واللقطة fallback.
          ⛔ في الإنتاج الـOCTA_OPP_SNAPSHOT مش مفعّل ⇒ السلوك القديم
             (proxy بس) — يعني ما فيش أي تغيير على الإنتاج. */
