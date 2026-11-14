@@ -12,6 +12,7 @@
     "deploy:preview": "bash tools/deploy.sh preview",
     "deploy:prod": "bash tools/deploy.sh prod",
     "dev": "wrangler dev",
+    "test": "node --test \"assets/tests/*.test.js\"",
     "check:dist": "node tools/check-dist.js",
     "check:guard": "node tools/check-deploy-guard.js",
     "check:news": "node tools/test-halan-news.js"

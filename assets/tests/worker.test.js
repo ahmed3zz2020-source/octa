@@ -266,3 +266,85 @@ test('مافيش اسم أداة ذكاء اصطناعي في ملفات الو�
     assert.ok(!/gemini|claude|chatgpt|copilot/i.test(s), f);
   }
 });
+
+/* ═══════════════════════════════════════════════════════════
+   ⏱️ ④ مهلة الـproxy — الفخ اللي كان بيعمل ٥٠٢
+   ───────────────────────────────────────────────────────────
+   📌 القياس (١٤ نوفمبر ٢٠٢٦): ردّ الـAPI وهو بارد = **٦٫٣٤ ثانية**
+      ومهلة الـworker كانت **٦٫٠٠ ثانية** ⇒ أول طلب بعد أي خمول
+      بيتقطع ⇒ ٥٠٢ ⇒ «⚠️ السيرفر بينزل» + بيانات محمية فاضية.
+   ⛔ والاختبار ده حارس: لو رجعنا لـ٦ ثواني ⇒ بيفشل فوراً.
+   ═══════════════════════════════════════════════════════════ */
+test('مهلة المحاولة الأولى ≥ ١٥ ثانية والمحاولات بعديها ٦ ثواني', () => {
+  const m1 = SRC.match(/const PROXY_TIMEOUT_FIRST_MS\s*=\s*(\d+)/);
+  const m2 = SRC.match(/const PROXY_TIMEOUT_MS\s*=\s*(\d+)/);
+  assert.ok(m1, 'PROXY_TIMEOUT_FIRST_MS مش موجود في worker.js');
+  assert.ok(m2, 'PROXY_TIMEOUT_MS مش موجود في worker.js');
+  const first = Number(m1[1]);
+  const base = Number(m2[1]);
+  assert.ok(first >= 15000,
+    'المحاولة الأولى لازم ≥ ١٥٠٠٠ عشان الـcold start (٦٫٣٤ث) يوصل — دلوقتي: ' + first);
+  assert.equal(base, 6000, 'مهلة المحاولات بعد الأولى لازم تفضل ٦٠٠٠');
+  assert.ok(SRC.includes('i === 0 ? PROXY_TIMEOUT_FIRST_MS : PROXY_TIMEOUT_MS'),
+    'المهلة الأولى مش مطبّقة على المحاولة الأولى');
+});
+
+test('⛔ سيرفر بطيء (٧ ثواني) ⇒ الـworker يرجّع ٢٠٠ مش ٥٠٢', async () => {
+  /* ⛔ ده هو سيناريو الـcold start بالظبط: السيرفر شغال بس بطيء.
+     ⛔ الكود القديم (مهلة ٦ ثواني) كان بيقطع ويحوّل ل٥٠٢. */
+  let calls = 0;
+  globalThis.fetch = (target, init) => new Promise((resolve, reject) => {
+    calls++;
+    const t = setTimeout(() => resolve(new Response('{"ok":true}', {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    })), 7000);
+    if (init && init.signal) {
+      init.signal.addEventListener('abort', () => {
+        clearTimeout(t);
+        reject(new Error('The operation was aborted'));
+      });
+    }
+  });
+  const w = makeWorker();
+  const env = { ASSETS: makeAssets(FILES) };
+  const t0 = Date.now();
+  const r = await w.fetch(req('https://octashares.com/api/prices'), env);
+  const dt = Date.now() - t0;
+  assert.equal(r.status, 200,
+    'السيرفر البطيء اتحوّل لخطأ بدل ما يرد — الرجوع: ' + r.status);
+  assert.equal(calls, 1, 'المحاولة الأولى كان المفروض تنجح (نداءات: ' + calls + ')');
+  assert.ok(dt < 14000, 'استنى وقت طويل أوي: ' + dt + 'ms');
+});
+
+test('السيرفر واقع فعلاً ⇒ ٥٠٢ بعد ٣ محاولات (مش indefinite)', async () => {
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    throw new Error('connection refused');
+  };
+  const w = makeWorker();
+  const env = { ASSETS: makeAssets(FILES) };
+  const r = await w.fetch(req('https://octashares.com/api/prices'), env);
+  assert.equal(r.status, 502);
+  const body = await r.text();
+  assert.ok(body.includes('api-proxy-failed'), body.slice(0, 120));
+  assert.equal(calls, 3, 'عدد المحاولات لازم ٣ (PROXY_TRIES) — دلوقتي: ' + calls);
+});
+
+test('السيرفر بيرجّع ٥٠٠ مرتين وبعدين ٢٠٠ ⇒ الـworker بيرجّع ٢٠٠', async () => {
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    if (calls < 3) return new Response('{"error":"boom"}', {
+      status: 500, headers: { 'Content-Type': 'application/json' },
+    });
+    return new Response('{"ok":true}', {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    });
+  };
+  const w = makeWorker();
+  const env = { ASSETS: makeAssets(FILES) };
+  const r = await w.fetch(req('https://octashares.com/api/prices'), env);
+  assert.equal(r.status, 200, 'الـworker محاولش يرجع من الـ500');
+  assert.equal(calls, 3, 'عدد المحاولات: ' + calls);
+});
