@@ -205,6 +205,11 @@
       ROWS = rows;
       render();
     });
+    /* ⭐ ١٤ نوفمبر ٢٠٢٦ — حدث تغيير السوق
+       📌 لوحة المتحرّكين (octa-movers.js) بتستمع عليه ⇒ تتحدّث مع السوق. */
+    try {
+      window.dispatchEvent(new CustomEvent('pm:market', { detail: { mk: mk } }));
+    } catch (e) { }
   }
 
   /* ── التشغيل ── */

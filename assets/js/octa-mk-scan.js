@@ -21,7 +21,7 @@
     'close', 'change', 'change_abs', 'volume', 'relative_volume_10d_calc',
     'market_cap_basic', 'price_earnings_ttm', 'price_book_fq', 'RSI',
     'MACD.macd', 'MACD.signal', 'EMA20', 'EMA50', 'EMA200', 'ATR',
-    'price_52_week_high', 'price_52_week_low', 'Perf.1M', 'Perf.3M', 'Perf.6M',
+    'price_52_week_high', 'price_52_week_low', 'Perf.W', 'Perf.1M', 'Perf.3M', 'Perf.6M',
     'Perf.Y', 'Perf.YTD', 'Volatility.D', 'beta_1_year', 'fundamental_currency_code',
     'exchange', 'sector', 'industry', 'description', 'total_shares_outstanding',
     'Recommend.All', 'dividends_yield_current', 'average_volume_30d_calc',
@@ -40,7 +40,7 @@
     'MACD.macd': 'macd', 'MACD.signal': 'macdSig',
     EMA20: 'ema20', EMA50: 'ema50', EMA200: 'ema200', ATR: 'atr',
     price_52_week_high: 'h52', price_52_week_low: 'l52',
-    'Perf.1M': 'p1m', 'Perf.3M': 'p3m', 'Perf.6M': 'p6m',
+    'Perf.W': 'p1w', 'Perf.1M': 'p1m', 'Perf.3M': 'p3m', 'Perf.6M': 'p6m',
     'Perf.Y': 'p1y', 'Perf.YTD': 'pYtd', 'Volatility.D': 'volD',
     beta_1_year: 'beta', fundamental_currency_code: 'currency',
     exchange: 'exchange', sector: 'sector', industry: 'industry',
@@ -58,6 +58,19 @@
 
   /* ⭐ إعداد كل سوق */
   const MK = {
+    /* ⭐ ١٤ نوفمبر ٢٠٢٦ — مصر في الماسح (لوحة المتحرّكين)
+       📌 السبب: صفحة السوق العامة كانت بتجيب مصر من /api/quotes
+          (تغيير اليوم بس) ⇒ مفيش فترات (أسبوع/شهر/سنة) ولا حجم نسبي.
+       📌 الحل: نفس ماسح TradingView ⇒ ٢٥٥ سهم بسعر مطابق ١٠٠٪
+          لـ /api/quotes + كل الفترات + الحجم النسبي.
+       📌 الأسماء العربية من octa-egx-names.js (محمل في الصفحة). */
+    egypt: {
+      url: 'https://scanner.tradingview.com/egypt/scan', n: 300,
+      body: {
+        filter: [{ left: 'type', operation: 'equal', right: 'stock' }],
+        options: { lang: 'en' }, markets: ['egypt']
+      }
+    },
     us: {
       url: 'https://scanner.tradingview.com/america/scan', n: 800,
       body: {
@@ -130,10 +143,18 @@
     return out;
   }
 
-  function scan(mk, cb) {
+  /* ⭐ ١٤ نوفمبر ٢٠٢٦ — maxAge: إعادة مسح حتى لو فيه كاش
+     📌 السبب: لوحة المتحرّكين بتتحدّث كل دقيقة ⇒ لازم نقدر نعيد المسح
+        من غير ما نكسر الكاش اللي الفلتر بي rely عليه.
+     📌 maxAge=0 ⇒ دايمًا جديد. */
+  function scan(mk, cb, opts) {
     var cfg = MK[mk];
     if (!cfg) { cb([]); return; }
-    if (CACHE[mk]) { cb(CACHE[mk]); return; }
+    opts = opts || {};
+    var age = opts.maxAge == null ? Infinity : Math.max(0, opts.maxAge);
+    if (CACHE[mk] && CACHE[mk + ':at'] && (Date.now() - CACHE[mk + ':at']) < age) {
+      cb(CACHE[mk]); return;
+    }
     loadNames(function () {
       var body = {
         filter: cfg.body.filter, options: cfg.body.options,
@@ -151,12 +172,15 @@
           .then(function (j) {
             var rows = j ? toRows(j) : [];
             var map = window.OCTA_MKT_NAMES || {};
+            /* ⭐ مصر: الأسماء العربية من خريطة EGX (محملة في الصفحة) */
+            var egx = (window.OCTA_EGX_NAMES && window.OCTA_EGX_NAMES.names) || {};
             for (var i = 0; i < rows.length; i++) {
-              var nm = map[rows[i].code];
+              var nm = map[rows[i].code] || egx[rows[i].code];
               if (nm) rows[i].name = nm;
               else if (!rows[i].nameEn) rows[i].nameEn = rows[i].code;
             }
             CACHE[mk] = rows;
+            CACHE[mk + ':at'] = Date.now();
             cb(rows);
           })
           .catch(function () { cb([]); });
