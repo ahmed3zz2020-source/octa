@@ -264,3 +264,10 @@ body.mv-lock { overflow: hidden; }
 .mv-root.mv-in-app .mv-wrap::before { display: none; }
 .mv-root.mv-in-app .mv-head { margin-top: 2px; }
 .mv-root.mv-in-app .mv-cols { gap: 12px; }
+
+/* ⭐ ملاحظة تصحيح الرقم (المصدر كان راجع لنسبة قديمة) */
+.mv-note-fix {
+  margin-top: 8px; padding: 8px 10px; border-radius: 10px;
+  background: var(--warnSoft); border: 1px solid rgba(245, 158, 11, .35);
+  color: var(--warn); font-size: 11.5px; line-height: 1.7;
+}

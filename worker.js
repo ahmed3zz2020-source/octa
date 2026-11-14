@@ -202,6 +202,102 @@ function tvRowsFromScan(data, cols) {
 }
 
 
+
+/* ══════════════════════════════════════════════════════════════════
+   ⭐⭐ تصحيح نسبة التغيّر اليومية في /api/quotes (١٤ نوفمبر ٢٠٢٦)
+   ──────────────────────────────────────────────────────────────────
+   📌 المشكلة: المصدر بيرجّع `change` مقارنةً بمرجع قديم لو السهم
+      عدّل سعره (توزيع/تقسيم) ⇒ مثال بنك قناة السويس: +٥٣.٢٠٪
+      والرقم الصح +٢.١٤٪ (مطابق للإغلاق الرسمي).
+      ⛔ حد البورصة المصرية اليومي ±٢٠٪ ⇒ +٥٣٪ مستحيل أصلاً.
+   📌 الحل: نجيب `change_from_open` من نفس المصدر (مطابق للإغلاق
+      الحقيقي) ⇒ ولو الفرق أكبر من ٣ نقاط نصحّح.
+   📌 ⛔ Fail-safe: أي خطأ ⇒ نرجّع الرد زي ما هو (مش بنكسر).
+   ══════════════════════════════════════════════════════════════════ */
+const TV_FIX_COLS = ['close', 'change', 'change_from_open'];
+
+async function tvChangeMap() {
+  const cache = caches && caches.default;
+  const key = 'https://octa.internal/v2/tvchg/egypt';
+  const cacheKey = new Request(key, { method: 'GET' });
+  try {
+    if (cache) {
+      const hit = await cache.match(cacheKey);
+      if (hit) {
+        const j = await hit.json();
+        if (j && j.map) return j.map;
+      }
+    }
+  } catch (e) { }
+  try {
+    const body = {
+      filter: [
+        { left: 'exchange', operation: 'in_range', right: ['EGX'] },
+        { left: 'type', operation: 'equal', right: 'stock' }
+      ],
+      options: { lang: 'en' },
+      columns: TV_FIX_COLS,
+      range: [0, 400],
+      sort: { sortBy: 'market_cap_basic', sortOrder: 'desc' }
+    };
+    const up = await fetch(TV_SCAN, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    if (!up.ok) return null;
+    const j = await up.json();
+    const rows = (j && j.data) || [];
+    const map = {};
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i], d = r.d || [];
+      const code = String(r.s || '').split(':').pop();
+      if (!code) continue;
+      const ch = d[1], fo = d[2];
+      if (ch == null || fo == null) continue;
+      if (!isFinite(ch) || !isFinite(fo)) continue;
+      if (Math.abs(ch - fo) <= 3) continue;   /* السهم الطبيعي ⇒ نسيبه */
+      map[code] = { change: fo, raw: ch };      /* المرجع القديم ⇒ الصحّح */
+    }
+    if (cache && Object.keys(map).length) {
+      try {
+        const res = new Response(JSON.stringify({ map: map }), {
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=600' }
+        });
+        await cache.put(cacheKey, res);
+      } catch (e) { }
+    }
+    return map;
+  } catch (e) { return null; }
+}
+
+async function fixQuotesChange(bodyText) {
+  try {
+    const j = JSON.parse(bodyText);
+    const mk = j && j.markets && j.markets.egypt;
+    if (!mk) return bodyText;
+    const map = await tvChangeMap();
+    if (!map || !Object.keys(map).length) return bodyText;
+    let fixed = 0;
+    for (const code in mk) {
+      const fx = map[code];
+      if (!fx) continue;
+      const q = mk[code];
+      if (!q || q.change == null) continue;
+      q.change = fx.change;
+      if (fx.raw != null) q.change_raw = fx.raw;
+      q.change_fixed = true;
+      fixed++;
+    }
+    if (!fixed) return bodyText;
+    return JSON.stringify(j);
+  } catch (e) { return bodyText; }
+}
+
 /* ⛔ اسم كوكي الجلسة — لازم يبقى نفس اسم الباك (octa_token) */
 const SESSION_COOKIE = 'octa_token';
 
@@ -1709,7 +1805,12 @@ async function handle(request, env, ctx) {
           await sleep(12000);
         }
         const upstream = await fetchApi(target, init);
-        const body = await upstream.text();
+        let body = await upstream.text();
+        /* ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — تصحيح نسبة اليوم (مرجع قديم بعد تعديل
+           سعر السهم). ⛔ Fail-safe: لو فشل ⇒ الرد زي ما هو. */
+        if (url.pathname === '/api/quotes') {
+          body = await fixQuotesChange(body);
+        }
         const out = new Headers();
         out.set('Content-Type', upstream.headers.get('Content-Type') || 'application/json');
         /* ⛔⛔⛔ Set-Cookie — كان بيضيع!

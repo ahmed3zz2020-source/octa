@@ -18,7 +18,7 @@
 
   /* ⭐ أعمدة الماسح ⇐ أسماء حقول الفلتر */
   const COLS = [
-    'close', 'change', 'change_abs', 'volume', 'relative_volume_10d_calc',
+    'close', 'change', 'change_from_open', 'change_abs', 'volume', 'relative_volume_10d_calc',
     'market_cap_basic', 'price_earnings_ttm', 'price_book_fq', 'RSI',
     'MACD.macd', 'MACD.signal', 'EMA20', 'EMA50', 'EMA200', 'ATR',
     'price_52_week_high', 'price_52_week_low', 'Perf.W', 'Perf.1M', 'Perf.3M', 'Perf.6M',
@@ -34,7 +34,8 @@
 
   /* ⭐ خريطة: عمود الماسح ⇐ حقل الفلتر */
   const MAP = {
-    close: 'price', change: 'change', change_abs: 'chgAbs', volume: 'volume',
+    close: 'price', change: 'change', change_from_open: 'chgOpen',
+    change_abs: 'chgAbs', volume: 'volume',
     relative_volume_10d_calc: 'rel_volume', market_cap_basic: 'mc',
     price_earnings_ttm: 'pe', price_book_fq: 'pb', RSI: 'rsi',
     'MACD.macd': 'macd', 'MACD.signal': 'macdSig',

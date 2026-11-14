@@ -104,7 +104,7 @@
      📌 ⛔ مفيش كلام من فراغ: كل حكم له شرط رقمي واضح.
      ══════════════════════════════════════════════════════════════ */
   function trendChip(r) {
-    var d = r.change, m = r.p1m, w = r.p1w;
+    var d = r.chgDay, m = r.p1m, w = r.p1w;
     if (!isNum(d)) return null;
     if (d > 0 && isNum(m) && m > 0 && isNum(w) && w <= 0) return { k: 'up', t: 'بداية تحوّل صاعد' };
     if (d > 0 && isNum(m) && m > 0) return { k: 'up', t: 'اتجاه صاعد' };
@@ -152,13 +152,45 @@
       if (!isNum(r.price)) continue;
       if (r.sector) r.sector = sectorAr(r.sector);
       if (r.industry) r.industry = sectorAr(r.industry);
+
+      /* ══════════════════════════════════════════════════════════
+         ⭐⭐ تصحيح نسبة اليوم (١٤ نوفمبر ٢٠٢٦)
+         ───────────────────────────────────────────────────────────
+         📌 المشكلة: حقل `change` بيرجع مقارنةً بمرجع قديم لو السهم
+            عدّل سعره (توزيع/تقplit) ⇒ example بنك قناة السويس:
+            +٥٣.٢٠٪ والرقم الصح +٢.١٤٪ (مطابق للإغلاق الرسمي).
+            ⛔ حد البورصة المصرية اليومي ±٢٠٪ ⇒ +٥٣٪ مستحيل أصلاً.
+         📌 القاعدة: لو الفرق بين `change` و`change_from_open` أكبر
+            من ٣ نقاط ⇒ الـchange مرجع قديم ⇒ ناخد `change_from_open`
+            (المطابق للإغلاق الحقيقي) ⭐
+         ⛔ ولو اتساووا (السهم الطبيعي) ⇒ نسيب `change` زي ما هو.
+         ══════════════════════════════════════════════════════════ */
+      if (isNum(r.change) && isNum(r.chgOpen) && Math.abs(r.change - r.chgOpen) > 3) {
+        r.chgRaw = r.change;
+        r.chgDay = r.chgOpen;
+        r.chgFixed = true;
+      } else {
+        r.chgRaw = r.change;
+        r.chgDay = r.change;
+        r.chgFixed = false;
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         ⭐ فلتر السيولة — السهم اللي اتداول فيه ٢ سهم مش «متحرك»
+         📌 نسبته بتكون عشوائية (مثال:Whitespace سهم بـ٠٪ أو +٢٠٪
+            بحجم ٢ سهم) ⇒ بيكون نجم اليوم بالغلط.
+         📌 القاعدة: لازم التداول يكون ٣٠٪ على الأقل من متوسط ١٠ أيام.
+         ══════════════════════════════════════════════════════════ */
+      if (isNum(r.relvol) && r.relvol < 0.3) continue;
+
       out.push(r);
     }
     return out;
   }
   function byField(f) {
-    var v = S.rows.filter(function (r) { return isNum(r[f]); });
-    v.sort(function (a, b) { return Number(b[f]) - Number(a[f]); });
+    var val = function (r) { return (f === 'change') ? r.chgDay : r[f]; };
+    var v = S.rows.filter(function (r) { return isNum(val(r)); });
+    v.sort(function (a, b) { return Number(val(b)) - Number(val(a)); });
     return v;
   }
 
@@ -179,7 +211,8 @@
 
   function itemHTML(r, i, maxAbs, dirCls) {
     var f = (PERIODS.filter(function (p) { return p.id === S.per; })[0] || PERIODS[0]).f;
-    var v = r[f];
+    /* ⭐ لو الفترة = اليوم ⇒ نعرض النسبة المصحّحة (chgDay) */
+    var v = (f === 'change') ? r.chgDay : r[f];
     var abs = Math.abs(Number(v) || 0);
     var w = maxAbs > 0 ? Math.max(3, Math.round(abs / maxAbs * 100)) : 0;
     var chips = [trendChip(r), flowChip(r)].filter(Boolean);
@@ -210,8 +243,9 @@
   function moodHTML(f) {
     var up = 0, dn = 0, fl = 0, sum = 0, n = 0;
     S.rows.forEach(function (r) {
-      if (!isNum(r[f])) return;
-      var x = Number(r[f]);
+      var val = (f === 'change') ? r.chgDay : r[f];
+      if (!isNum(val)) return;
+      var x = Number(val);
       n++; sum += x;
       if (x > 0) up++; else if (x < 0) dn++; else fl++;
     });
@@ -228,12 +262,13 @@
     var list = byField(f);
     if (!list.length) return '';
     /* ⭐ نجم الفترة: أكبر حركة مطلقة */
-    var star = list[0], best = Math.abs(Number(star[f]) || 0);
+    var sv = function (r) { return (f === 'change') ? r.chgDay : r[f]; };
+    var star = list[0], best = Math.abs(Number(sv(star)) || 0);
     for (var i = 1; i < list.length; i++) {
-      var a = Math.abs(Number(list[i][f]) || 0);
+      var a = Math.abs(Number(sv(list[i])) || 0);
       if (a > best) { best = a; star = list[i]; }
     }
-    if (!isNum(star[f])) return '';
+    if (!isNum(sv(star))) return '';
     var m = MK[S.mk] || MK.egypt;
     var chips = [trendChip(star), flowChip(star)].filter(Boolean);
     return '<div class="mv-hero ' + dir(star[f]) + '">' +
@@ -241,7 +276,7 @@
       '<div class="mv-hero-row">' +
       '<div class="mv-hero-name">' + esc(star.name || star.nameEn || star.code) +
       ' <span class="mv-hero-code">' + esc(star.code) + '</span></div>' +
-      '<div class="mv-hero-chg ' + dir(star[f]) + '">' + ltr(pct(star[f])) + '</div>' +
+      '<div class="mv-hero-chg ' + dir(sv(star)) + '">' + ltr(pct(sv(star))) + '</div>' +
       '</div>' +
       '<div class="mv-hero-sub">السعر ' + ltr(n2(star.price)) + ' ' + esc(m.cur) +
       (chips.length ? ' · ' + chips.map(function (c) { return esc(c.t); }).join(' · ') : '') +
@@ -384,7 +419,8 @@
 
   function perGrid(r) {
     var items = PERIODS.map(function (p) {
-      var v = r[p.f];
+      /* ⭐ فترة «اليوم» ⇒ النسبة المصحّحة (مش المرجع القديم) */
+      var v = (p.f === 'change') ? r.chgDay : r[p.f];
       return '<div class="mv-pg-i ' + dir(v) + '"><span>' + esc(p.n) + '</span><b>' + ltr(pct(v, 1)) + '</b></div>';
     }).join('');
     return '<div class="mv-pg">' + items + '</div>';
@@ -421,8 +457,12 @@
       '</div>' +
       '<div class="mv-sheet-price">' +
       '<div class="mv-sp-n"><b>' + n2(r.price) + '</b> <span>' + esc(m.cur) + '</span></div>' +
-      '<div class="mv-sp-c ' + dir(r.change) + '">' + ltr(pct(r.change)) + ' اليوم</div>' +
+      '<div class="mv-sp-c ' + dir(r.chgDay) + '">' + ltr(pct(r.chgDay)) + ' اليوم</div>' +
       '</div>' +
+      (r.chgFixed
+        ? '<div class="mv-note-fix">ⓘ الرقم اتصحّح: المصدر كان راجع لنسبة قديمة بعد تعديل سعر السهم · المرجع الصح: ' +
+          ltr(pct(r.chgDay)) + ' (مطابق للإغلاق الرسمي)</div>'
+        : '') +
       (chips.length ? '<div class="mv-chips big">' + chips.map(function (c) {
         return '<span class="mv-chip ' + c.k + '">' + esc(c.t) + '</span>';
       }).join('') + '</div>' : '') +
