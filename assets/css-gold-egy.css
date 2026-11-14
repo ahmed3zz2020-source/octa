@@ -338,3 +338,171 @@ body.eg-lock { overflow: hidden !important; }
   .gbar { grid-template-columns: 96px 1fr 64px; font-size: .72rem; }
   .egkv-r { grid-template-columns: 1fr; }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   ⭐ v2 — ١٥ نوفمبر ٢٠٢٦: زرار الميزان + مناطق الدعم/المقاومة +
+   العوامل + مصفوفة العوائد السنوية
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── زرار الميزان (جنب الـX) ───────────────────────────── */
+.egbal-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--goldLine);
+  background: var(--goldBg);
+  color: var(--gold);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--t1);
+  flex: 0 0 auto;
+}
+.egbal-btn:hover { background: var(--goldLine); color: var(--gold2); }
+.egbal-btn.is-on {
+  background: var(--gold);
+  color: #10233a;
+  border-color: var(--gold);
+}
+.egbal-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* ── شارت الذهب: أطول شوية ─────────────────────────────── */
+.egchart--gold { min-height: 250px; }
+.eglegend--gold { margin-top: 10px; }
+.eglegend--gold .eglg i { width: 14px; height: 3px; }
+
+/* ── مناطق الدعم والمقاومة ─────────────────────────────── */
+.egzones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--s2);
+}
+.egzone {
+  background: var(--wash);
+  border: 1px solid var(--line);
+  border-radius: var(--r3);
+  padding: var(--s3);
+}
+.egzone--support { border-color: rgba(34,197,94,.42); background: rgba(34,197,94,.08); }
+.egzone--resistance { border-color: rgba(239,68,68,.42); background: rgba(239,68,68,.08); }
+.egzone-t { font-size: .76rem; font-weight: 800; color: var(--muted); }
+.egzone-v { font-size: 1.22rem; font-weight: 900; color: var(--txt); margin-top: 3px; }
+.egzone-v small { font-size: .66rem; color: var(--muted); }
+.egzone-s { font-size: .7rem; color: var(--muted); margin-top: 4px; }
+.egzone-z { font-size: .68rem; color: var(--dim); margin-top: 3px; }
+.egzone--none .egzone-v { color: var(--dim); font-size: .9rem; }
+.egverdict {
+  margin-top: var(--s2);
+  background: var(--wash);
+  border: 1px solid var(--line);
+  border-radius: var(--r2);
+  padding: 9px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+.egverdict-k { font-size: .74rem; font-weight: 800; color: var(--muted); }
+.egverdict-v { font-size: .95rem; font-weight: 900; color: var(--gold); }
+.egverdict-s { font-size: .7rem; color: var(--muted); }
+.egzone-note {
+  margin-top: var(--s2);
+  font-size: .7rem;
+  color: var(--muted);
+  line-height: 1.7;
+  padding: 8px 10px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r2);
+}
+
+/* ── تفكيك السعر ───────────────────────────────────────── */
+.egdec { display: grid; gap: var(--s2); }
+.egdec-r {
+  display: grid;
+  grid-template-columns: 1fr 74px;
+  gap: 4px 10px;
+  align-items: center;
+}
+.egdec-n { font-size: .82rem; font-weight: 800; color: var(--txt); }
+.egdec-v { font-weight: 900; text-align: end; }
+.egdec-v.gup { color: var(--up); }
+.egdec-v.gdown { color: var(--dn); }
+.egdec-bar {
+  grid-column: 1 / -1;
+  height: 8px;
+  direction: ltr;
+  background: var(--wash);
+  border: 1px solid var(--line);
+  border-radius: var(--rfull);
+  overflow: hidden;
+}
+.egdec-fill { display: block; height: 100%; border-radius: var(--rfull); }
+.egdec-s { grid-column: 1 / -1; font-size: .68rem; color: var(--dim); }
+.egdec-total {
+  margin-top: var(--s2);
+  padding: 10px 12px;
+  border: 1px solid var(--goldLine);
+  background: var(--goldBg);
+  border-radius: var(--r2);
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.egdec-total span { font-size: .82rem; font-weight: 800; color: var(--txt); }
+.egdec-total span.gup { color: var(--up); font-weight: 900; }
+.egdec-total span.gdown { color: var(--dn); font-weight: 900; }
+.egdec-total small { font-size: .68rem; color: var(--muted); width: 100%; }
+
+/* ── العوامل ───────────────────────────────────────────── */
+.egfacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--s2);
+}
+.egfact {
+  background: var(--wash);
+  border: 1px solid var(--line);
+  border-radius: var(--r3);
+  padding: 10px 11px;
+}
+.egfact-h { display: flex; align-items: center; gap: 6px; }
+.egfact-n { font-size: .76rem; font-weight: 800; color: var(--muted); flex: 1; }
+.egfact-d { font-weight: 900; font-size: .8rem; }
+.egfact-d.gup { color: var(--up); }
+.egfact-d.gdown { color: var(--dn); }
+.egfact-d.gflat { color: var(--ntr); }
+.egfact-v { font-size: 1.16rem; font-weight: 900; color: var(--gold); margin-top: 2px; }
+.egfact-r { font-size: .68rem; color: var(--txt); line-height: 1.6; margin-top: 4px; }
+.egfact-s { font-size: .62rem; color: var(--dim); margin-top: 4px; }
+
+/* ── مصفوفة العوائد السنوية ────────────────────────────── */
+.gtbl.gym { min-width: 520px; }
+.gym-y { text-align: center !important; }
+.gym-c {
+  text-align: center;
+  font-weight: 800;
+  font-size: .74rem;
+  padding: 7px 4px;
+  white-space: nowrap;
+}
+.gym-c bdi { font-weight: 800; }
+
+@media (max-width: 520px) {
+  .egdec-r { grid-template-columns: 1fr 66px; }
+  .egfact { padding: 9px 10px; }
+}
+
+/* ⭐ عمود الاسم ثابت (sticky) في مصفوفة العوائد */
+.gtbl.gym th:first-child,
+.gtbl.gym td:first-child {
+  position: sticky;
+  right: 0;
+  background: var(--pri2);
+  z-index: 2;
+  box-shadow: -1px 0 0 var(--line);
+}
+.gtbl.gym thead th:first-child { background: var(--wash); }
