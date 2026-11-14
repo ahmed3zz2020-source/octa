@@ -199,7 +199,14 @@ async function refresh(env) {
         const dt = dateStr(it.dateStamp);
         events.push({
           code, isin, kind: c.kind, kindAr: c.kindAr, mode: c.mode,
-          headline: head.replace(/\s+/g, ' ').trim().slice(0, 220),
+          /* ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ٢٢٠ ⇒ ٤٠٠ حرف
+             📌 السبب: الإعلان الرسمي شكله:
+                «العنوان : الشركة (CODE.CA) - الحدث  اسم الشركة: … كود ر和义务…
+                 مضمون الاعلان : <نص الخبر>»
+             ⇒ بـ٢٢٠ حرف كان نص الخبر بيتقصّ ومحدش بيشوفه.
+             📌 ٤٠٠ حرف بيوصل لنص الخبر (أول ٢٠٠+ حرف منه).
+             📌 حجم الـKV بيزيد ~١٥٠ ك.ب (٣٢٠ ⇒ ~٤٧٠ ك.ب) — مقبول. */
+          headline: head.replace(/\s+/g, ' ').trim().slice(0, 400),
           date: dt, status: statusOf(dt),
         });
       }
