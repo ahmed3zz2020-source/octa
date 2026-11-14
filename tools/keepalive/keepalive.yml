@@ -1,0 +1,56 @@
+name: ⏱️ إيقاظ السيرفر (Keepalive)
+
+# ⭐⭐⭐ ليش ده موجود (١٤ نوفمبر ٢٠٢٦)؟
+# 📌 المشكلة: Railway بينام بعد فترة خمول ⇒ أول طلب بعد السكون =
+#   cold start (≈٦-١٢ ثانية) ⇒ البوابة كانت بتقعد قدام المستخدم
+#   ⇒ «٣٥ ثانية» قبل ما الموقع يفتح. ⛔
+# 📌 ⛔ كرون Cloudflare على الـworker بتاع الموقع **مقيس إنه مش بيشتغل**
+#   (ردّ الـhealth قفز من ٠٫٢٥s لـ ٦٫٣٤s ⇒ السيرفر نايم).
+# 📌 ✅ الحل: GitHub Actions (الريبو **عام** ⇒ Actions مجانية بلا حدود)
+#   ⇒ ping كل ٥ دقايق (Railway مباشرة + الـworkers) ⇒ السيرفر ما بينامش.
+# 📌 ⚠️ لمّا نتحوّل للدومين: نفس الـworkflow بيرنق الدومين برضه.
+
+on:
+  schedule:
+    # ⏱️ كل ٥ دقايق (GitHub بيعطّل المهمة شوية تحت الضغط — وده مقبول)
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # تشغيل يدوي عند الحاجة
+
+jobs:
+  keepalive:
+    name: ping الخوادم
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: ping Railway + المعاينة + الإنتاج + عامل هالان
+        run: |
+          set -u
+          # ⭐ Railway **مباشرة** (مش عن طريق الـworker) ⇒ أضمن
+          #   إن السيرفر مش بينام حتى لو كرون الـworker متعطّل.
+          for url in \
+            "https://octa-prices-production-4ccb.up.railway.app/api/health" \
+            "https://octa-preview.ahmed3zz2020.workers.dev/api/health" \
+            "https://octashares.com/api/health" \
+            "https://halan-feed.ahmed3zz2020.workers.dev/status" ; do
+            t0=$(date +%s)
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 \
+                   -A 'octa-keepalive/1.0' "$url" || echo 000)
+            t1=$(date +%s)
+            echo "$url => $code ($((t1-t0))s)"
+          done
+          echo "⏱️ $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
+      # ⭐ كل ~٣٠ دقيقة: نجدد كاش هالان (الأحداث + عمق السوق)
+      # 📌 الشرط: الدقيقة مضاعفة ٣٠ تقريباً (:00 و :30) ⇒ مرتين/ساعة
+      # 📌   (مش كل ٥ دقايق ⇒ مش بنستهلك توكن MCP).
+      - name: تجديد كاش هالان (كل ~٣٠ دقيقة)
+        run: |
+          MIN=$(date -u '+%M')
+          if [ "$((10#$MIN % 30))" -lt 6 ]; then
+            echo "♻️ تجديد كاش هالان (الدقيقة $MIN)"
+            curl -s --max-time 90 -A 'octa-keepalive/1.0' \
+              "https://halan-feed.ahmed3zz2020.workers.dev/refresh" | head -c 400 || true
+            echo ""
+          else
+            echo "⏭️ مش دور التجديد (الدقيقة $MIN)"
+          fi

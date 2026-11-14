@@ -9,6 +9,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 const HALAN_MCP_URL = 'https://api-redirect.halan.io/ai/brokerage-mcp';
+const HALAN_LAST_REFRESH_KEY = 'halan_last_refresh_v1';
 const HALAN_STATE_KEY = 'halan_state_v1';
 const HALAN_EVENTS_KEY = 'halan_events_v1';
 const HALAN_DEPTH_KEY = 'halan_depth_v1';
@@ -218,11 +219,41 @@ async function refresh(env) {
 export default {
   /* ⭐ الكرون: يجدّد كاش الأحداث (كل ٣٠ دقيقة) في isolate مستقل */
   async scheduled(event, env, ctx) {
-    try {
-      const r = await refresh(env);
-      console.log('[FEED] refreshed events=' + r.events + ' isins=' + r.isins + ' kv=' + (r.ok ? 'ok' : 'FAIL'));
-    } catch (e) {
-      console.warn('[FEED] failed: ' + String(e && e.message || e));
+    /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ «عامل الإيقاظ» — أهم حاجة في الملف ده
+    📌 السبب: Railway بينام بعد خمول ⇒ أول طلب = cold start (٦-١٢ ثا)
+    📌   ⇒ البوابة كانت بتقعد ٣٥ ثانية ⛔.
+    📌 📌 ليه العامل ده؟ لأن كرون Cloudflare **فيه اشتغل فعلاً**
+    📌   (مقيس: كاش هالان اتجدّد) — عكس العامل بتاع الموقع.
+    📌 ✅ السلوك: كل ٥ دقايق ⇒ ping لـ Railway + الـworkers (إيقاظ)
+    📌   وكل ~٣٠ دقيقة ⇒ تجديد كاش هالان (عشان ما نحرقش توكن MCP). */
+    const now = Date.now();
+    const last = await kvGet(env, HALAN_LAST_REFRESH_KEY);
+    const lastMs = (last && last.at) ? Number(last.at) : 0;
+    const dueRefresh = (now - lastMs) > 28 * 60 * 1000;   // ~٣٠ دقيقة
+
+    if (dueRefresh) {
+      try {
+        const r = await refresh(env);
+        await kvPut(env, HALAN_LAST_REFRESH_KEY, { at: now, ok: !!r.ok, events: r.events, isins: r.isins });
+        console.log('[FEED] refreshed events=' + r.events + ' isins=' + r.isins + ' kv=' + (r.ok ? 'ok' : 'FAIL'));
+      } catch (e) {
+        console.warn('[FEED] failed: ' + String(e && e.message || e));
+      }
+    } else {
+      console.log('[FEED] skip refresh (باقي ' + Math.round((28 * 60 * 1000 - (now - lastMs)) / 60000) + ' دقيقة)');
+    }
+
+    /* 🔔 إيقاظ: Railway + عمّال OCTA (اللي بيناموا ⇒ cold start) */
+    const PING = [
+      'https://octa-prices-production-4ccb.up.railway.app/api/health',
+      'https://octa-preview.ahmed3zz2020.workers.dev/api/health',
+      'https://octashares.com/api/health'
+    ];
+    for (const u of PING) {
+      try {
+        const r = await fetch(u, { headers: { 'User-Agent': 'octa-keepalive/1.0' } });
+        console.log('[PING]', u, r.status);
+      } catch (e) { console.warn('[PING] fail', u, String(e && e.message || e)); }
     }
   },
 
