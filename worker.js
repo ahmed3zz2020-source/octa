@@ -871,6 +871,49 @@ async function handle(request, env, ctx) {
        📌 stale-while-revalidate: أول طلب بعد انتهاء الكاش بيرجّع
           النسخة القديمة فوراً ويحدّث في الخلفية — عشان المستخدم
           ما يستناش ٢٠ ثانية كل مرة. */
+    /* ══════════════════════════════════════════════════════════════
+    ⛔⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐⭐ بوابة الـAPI (في أول الـWorker!)
+    ──────────────────────────────────────────────────────────────
+    📌 لازم تكون **قبل** كل معالجات الـAPI الخاصة (dividends · news
+    📌 · obdepth · tvscan · halan …) ⇒ هي كانت بتلتفّ على البوابة.
+    📌 المتاح بلا جلسة: health · track · auth/* · quotes · logos · tvlogo/*
+    ══════════════════════════════════════════════════════════════ */
+    /* ⛔⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐ مسار التسجيل القديم اتقفل.
+       📌 السبب: /api/auth/register كان لسه شغال والإيميل فيه اختياري
+       ⛔ ⇒ حد يعمل حساب من غير إيميل و uid = هاش الكود بس ⇒
+       ⛔    منعرفش مين هو خالص. البوابة الجديدة (OTP) بتطلب إيميل.
+       ⛔ ده كان مفتوح ⇒ حد يعمل حسابات بلا هوية وبيلعب بلا حدود. */
+    if (url.pathname === '/api/auth/register') {
+      return new Response(JSON.stringify({
+        ok: false,
+        error: 'طريقة التسجيل القديمة اتقفلت — استخدم شاشة التسجيل الجديدة',
+        hint: 'لازم إيميل + كود تحقق',
+        code: 'legacy_register_disabled'
+      }), {
+        status: 410,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store'
+        }
+      });
+    }
+    if (url.pathname.startsWith('/api/') && request.method !== 'OPTIONS'
+      && !isPublicApi(url.pathname) && !hasSession(request)) {
+      return new Response(JSON.stringify({
+        ok: false,
+        error: 'تسجيل الدخول مطلوب',
+        hint: 'سجّل دخول أو اعمل حساب من البوابة، وبعدها افتح تاني',
+        code: 'auth_required'
+      }), {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store',
+          'X-OCTA-Auth': 'required'
+        }
+      });
+    }
+
     if (url.pathname === '/api/tvscan' && env && env.OCTA_TV_PROXY === 'on') {
       const c = url.searchParams.get('c') || 'egx';
       const limit = Math.max(1, Math.min(400, Number(url.searchParams.get('limit') || 400)));
@@ -1591,41 +1634,6 @@ async function handle(request, env, ctx) {
         h.set('Location', '/gate.html');
         h.set('Cache-Control', 'no-store');
         return new Response(null, { status: 302, headers: h });
-      }
-      /* ⛔⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐ مسار التسجيل القديم اتقفل.
-         📌 السبب: /api/auth/register كان لسه شغال والإيميل فيه اختياري
-         ⛔ ⇒ حد يعمل حساب من غير إيميل و uid = هاش الكود بس ⇒
-         ⛔    منعرفش مين هو خالص. البوابة الجديدة (OTP) بتطلب إيميل.
-         ⛔ ده كان مفتوح ⇒ حد يعمل حسابات بلا هوية وبيلعب بلا حدود. */
-      if (url.pathname === '/api/auth/register') {
-        return new Response(JSON.stringify({
-          ok: false,
-          error: 'طريقة التسجيل القديمة اتقفلت — استخدم شاشة التسجيل الجديدة',
-          hint: 'لازم إيميل + كود تحقق',
-          code: 'legacy_register_disabled'
-        }), {
-          status: 410,
-          headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Cache-Control': 'no-store'
-          }
-        });
-      }
-      if (request.method !== 'OPTIONS' && !isPublicApi(url.pathname)
-        && !hasSession(request)) {
-        return new Response(JSON.stringify({
-          ok: false,
-          error: 'تسجيل الدخول مطلوب',
-          hint: 'سجّل دخول أو اعمل حساب من البوابة، وبعدها افتح تاني',
-          code: 'auth_required'
-        }), {
-          status: 401,
-          headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Cache-Control': 'no-store',
-            'X-OCTA-Auth': 'required'
-          }
-        });
       }
       /* ⭐⭐ محرّك الفرص (OPP-001) — الباك الحيّ الأول، واللقطة fallback.
          ⛔ في الإنتاج الـOCTA_OPP_SNAPSHOT مش مفعّل ⇒ السلوك القديم
