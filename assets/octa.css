@@ -2915,20 +2915,22 @@
   /* ⭐ الكارت كله قابل للدوس ⇒ يفتح النافذة (طلب المالك ١٤ نوفمبر) */
   .tf-card { cursor:pointer; }
   .tf-card:active { transform:scale(.995); }
-  /* ⭐⭐⭐ نافذة التحليل الفني الكامل (صفحة مستقلة فيها ✕ فوق) */
+  /* ⭐⭐⭐ نافذة التحليل الفني الكامل (صفحة مستقلة فيها ✕ فوق)
+     📌 ⭐ الخلفية من متغيّرات الثيم (فاتح/داكن) — مش لون ثابت،
+     ولا المحتوى بيطلع نص غامق على غامق. */
   .tf-modal { display:none; position:fixed; inset:0; z-index:9999;
-    background:rgba(3,9,17,.96); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    background:var(--pri); color:var(--txt);
     overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .tf-modal.open { display:block; }
   .tf-modal-box { min-height:100%; max-width:760px; margin:0 auto; padding:12px 12px 60px; }
   .tf-modal-head { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:12px;
-    padding:10px 0 12px; margin-bottom:4px;
-    background:linear-gradient(180deg, rgba(3,9,17,.99) 76%, transparent); }
+    padding:10px 0 12px; margin-bottom:4px; background:var(--pri2);
+    border-bottom:1px solid var(--line); }
   .tf-modal-title { font:900 1.16rem/1.3 system-ui, sans-serif; color:var(--gold); }
   .tf-modal-sub { font:400 .78rem/1.5 system-ui, sans-serif; color:var(--muted); margin-top:2px; }
   .tf-modal-sub b { color:var(--txt); }
   .tf-modal-close { flex:0 0 auto; width:40px; height:40px; border-radius:12px;
-    border:1px solid var(--line); background:rgba(255,255,255,.05); color:var(--txt);
+    border:1px solid var(--line); background:var(--wash); color:var(--txt);
     font:700 1.05rem system-ui, sans-serif; cursor:pointer; }
   .tf-modal-close:hover { border-color:var(--red2); color:var(--red2); }
   @media (max-width:640px) {
