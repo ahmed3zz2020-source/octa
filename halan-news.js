@@ -216,26 +216,47 @@ export function parseHalaText(raw) {
   if (!s) return { title: '', body: '' };
 
   /* ① شيل لابل «العنوان :» */
-  s = s.replace(/^العنوان\s*[::\-–—]\s*/, '').trim();
+  s = s.replace(/^العنوان\s*[:\-–—]\s*/, '').trim();
 
-  /* ② نص الإعلان = بعد «مضمون الاعلان :» */
+  /* ② نص الإعلان = بعد «مضمون الاعلان» (نوع الإعلان: قرار/بيان) */
   let body = '';
-  const bi = s.indexOf('مضمون الاعلان');
+  const bi = s.indexOf('مضمون');
   if (bi >= 0) {
-    body = s.slice(bi).replace(/^مضمون\s*الاعلان\s*[::]?\s*/, '').trim();
+    body = s.slice(bi).replace(/^مضمون\s*(?:الاعلان|الإعلان)?\s*[:\-–—]?\s*/, '').trim();
     s = s.slice(0, bi).trim();
   }
 
-  /* ③ بيانات الشركة (اسم الشركة · كود الترقيم · كود رويترز) — بتتقص */
-  const ci = s.search(/اسم\s+الشركة\s*[::]/);
-  let head = ci >= 0 ? s.slice(0, ci).trim() : s.trim();
+  /* ③ العنوان = النص بعد رمز السهم (CODE.CA)
+     📌 ليش مش بالريجكس: اسم الشركة نفسه فيه شرطات وأقواس أحياناً
+        (مصرف أبو ظبي- مصر) ⇒ أي ريجكس على الأقواس بيفشل. */
+  let head = s;
+  const ti = s.indexOf(')');
+  if (ti > 0 && ti < 220) head = s.slice(ti + 1).replace(/^[\s\-–—:،]+/, '').trim();
 
-  /* ④ شيل «اسم الشركة (الرمز) - » من أول العنوان */
-  const stripped = head.replace(/^[^-–—]{2,160}?\([A-Za-z0-9][A-Za-z0-9\.\-]{1,19}\)\s*[-–—:]\s*/, '').trim();
-  if (stripped && stripped !== head) head = stripped;
+  /* ④ اقطع العنوان عند أول تسمية حقل (بيانات الشركة/البيانات المالية) */
+  const LABELS = ['اسم الشركة', 'اسم البنك', 'كود الترقيم', 'كود رويترز', 'العملة',
+    'القوائم المالية', 'صافي الربح', 'أرقام المقارنة', 'رأس المال', 'المركز',
+    'المدقق', 'المستشار', 'رقم التسجيل'];
+  for (let i = 0; i < LABELS.length; i++) {
+    const li = head.indexOf(LABELS[i]);
+    if (li > 0) { head = head.slice(0, li).trim(); break; }
+  }
 
   /* ⑤ لو العنوان بقى فاضي ⇒ نرجع النص الأصلي (نظيف) */
   if (!head) head = s;
+
+  /* ⑥ نص الإعلان: لو مفيش «مضمون الاعلان» ⇒ ناخد الأرقام المالية
+     (نوع إعلان النتائج) بدل بيانات الشركة. */
+  if (!body) {
+    const hi = s.indexOf(head);
+    let tail = hi >= 0 ? s.slice(hi + head.length).trim() : '';
+    const FIN = ['القوائم المالية', 'صافي الربح', 'أرقام المقارنة', 'الربح'];
+    for (let i = 0; i < FIN.length; i++) {
+      const fi = tail.indexOf(FIN[i]);
+      if (fi >= 0) { tail = tail.slice(fi).trim(); break; }
+    }
+    body = tail;
+  }
 
   return { title: head, body: body };
 }
