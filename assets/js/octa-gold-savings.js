@@ -296,7 +296,7 @@
     if (libP) return libP;
     libP = new Promise(function (res, rej) {
       var s = document.createElement('script');
-      s.src = 'assets/js/vendor/lightweight-charts.standalone.production.js?v=202611140514';
+      s.src = 'assets/js/vendor/lightweight-charts.standalone.production.js?v=202611140517';
       s.onload = function () { res(window.LightweightCharts); };
       s.onerror = function () { rej(new Error('lib')); };
       document.head.appendChild(s);
