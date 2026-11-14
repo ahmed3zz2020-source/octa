@@ -1544,7 +1544,13 @@ function barRow(s) {
      قبل الكلام ده كنا بنعرض «▲ +0.00%» — وده **رقم مخترع**.
      ⛔ م.Rule: الرقم اللي مش موجود لازم ينكتب «—» مش صفر.
      «0.00%» الحقيقي لسه بيطلع 0.00% — لأن changeHas بيفرّق بينهم. */
-  if (!s.changeHas) {
+  /* ⭐ ١٤ نوفمبر ٢٠٢٦ — الـAPI بيرجّع `change` بس مش `changeHas`
+     ⇒ الشرط القديم كان بيمسح كل الأرقام ويطلع «—».Fallback:
+     لو الراية مش موجودة ⇒ نعتبر إن `change` موجود = بيانات حقيقية.
+     ⛔ الرقم اللي مش موجود بيفضل «—» (مش صفر) ⭐. */
+  const _hasChange = (s.changeHas !== undefined && s.changeHas !== null)
+    ? !!s.changeHas : (s.change != null);
+  if (!_hasChange) {
   return '<div class="bar-stock" onclick="openStockModal(\'' + s.code + '\')">' +
   '<div class="bs-l"><div class="bs-t"><span class="bs-code">' + s.code + '</span>' +
   '<span class="bs-name">' + (s.name||'').slice(0,20) + '</span></div>' +
@@ -1583,9 +1589,14 @@ async function loadPeriodData(p) {
   } catch (e) { body.innerHTML = '<div class="dc-loading" style="padding:18px;text-align:center;color:#ff5252">تعذر: ' + (e.message||'') + '</div>'; }
 }
 function buildMoversCard() {
-  const tabs = '<div class="uc-tabs" id="glTabs">' + PERIODS.map(p =>
-  '<button class="uc-tab' + (p.k==='change'?' on':'') + '" onclick="loadPeriodData(\'' + p.k + '\')">' + p.n + '</button>').join('') + '</div>';
-  return uniCard('glCard', '📊', 'أعلى ١٠ صعوداً وهبوطاً', 'اضغط للفلترة حسب الفترة', tabs + '<div id="glBody"></div>');
+  /* ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — اتغيّر للوحة المتحرّكين (octa-movers.js).
+     📌 السبب: الكارت القديم كان بيقرأ /api/rank ⇒ مفيش `changeHas`
+        ⇒ كل سطر بيطلع «—» ⭐ ومفيش فترات (perf_w/1m…) في الرد أصلاً.
+     📌 الحل: نفس وحدة اللوحة (ماسح السوق) ⇒ أرقام حقيقية + فترات
+        + حكم على كل حركة + شيت تفاصيل — في التطبيق والصفحة العامة.
+     📌 التبايبس بتاعة الفترة بقت جوه اللوحة نفسها. */
+  return uniCard('glCard', '🔥', 'لوحة المتحرّكين', 'أعلى ١٠ صعوداً وهبوطاً — والقصة ورا كل حركة',
+    '<div id="mvHost"></div>');
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -2518,7 +2529,19 @@ async function _armMarketRun(box) {  const [d, tk, rank] = await Promise.all([
 
   // الشريط المتحرك + الفترات
   initMarketTicker(gold);
-  loadPeriodData('change');
+  /* ⭐ لوحة المتحرّكين — تُركّب بعد رسم الكارت (الـhost جوّه box) */
+  try {
+    var mvHost = document.getElementById('mvHost');
+    if (mvHost && window.OCTAMovers) {
+      window.OCTAMovers.mount(mvHost, {
+        app: true, mk: 'egypt',
+        onOpen: function (code) {
+          try { if (typeof openStockModal === 'function') openStockModal(code); }
+          catch (e) { }
+        }
+      });
+    }
+  } catch (e) { }
 }
 
 

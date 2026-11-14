@@ -46,7 +46,10 @@
 
   const S = {
     mk: 'egypt', per: 'd', rows: [], root: null, sheet: null,
-    openCode: null, timer: null, loading: false, err: ''
+    openCode: null, timer: null, loading: false, err: '',
+    /* ⭐ وضع التطبيق (١٤ نوفمبر ٢٠٢٦):
+       ⭐ جوه التطبيق ⇒ الزرار بيفتح تحليل السهم بدل ما يودّي البوابة. */
+    app: false, onOpen: null
   };
 
   /* ── أدوات ── */
@@ -304,12 +307,13 @@
       '</section>' +
       '</div>' +
 
-      /* ── دعوة المتابعة ── */
+      /* ── دعوة المتابعة (الصفحة العامة بس) ── */
+      (S.app ? '' :
       '<div class="mv-cta">' +
       '<div class="mv-cta-t"><b>الحركة دي تستاهل المتابعة؟</b>' +
       '<span>ادخل واشوف تحليل OCTA الكامل (٨ محاور + قرار واضح) لكل سهم، وابدأ تتابع اللي يعجبك.</span></div>' +
       '<a class="mv-cta-b" href="/gate.html">ادخل وابدأ تتابع ↗</a>' +
-      '</div>' +
+      '</div>') +
 
       '<div class="mv-foot">الأسعار والحركة من ماسح السوق · آخر تحديث <span id="mvWhen2">' +
       esc(S.last ? hhmmss(S.last) : '—') + '</span> · بتتحدّث كل دقيقة</div>' +
@@ -429,15 +433,28 @@
         return '<div class="mv-fact"><span>' + esc(f[0]) + '</span><b>' + esc(f[1]) + '</b></div>';
       }).join('') + '</div></div>' : '') +
       '<div class="mv-sheet-cta">' +
-      '<a class="mv-cta-b" href="/gate.html">ادخل واشوف تحليل OCTA لهذا السهم ↗</a>' +
-      '<span class="mv-cta-n">التحليل الكامل والقرار بعد تسجيل الدخول</span>' +
+      (S.app
+        ? '<button class="mv-cta-b" id="mvOpen" type="button">افتح تحليل السهم في OCTA ↗</button>' +
+          '<span class="mv-cta-n">تحليل كامل ٨ محاور + قرار واضح</span>'
+        : '<a class="mv-cta-b" href="/gate.html">ادخل واشوف تحليل OCTA لهذا السهم ↗</a>' +
+          '<span class="mv-cta-n">التحليل الكامل والقرار بعد تسجيل الدخول</span>') +
       '</div>';
     var sheet = $('mvSheet');
     if (sheet) { sheet.hidden = false; requestAnimationFrame(function () { sheet.classList.add('on'); }); }
     try { document.body.classList.add('mv-lock'); } catch (e) { }
     var x = $('mvX');
     if (x) x.addEventListener('click', closeSheet);
+    var ob = $('mvOpen');
+    if (ob) ob.addEventListener('click', function () { closeSheet(); openStock(r.code); });
     document.addEventListener('keydown', escClose);
+  }
+
+  /* ⭐ فتح السهم: في التطبيق ⇒ تحليل السهم · في الصفحة العامة ⇒ البوابة */
+  function openStock(code) {
+    if (S.app && typeof S.onOpen === 'function') {
+      try { S.onOpen(code); return; } catch (e) { }
+    }
+    try { window.location.href = '/gate.html'; } catch (e) { }
   }
 
   function escClose(e) { if (e.key === 'Escape') closeSheet(); }
@@ -475,6 +492,8 @@
     if (S.timer) return;
     S.timer = setInterval(function () {
       if (document.hidden) return;      /* ⛔ ما نعملش طلبات والتبويب مخفي */
+      /* ⛔ الكارت مطوي أو الصفحة مش معروضة ⇒ ما نعملش طلبات */
+      if (!S.root || !S.root.isConnected || S.root.offsetParent === null) return;
       load(true);
     }, 60000);
   }
@@ -485,8 +504,12 @@
   function mount(el, opts) {
     S.root = (typeof el === 'string') ? $(el) : el;
     if (!S.root) return;
-    if (opts && opts.mk) S.mk = opts.mk;
+    opts = opts || {};
+    if (opts.mk) S.mk = opts.mk;
+    if (opts.app != null) S.app = !!opts.app;
+    if (opts.onOpen) S.onOpen = opts.onOpen;
     S.root.classList.add('mv-root');
+    if (S.app) S.root.classList.add('mv-in-app');
     render();
     load(false);
     startTimer();

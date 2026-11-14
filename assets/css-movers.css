@@ -256,3 +256,11 @@
 
 /* ⭐ منع تمرير الخلفية لما الشيت مفتوح */
 body.mv-lock { overflow: hidden; }
+
+/* ═══ جوّه التطبيق — اللوحة من غير إطار (الكارت بيغلّفها) ═══ */
+.mv-root.mv-in-app .mv-wrap {
+  background: transparent; border: 0; border-radius: 0; padding: 0; overflow: visible;
+}
+.mv-root.mv-in-app .mv-wrap::before { display: none; }
+.mv-root.mv-in-app .mv-head { margin-top: 2px; }
+.mv-root.mv-in-app .mv-cols { gap: 12px; }
