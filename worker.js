@@ -35,6 +35,10 @@
 const API = 'https://octa-prices-production-4ccb.up.railway.app';
 const TRIES = 3;
 
+/* ⭐ محرك محور الأخبار (هالان) — نسخة مطابقة 1:1 من news_engine في الباك.
+   📌 الاختبار: tools/test-halan-news.js ⇒ 182/182 مطابقة. */
+import { newsEngine, mergeEvents, eventsByCode } from './halan-news.js';
+
 /* ══════════════════════════════════════════════════════════════
    ⭐ جسر سكانر TradingView — للفلتر (Smart Money)
    ──────────────────────────────────────────────────────────────
@@ -467,12 +471,22 @@ function withSiteOrigin(html, origin) {
  📌 ⛌ ⛌ ⇒ المستخدم بيفتح نسخة قديمة (bootstrap مفقود · إصلاحات مفقودة)
  📌 ✅ الحل: header `Cache-Control: no-cache` في الطلب ⇒ الـedge يعمل bypass
  ════════════════════════════════════════════════════════════════ */
-async function assetsFresh(env, request) {
+async function assetsFresh(env, request, opts) {
   const r = new Request(request.url, request);
   const _url = new URL(request.url);
   const h = new Headers(r.headers);
-  h.set('Cache-Control', 'no-cache');
-  h.set('Pragma', 'no-cache');
+  /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — الأصول الثابتة (JS/CSS/الخطوط) بتتخزّن
+     📌 السبب: كل رابط أصل عليه ختم نسخة (?v=YYYYMMDDHHmm) ⇒ النسخة
+     📌   الجديدة = رابط جديد ⇒ الكاش الآمن صحيح.
+     📌 ❌ قبل كده: no-store على كل حاجة ⇒ **٣ ميجا بتتحمّل كل زيارة**
+     📌   ⇒ على الموبايل = ١٥-٤٠ ثانية انتظار ⛔ (ده سبب «٣٥ ثانية»).
+     📌 ✅ الحل: نطلب من الـedge النسخة المخزّنة (مش no-cache).
+     📌   (الـHTML لسه no-store — هو اللي فيه الختم الجديد.) */
+  const _static = opts && opts.static === true;
+  if (!_static) {
+    h.set('Cache-Control', 'no-cache');
+    h.set('Pragma', 'no-cache');
+  }
   /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ bypass كامل للـedge cache
   📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
   📌 ⛌ ⛌.cf.cacheEverything=false + cacheTtl=0 ⇒ المتصفح/الـedge
@@ -669,20 +683,39 @@ export default {
    📌   ⭐ read-only: بيقرا /api/health بس (لا يكتب ولا يعدّل).
    📌   ⭐ بيفوق الـisolate بتاع الـWorker كمان (بيمنع cold start ليه هو).
    📌
-   📌 التفعيل: في wrangler-preview.jsonc (معاينة) وwrangler.jsonc (إنتاج):
+   📌 التفعيل: في wrangler.jsonc (معاينة) وwrangler-prod.jsonc (إنتاج):
    📌   "triggers": { "crons": [cron كل ٥ دقايق] }
    */
   async scheduled(event, env, ctx) {
     const target = API + '/api/health';
+    let status = 'unknown';
     try {
       const r = await fetch(target, {
         headers: { 'User-Agent': 'octa-keepalive/1.0' }
       });
-      console.log('[keepalive]', new Date().toISOString(), 'http', r.status);
+      status = 'http ' + r.status;
+      console.log('[keepalive]', new Date().toISOString(), status);
     } catch (e) {
-      console.log('[keepalive]', new Date().toISOString(), 'err',
-        (e && e.message) || 'unknown');
+      status = 'err ' + ((e && e.message) || 'unknown');
+      console.log('[keepalive]', new Date().toISOString(), status);
     }
+    /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ marker قابل للقياس
+    📌 ليه؟ كرون Cloudflare **مقيس إنه مش بيشتغل** على العامل ده
+    📌   (السيرفر نام ⇒ ردّ ٦٫٣٤ ثانية). ⛔ من غير marker مش
+    📌   هنعرف هو اشتغل ولا لأ.
+    📌 ✅ الحل: نكتب آخر تشغيل في الـKV ⇒ نقراه من برّه (API/console).
+    📌   (في معرّفBiglobal نقدر نقراه بـcurl على /api/halan/status) */
+    try {
+      if (env && env.HALAN_KV) {
+        await env.HALAN_KV.put('octa_keepalive_last', JSON.stringify({
+          at: Date.now(), iso: new Date().toISOString(), status: status
+        }));
+      }
+    } catch (e) { }
+
+    /* ⭐ هالان — كرون تجديد الكاش Lives في عامل منفصل (halan-feed)
+       ⇐ عشان ما يحجبش طلبات الموقع (isolate واحد = طلبات بتقف).
+       ⇐ هنا الكرون بيعمل ping بس (سريع) ⇐ والـKASH بيتملّى من العامل التاني. */
   }
 };
 
@@ -1176,6 +1209,44 @@ async function handle(request, env, ctx) {
       }
     }
 
+    /* ════════════════════════════════════════════════════════════════
+       ⭐⭐⭐ محور الأخبار — كل الأسهم (endpoint مفتوح للاختبار)
+       ────────────────────────────────────────────────────────────────
+       📌 بيرجّع لكل سهم: درجة المحور · عدد الأحداث · الأهمية · المصدر
+       📌 المصدر = foudalens (الباك) + هالان (المroker MCP) — مدمجين
+       ════════════════════════════════════════════════════════════════ */
+    if (url.pathname === '/api/halan/axis') {
+      try {
+        const ek = await env.HALAN_KV.get('halan_events_v1', 'json');
+        const halanByCode = eventsByCode(ek);
+        const codes = Object.keys(halanByCode).sort();
+        const out = [];
+        for (const code of codes) {
+          const he = halanByCode[code];
+          const news = newsEngine(he);
+          out.push({
+            code: code,
+            axis: news.score,
+            events: news.events_count,
+            materiality: news.materiality,
+            headline: news.headline,
+            has_news: news.has_news,
+            source: 'halan',
+          });
+        }
+        return new Response(JSON.stringify({
+          ok: true,
+          count: out.length,
+          updatedAt: ek && ek.at ? new Date(ek.at).toISOString() : null,
+          source: 'بورصة هالان (Halan Borsa) — إعلانات وأخبار الشركات',
+          axes: out,
+        }, null, 1), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=120' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: String(e && e.message || e) }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
     if (url.pathname === '/api/rss') {
       const rss = (url.searchParams.get('url') || '').trim();
       if (!rss) {
@@ -1276,7 +1347,181 @@ async function handle(request, env, ctx) {
       }
     }
 
+    /* ⭐ نقطة فحص: افتحها على موبايلك وقولّي النتيجة */
+    if (url.pathname === '/api/halan/status') {
+      const st = await (async () => { try { return await env.HALAN_KV.get('halan_state_v1', 'json'); } catch (e) { return null; } })();
+      const ev = await (async () => { try { return await env.HALAN_KV.get('halan_events_v1', 'json'); } catch (e) { return null; } })();
+      return new Response(JSON.stringify({
+        ok: true, worker: 'octa-preview',
+        tokenCached: !!(st && st.access),
+        tokenAgeMin: st && st.at ? Math.round((Date.now() - st.at) / 60000) : null,
+        events: (ev && ev.events || []).length,
+        isins: ev ? Object.keys(ev.isinOf || {}).length : 0,
+        eventsAgeMin: ev && ev.at ? Math.round((Date.now() - ev.at) / 60000) : null,
+        now: new Date().toISOString(),
+      }, null, 1), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+    }
     /* 1) proxy للـAPI (نفس origin عشان نتفادى CORP same-site) */
+    /* ══════════ ⭐ هالان (بورصة مصر) — ٩ نوفمبر ٢٠٢٦ ══════════
+       📌 ① /api/obdepth/<code> ⇒ عمق السوق الحقيقي.
+       📌   الباك بيرجّع 503 no_key (محتاج EGX_LIVE_KEY) ⇒ هنا بنجيبه من هالان.
+       📌 ② /api/dividends ⇒ بندمج إعلانات هالان مع المصدر الحالي.
+       📌 ⛔ التوكن في أسرار الـWorker + KV — مش في الكود ولا في المتصفح.
+       📌 ⛔ بيانات بسوق عامة — مفيش أي مسار للمحفظة أو الأوامر. */
+    if (url.pathname.startsWith('/api/obdepth/')) {
+      /* ⭐ عمق السوق من هالان — **قراءة KV بس** (صفر نداءات MCP في مسار الطلب
+         ⇒ صفر حجب للـisolate ⇒ مفيش شاشة بيضا). العامل halan-feed بيملّي الـKV. */
+      try {
+        const code = url.pathname.split('/').pop().toUpperCase();
+        const dk = await env.HALAN_KV.get('halan_depth_v1', 'json');
+        const dd = dk && dk.depth && dk.depth[code];
+        const d = dd ? { bids: dd.bids || [], asks: dd.asks || [], trades: [], last: dd.last,
+                         spread_pct: dd.spread_pct, lastClose: dd.lastClose,
+                         volume: dd.volume, value_today: dd.value_today } : null;
+        if (d) {
+          return new Response(JSON.stringify({ ok: true, cached: false, source: 'halan', data: d }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=120' }
+          });
+        }
+      } catch (e) { }
+      /* ⛔ مفيش بيانات من هالان ⇒ نكمّل عادي للـAPI (المصدر القديم) */
+    }
+    if (url.pathname === '/api/dividends') {
+      try {
+        const upTarget = API + url.pathname + url.search;
+        const up = await fetchApi(upTarget, { method: request.method, headers: buildHeaders(request) });
+        const upTxt = await up.text();
+        let merged;
+        try { merged = JSON.parse(upTxt); } catch (e) { merged = { actions: [] }; }
+        try {
+          const ek = await env.HALAN_KV.get('halan_events_v1', 'json');
+          const evs = (ek && ek.events) || [];
+          if (evs.length) {
+            const acts = Array.isArray(merged.actions) ? merged.actions : [];
+            const seen = {};
+            for (const a of acts) {
+              seen[(a.code || '') + '|' + (a.kind || '') + '|' + (a.date || '')] = 1;
+              seen[(a.code || '') + '|' + (a.date || '')] = 1;
+            }
+            let added = 0;
+            for (const e of evs) {
+              const k1 = e.code + '|' + e.kind + '|' + e.date;
+              const k2 = e.code + '|' + e.date;
+              if (seen[k1] || seen[k2]) continue;
+              seen[k1] = 1; seen[k2] = 1;
+              acts.push({
+                code: e.code, id: e.code + '|' + e.kind + '|' + (e.date || ''),
+                kind: e.kind, kindAr: e.kindAr, mode: e.mode,
+                date: e.date, distributionDate: e.date, recordDate: e.date,
+                headline: e.headline, value: null, ratio: null, currency: null,
+                yieldPct: null, lastClose: null, nameAr: null, nameEn: null,
+                sector: null, status: e.status, source: 'halan',
+              });
+              added++;
+            }
+            acts.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+            merged.actions = acts;
+            merged.halanEvents = added;
+          }
+        } catch (e) { }
+        const out = new Headers();
+        out.set('Content-Type', 'application/json');
+        out.set('Cache-Control', 'public, max-age=300');
+        const scUp = up.headers.get('Set-Cookie');
+        if (scUp) out.set('Set-Cookie', scUp);
+        return new Response(JSON.stringify(merged), { status: up.status, headers: out });
+      } catch (e) { /* ⛔ fallback: يكمّل عادي للـAPI */ }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       ⭐⭐⭐ محور الأخبار الحقيقي (هالان) — ١٠ نوفمبر ٢٠٢٦
+       ────────────────────────────────────────────────────────────────
+       📌 المشكلة: الباك بيرجّع «45» ثابت لكل سهم مفيش عندو أحداث في
+          مصدره (foudalens) ⇒ 220 من 287 سهم محور الأخبار بتاعهم وهمي.
+          ⛔ «45» دي مش رقم مخترع — هي قاعدة الباك نفسها
+             (update_prices.py: news_engine → "مفيش أخبار ⇒ 45").
+          ⛔ والباك مش شايف أحداث هالان أصلاً ⇒ الملف
+             (data/halan_events.json) مش موجود عنده.
+
+       📌 الحل: نحسب محور الأخبار هنا بنفس معادلة الباك **بالحرف**
+          (نسخة مطابقة 1:1 · halan-news.js) ونمدجه مع أحداث هالان.
+          ⭐ الاختبار: tools/test-halan-news.js ⇒ 182/182 مطابقة
+             مع news_engine الحقيقي من كود الباك.
+
+       📌 ليه هنا مش في الباك؟ نشر الباك محتاج صلاحية كتابة على
+          ريبو octa-prices (التوكن الحالي مقيّد على ريبو octa بس)
+          ⇒ الباك هيشوف نفس النتيجة لما الـpatch يتنشر.
+
+       📌 ⛔ مفيش نداء MCP في مسار الطلب (قراءة KV بس) ⇒ صفر تجميد.
+       ════════════════════════════════════════════════════════════════ */
+    if (url.pathname.startsWith('/api/news/') || url.pathname.startsWith('/api/intelligence/')) {
+      const isNews = url.pathname.startsWith('/api/news/');
+      try {
+        const upTarget = API + url.pathname + url.search;
+        const up = await fetchApi(upTarget, { method: request.method, headers: buildHeaders(request) });
+        const upTxt = await up.text();
+        let upJson;
+        try { upJson = JSON.parse(upTxt); } catch (e) { upJson = {}; }
+
+        /* ⛔ الباك بيرجّع 401/404 ⇒ نسيب الرد زي ما هو */
+        if (!upJson || upJson.error) {
+          return new Response(upTxt, { status: up.status, headers: up.headers });
+        }
+
+        const code = String(upJson.code || url.pathname.split('/').pop() || '').toUpperCase();
+        const ek = await env.HALAN_KV.get('halan_events_v1', 'json');
+        const halanByCode = eventsByCode(ek);
+        const halanEvents = halanByCode[code] || [];
+
+        /* 📌 أحداث الباك: من الرد نفسه (فودالنس) — نفس الشكل */
+        const backendRaw = (isNews && upJson.news && Array.isArray(upJson.news.events))
+          ? upJson.news.events
+          : ((upJson.news_engine && Array.isArray(upJson.news_engine.events))
+            ? upJson.news_engine.events : []);
+        const backendEvents = backendRaw.map(e => ({
+          kind: e.kind, kindAr: e.kindAr, headline: e.headline,
+          date: e.date, value: (e.value === undefined ? undefined : e.value),
+        }));
+
+        const merged = mergeEvents(backendEvents, halanEvents);
+        const news = newsEngine(merged);
+
+        /* ⭐ التغطية: هل فيه حدث حقيقي؟ (هالان أضاف أحداث جديدة) */
+        const addedHalan = Math.max(0, merged.length - backendEvents.length);
+        if (isNews) {
+          upJson.news = news;
+        } else {
+          /* 📌 /api/intelligence ⇒ news_engine (مش news) */
+          upJson.news_engine = news;
+        }
+        upJson.newsSource = addedHalan > 0 ? 'halan' : 'backend';
+        upJson.halanEvents = addedHalan;
+        /* ⭐ المحاور (axes) — الباك بيرجّعها من اللقطة (45 فيها).
+           ⛔ بنحدّثها بنفس القيمة الجديدة ⇒ الأذرع في الواجهة تعرض الرقم الحقيقي. */
+        if (upJson.axes && typeof upJson.axes === 'object') {
+          upJson.axes.news = news.score;
+        }
+        /* 📌 محور الأخبار متاح كـendpoint مستقل كمان (للاختبار) */
+        if (url.searchParams.get('axis') === '1') {
+          upJson.axis = { code, news: news.score, events: news.events_count,
+                          materiality: news.materiality, source: upJson.newsSource };
+        }
+
+        const out = new Headers();
+        out.set('Content-Type', 'application/json');
+        /* 📌 intelligence محمي (يتطلب جلسة) ⇒ private. news عام ⇒ public.
+           ⛔ خلّيناها private في الحالتين (أأمن، والعميل بيجيبه بجلسة). */
+        out.set('Cache-Control', 'private, max-age=120');
+        const scUp = up.headers.get('Set-Cookie');
+        if (scUp) out.set('Set-Cookie', scUp);
+        return new Response(JSON.stringify(upJson), { status: up.status, headers: out });
+      } catch (e) {
+        console.warn('[HALAN-NEWS] fallback:', String(e && e.message || e));
+        /* ⛔ fallback: نكمّل عادي للـAPI (أفضل من رد غلط) */
+      }
+    }
+
     if (url.pathname.startsWith('/api/')) {
       /* ⭐⭐ محرّك الفرص (OPP-001) — الباك الحيّ الأول، واللقطة fallback.
          ⛔ في الإنتاج الـOCTA_OPP_SNAPSHOT مش مفعّل ⇒ السلوك القديم
@@ -1542,6 +1787,7 @@ async function handle(request, env, ctx) {
     */
     /* ⭐ كل المسارات دي بتقابل TOOL_PAGES في octa-core.js */
     const SPA_ROUTES = ['/markets', '/stocks', '/tools', '/engine', '/arms', '/filters',
+      '/newsaxis',
       '/filter', '/best', '/screener', '/dividends', '/octasearch', '/verdict', '/pick',
       '/compare', '/radar', '/smartmoney', '/money', '/news', '/academy', '/watchlist',
       '/search', '/calc', '/bestpick', '/radar-stock'];
@@ -1599,7 +1845,7 @@ async function handle(request, env, ctx) {
       return new Response(pageHtml, { status: res.status, headers: h });
     }
     if (/\.(js|mjs|css)$/.test(url.pathname)) {
-      const res = await assetsFresh(env, request);
+      const res = await assetsFresh(env, request, { static: true });
       const h = new Headers(res.headers);
       /* ⛌⛌⛌ لازم نمسح كل الـcache-control القديم ونحط واحد
        📌 ⛌ ⛌ ⛌ (لأن الـ_headers بيحط ٣ قواعد متلاصقة)
@@ -1613,7 +1859,18 @@ async function handle(request, env, ctx) {
        h.delete('Cache-Control');
        h.delete('Pragma');
        h.delete('Expires');
-       h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐⭐⭐ تخزين طويل للأصول المختومة
+      📌 كل رابط أصل في صفحات OCTA عليه ?v=YYYYMMDDHHmm ⇒ النسخة
+      📌   الجديدة = رابط جديد ⇒ الكاش الآمن صحيح تماماً.
+      📌 ⇒ الزيارة الثانية onwards: **صفر بايت** من الـJS ⇒ فتح فوري.
+      📌 ⛔ الأمان: لو الرابط **من غير** ختم ⇒ no-store (مش بنخاطر
+      📌   بنسخة قديمة أبداً). */
+      const _stamped = /[?&]v=[0-9]{8,}/.test(url.search || '');
+      if (_stamped) {
+        h.set('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      }
        h.set('Pragma', 'no-cache');
        h.set('Expires', '0');
        h.set('ETag', '"' + Date.now() + '"');

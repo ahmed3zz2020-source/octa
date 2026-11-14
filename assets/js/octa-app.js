@@ -102,19 +102,26 @@ function phaseOf(mk){
      (كل الكروت «—») ومفيش أي محاولة تانية ⇒ المستخدم واقف على صفحة ميتة.
    📌 ✅ الحل: نعيد المحاولة ٣ مرات بتباعد متزايد (١٫٥ ← ٤ ← ٩ ثواني)
      والصفحة بتتحدّث لوحدها أول ما الشبكة ترجع. */
-/* ⛔ ٦ محاولات بتباعد متزايد ⇒ ~٩٥ ثانية تغطية (أكتر من أي انقطاع شبكة قصير) */
-const OCTA_RETRY_DELAYS = [1200, 3000, 7000, 12000, 20000, 35000];
+/* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ سقف إعادة المحاولة اتقصّص
+📌 السبب: [١٢٠٠, ٣٠٠٠, ٧٠٠٠, ١٢٠٠٠, ٢٠٠٠٠, ٣٥٠٠٠] + مهلة ٧ ثواني
+📌   لكل محاولة ⇒ **٢ دقيقة** واقف على «بنحاول تاني» ⛔
+📌   ⇒ ده بالظبط «٣٥ ثانية» اللي شكا منهم أحمد.
+📌 ✅ الحل: ٣ محاولات فقط (١٢٠٠ / ٣٠٠٠) + مهلة ٩ ثواني
+📌   ⇒ السقف ≈ ٢٩ ثانية، والوضع الطبيعي (السيرفر دافي) = فوري.
+📌 ⛔ مع المراقب كل ٨ ثواني (بتعيد بناء الكارت الفاضي) ⇒ البيانات
+📌   بتكمّل لوحدها من غير ما المستخدم يستنى. */
+const OCTA_RETRY_DELAYS = [1200, 3000];
 async function fetchRetry(url, opts, tries){
   const n = Math.max(1, tries || OCTA_RETRY_DELAYS.length + 1);
   let lastErr = null;
   for (let i = 0; i < n; i++){
     try{
-      /* ⛔⛔ مهلة لكل محاولة (٧ ثواني) — من غيرها الطلب المعلّق
-         بيقعد ٢٤ ثانية جوه البروبكاي والصفحة بتفضل ميتة. */
+      /* ⛔⛔ مهلة لكل محاولة (٩ ثواني) — تغطي cold start (≈١٢s)
+         ⛌   عبر إعادة المحاولة جوه الـworker (٦s×٣). */
       let ctrl = null;
       if (typeof AbortController !== 'undefined'){
         ctrl = new AbortController();
-        var _to = setTimeout(function(){ try { ctrl.abort(); } catch(e){} }, 7000);
+        var _to = setTimeout(function(){ try { ctrl.abort(); } catch(e){} }, 9000);
       }
       let o2 = Object.assign({}, opts || {});
       if (ctrl) o2.signal = ctrl.signal;
@@ -732,7 +739,9 @@ async function cardEGX(code,row){
   (has?'<div class="mflag grn"><span>📢</span><span><b>فيه أحداث.</b> '+esc(NW.headline||'')+'</div>'
   :'<div class="mflag gold"><span>😐</span><span>'+esc(NW.headline||NW.note||'لا توجد أحداث معلنة')+'</div>')+
   (NW.score!=null?'<div style="font-size:.72rem;color:var(--muted);margin-top:7px">درجة الأخبار: '+
-  Math.round(NW.score)+'/100 · materiality: '+esc(String(NW.materiality||'—'))+'</div>':'')+
+  Math.round(NW.score)+'/100 · materiality: '+esc(String(NW.materiality||'—'))+
+  ' · <a href="#newsaxis" onclick="switchPage(\'newsaxis\');return false;" '+
+  'style="color:var(--gold);font-weight:800">كل الأسهم ←</a></div>':'')+
   '</div>';
   }
 

@@ -831,7 +831,7 @@ html[data-dev="1"] .octa-devbar::after {
    ══════════════════════════════════════════════════════════════ */
 @media (max-width: 760px) {
 
-  /* نقطة بداية واضحة لكل كارت — марכر أعمق */
+  /* نقطة بداية واضحة لكل كارت — marker أعمق */
   .sv-g > b {
     position: relative;
     padding-right: 14px;

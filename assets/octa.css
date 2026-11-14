@@ -5360,6 +5360,16 @@ body.sb-open .sb-scrim { display: block; }
 .sb-x:hover { border-color: var(--gold); color: var(--gold); }
 
 /* ── التنقّل ── */
+/* ⭐⭐⭐ بحث في القائمة الجانبية (١٠ نوفمبر ٢٠٢٦) */
+.sb-search { padding: 10px 10px 2px; }
+.sb-search input {
+  width: 100%; padding: 9px 12px; border-radius: 11px;
+  border: 1px solid var(--line); background: var(--wash);
+  color: var(--txt); font-family: inherit; font-size: .82rem;
+}
+.sb-search input:focus { outline: none; border-color: rgba(212,175,55,.5); }
+.sb-search input::placeholder { color: var(--muted); }
+
 .sb-nav {
   flex: 1 1 auto;
   overflow-y: auto;
@@ -7204,7 +7214,7 @@ body.light .fz-wx { background: #fffdf7; }
 
 /* ══════════════════════════════════════════════════════════════
    📖 نافذة الشرح (؟) — 16 أكتوبر 2026
-   ⛔слashed: من غير تباين 4.5:1 في الوضعين، ومفيش نص أقصر من 44px
+   ⛔slashed: من غير تباين 4.5:1 في الوضعين، ومفيش نص أقصر من 44px
    ══════════════════════════════════════════════════════════════ */
 .octa-why-wrap { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 18px; }
 .octa-why-bg { position: absolute; inset: 0; background: rgba(4,10,18,.72); backdrop-filter: blur(4px); }

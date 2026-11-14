@@ -1,0 +1,11 @@
+name = "halan-feed"
+account_id = "74e046678adabf0706024b97b205882b"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+
+[triggers]
+crons = ["*/30 * * * *"]
+
+[[kv_namespaces]]
+binding = "HALAN_KV"
+id = "8c9beca8ef09451b9767819d3060fb55"

@@ -40,7 +40,7 @@
   · شتاء (UTC+2) → بيرجع +2
   ⛔-market phase-server بيحسب بالـbackend صح (UTC+3)،
   فالواجهة كانت هي اللي غالطة. */
-  /* getTimezoneOffset بيرجع الدقائق *قبل* UTC (بتUIS بتволبvice بتUTC+3
+  /* getTimezoneOffset بيرجع الدقائق *قبل* UTC (بالـUI وبـvoice بتUTC+3
   فبترجع −180). فبـ180 دي بقى إحنا بنطرح، وبـ−180 إحنا بنضيف.
   ⛌ الحساب = الجهاز + إزاحة القاهرة، لا الفرق. */
   var tzMin = d.getTimezoneOffset();  // دقيقة، قبل UTC

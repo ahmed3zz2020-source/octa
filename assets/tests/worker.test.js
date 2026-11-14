@@ -31,9 +31,23 @@ function makeWorker() {
      ⛔ بنحوّل `export default` لـ `module.exports` عشان new Function
         يقبلها. */
   const mod = { exports: {} };
-  const body = SRC.replace('export default', 'module.exports =');
+  /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ الـworker بقى ESM فيه import (هالان)
+  📌 السبب: worker.js بقى بيعمل
+  📌   import { newsEngine, mergeEvents, eventsByCode } from './halan-news.js';
+  📌   ⛔ `new Function` مش بيفهم import ⇒ «Cannot use import statement»
+  📌   ⇒ كل اختبارات الـworker كانت بتفشل (١٢ فشل).
+  📌 ✅ الحل: نحطّط سطر الـimport ونحقن كود halan-news.js (بتصديراته
+  📌   محوّلة لمتغيرات) في نفس الـscope ⇒ نفس السلوك بالظبط.
+  📌 (الـwrangler بيعمل bundling حقيقي ⇒ السلوك في الإنتاج سليم.) */
+  const halanSrc = fs.readFileSync(path.join(ROOT, 'halan-news.js'), 'utf8')
+    .replace(/export\s+(function|const|let|var)\s+/g, '$1 ')
+    .replace(/export\s*\{[^}]*\}\s*;?/g, '')
+    .replace(/export\s+default\s+/g, '');
+  const body = SRC
+    .replace(/^\s*import\s+\{[^}]*\}\s+from\s+['"][^'"]+['"];?\s*$/m, '')
+    .replace('export default', 'module.exports =');
   const fn = new Function('module', 'exports', 'Request', 'Response',
-    'Headers', 'URL', 'fetch', 'setTimeout', body);
+    'Headers', 'URL', 'fetch', 'setTimeout', halanSrc + '\n' + body);
   fn(mod, mod.exports, Request, Response, Headers, URL,
     globalThis.fetch, globalThis.setTimeout);
   return mod.exports;

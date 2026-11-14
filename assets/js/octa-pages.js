@@ -4994,7 +4994,7 @@ function icRows(list, valKey) {
   ════════════════════════════════════════════════════════════ */
 (function killLegacyHome() {
   /* ═══ صفحات الأدوات/الفلاتر — لازم نجيبها من الموت مع المحتوى القديم ═══ */
-  const KEEP = ['filter','best','screener','dividends','compare','calc','academy','bestpick','news','search','engine','arms','markets','stocks','intel','dash','octasearch','verdict','pick','money','radar','radar-stock','setups','studio','zones','challenges','wip'];
+  const KEEP = ['filter','best','screener','dividends','newsaxis','compare','calc','academy','bestpick','news','search','engine','arms','markets','stocks','intel','dash','octasearch','verdict','pick','money','radar','radar-stock','setups','studio','zones','challenges','wip'];
   function rescueToolPages(old) {
   let host = document.getElementById('toolPagesHost');
   if (!host) {
@@ -5181,7 +5181,7 @@ function openMarketGauge(){
     { r:'٢١ – ٤٢', t:'الحذر يغلب 🐻', d:'أسهم أكثرها سلبية. (وضعك دلوقتي: '+B.gauge+')' },
     { r:'٤٣ – ٥٧', t:'متردد ⚖️', d:'مفيش اتجاه واضح — القرار فردي.' },
     { r:'٥٨ – ٨٠', t:'شهية مخاطرة أعلى 🐂', d:'أسهم أكثرها إيجابية.' },
-    { r:'٨١ – ١٠٠', t:'طموح شديد', d:'نفس الكلام بس أشد — احذر إنك تفتح позиونات كبيرة.' }
+    { r:'٨١ – ١٠٠', t:'طموح شديد', d:'نفس الكلام بس أشد — احذر إنك تفتح مراكز كبيرة.' }
   ];
   var bandHtml = bands.map(function(b){
     var cur = (B.state==='bear' && b.r.indexOf('٢١')===0) ? ' is-cur' :

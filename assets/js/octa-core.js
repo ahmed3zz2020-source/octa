@@ -689,6 +689,7 @@ function octaPageInit(id) {
   }, 40);
   if (id === 'pick') setTimeout(async ()=>{ if (typeof octaLoadDB==='function'){ try{ await octaLoadDB(); }catch(e){} } if (typeof pickInit==='function') pickInit(); }, 150);
   if (id === 'dividends' && typeof dvLoad === 'function') dvLoad();
+  if (id === 'newsaxis' && typeof naLoad === 'function') naLoad();
   if (id === 'octasearch') {
   if (!window.__osInit) { window.__osInit = 1; setTimeout(() => octaInit(), 80); }
   // نفضّي قائمة النتائج (بس نسيب نص البحث زي ما هو — عشان تختار نتيجة تانية)
@@ -845,7 +846,7 @@ function switchPage(id) {
    📌 رابط مباشر `#/stocks` أو `#/markets` يفتح لوحة الأسواق.
    📌 + URL كامل (octashares.com/markets) — الـworker بيقدّم index.html.
    ⚠️ 'stocks' و 'markets' نقطة واحدة — كلهم بيفتحوا نفس الصفحة. */
-const TOOL_PAGES = ['filter','best','screener','dividends','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms','money','radar','radar-stock','setups','studio','zones','challenges','stocks','markets','wip'];
+const TOOL_PAGES = ['filter','best','screener','dividends','newsaxis','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms','money','radar','radar-stock','setups','studio','zones','challenges','stocks','markets','wip'];
 /* ══════════════════════════════════════════════════════════════
  *  🧰 شريط الأدوات — 8 أدوات بس، والباتاقي في الـsidebar
  *  ──────────────────────────────────────────────────────────
@@ -867,6 +868,7 @@ const TOOLS = [
   { id:'engine',  i:'🧠', n:'المحرك',  d:'التحليل الكامل بالمحاور', mk:'egx' },
   { id:'octasearch', i:'🔎', n:'بحث OCTA',  d:'تحليل أي سهم بالاسم', mk:'egx' },
   { id:'dividends',  i:'📅', n:'التوزيعات',  d:'نقدي · أسهم · إعلانات', mk:'egx' },
+  { id:'newsaxis',  i:'📰', n:'محور الأخبار',  d:'درجة أخبار كل سهم', mk:'egx' },
   { id:'pick',  i:'🆚', n:'المقارنة الذكية', mk:'egx',
     d:'اكتب لحد 10 أسهم · OCTA يرتّبهم بمعايره' },
   { id:'filter',  i:'🗂️', n:'فلاتر المؤشرات',  d:'8 فلاتر ذكية', mk:'egx' },

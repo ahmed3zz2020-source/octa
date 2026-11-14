@@ -818,7 +818,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  paintCode();
  paintPad(false);
  paintPad(false);
- /* ⭐⭐⭐ ⭐⭐ ده التском الحقيقي 
+ /* ⭐⭐⭐ ⭐⭐ ده التسكين الحقيقي 
  ⛌ «استنى ٣٠ ثانية»  بس  لو المستخدم **نسي**
   الباسورد  هيضل يدور تاني  لحد ما يمل.
  ⛌ فبنديه  في نفس اللحظة  زرار «نسيت الباسورد؟»
@@ -2701,7 +2701,8 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  📌 الحل: نطلب /api/health على فترات ⇒ أول ما يرجّع ⇒ clearHint()
    ⇒ البانر يختفي لوحده والوضع يرجع طبيعي. */
  function watchServer(){
-  var waits = [5000, 15000, 35000, 60000, 120000];
+ /* ⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐ نفس القاعدة: أول فحص بعد ٤ ثواني. */
+  var waits = [4000, 12000, 25000, 60000, 120000];
   for (var i = 0; i < waits.length; i++) {
   setTimeout(function () {
   try {
@@ -2716,7 +2717,10 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
   }
  }
  function retryLater(){
-  var waits = [5000, 15000, 35000];
+ /* ⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐ [٥٠٠٠, ١٥٠٠٠, ٣٥٠٠٠] ⇒ [٤٠٠٠, ١٢٠٠٠, ٢٥٠٠٠]
+ 📌 السبب: ٣٥ ثانية كانت = «موقعي واقّف نص دقيقة» ⛔
+ 📌   ⇒ دلوقتي أول تحقّق بعد ٤ ثواني (يكفي). */
+  var waits = [4000, 12000, 25000];
   for (var i = 0; i < waits.length; i++) {
   setTimeout(function () {
   var t = token();
@@ -2766,9 +2770,31 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  · ⛔ بعد ٨ ثواني بدون رد: نسمح بالتصفح زي زائر عادي
    (الباك لما يرد هيتحقق من require_user في كل endpoint محمي) */
 
- var tries = 0, MAX_TRIES = 3;
+ var tries = 0, MAX_TRIES = 2;
  var STARTED = 0;
  var FIRST = 0;
+ /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ «مهلة السماح» — إصلاح تعليق ٣٥ ثانية
+ 📌 العَرَض: بعد فترة سكون طويلة ⇒ السيرفر بينام ⇒ أول طلب
+ 📌   (/api/auth/me) بياخد ≈١٢ ثانية (cold start) ⇒ البوابة
+ 📌   (شاشة كاملة) بتقعد قدام المستخدم ⇒ **٣٥ ثانية** ⛔.
+ 📌 ✅ الحل: بعد **٤٫٥ ثانية** من فتح الصفحة، لو التحقق لسه
+ 📌   ماردش ⇒ **نفتح التطبيق** (تصفح) + بانر صغير «بنتحقق في
+ 📌   الخلفية». ⛔ لو الرد وصل 401 ⇒ البوابة ترجع فوراً (مقفول).
+ 📌   ⇒ المستخدم مش بيقف قدام شاشة أبداً.
+ 📌 ⛔ الأمان زي ما هو: التوكن الغلط ⇒ 401 ⇒ البوابة. */
+ var RESOLVED = false;
+ var _grace = setTimeout(function () {
+  try {
+   if (RESOLVED) return;
+   RESOLVED = true;
+   try { sessionStorage.setItem('octa_allow_browse', '1'); } catch (e) { }
+   clearHint();
+   hint('⏳ السيرفر بيصحّي — فتحنا لك التطبيق. بنتحقق من حسابك في الخلفية.',
+        '#0f2a44', '#cfe3f5');
+   shut();
+   retryLater();
+  } catch (e) { }
+ }, 4500);
 
  function verifyOnce(){
  STARTED = Date.now();
@@ -2781,7 +2807,11 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  ⛌ ⭐ والآن: ٢٠ ثانية تغطي cold start (١٢) + تري الـWorker (٣×٦=١٨)
  ⛌   ⇒ الرد بيوصل فعلاً بدل ما نقصّ الطلب. */
  var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
- var to = setTimeout(function () { if (ctrl) try { ctrl.abort(); } catch (e) { } }, 20000);
+ /* ⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐ ٢٠ ⇒ ٩ ثواني
+ 📌 السبب: مهلة السماح (٤٫٥s) بتتكفّل بالانتظار ⇒ مفيش داعي
+ 📌   نقعد ٢٠ ثانية. ⛔ بس لازم تغطي cold start (≈١٢s) ⇒
+ 📌   الـworker بيعيد المحاولة جوه (٦s×٣) ⇒ هو اللي يرد. */
+ var to = setTimeout(function () { if (ctrl) try { ctrl.abort(); } catch (e) { } }, 9000);
  return fetch(apiBase() + '/api/auth/me', {
  headers: { 'Authorization': 'Bearer ' + t },
  credentials: 'include',
@@ -2798,6 +2828,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
   📌 ⛌ ⛌ ⛌ ⛌ ⛌ (والكوكي لسه شغال كخط دفاع تاني)
   */
  if (r.ok) {
+ try { RESOLVED = true; clearTimeout(_grace); } catch (e) { }
  /* ⛌⛌⛌ ٢٤ أكتوبر ٢٠٢٦ — ⭐ نقرأ الـbody مرة واحدة كـtext
   📌 (r.json() ممكن يت consume — safer نحمله ourselves)
   */
@@ -2822,6 +2853,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  ⛌   يفضل مكانه (لما السيرفر يرجع تفضل مسجّل).
  ⛌ ⛔ 401/403 = التوكن فعلاً غلط ⇒ المسح + البوابة زي ما هي. */
  if (r.status >= 500) {
+ try { RESOLVED = true; clearTimeout(_grace); } catch (e) { }
  clearHint();
  try { sessionStorage.setItem('octa_allow_browse', '1'); } catch (e) { }
  hint('⚠️ السيرفر بينزل — بتفتح بدون تسجيل. الداتا المحمية هتطلب الدخول.', '#7a2b16', '#ffd9c9');
@@ -2851,6 +2883,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  📌 ✅ الحل: لو في تدفّق ⇒ نكتفي بمسح التوكن ومكملش
  📌 ✅ (المستخدم هيكمّل كتابة الكود / الباسورد عادي).
  */
+ try { RESOLVED = true; clearTimeout(_grace); } catch (e) { }
  if (inFlow()) { return; }
  logoutLocal();
  mount(); welcome(); open();
@@ -2867,7 +2900,10 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  📌       ⇒ لو السيرفر رجع، الشريط يختفي لوحده (الرسالة تبقى صادقة).
  📌   (③) أثناء الانتظار: «⏳» مش «⚠️» — الإنذار الأحمر مش على حاله. */
  var total = (Date.now() - FIRST) / 1000;
- if (tries < MAX_TRIES && total < 45) {
+ /* ⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐ ٤٥ ⇒ ١٢ ثانية
+ 📌 السبب: ٤٥ ثانية = «موقعي واقّف نص دقيقة» ⛔
+ 📌   ⇒ الـworker بيعيد المحاولة جوه ⇒ ١٢ ثانية كفاية. */
+ if (tries < MAX_TRIES && total < 12) {
   hint('⏳ بنحاول نتأكد من حسابك… (' + tries + '/' + MAX_TRIES + ') — استنى ثانية', '#0f2a44', '#cfe3f5');
   setTimeout(verifyOnce, 900 * tries);
   return;
@@ -2882,8 +2918,13 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
   return;
  }
  if (token()) {
-  hint('⏳ السيرفر بطيء — بنتحقق من حسابك في الخلفية. تقدر تتفرج دلوقتي.', '#7a2b16', '#ffd9c9');
-  mount(); welcome(); open();
+  /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ التطبيق بيفتح (مش شاشة الدخول)
+  📌 السبب: «mount(); welcome(); open();» = **شاشة الدخول** اللي
+  📌   كانت بتغطي الشاشة ٣٥ ثانية ⛔ ⇒ المستخدم ميفتحش الموقع.
+  📌 ✅ الحل: shut() = فتح التطبيق + بانر «بنتحقق في الخلفية».
+  📌   ⛔ لو الرد رجع 401 ⇒ البوابة ترجع فوراً (مقفول). */
+  hint('⏳ السيرفر بطيء — فتحنا لك التطبيق. بنتحقق من حسابك في الخلفية.', '#0f2a44', '#cfe3f5');
+  shut();
   retryLater();
   return;
  }

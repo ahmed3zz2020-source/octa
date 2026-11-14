@@ -6,7 +6,16 @@ const fs = require('fs');
  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ «طلبت ٣ أكواد» بدل «٥» + البوابة القديمة.
  📌 ✅ الحل: نحدّث الملفين.
  */
-const FILES = ['index.html', 'gate.html'];
+/* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ لازم الختم يغطي **كل** ملف بيحمّل أصل.
+📌 كان: index.html + gate.html بس ⇒ market.html (الصفحة العامة) و
+📌   reset.html وخطوط Tajawal فضلوا بختم قديم ⇒ مع الكاش الطويل
+📌   دول هيفضلوا يقدّموا نسخة قديمة **للأبد** ⇒ نسخة قديمة عند الزائر.
+📌 ✅ الحل: نختم كل صفحة + ملف الخطوط. */
+const FILES = ['index.html', 'gate.html', 'market.html', 'reset.html',
+  'assets/octa-fonts.css',
+  /* 📌 الملفين دول فيهما مرجع ديناميكي لـ?v=__BUILD__
+     (سكربت الـvendor + الخطوط) ⇒ لازم الختم يوصلهم. */
+  'assets/js/octa-chartkit.js', 'assets/js/octa-gold-savings.js'];
 /* ⛔ كان بياخد آخر 4 أرقام من الـepoch ms — مش تاريخ، وبيرجع
    لورا أحياناً. دلوقتي تاريخ+وقت حقيقي: YYYYMMDDHHmm (بيزيد كل مرة). */
 const _d = new Date();

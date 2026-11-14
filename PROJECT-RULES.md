@@ -16,6 +16,19 @@
 **ممنوع أي نشر على octashares.com من غير كلمة صريحة من أحمد.**
 حتى لو الإصلاح مؤكد—even لو واضح إنه مظبوط.
 
+### ⛔⛔ وده بينفّذ بالحارس مش بالكلام
+| الهدف | الأمر |
+|---|---|
+| المعاينة (افتراضي) | `bash tools/deploy.sh preview`  ·  أو `npm run deploy` |
+| الإنتاج | `PUBLISH_PROD="ارفع على الدومين" bash tools/deploy.sh prod` |
+
+- ⛔ **ممنوع** `wrangler deploy` من غير `--config` — من غيره بينشر على **الإنتاج**
+  (`wrangler.jsonc` اسمه `octa`!). ده سبب حادث ٩ نوفمبر — شوف
+  `docs/POSTMORTEM-2026-11-09-deploy-accident.md`.
+- ⛔ `npm run deploy` بقى **معاينة** بس. للإنتاج: `npm run deploy:prod`.
+- ✅ حارس النشر بيعمل: قفل الإنتاج · التحقق من اسم العامل · فحص الأسرار ·
+  فحص حيّ بعد النشر ⇒ **تراجع تلقائي** لو فشل.
+
 ## 4) أول حاجة في أي شات جديد
 ```bash
 bash check-sync.sh

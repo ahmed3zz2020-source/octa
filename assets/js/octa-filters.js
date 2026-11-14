@@ -2205,7 +2205,7 @@ function fzCfwScore(s){
   /* ① FCF موجب وكبير (35) */
   const mc = s.mc || 0;
   if (s.fcf != null && s.fcf > 0){
-  /* FCF كنسبة من حجم السوق — абсолют малоScaleShares */
+  /* FCF كنسبة من حجم السوق — مقياس صغير مطلق لـ ScaleShares */
   const fcfYield = mc > 0 ? s.fcf / mc * 100 : null;
   if (fcfYield != null){
   sc += fcfYield>=8?35 : fcfYield>=5?31 : fcfYield>=3?26 : fcfYield>=1?19 : 10;

@@ -1164,7 +1164,7 @@
       let summary = '<div class="ix-cmp-sum">';
       if (best) summary += '<div>📈 أعلى أداء في الفترة: <b>' + esc(best.name_ar) + '</b> (' + pct(best.return_pct) + ')</div>';
       if (worst) summary += '<div>📉 أكبر هبوط: <b>' + esc(worst.name_ar) + '</b> (' + pct(worst.max_drawdown, 1) + ')</div>';
-      summary += '<div class="ix-note">📌 أداء تاريخي مش ضمان للمستقبل. كل مؤشر ليه منهجية مختلفة — والقارنة بين их بتوضح الفرق مش الترتيب.</div></div>';
+      summary += '<div class="ix-note">📌 أداء تاريخي مش ضمان للمستقبل. كل مؤشر ليه منهجية مختلفة — والقارنة بينهم بتوضح الفرق مش الترتيب.</div></div>';
 
       body.innerHTML = ctl + chart + table + summary;
       drawCmp(d);

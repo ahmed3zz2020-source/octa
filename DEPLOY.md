@@ -11,7 +11,11 @@ Ahmed بيقولي المشكلة أو التعديل
         ↓
 git commit + push
         ↓
-npx wrangler deploy
+bash tools/deploy.sh preview     ← المعاينة (الافتراضي · آمن)
+        ↓
+اختبار على octa-preview
+        ↓
+PUBLISH_PROD="ارفع على الدومين" bash tools/deploy.sh prod
         ↓
 octashares.com اتحدث ✅
 ```
@@ -116,7 +120,8 @@ curl -s "https://octashares.com/assets/js/octa-screener.js?v=$(date +%s)" | grep
 ```
 octa5/
 ├── index.html              ← الصفحة الرئيسية
-├── wrangler.jsonc          ← إعدادات Cloudflare
+├── wrangler.jsonc          ← إعدادات المعاينة (الافتراضي · آمن)
+├── wrangler-prod.jsonc     ← إعدادات الإنتاج (لازم --config صريح)
 ├── package.json            ← أوامر البناء
 ├── assets/
 │   ├── octa.css            ← الأنماط الأساسية
