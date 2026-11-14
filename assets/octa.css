@@ -6251,8 +6251,15 @@ body.set-notab { font-variant-numeric: normal; }
 
 @media (max-width: 760px) {
   .af-grid { grid-template-columns: 1fr; }
-  .af-t { font-size: .75rem; }
-  .af-t th, .af-t td { padding: 8px 9px; }
+  .af-t { font-size: .72rem; }
+  .af-t th, .af-t td { padding: 7px 6px; }
+  /* ⭐ الموبايل: نخفي الترتيب والقطاع ⇒ الأرقام تبان من غير سحب أفقي.
+     (الجدول كان بيتمرير يمين/شمال وعمود التقييم كان بره الشاشة.) */
+  .af-t th:nth-child(1), .af-t td:nth-child(1),
+  .af-t th:nth-child(3), .af-t td:nth-child(3) { display: none; }
+  .af-nm { font-size: .62rem; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* ⭐ وحدة «من 100» سطر تحتها ⇒ عمود أضيق */
+  .af-th-u { display: block; font-size: .58rem; line-height: 1.2; }
 }
 .af-over {
   font-style: normal; font-size: .68rem; margin-inline-start: 3px;
