@@ -103,16 +103,16 @@
   { id: 'total', ic: '🐙', n: 'المجموع', d: 'تقييم OCTA الكامل',
   get: function (s) { return num(s.score); }, src: 'محاور المحرك كلها', inTotal: true },
   { id: 'q', ic: '💰', n: 'الأساسي', d: 'جودة الشركة من جوه',
-  get: function (s) { return axLive(s, 'fundamental', 'q'); }, src: 'أرباح وعوائد ونسب', inTotal: true },
+  get: function (s) { return axLive(s, 'fundamental', 'q'); }, src: 'أرباح وعوائد ونسب', inTotal: true, axis: 'fundamental' },
   { id: 'v', ic: '🏷️', n: 'التقييم', d: 'السهم غالي ولا رخيص',
   get: function (s) { return valScore(s); }, src: 'مضاعف الربحية والقيمة الدفترية', derived: true },
   { id: 'm', ic: '📈', n: 'الفني', d: 'حركة السعر والزخم',
-  get: function (s) { return axLive(s, 'technical', 'm'); }, src: 'مؤشرات فنية من الرسم البياني', inTotal: true },
+  get: function (s) { return axLive(s, 'technical', 'm'); }, src: 'مؤشرات فنية من الرسم البياني', inTotal: true, axis: 'technical' },
   { id: 'lq', ic: '💧', n: 'السيولة', d: 'تقدر تبيع بدري ولا لأ',
-  get: function (s) { return axLive(s, 'liquidity', 'lq'); }, src: 'حجم التداول ونسبته', inTotal: true },
+  get: function (s) { return axLive(s, 'liquidity', 'lq'); }, src: 'حجم التداول ونسبته', inTotal: true, axis: 'liquidity' },
   { id: 'sf', ic: '🛡️', n: 'الأمان', d: 'السهم بيتزنق قد إيه',
   get: function (s) { var v = num(s.safety); if (v != null) return v; var o = ax(s, 'sf'); return o == null ? null : o; },
-  src: 'بيتا · دين · تقلب · أكبر هبوط · شارپ', inTotal: true },
+  src: 'بيتا · دين · تقلب · أكبر هبوط · شارپ', inTotal: true, axis: 'risk' },
   /* ↓ الاتنين دول مش من محرك الخمسة — محسوبين من بيانات تاريخية حقيقية.
   كل واحد فيهم بيقول التغطية بتاعته بوضوح. */
   { id: 'risk', ic: '⚠️', n: 'المخاطرة', d: 'التذبذب وأكبر هبوط',
@@ -414,6 +414,31 @@
   return h;
   }
 
+  /* ⭐⭐ شرح الفرق بين عمود الذراع وعمود المجموع (١٤ نوفمبر ٢٠٢٦)
+     📌 المالك سأل: «التقييم من 100 والمجموع من 100 — الفرق إيه؟»
+     ⇒ التقييم = درجة السهم في الذراع ده وحده · المجموع = نتيجته النهائية.
+     ⭐ والوزن بيتقرا من المصدر الحيّ (محرك الأوزان) — مش رقم ثابت. */
+  function armExplain(arm) {
+  var AW = (typeof window.OCTA_AXIS_W === 'function') ? window.OCTA_AXIS_W() : null;
+  var w = '';
+  if (arm.axis && AW && typeof AW[arm.axis] === 'number') w = String(AW[arm.axis]);
+  var h = '<div class="af-dnote">';
+  if (arm.inTotal) {
+  h += '<div class="af-dn"><b>' + esc(arm.n) + '</b> = درجة السهم في الذراع ده وحده — وده <b>داخل في النتيجة النهائية</b>' +
+  (w ? ' بوزن <b>' + w + '%</b>' : '') + '.</div>';
+  } else {
+  h += '<div class="af-dn"><b>' + esc(arm.n) + '</b> = درجة السهم في الذراع ده وحده — وده <b>مش جزء</b> من النتيجة النهائية.</div>';
+  }
+  h += '<div class="af-dn"><b>المجموع</b> = <b>النتيجة النهائية</b> في محرك OCTA (سبعة محاور موزونة، بعد خصم المخاطرة والثقة).</div>';
+  if (arm.inTotal) {
+  h += '<div class="af-dn"><b>الفرق</b> = الفرق بين الدرجتين <b>بالنقاط</b> — كل ما الرقم أعلى، السهم ده قوي في الذراع ده بس ضعيف في الباقي.</div>';
+  } else {
+  h += '<div class="af-dn"><b>الفرق</b> = «—» هنا، لأن الدرجة دي مش جزء من المجموع، فمفيش رقم ناقصه نقارنه بيه.</div>';
+  }
+  h += '</div>';
+  return h;
+  }
+
   /* ═══ التفاصيل ═══ */
   function renderDetail() {
   var arm = ARMS8.filter(function (a) { return a.id === AF.arm; })[0] || ARMS8[0];
@@ -465,6 +490,9 @@
   (skipped ? '<span class="af-s warn"><b>' + skipped + '</b> ' +
   (arm.id === 'div' ? 'بدون توزيع' : 'بدون بيانات') + '</span>' : '') +
   '<span class="af-s ok"><b>' + shown.length + '</b> عدّى الفلتر</span></div>';
+
+  /* ⭐ شرح الأعمدة (قبل الجدول) — الفرق بين درجة الذراع والمجموع */
+  h += armExplain(arm);
 
   if (!shown.length) {
   h += '<div class="af-empty">مفيش سهم عدّى. جرّب تنزل الدرجة لـ ' + Math.max(0, AF.min - 20) + '.' +

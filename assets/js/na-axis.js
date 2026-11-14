@@ -15,6 +15,7 @@ var NA_DATA = null;
 var NA_LOADING = false;
 var NA_FILTER = 'all';
 var NA_SORT = 'desc';
+var NA_SEARCH = '';   /* ⭐ بحث بالكود/الاسم (١٤ نوفمبر ٢٠٢٦) */
 
 function naEsc(s) {
   return String(s == null ? '' : s)
@@ -93,11 +94,21 @@ function naRender() {
       '<div class="dv-kpi-l">آخر تحديث</div></div>';
   }
 
-  /* ⭐ الفلترة */
+  /* ⭐ الفلترة — Importance chip + search by code/name */
   let rows = all.filter(a => {
     if (NA_FILTER === 'all') return true;
     return a.materiality === NA_FILTER;
   });
+  /* ⭐ البحث (١٤ نوفمبر ٢٠٢٦) — بالكود أو بالاسم
+     📌 يشتغل مع الفلتر الحالي (chips) — مش بيلغيّه. */
+  const q = String(NA_SEARCH || '').trim().toUpperCase();
+  if (q) {
+    rows = rows.filter(a => {
+      const code = String(a.code || '').toUpperCase();
+      const name = String(a.name || a.nameAr || '').toUpperCase();
+      return (code && code.indexOf(q) >= 0) || (name && name.indexOf(q) >= 0);
+    });
+  }
   rows.sort((a, b) => NA_SORT === 'desc' ? (b.axis - a.axis) : (a.axis - b.axis));
 
   const h = document.getElementById('naSecH');
@@ -108,13 +119,16 @@ function naRender() {
       : (NA_FILTER === 'critical' ? 'أحداث حرجة'
         : NA_FILTER === 'high' ? 'أهمية عالية'
           : NA_FILTER === 'medium' ? 'أهمية متوسطة' : 'أهمية منخفضة');
-    h.innerHTML = '📋 ' + flab + ' <span class="dv-s">' + rows.length + ' سهم</span>';
+    h.innerHTML = (q ? '🔎 نتائج «' + naEsc(NA_SEARCH.trim()) + '»' : '📋 ' + flab) +
+      ' <span class="dv-s">' + rows.length + ' سهم</span>';
   }
 
   const box = document.getElementById('naList');
   if (!box) return;
   if (!rows.length) {
-    box.innerHTML = '<div class="dv-empty">📭 مفيش أسهم في الفلتر ده.</div>';
+    box.innerHTML = '<div class="dv-empty">📭 ' + (String(NA_SEARCH || '').trim()
+      ? 'مفيش سهم بالبحث ده.'
+      : 'مفيش أسهم في الفلتر ده.') + '</div>';
   } else {
     box.innerHTML = rows.map(function (a) {
       const m = naMatLabel(a.materiality);
@@ -164,5 +178,14 @@ document.addEventListener('click', function (e) {
       x.classList.toggle('active', x === b);
     });
   }
+  naRender();
+});
+
+/* ⭐ البحث في محور الأخبار (١٤ نوفمبر ٢٠٢٦) — كتابة كل حرف يعمل تحديث
+   📌 الـinput جوّه الصفحة (مش السايد بار) ⇒ المستمع عام على الـdocument. */
+document.addEventListener('input', function (e) {
+  const t = e.target;
+  if (!t || t.id !== 'naSearch') return;
+  NA_SEARCH = t.value || '';
   naRender();
 });

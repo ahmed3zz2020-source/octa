@@ -134,6 +134,10 @@ function loadArms(db, liveMap) {
   sb.win.octaLoadDB = function () { return Promise.resolve(sb.win.OS_DB); };
   sb.win.nzAxisScore = stubNzAxisScore;
   sb.win.nzIsBank = function () { return false; };
+  /* أوزان المحرك الحيّة (مصدر واحد) */
+  sb.win.OCTA_AXIS_W = function () {
+    return { risk: 27, fundamental: 24, technical: 20, liquidity: 20, news: 5, sentiment: 4, portfolio: 0 };
+  };
   sb.win.OCTALiveMarkets = function () {
     return Promise.resolve({ ok: true, map: liveMap || {}, ts: '2026-11-14T05:00:00Z', n: Object.keys(liveMap || {}).length });
   };
@@ -346,9 +350,6 @@ test('⑩ عنوان القائمة يقول الفلتر الحالي', async (
   assert.ok(sb.els.naSecH.innerHTML.includes('1 سهم'), 'لازم عدد الأسهم يطابق الفلتر');
 });
 
-/* ═══════════════════════════════════════════════════════════════════
-   ⑤ مضاعف ٠ = أسوأ درجة (مش ٩٥) — تصحيح جداول التقييم
-   ═══════════════════════════════════════════════════════════════════ */
 test('⑫ الشركة الخاسرة (مضاعف ٠) بتاخد أسوأ درجة — مش ٩٥', () => {
   const src = fs.readFileSync(path.join(ROOT, 'assets/js/octa-filters.js'), 'utf8');
   assert.ok(src.includes('b:[[0,20],[5,95],[8,88],[12,78],[18,66],[28,52],[50,35],[NZ_R,20]]'),
@@ -381,4 +382,47 @@ test('⑪ parseHalaText بيفصل العنوان ونص الإعلان', () => 
   const empty = parse('');
   assert.equal(empty.title, '');
   assert.equal(empty.body, '');
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   ⑥ البحث في محور الأخبار + شرح الفرق بين الأعمدة
+   ═══════════════════════════════════════════════════════════════════ */
+test('⑬ البحث في محور الأخبار يشتغل بالكود', async () => {
+  const sb = loadNews(AXIS_PAYLOAD);
+  await sb.win.naLoad();
+  assert.ok(sb.els.naList.innerHTML.includes('ADCI'), 'قبل البحث: ADCI ظاهر');
+  assert.ok(sb.els.naList.innerHTML.includes('ABUK'), 'قبل البحث: ABUK ظاهر');
+  /* كتابة «adci» (حروف صغيرة) */
+  sb.doc.dispatchEvent({ type: 'input', target: { id: 'naSearch', value: 'adci' } });
+  const html = sb.els.naList.innerHTML;
+  assert.ok(html.includes('ADCI'), 'بعد البحث: ADCI لسه ظاهر');
+  assert.ok(!html.includes('ABUK'), 'بعد البحث: ABUK مخفي');
+  assert.ok(sb.els.naSecH.innerHTML.includes('نتائج'), 'العنوان يقول «نتائج»');
+});
+
+test('⑭ بحث مالوش نتيجة ⇒ رسالة واضحة', async () => {
+  const sb = loadNews(AXIS_PAYLOAD);
+  await sb.win.naLoad();
+  sb.doc.dispatchEvent({ type: 'input', target: { id: 'naSearch', value: 'ZZZZ' } });
+  const html = sb.els.naList.innerHTML;
+  assert.ok(html.includes('مفيش سهم بالبحث'), 'لازم رسالة واضحة');
+  assert.ok(!html.includes('ADCI'), 'مفيش أسهم');
+});
+
+test('⑮ الجدول بيشرح الفرق بين درجة الذراع والمجموع', () => {
+  const sb = loadArms(DB, LIVE);
+  sb.win.OCTAArmsFilter._t.setLive(LIVE);
+  /* ذراع التقييم ⇒ مش جزء من النتيجة النهائية */
+  clickArm(sb, 'v');
+  let html = sb.els.armsList.innerHTML;
+  assert.ok(html.includes('af-dnote'), 'لازم فيه صندوق الشرح');
+  assert.ok(html.includes('مش جزء'), 'التقييم: لازم يتsay إنه مش جزء من النتيجة');
+  assert.ok(html.includes('النتيجة النهائية'), 'لازم يشرح إيه هو المجموع');
+  assert.ok(html.includes('مفيش رقم ناقصه نقارنه بيه'), 'لازم يشرح ليه الفرق «—» هنا');
+  /* ذراع داخل في المجموع ⇒ بوزن من المصدر الحيّ */
+  clickArm(sb, 'q');
+  html = sb.els.armsList.innerHTML;
+  assert.ok(html.includes('داخل في النتيجة النهائية'), 'الأساسي داخل في النتيجة');
+  assert.ok(html.includes('24%'), 'لازم وزن المحور من المصدر الحيّ');
+  assert.ok(html.includes('بالنقاط'), 'الفرق بالنقاط');
 });

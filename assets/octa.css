@@ -6249,6 +6249,17 @@ body.set-notab { font-variant-numeric: normal; }
 }
 .af-legend b { color: var(--gold); }
 
+/* ⭐⭐ شرح الفرق بين درجة الذراع والمجموع (١٤ نوفمبر ٢٠٢٦) */
+.af-dnote {
+  background: rgba(212,175,55,.07); border: 1px solid rgba(212,175,55,.26);
+  border-radius: 12px; padding: 11px 13px; margin: 11px 0 13px;
+  font-size: .78rem; line-height: 1.85; color: var(--txt);
+}
+.af-dnote .af-dn { margin-bottom: 3px; }
+.af-dnote .af-dn:last-child { margin-bottom: 0; }
+.af-dnote b { color: var(--gold); }
+body.light .af-dnote { background: #fffdf5; border-color: rgba(212,175,55,.4); }
+
 @media (max-width: 760px) {
   .af-grid { grid-template-columns: 1fr; }
   .af-t { font-size: .7rem; }
