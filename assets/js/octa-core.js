@@ -429,11 +429,15 @@ function octaTrack(event, page, label) {
   // ⛔ مبنعتش في التطوير — عشان الأرقام تنضف
   if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
 
+  /* ⭐ ١٤ نوفمبر ٢٠٢٦ — الـuid بيرجع للـuid المحفوظ في localStorage
+     (بعد التحديث الـwindow بيتصفّر) ⇒ كل حدث ليه uid ⇒ السجل بيتحدّث. */
+  var _uid = window.OCTA_USER_ID || '';
+  if (!_uid) { try { _uid = localStorage.getItem('octa_uid') || ''; } catch (e) { } }
   var body = JSON.stringify({
   event: event || 'page_view',
   page: String(page || '').slice(0, 32),
   label: String(label || '').slice(0, 24),
-  uid: (window.OCTA_USER_ID || '')
+  uid: _uid
   });
   // ⛔ no-cors + بدون بيانات حساسة
   fetch(OCTA_API + '/api/track', {
@@ -1974,6 +1978,8 @@ function renderEnginePicker() {
 
 function analyzeStock(code) {
   console.log('🔍 analyzeStock:', code);
+  /* ⭐ ١٤ نوفمبر ٢٠٢٦ — نسجّل السهم اللي المستخدم فتحه (التفضيل الحقيقي) */
+  try { octaTrack('action', 'stock', String(code || '').slice(0, 24)); } catch (e) { }
   // نبحث في EGX_STOCKS (المتاح على TradingView) أولاً، ولو مش موجود نستخدم STOCKS
   let name = code;
   const egxStock = EGX_STOCKS.find(s => s.code === code);

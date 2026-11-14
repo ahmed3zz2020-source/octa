@@ -950,6 +950,11 @@ function fzRenderTabs(){
 function fzGo(id){
   const t = FZ_TABS.find(x=>x.id===id); if (!t) return;
   FZ_ACTIVE = id;
+  /* ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — نسجّل الفلتر اللي المستخدم فتحه.
+     ⛔ قبل كده مفيش ولا حدث action مبعوت ⇒ «actions = 0» ⇒
+     مكنش في أي طريقة نعرف أنهي فلتر الناس بتحبه.
+     ⭐ label = كود الفلتر (safety/income/moment/value/qual/liquid/growth/cash/best/five/triple) */
+  try { octaTrack('action', 'filter', String(id).slice(0, 24)); } catch (e) { }
   /* إخفاء الكل */
   FZ_TABS.forEach(function(x){
   const el = document.getElementById(x.box);

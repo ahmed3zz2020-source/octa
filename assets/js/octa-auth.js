@@ -21,6 +21,10 @@
   localStorage.setItem('octa_token', token);
   localStorage.setItem('octa_user', JSON.stringify(user || {}));
   window.OCTA_USER_ID = (user && user.id) || '';
+  /* ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — السبب الجذري لـ«آخر ظهور» قديم و٢٣٪ زيارات
+     غير منسوبة: الـuid كان في الذاكرة بس ⇒ أي تحديث للصفحة بيمسحه.
+     دلوقتي بنحفظه مع الـtoken ⇒ كل page_view بعد التحديث ليها uid. */
+  try { localStorage.setItem('octa_uid', window.OCTA_USER_ID || ''); } catch (e) { }
   } catch (e) { }
   }
 
@@ -28,6 +32,7 @@
   try {
   localStorage.removeItem('octa_token');
   localStorage.removeItem('octa_user');
+  try { localStorage.removeItem('octa_uid'); } catch (e) { }
   window.OCTA_USER_ID = '';
   } catch (e) { }
   location.reload();
@@ -37,6 +42,19 @@
   try { return JSON.parse(localStorage.getItem('octa_user') || 'null'); }
   catch (e) { return null; }
   }
+
+  /* ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — استرجاع الـuid من localStorage عند تحميل الصفحة.
+     ⛔ لازم يبقى قبل أي page_view ( octaTrack بيرجع للـuid المحفوظ كمان). */
+  try {
+  if (!window.OCTA_USER_ID) {
+  window.OCTA_USER_ID = localStorage.getItem('octa_uid') || '';
+  if (!window.OCTA_USER_ID) {
+  var _u = null;
+  try { _u = JSON.parse(localStorage.getItem('octa_user') || 'null'); } catch (e) { }
+  if (_u && _u.id) { window.OCTA_USER_ID = _u.id; localStorage.setItem('octa_uid', _u.id); }
+  }
+  }
+  } catch (e) { }
 
   function esc(s) {
   return String(s == null ? '' : s)
