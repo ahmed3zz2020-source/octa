@@ -1791,6 +1791,7 @@ async function handle(request, env, ctx) {
       '/filter', '/best', '/screener', '/dividends', '/octasearch', '/verdict', '/pick',
       '/compare', '/radar', '/smartmoney', '/money', '/news', '/academy', '/watchlist',
       '/search', '/calc', '/bestpick', '/radar-stock'];
+    /* ⭐ 'watchlist' مش في السكربت ⇒ مسار ميت ⇒ شِلنّاه (مفيش صفحة watchlist). */
     if (SPA_ROUTES.indexOf(url.pathname) !== -1) {
       /* 🌍 الزائر المجهول على /markets ⇒ صفحة الفلتر العامة (مش التطبيق) */
       if (!hasSession(request) && (url.pathname === '/markets' || url.pathname === '/stocks')) {

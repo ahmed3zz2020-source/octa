@@ -577,7 +577,17 @@ const OS_NAV = {
   if (hash && hash.charAt(0) === '/') hash = hash.slice(1);
   if (!hash) {
     const pPath = (location.pathname || '').replace(/^\//, '').replace(/\.html$/, '');
-    if (pPath && pPath !== 'index' && typeof TOOL_PAGES !== 'undefined' && TOOL_PAGES.indexOf(pPath) >= 0) hash = pPath;
+    if (pPath && pPath !== 'index') {
+      /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ المسار المباشر ⇒ الصفحة الصح
+      📌 السبب: الـworker بيقدّم index.html لكل مسار صفحة (SPA) — بس
+      📌   لو المسار مش موجود في TOOL_PAGES ⇒ المتصفح بيفتح الصفحة
+      📌   **الافتراضية** ⛔ (قِسنا: `/tools` فتح الرادار و`/filters`
+      📌   فتح المحرك — أي رابط تشاركه بيودي المستخدم لمكان غلط).
+      📌 ✅ الحل: خريطة alias (المسار ⇒ الـid الحقيقي). */
+      const mapped = (typeof OCTA_PATH_ALIAS !== 'undefined' && OCTA_PATH_ALIAS[pPath])
+        ? OCTA_PATH_ALIAS[pPath] : pPath;
+      if (typeof TOOL_PAGES !== 'undefined' && TOOL_PAGES.indexOf(mapped) >= 0) hash = mapped;
+    }
   }
   if (hash && typeof TOOL_PAGES !== 'undefined' && TOOL_PAGES.indexOf(hash) >= 0) {
     if (!this.valid(hash)) return false;   // ⏳ لسه مش جاهزة
@@ -846,7 +856,19 @@ function switchPage(id) {
    📌 رابط مباشر `#/stocks` أو `#/markets` يفتح لوحة الأسواق.
    📌 + URL كامل (octashares.com/markets) — الـworker بيقدّم index.html.
    ⚠️ 'stocks' و 'markets' نقطة واحدة — كلهم بيفتحوا نفس الصفحة. */
-const TOOL_PAGES = ['filter','best','screener','dividends','newsaxis','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms','money','radar','radar-stock','setups','studio','zones','challenges','stocks','markets','wip'];
+const TOOL_PAGES = ['filter','best','screener','dividends','newsaxis','octasearch','verdict','pick','compare','calc','academy','bestpick','news','search','engine','arms','money','radar','radar-stock','setups','studio','zones','challenges','stocks','markets','dash','wip'];
+/* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ خريطة المسار المباشر ⇒ الـid الحقيقي
+📌 المسارات اللي الـworker بيقدّم لها index.html (SPA) — وكلها لازم
+📌   تفتح الصفحة الصح لما حد يفتحها مباشرة (أو يشاركها).
+📌 ⚠️ 'dash' = لوحة التحكم (عنصرها `dashPage` مش `.page`). */
+const OCTA_PATH_ALIAS = {
+  'tools': 'dash',        // ⭐ لوحة التحكم
+  'filters': 'filter',    // ⭐ فلاتر المؤشرات
+  'smartmoney': 'money',  // ⭐ Smart Money
+  'money': 'money',
+  'markets': 'stocks',    // ⭐ نقطة واحدة مع «الأسهم»
+  'watchlist': 'arms'     // ⭐ مفيش صفحة watchlist ⇒ رجّعها للأذرع
+};
 /* ══════════════════════════════════════════════════════════════
  *  🧰 شريط الأدوات — 8 أدوات بس، والباتاقي في الـsidebar
  *  ──────────────────────────────────────────────────────────
