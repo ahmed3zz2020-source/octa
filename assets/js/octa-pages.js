@@ -1735,10 +1735,18 @@ function buildEgyCard(ticker, gold) {
   const WANT = [
   { id:'tk-egx', n:'📊 EGX30' }, { id:'tk-egx70', n:'📈 EGX70' },
   { id:'tk-egx100', n:'📉 EGX100' }, { id:'tk-egx33', n:'🕌 مؤشر الشريعة' },
-  { id:'tk-usd', n:'💵 دولار/الجنيه' }, { id:'tk-gold', n:'🥇 ذهب/الجرام' },
+  { id:'tk-usd', n:'💵 دولار/الجنيه' }, { id:'tk-gold', n:'🥇 الذهب المصري', eg:true },
   ];
   const body = '<div class="mini-row c6">' + WANT.map(w => {
   const t = map[w.id];
+  /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — كارت «الذهب المصري» بقى كارت مستقل: سعر الجرام
+     بالجنيه + علامة الميزان (مقارنة الذهب بـEGX30) + مقارنة الأصول الأربعة.
+     الموديول: assets/js/octa-gold-egy.js */
+  if (w.eg) {
+    return (window.OCTAGoldEgy && window.OCTAGoldEgy.tile)
+      ? window.OCTAGoldEgy.tile()
+      : '<div class="mini"><div class="mini-n">' + w.n + '</div><div class="mini-v">—</div></div>';
+  }
   if (!t) return '<div class="mini"><div class="mini-n">' + w.n + '</div><div class="mini-v">—</div></div>';
 
   /* ⛔⛔⛔ ٢٦ أكتوبر ٢٠٢٦ — ⭐ صفر مش يعني «مفيش رقم»
@@ -1790,7 +1798,7 @@ function buildEgyCard(ticker, gold) {
   return '<div class="mini"' + clickable + '><div class="mini-n">' + w.n + '</div><div class="mini-v">' + v + '</div>' +
   chgHtml + offNote + sub + '</div>';
   }).join('') + '</div>' +
-  '<div class="mini-note">💡 الجرام = أونصة الذهب (دولار) × الدولار/الجنيه ÷ 31.1035 — بيتحسب لحظياً</div>' +
+  '<div class="mini-note">💡 الجرام = أونصة الذهب (دولار) × الدولار/الجنيه ÷ 31.1035 — بيتحسب لحظياً · اضغط «الذهب المصري» تشوف المقارنة الكاملة (ذهب · EGX30 · دولار · شهادات)</div>' +
   '<div class="mini-note">💵 الدولار/الجنيه: اضغط عليه تشوف «ذكاء الدولار» — السعر الرسمي، التحليل الفني، الدعم والمقاومة، العوامل الاقتصادية والسيناريوهات.</div>' +
   '<div class="mini-note">🕌 مؤشر الشريعة (EGX 33 Shariah): اضغط عليه تشوف تحليل كامل —المنهجية والمكونات ونتيجة OCTA لكل سهم.</div>';
   return uniCard('egyCard', '🇪🇬', 'مؤشرات السوق المصري', 'الأسهم والمؤشرات والعملات والذهب', body, true);
@@ -2536,6 +2544,11 @@ async function _armMarketRun(box) {  const [d, tk, rank] = await Promise.all([
 
   // الشريط المتحرك + الفترات
   initMarketTicker(gold);
+  /* ⭐⭐⭐ كارت «الذهب المصري» — نملأ سعر الجرام وعلامة الميزان بعد ما
+     الكارت يترسم (البيانات بتتحمّل من الـAPI). */
+  try {
+    if (window.OCTAGoldEgy && window.OCTAGoldEgy.paintTile) window.OCTAGoldEgy.paintTile();
+  } catch (e) { }
   /* ⭐ لوحة المتحرّكين — تُركّب بعد رسم الكارت (الـhost جوّه box) */
   try {
     var mvHost = document.getElementById('mvHost');

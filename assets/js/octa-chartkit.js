@@ -19,7 +19,7 @@
     if (loading) return loading;
     loading = new Promise(function (res, rej) {
       var s = document.createElement('script');
-      s.src = 'assets/js/vendor/lightweight-charts.standalone.production.js?v=202611142045';
+      s.src = 'assets/js/vendor/lightweight-charts.standalone.production.js?v=202611142236';
       s.onload = function () { lib = window.LightweightCharts; res(lib); };
       s.onerror = function () { rej(new Error('chart lib failed')); };
       document.head.appendChild(s);

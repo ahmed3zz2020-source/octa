@@ -1,0 +1,242 @@
+{
+ "source": "البنك المركزي المصري (CBE)",
+ "note": "شهادة ٣ شهور = متوسط فائدة الودائع (أكثر من شهر و≤ ٣ شهور) — مرجّح على ~٨٠٪ منDeposits. شهادة سنة = شهادة الاستثمار لمدة ١٢ شهر (العائد التراكمي). الأرقام بت_RATE من نشرة البنك المركزي.",
+ "sources": [
+  {
+   "name": "البنك المركزي المصري — Economic Review Vol.66 (2025/2026), Statistical Annex (2/5/1)",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/research/volumes/2025-2026/volume-66-no,-d-,2.pdf",
+   "covers": "٢٠٢٣-٠١ → ٢٠٢٥-١٢"
+  },
+  {
+   "name": "البنك المركزي المصري — Monthly Statistical Bulletin (3/2026)",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/3/monthly-statistical-bulletin-348.pdf",
+   "covers": "شهر 3 عبر ٢٠٢١ → ٢٠٢٦"
+  },
+  {
+   "name": "البنك المركزي المصري — Monthly Statistical Bulletin (4/2026)",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/4/monthly-statistical-bulletin-349.pdf",
+   "covers": "شهر 4 عبر ٢٠٢١ → ٢٠٢٦"
+  },
+  {
+   "name": "البنك المركزي المصري — Monthly Statistical Bulletin (5/2026)",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/5/monthly-statistical-bulletin-350.pdf",
+   "covers": "شهر 5 عبر ٢٠٢١ → ٢٠٢٦"
+  },
+  {
+   "name": "البنك المركزي المصري — Monthly Statistical Bulletin (6/2026)",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/6/monthly-statistical-bulletin-351.pdf",
+   "covers": "شهر 6 عبر ٢٠٢١ → ٢٠٢٦"
+  },
+  {
+   "name": "البنك المركزي المصري — Monthly Statistical Bulletin (7/2026)",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/7/monthly-statistical-bulletin-352.pdf",
+   "covers": "شهر 7 عبر ٢٠٢١ → ٢٠٢٦"
+  }
+ ],
+ "rates": {
+  "2021-03": {
+   "dep_3m": 7.4,
+   "cert_1y": 6.0
+  },
+  "2021-04": {
+   "dep_3m": 7.4,
+   "cert_1y": 6.0
+  },
+  "2021-05": {
+   "dep_3m": 7.4,
+   "cert_1y": 6.0
+  },
+  "2021-06": {
+   "dep_3m": 7.4,
+   "cert_1y": 6.0
+  },
+  "2021-07": {
+   "dep_3m": 7.4,
+   "cert_1y": 6.0
+  },
+  "2022-03": {
+   "dep_3m": 8.6,
+   "cert_1y": 7.5
+  },
+  "2022-04": {
+   "dep_3m": 8.6,
+   "cert_1y": 7.5
+  },
+  "2022-05": {
+   "dep_3m": 8.6,
+   "cert_1y": 7.5
+  },
+  "2022-06": {
+   "dep_3m": 8.6,
+   "cert_1y": 7.5
+  },
+  "2022-07": {
+   "dep_3m": 8.6,
+   "cert_1y": 7.5
+  },
+  "2023-01": {
+   "dep_3m": 10.7,
+   "cert_1y": 9.5
+  },
+  "2023-02": {
+   "dep_3m": 10.8,
+   "cert_1y": 9.5
+  },
+  "2023-03": {
+   "dep_3m": 11.0,
+   "cert_1y": 9.5
+  },
+  "2023-04": {
+   "dep_3m": 11.7,
+   "cert_1y": 11.0
+  },
+  "2023-05": {
+   "dep_3m": 12.3,
+   "cert_1y": 11.0
+  },
+  "2023-06": {
+   "dep_3m": 12.2,
+   "cert_1y": 11.0
+  },
+  "2023-07": {
+   "dep_3m": 13.3,
+   "cert_1y": 11.0
+  },
+  "2023-08": {
+   "dep_3m": 13.4,
+   "cert_1y": 11.5
+  },
+  "2023-09": {
+   "dep_3m": 13.9,
+   "cert_1y": 11.5
+  },
+  "2023-10": {
+   "dep_3m": 13.9,
+   "cert_1y": 11.5
+  },
+  "2023-11": {
+   "dep_3m": 14.4,
+   "cert_1y": 11.5
+  },
+  "2023-12": {
+   "dep_3m": 14.2,
+   "cert_1y": 11.5
+  },
+  "2024-01": {
+   "dep_3m": 14.7,
+   "cert_1y": 11.5
+  },
+  "2024-02": {
+   "dep_3m": 15.5,
+   "cert_1y": 12.0
+  },
+  "2024-03": {
+   "dep_3m": 17.4,
+   "cert_1y": 14.0
+  },
+  "2024-04": {
+   "dep_3m": 19.3,
+   "cert_1y": 14.0
+  },
+  "2024-05": {
+   "dep_3m": 20.1,
+   "cert_1y": 14.0
+  },
+  "2024-06": {
+   "dep_3m": 20.0,
+   "cert_1y": 14.0
+  },
+  "2024-07": {
+   "dep_3m": 20.6,
+   "cert_1y": 14.0
+  },
+  "2024-08": {
+   "dep_3m": 20.6,
+   "cert_1y": 14.0
+  },
+  "2024-09": {
+   "dep_3m": 20.0,
+   "cert_1y": 14.0
+  },
+  "2024-10": {
+   "dep_3m": 20.1,
+   "cert_1y": 14.0
+  },
+  "2024-11": {
+   "dep_3m": 20.7,
+   "cert_1y": 14.0
+  },
+  "2024-12": {
+   "dep_3m": 20.9,
+   "cert_1y": 14.0
+  },
+  "2025-01": {
+   "dep_3m": 21.0,
+   "cert_1y": 14.0
+  },
+  "2025-02": {
+   "dep_3m": 20.4,
+   "cert_1y": 14.0
+  },
+  "2025-03": {
+   "dep_3m": 20.2,
+   "cert_1y": 14.0
+  },
+  "2025-04": {
+   "dep_3m": 19.3,
+   "cert_1y": 14.0
+  },
+  "2025-05": {
+   "dep_3m": 18.2,
+   "cert_1y": 14.0
+  },
+  "2025-06": {
+   "dep_3m": 18.1,
+   "cert_1y": 14.0
+  },
+  "2025-07": {
+   "dep_3m": 18.0,
+   "cert_1y": 14.0
+  },
+  "2025-08": {
+   "dep_3m": 17.8,
+   "cert_1y": 14.0
+  },
+  "2025-09": {
+   "dep_3m": 17.0,
+   "cert_1y": 14.0
+  },
+  "2025-10": {
+   "dep_3m": 16.5,
+   "cert_1y": 14.0
+  },
+  "2025-11": {
+   "dep_3m": 15.8,
+   "cert_1y": 14.0
+  },
+  "2025-12": {
+   "dep_3m": 15.9,
+   "cert_1y": 14.0
+  },
+  "2026-03": {
+   "dep_3m": 14.7,
+   "cert_1y": 14.0
+  },
+  "2026-04": {
+   "dep_3m": 14.8,
+   "cert_1y": 14.0
+  },
+  "2026-05": {
+   "dep_3m": 14.2,
+   "cert_1y": 14.0
+  },
+  "2026-06": {
+   "dep_3m": 14.2,
+   "cert_1y": 14.0
+  },
+  "2026-07": {
+   "dep_3m": 14.3,
+   "cert_1y": 14.0
+  }
+ }
+}
