@@ -1253,6 +1253,10 @@ function hardCloseViews() {
 function closeStockPanel() {
   const p = document.getElementById('stockPanel');
   if (p) p.style.display = 'none';
+  /* ⭐ ١٤ نوفمبر ٢٠٢٦ — اقفل الطبقة الكاملة + رجّع التمرير */
+  const host = document.getElementById('stockPanelHost');
+  if (host) { host.classList.remove('open'); host.style.setProperty('display', 'none', 'important'); }
+  try { document.body.classList.remove('sp-lock'); } catch (e) { }
   OM_OPEN = false;
 }
 
@@ -1556,6 +1560,13 @@ async function openStockModal(code) {
   const body = document.getElementById('spBody');
   const head = document.getElementById('spHead');
   if (!p || !body) return;
+  /* ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — فتح التحليل **بالكامل الشاشة** */
+  const host = document.getElementById('stockPanelHost');
+  if (host) {
+    host.style.removeProperty('display');
+    host.classList.add('open');
+  }
+  try { document.body.classList.add('sp-lock'); } catch (e) { }
   p.style.display = 'block';
   p.style.animation = 'none'; void p.offsetHeight;
   p.style.animation = 'spIn .3s cubic-bezier(.4,0,.2,1)';
@@ -1611,7 +1622,7 @@ async function openStockModal(code) {
   ((pos||neg||tp||tn) ? '<div class="dc-sect-h">💡 ليه التقييم كده؟</div><div class="dc-facts">' + pos + tp + neg + tn +
   ((ex.what_could_invalidate||[]).length ? '<div class="dc-fact inv">⚠️ ' + ex.what_could_invalidate[0] + '</div>' : '') +
   '</div>' : '') +
-  '<button onclick="goFullAnalysis()" style="margin-top:18px;width:<span class="flt-ltr">100%</span>;padding:13px;background:var(--gold);' +
+  '<button onclick="goFullAnalysis()" style="margin-top:18px;width:100%;padding:13px;background:var(--gold);' +
   'color:#0a1929;border:none;border-radius:12px;font-weight:900;font-size:.92rem;cursor:pointer">' +
   '📊 افتح التحليل الكامل (الرسم البياني + كل التفاصيل)</button>';
   } catch (e) {
@@ -1624,13 +1635,14 @@ function ensurePanel() {
   if (document.getElementById('stockPanel')) return;
   const d = document.createElement('div');
   d.id = 'stockPanel';
-  d.style.cssText = 'max-width:1400px;margin:0 auto 40px;padding:0 22px;display:none';
+  d.style.cssText = 'max-width:980px;margin:0 auto;padding:0 14px 80px;display:none';
   d.innerHTML =
-  '<div style="background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:20px;padding:22px">' +
-  '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">' +
+  '<div class="sp-shell">' +
+  '<div class="sp-bar">' +
   '<div id="spHead" style="flex:1;font-size:1.05rem;font-weight:900;color:var(--gold)"></div>' +
   '<button onclick="goFullAnalysis()" class="omfull" style="padding:8px 14px;border-radius:9px;border:1px solid rgba(212,175,55,.4);background:rgba(212,175,55,.12);color:var(--gold);font-weight:800;font-size:.78rem;cursor:pointer;font-family:inherit">📊 التحليل الكامل</button>' +
-  '<button onclick="closeStockPanel()" class="omx" style="width:34px;height:34px;border-radius:<span class="flt-ltr">50%</span>;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--txt);font-size:1.2rem;cursor:pointer;font-family:inherit">×</button>' +
+  '<button onclick="closeStockPanel()" class="omx" style="width:34px;height:34px;flex:0 0 auto;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--txt);font-size:1.2rem;cursor:pointer;font-family:inherit">×</button>' +
+  '</div>' +
   '</div>' +
   '<div id="spBody"></div>' +
   '</div>';
@@ -1645,8 +1657,23 @@ function ensurePanel() {
   }
   document.getElementById('stockPanelHost').appendChild(d);
   const st = document.createElement('style');
-  st.textContent = '@keyframes spIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}' +
-  'body.light #stockPanel>div{background:#fff!important;border-color:#e5e7eb!important}';
+  st.textContent =
+  '@keyframes spIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}' +
+  /* ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — لوحة السهم بقت **بالكامل الشاشة**
+     📌 السبب: كانت بتتحط في 流 الصفحة قبل صفحة السوق ⇒ المستخدم
+        بيشوف صفحة السوق تحت التحليل (طلب المالك).
+     📌 الحل: الـhost بقى طبقة fixed تغطي الشاشة كلها. */
+  '#stockPanelHost{position:fixed;inset:0;z-index:230;background:var(--pri);' +
+  'overflow-y:auto;overscroll-behavior:contain;display:none;-webkit-overflow-scrolling:touch}' +
+  '#stockPanelHost.open{display:block}' +
+  'body.sp-lock{overflow:hidden}' +
+  '#stockPanel .sp-shell{background:rgba(255,255,255,.03);border:1px solid var(--line);' +
+  'border-radius:18px;padding:14px 12px 18px}' +
+  '#stockPanel .sp-bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;' +
+  'margin:-14px -12px 14px;padding:12px;background:var(--pri2);border-bottom:1px solid var(--line);' +
+  'border-radius:18px 18px 0 0;flex-wrap:wrap}' +
+  'body.light #stockPanel .sp-shell{background:#fff;border-color:#e5e7eb}' +
+  'body.light #stockPanel .sp-bar{background:#fff}';
   document.head.appendChild(st);
 }
 

@@ -1395,6 +1395,10 @@ function showArmView(arm) {
   const cfg = ARM_MAP[arm];
   const sp = document.getElementById('stockPanel');
   if (sp) sp.style.display = 'none';
+  /* ⭐ ١٤ نوفمبر ٢٠٢٦ — اقفل طبقة التحليل الكاملة كمان */
+  const sph = document.getElementById('stockPanelHost');
+  if (sph) { sph.classList.remove('open'); sph.style.setProperty('display', 'none', 'important'); }
+  try { document.body.classList.remove('sp-lock'); } catch (e) { }
   window.SI_ARM = arm;
   const bEl = document.getElementById('armBody');
   if (bEl) bEl.innerHTML = '<div class="opps-loading">🔄 جاري التحميل...</div>';
@@ -2503,7 +2507,7 @@ async function _armMarketRun(box) {  const [d, tk, rank] = await Promise.all([
 
   // ⑥ 🌍 الأسواق العالمية
   uniCard('mktCard', '🌎', 'الأسواق العالمية', 'أسهم ومؤشرات أمريكا — اضغط للفتح',
-  '<button onclick="openMarkets()" style="width:<span class="flt-ltr">100%</span>;padding:14px;background:linear-gradient(135deg,rgba(56,189,248,.14),rgba(255,255,255,.02));' +
+  '<button onclick="openMarkets()" style="width:100%;padding:14px;background:linear-gradient(135deg,rgba(56,189,248,.14),rgba(255,255,255,.02));' +
   'border:1px solid rgba(56,189,248,.35);border-radius:13px;color:var(--txt);font-family:inherit;' +
   'font-size:.9rem;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px">' +
   '🌍 افتح لوحة الأسواق العالمية</button>') +

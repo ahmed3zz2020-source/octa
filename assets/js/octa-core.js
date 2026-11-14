@@ -805,6 +805,10 @@ function switchPage(id) {
   });
   const sp0 = document.getElementById('stockPanel');
   if (sp0) sp0.style.display = 'none';
+  /* ⭐ ١٤ نوفمبر ٢٠٢٦ — طبقة التحليل الكاملة (fixed) كمان */
+  const sph0 = document.getElementById('stockPanelHost');
+  if (sph0) { sph0.classList.remove('open'); sph0.style.setProperty('display', 'none', 'important'); }
+  try { document.body.classList.remove('sp-lock'); } catch (e) { }
 
   // ═══ لوحة التحكم (PHASE 18) — جوّا صفحة الرئيسية ═══
   if (id === 'dash') {
