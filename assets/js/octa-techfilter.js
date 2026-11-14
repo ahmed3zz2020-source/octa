@@ -289,7 +289,16 @@
         return y1 - x1 || b.m - a.m;
       });
     } else {
-      out.sort(function (a, b) { return b.m - a.m; });
+      /* ⛔ ترتيبCompetition: المحور الفني (المحرك) أولاً.
+         ⛔ كاسر التعادل = المعايير المبقية ثم قوة البنية (مسافة فوق 200).
+         (المحور الفني مربوط بمدى واسع ⇒ ناس كتير بنفس الدرجة.) */
+      out.sort(function (a, b) {
+        if (b.m !== a.m) return b.m - a.m;
+        if (b.crit.pass !== a.crit.pass) return b.crit.pass - a.crit.pass;
+        var ga = (a.v.data.price && a.v.data.ma200) ? ((a.v.data.price - a.v.data.ma200) / a.v.data.price * 100) : -999;
+        var gb = (b.v.data.price && b.v.data.ma200) ? ((b.v.data.price - b.v.data.ma200) / b.v.data.price * 100) : -999;
+        return gb - ga;
+      });
     }
     return out;
   }
