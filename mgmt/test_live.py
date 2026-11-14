@@ -61,7 +61,7 @@ with sync_playwright() as pw:
       nav: getComputedStyle(document.querySelector('#nav')).display,
       kpiVals:[...document.querySelectorAll('#kpis .kpi .v')].map(x=>x.innerText)
     })""")
-    chk("٨ مؤشرات", r['kpis'] == 8, str(r['kpiVals']))
+    chk("٩ مؤشرات", r['kpis'] == 9, str(r['kpiVals']))
     chk("١٣ بطاقة مستخدم", r['cards'] == 13)
     chk("البطاقات ظاهرة والجدول مخفي على الموبايل", r['cardsVis'] == 'flex' and r['tableVis'] == 'none')
     chk("٤٧ عملية في الخط الزمني", r['tl'] == 47)
@@ -82,6 +82,58 @@ with sync_playwright() as pw:
     p.fill('#uSearch', 'ZZZZ'); p.wait_for_timeout(500)
     chk("بحث فاشل ⇒ مفيش نتايج", p.evaluate("document.querySelectorAll('#cardsBox .ucard').length") == 0)
     p.fill('#uSearch', ''); p.wait_for_timeout(400)
+
+    # ── ⭐ تبديل الجدول/البطاقات على الموبايل (١٤ نوفمبر) ──
+    p.click('#vTable'); p.wait_for_timeout(600)
+    t = p.evaluate("""()=>({
+      cards:getComputedStyle(document.querySelector('#cardsBox')).display,
+      table:getComputedStyle(document.querySelector('#tUsersWrap')).display,
+      rows:document.querySelectorAll('#tUsers tbody tr').length,
+      view:document.body.getAttribute('data-view')
+    })""")
+    chk("زر «جدول» بيظهر الجدول على الموبايل", t['table'] != 'none' and t['cards'] == 'none',
+        f"جدول={t['table']} بطاقات={t['cards']} data-view={t['view']}")
+    chk("صفوف الجدول موجودة", t['rows'] == 13, str(t['rows']))
+    # ⭐ البحث في عرض الجدول (كان ما بيفلترش خالص)
+    p.fill('#uSearch', 'هبة'); p.wait_for_timeout(600)
+    tr = p.evaluate("document.querySelectorAll('#tUsers tbody tr').length")
+    chk("البحث بيفلتر الجدول كمان", tr == 1, f"{tr} سطر")
+    p.fill('#uSearch', 'ZZZZ'); p.wait_for_timeout(500)
+    tr0 = p.evaluate("document.querySelectorAll('#tUsers tbody tr').length")
+    chk("بحث فاشل في الجدول ⇒ صفر صفوف", tr0 == 0, str(tr0))
+    p.fill('#uSearch', ''); p.wait_for_timeout(400)
+    p.click('#vCards'); p.wait_for_timeout(600)
+    c2 = p.evaluate("getComputedStyle(document.querySelector('#cardsBox')).display")
+    chk("زر «بطاقات» بيرجّع للبطاقات", c2 == 'flex', c2)
+
+    # ── ⭐ تصدير Excel حقيقي ──
+    try:
+        with p.expect_download(timeout=25000) as dl:
+            p.click("button[onclick='dlUsers()']")
+        d = dl.value
+        path = '/tmp/octa_export_test.xlsx'
+        d.save_as(path)
+        import zipfile, os
+        ok = os.path.exists(path) and zipfile.is_zipfile(path)
+        z = zipfile.ZipFile(path) if ok else None
+        names = z.namelist() if z else []
+        wbxml = z.read('xl/workbook.xml').decode('utf-8', 'replace') if z else ''
+        chk("تصدير Excel ملف .xlsx سليم", ok and 'xl/workbook.xml' in names, f"{os.path.getsize(path) if ok else 0}B")
+        chk("الملف فيه ٣ أوراق (مستخدمين/جلسات/خط زمني)", wbxml.count('<sheet ') == 3, wbxml[:120])
+        chk("اسم الملف عربي .xlsx", d.suggested_filename.endswith('.xlsx'), d.suggested_filename)
+    except Exception as e:
+        chk("تصدير Excel", False, str(e)[:120])
+
+    # ── ⭐ التفضيلات (الأسهم اللي بيتابعها) ──
+    pf = p.evaluate("""async () => { const r = await fetch('/api/prefs',{credentials:'same-origin'}); return await r.json(); }""")
+    us = (pf.get('users') or [])
+    wsum = sum(u.get('n', 0) for u in us)
+    # ⭐ التكرار يتchecked جوه كل مستخدم (نفس السهم ممكن يتابعه اتنين)
+    dup = [u.get('name') for u in us
+           if len([w['code'] for w in (u.get('watch') or [])]) != len(set(w['code'] for w in (u.get('watch') or [])))]
+    chk("/api/prefs بيرجّع ١٣ مستخدم", len(us) == 13, str(len(us)))
+    chk("متابعات الأسهم من غير تكرار جوه كل مستخدم", not dup, str(dup))
+    chk("فيه متابعات فعلاً", wsum >= 7, str(wsum))
 
     # ── ورقة المستخدم ──
     p.evaluate("document.querySelector('#cardsBox .ucard').click()"); p.wait_for_timeout(700)

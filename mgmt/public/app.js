@@ -84,13 +84,18 @@
       pullRemote('/api/admin/users'),
       pullRemote('/api/admin/logins')
     ];
+    /* ⭐ تفضيلات كل مستخدم (الأسهم اللي بيتابعها) — اختياري: لو فشل ما بيأثرش.
+       ⛔ مسارWorker نفسه (مش /api/proxy — البوكس ده بيسمح بـ/api/admin بس). */
+    jobs.push(fetch('/api/prefs', { cache: 'no-store', credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; }));
     /* ⛔ السجل الخام: مسار اختياري — لو مش موجود نتجاه ونمشي */
     if (!state.rawUnavailable) {
       jobs.push(pullRemote('/api/admin/events').then(function (v) { if (v === null) state.rawUnavailable = true; return v; }).catch(function () { state.rawUnavailable = true; return null; }));
     }
     return Promise.all(jobs).then(function (r) {
       if (typeof window.merge === 'function') {
-        window.D = window.merge(r[0], r[1], r[2]);
+        window.D = window.merge(r[0], r[1], r[2], r[3]);
       }
       if (r[3] && r[3].events) {
         window.D.raw_events = r[3].events;

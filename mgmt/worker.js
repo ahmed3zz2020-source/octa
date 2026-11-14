@@ -21,6 +21,8 @@
  */
 
 const ORIGIN = "https://octa-prices-production-4ccb.up.railway.app";
+/* ⭐ كاش التفضيلات (في الذاكرة) — ٣٠ دقيقة */
+let PREFS_CACHE = null;
 const COOKIE = "octa_mgmt_sess";
 const SESSION_TTL = 60 * 60 * 24 * 30; // ٣٠ يوم
 
@@ -168,6 +170,60 @@ export default {
           has_admin: !!env.OCTA_ADMIN_TOKEN,
           has_password: !!env.APP_PASSWORD,
         });
+      }
+
+      /* ── ⭐ تفضيلات المستخدمين: الأسهم اللي بيتابعها كل واحد ──
+         ⛔ الـadmin token مش بيوصلش للمتصفح ⇒mint_session + alerts/watch
+         كلهم من السيرفر. الكاش ٣٠ دقيقة (البيانات مش بتتغير كل ثانية). */
+      if (path === "/api/prefs") {
+        const authed = await validSession(request, env.SESSION_SECRET);
+        if (!authed) return json({ ok: false, error: "لازم تسجيل دخول" }, 401);
+        if (!env.OCTA_ADMIN_TOKEN) return json({ ok: false, error: "التوكن غير مهيّأ" }, 500);
+        const now = Date.now();
+        if (PREFS_CACHE && (now - PREFS_CACHE.ts) < 1800000) {
+          return json({ ok: true, cached: 1, users: PREFS_CACHE.users }, 200);
+        }
+        try {
+          const up = await proxyToRailway("/api/admin/users", env.OCTA_ADMIN_TOKEN);
+          if (!up.ok) return json({ ok: false, error: "تعذّر جلب المستخدمين" }, 502);
+          const uj = await up.json();
+          const items = await Promise.all((uj.users || []).map(async (u) => {
+            const email = String(u.email || "").trim();
+            const base = { uid: u.uid, name: u.name, email: email, watch: [], n: 0 };
+            if (!email) return base;
+            try {
+              const mr = await fetch(ORIGIN + "/api/admin/mint_session", {
+                method: "POST",
+                headers: { "X-OCTA-Admin": env.OCTA_ADMIN_TOKEN, "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email }),
+              });
+              if (!mr.ok) return base;
+              const mj = await mr.json();
+              if (!mj.token) return base;
+              const wr = await fetch(ORIGIN + "/api/alerts/watch", {
+                headers: { Authorization: "Bearer " + mj.token },
+              });
+              if (!wr.ok) return base;
+              const wj = await wr.json();
+              /* ⛔ با�� في الباك (update_prices.py:12583): w_list جوّه اللوب
+                 ⇒ القائمة كلها بتترجع مع كل عنصر ⇒ ٦ أسهم = ٣٦ سطر.
+                 هنا بنخلي أول ظهور بس لكل كود. */
+              const seen = {}, list = [];
+              (wj.items || []).forEach((i) => {
+                if (!i || !i.code || seen[i.code]) return;
+                seen[i.code] = 1;
+                list.push({ code: i.code, hi: i.hi, lo: i.lo, at: i.at });
+              });
+              return { uid: u.uid, name: u.name, email: email, watch: list, n: list.length };
+            } catch (e) {
+              return base;
+            }
+          }));
+          PREFS_CACHE = { ts: now, users: items };
+          return json({ ok: true, cached: 0, users: items }, 200);
+        } catch (e) {
+          return json({ ok: false, error: String((e && e.message) || e) }, 502);
+        }
       }
 
       /* ── التمرير ── */
