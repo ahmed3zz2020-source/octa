@@ -928,10 +928,10 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  formEl().innerHTML =
  '<div class="gt-ico">🐙</div>' +
  '<h1 class="gt-h">OCTA</h1>' +
- '<p class="gt-sub">اخطبوط — 8 أذرع بتحلّل السهم من كل زاوية</p>' +
+ '<p class="gt-sub">أخطبوط — ٨ أذرع بتحلّل السهم من كل زاوية</p>' +
  '<button class="gt-go" id="gtReg" type="button">إعمل حساب جديد</button>' +
  '<button class="gt-go alt" id="gtLogin" type="button">عندك حساب؟ ادخل</button>' +
- '<div class="gt-note">الدخول بالباسورد بس — 4 أرقام من غير إيميل</div>';
+ '<div class="gt-note">الدخول بالكود (٤ أرقام) · والحساب الجديد بالإيميل وكود تحقق</div>';
 
  document.getElementById('gtReg').onclick = function () { signup(); };
  document.getElementById('gtLogin').onclick = function () { login(); };
@@ -1215,7 +1215,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  '<h1 class="gt-h">تم</h1>' +
  '<p class="gt-txt">من هنا وكل مرة هتدخل بالباسورد</p>' +
  '<p class="gt-sent-s">' + esc(mail || '') + '</p>' +
- '<div class="gt-note">احفظ الـ4 أرقام دي كويس — هم وسيلة الدخول الوحيدة</div>' +
+ '<div class="gt-note">احفظ الـ٤ أرقام دي كويس — هم وسيلة الدخول</div>' +
  '<button class="gt-go" id="gtNow" type="button">ادخل دلوقتي</button>';
 
  var b = document.getElementById('gtNow');
@@ -2078,11 +2078,11 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  '<div class="gt-ico">💡</div>' +
  '<h1 class="gt-h">محتاج مساعدة؟</h1>' +
  '<div class="gt-txt left">' +
- '• <b>الباسورد</b> هو الـ4 أرقام اللي انت اخترتها أول مرة — من غيرهم مفيش دخول<br>' +
+ '• <b>الباسورد</b> هو الـ٤ أرقام اللي انت اخترتها أول مرة — من غيرهم مفيش دخول<br>' +
  '• <b>مفيش إيميل</b> في شاشة الدخول — الباسورد هو كل حاجة<br>' +
- '• <b>نسيت الـ4 أرقام؟</b> ابعت كود على إيميلك المسجّل واختار ٤ جديدة<br>' +
+ '• <b>نسيت الـ٤ أرقام؟</b> ابعت كود على إيميلك المسجّل واختار ٤ جديدة<br>' +
  '• <b>3 غلط ورا بعض جوه دقيقة</b> يطلبوا كود على الإيميل — وده بيحميك<br>' +
- '• <b>القفل</b> بعد ٤ محاولات غلط  وبيفتح فورًا  ابعت كود على الإيميل' +
+ '• <b>القفل</b> بعد ٤ محاولات غلط وبيفتح فورًا — ابعت كود على الإيميل' +
  '</div>' +
  '<button class="gt-go" id="gtBackH" type="button">فهمت — ارجع</button>';
 
