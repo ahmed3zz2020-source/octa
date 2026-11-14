@@ -1572,7 +1572,7 @@ async function loadPeriodData(p) {
   document.querySelectorAll('#glTabs .uc-tab').forEach(t => t.classList.toggle('on', t.dataset.p === p));
   body.innerHTML = '<div class="dc-loading" style="padding:22px;text-align:center;color:#8b9eb0">🔄 جاري التحميل...</div>';
   try {
-  const all = (await apiGet('/api/rank?limit=252', 20000)).results || [];
+  const all = (await apiGet('/api/rank?limit=400', 20000)).results || [];
   const sorted = all.slice().sort((a,b)=>(b[p]||0)-(a[p]||0));
   const up = sorted.filter(s=>(s[p]||0) > 0).slice(0,10);
   const dn = sorted.filter(s=>(s[p]||0) < 0).slice(-10).reverse();
@@ -1830,7 +1830,7 @@ function renderTvSearchBox() {
 async function initTvList() {
   if (TV_LIST.length) return;
   try {
-  const d = await apiGet('/api/rank?limit=252', 20000);
+  const d = await apiGet('/api/rank?limit=400', 20000);
   TV_LIST = d.results || [];
   } catch (e) { TV_LIST = []; }
 }
@@ -1943,7 +1943,7 @@ async function showSector(sec) {
   box.dataset.sec = sec;
   box.innerHTML = '<div class="dc-loading" style="padding:18px;text-align:center;color:#8b9eb0">🔄 ' + sec + '...</div>';
   try {
-  if (!ALL_STK.length) ALL_STK = (await apiGet('/api/rank?limit=252', 20000)).results || [];
+  if (!ALL_STK.length) ALL_STK = (await apiGet('/api/rank?limit=400', 20000)).results || [];
   const list = ALL_STK.filter(s => (s.sector||'أخرى')===sec).sort((a,b)=>(b.change||0)-(a.change||0)).slice(0,25);
   if (!list.length) { box.innerHTML = '<div class="dc-loading">لا توجد أسهم</div>'; return; }
   box.innerHTML = '<div class="dc-col-h" style="margin-bottom:7px">📂 أسهم ' + sec + ' (' + list.length + ')</div>' +
@@ -2449,7 +2449,7 @@ async function _armMarketRun(box) {  const [d, tk, rank] = await Promise.all([
      حلقة إعادة البناء (كل ٨ ثواني) هي اللي بتكمّل-liما الشبكة ترجع. */
   apiGet('/api/dashboard', 12000).catch(() => ({decisions:{},sectors:[],top10:[],bottom10:[],health:{},axis_average:{}})),
   apiGet('/api/ticker', 10000).catch(() => ({ticker:[]})),
-  apiGet('/api/rank?limit=252', 20000).catch(() => ({results:[]})),
+  apiGet('/api/rank?limit=400', 20000).catch(() => ({results:[]})),
   ]);
   if (tk && tk.ticker && tk.ticker.length) _armMarketRetry = 0;
   const gold = (() => {
@@ -4821,7 +4821,7 @@ async function initStockSearch() {
   if (SS_ALL.length || SS_LOADING) return;
   SS_LOADING = true;
   const urls = [
-  OCTA_API + '/api/rank?limit=252',
+  OCTA_API + '/api/rank?limit=400',
   OCTA_API + '/api/prices',
   ];
   for (const u of urls) {

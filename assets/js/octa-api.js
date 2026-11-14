@@ -342,7 +342,8 @@
   if (_ckey) {
     const _hit = _octaCacheGet(_ckey);
     if (_hit) {
-      try { return Promise.resolve(_hit.resp.clone()); } catch (e) { }
+      const _mk = _octaCacheMake(_hit);
+      if (_mk) return Promise.resolve(_mk);
     }
   }
   const _budgeted = function () {
@@ -455,26 +456,66 @@ function _octaBudgetWait(bucket) {
    📌 ⛔ ٣٠ ثانية بس (الأسعار بتتحدّث كل ١٥ دقيقة ⇒ أأمن من الكاش). */
 var OCTA_RESP_CACHE = {};
 var OCTA_RESP_TTL = 30000;
+/* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ عمر مختلف لكل مسار
+   📌 الأسعار: ٥ ثواني ⇒ الطلبات المتكررة بتتدمج (طلب ٩٢٧ ك.ب!)
+   بس زرار «تحديث الأسعار» يجيب بيانات جديدة ⇒ مش بيفضل قديم.
+   📌 الرتب: ١٠ ثواني ⇒ الدرجة مابتتغيرش في دقايق.
+   📌 الباقي: ٣٠ ثانية (الافتراضي). */
+var OCTA_RESP_TTL_BY_PATH = { '/api/prices': 5000, '/api/rank': 10000,
+                               '/api/ticker': 10000, '/api/data_full': 10000 };
+function _octaCacheTTL(key) {
+  try {
+    var s = String(key || '');
+    for (var p in OCTA_RESP_TTL_BY_PATH) {
+      if (s.indexOf(p) >= 0) return OCTA_RESP_TTL_BY_PATH[p];
+    }
+  } catch (e) { }
+  return OCTA_RESP_TTL;
+}
 function _octaCacheGet(key) {
   try {
     var rec = OCTA_RESP_CACHE[key];
     if (!rec) return null;
-    if (Date.now() - rec.t > OCTA_RESP_TTL) { delete OCTA_RESP_CACHE[key]; return null; }
+    if (Date.now() - rec.t > _octaCacheTTL(key)) { delete OCTA_RESP_CACHE[key]; return null; }
     return rec;
   } catch (e) { return null; }
 }
+/* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐⭐⭐ إصلاح جذري: نخزّن **نص** الرد
+   📌 كان بنخزّن الـResponse نفسه ⇒ أول مستهلك بيقراه (res.json())
+   ⇒ الـbody بيتقرا ⇒ الـclone بعدين بيفشل ⇒ الكاش **ما كانش
+   بيشتغل خالص** ⛔ (وهو سبب تكرار الطلبات: engine-weights ×٥).
+   📌 ✅ الحل: نقرا نسخة من الـbody كنص ⇒ ونرجّع Response جديد لكل
+   مستهلك ⇒ الكاش يشتغل فعلاً ⛔→✅. */
 function _octaCachePut(key, resp) {
   try {
-    OCTA_RESP_CACHE[key] = { t: Date.now(), resp: resp };
-    var n = 0; for (var k in OCTA_RESP_CACHE) n++;
-    if (n > 160) {
-      var oldest = null, ot = 1e12;
-      for (var k2 in OCTA_RESP_CACHE) {
-        if (OCTA_RESP_CACHE[k2].t < ot) { ot = OCTA_RESP_CACHE[k2].t; oldest = k2; }
-      }
-      if (oldest) delete OCTA_RESP_CACHE[oldest];
-    }
+    if (!resp || !resp.ok) return;
+    var clone = resp.clone();
+    var ct = '';
+    try { ct = resp.headers.get('Content-Type') || ''; } catch (e) { }
+    var st = 200;
+    try { st = resp.status || 200; } catch (e) { }
+    clone.text().then(function (body) {
+      try {
+        OCTA_RESP_CACHE[key] = { t: Date.now(), body: body, ct: ct, status: st };
+        var n = 0; for (var k in OCTA_RESP_CACHE) n++;
+        if (n > 160) {
+          var oldest = null, ot = 1e12;
+          for (var k2 in OCTA_RESP_CACHE) {
+            if (OCTA_RESP_CACHE[k2].t < ot) { ot = OCTA_RESP_CACHE[k2].t; oldest = k2; }
+          }
+          if (oldest) delete OCTA_RESP_CACHE[oldest];
+        }
+      } catch (e2) { }
+    }).catch(function () { });
   } catch (e) { }
+}
+function _octaCacheMake(rec) {
+  try {
+    return new Response(rec.body, {
+      status: rec.status || 200,
+      headers: { 'Content-Type': rec.ct || 'application/json' }
+    });
+  } catch (e) { return null; }
 }
 
 function _octaPump() {
