@@ -112,7 +112,7 @@ let OPEN = localStorage.getItem('octa_sidebar') === '1';
  host.innerHTML =
  '<div class="sb-head">' +
  '<span class="sb-logo">🐙</span>' +
- '<div class="sb-brand"><b>OCTA</b><i>اخطبوط 5</i></div>' +
+ '<div class="sb-brand"><b>OCTA</b><i>أخطبوط 5</i></div>' +
  '<button class="sb-x" onclick="sbToggle()">✕</button>' +
  '</div>' +
  /* ⭐⭐⭐ بحث في القائمة (١٠ نوفمبر ٢٠٢٦)

@@ -468,9 +468,19 @@
         });
         /* ⭐ مناطق الدعم والمقاومة — خطان لكل منطقة + عنوان */
         var sr = (tech && tech.sr) || null;
+        /* ⭐⭐⭐ فلتر القرب — مشترك بين الرسم والـautoscale */
+        var curP = (sr && sr.current != null) ? sr.current : (D.last.gram || 0);
+        function near(z) {
+          if (!z) return false;
+          var m = z.mid != null ? z.mid : z.center;
+          if (m == null || !curP) return false;
+          return Math.abs(m / curP - 1) <= 0.30;
+        }
         if (sr && main) {
-          var sup = (sr.support || []).slice(0, 2);
-          var res = (sr.resistance || []).slice(0, 2);
+          /* ⭐⭐⭐⭐ على الشارت: **أقرب دعم + أقرب مقاومة بس** — أي منطقة أبعد
+             بتمدّد النطاق مخلياً بالسعر appears مسطّح. الباقي موجود في الكارت. */
+          var sup = sr.nearest_support ? [sr.nearest_support] : [];
+          var res = sr.nearest_resistance ? [sr.nearest_resistance] : [];
           function zone(z, kind) {
             if (!z || z.low == null || z.high == null) return;
             var col = kind === 'support' ? 'rgba(34,197,94,.85)' : 'rgba(239,68,68,.85)';
@@ -495,6 +505,33 @@
             price: D.last.gram, color: '#d4af37', lineWidth: 1, lineStyle: 2,
             axisLabelVisible: true, title: 'السعر الآن'
           });
+        } catch (e) { }
+        /* ⭐⭐⭐⭐ لازم **مناطق الدعم والمقاومة تكون جوه نطاق الشارت** —
+           من غير كده في الفترات القصيرة بيكونوا بره الشاشة والمستخدم
+           مش هيشوف مناطق الشراء/البيع أصلاً.
+           ✅ الحل: autoscaleInfoProvider يمدّد النطاق ليشمل أقرب دعم/مقاومة. */
+        try {
+          var lo = Infinity, hi = -Infinity;
+          pts.forEach(function (q) { if (q.value < lo) lo = q.value; if (q.value > hi) hi = q.value; });
+          /* ⭐ نفس فلتر القرب — عشان النطاق ما يتمددش لدرجة إن السعر يبقى مسطّح */
+          var zones = [];
+          if (sr && sr.nearest_support) zones.push(sr.nearest_support);
+          if (sr && sr.nearest_resistance) zones.push(sr.nearest_resistance);
+          zones.forEach(function (z) {
+            var m = z.mid != null ? z.mid : z.center;
+            if (m == null) return;
+            lo = Math.min(lo, m); hi = Math.max(hi, m);
+            if (z.low != null) lo = Math.min(lo, z.low);
+            if (z.high != null) hi = Math.max(hi, z.high);
+          });
+          if (isFinite(lo) && isFinite(hi) && hi > lo) {
+            var pad = (hi - lo) * 0.04;
+            main.applyOptions({
+              autoscaleInfoProvider: function () {
+                return { priceRange: { minValue: lo - pad, maxValue: hi + pad } };
+              }
+            });
+          }
         } catch (e) { }
         chart.timeScale().fitContent();
         host.__chart = chart;
