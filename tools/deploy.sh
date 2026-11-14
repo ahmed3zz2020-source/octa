@@ -229,10 +229,26 @@ if [ -n "$LOCAL_BUILD" ]; then
   # ⭐ الزائر المجهول بياخد market.html (مفيهوش ختم) ⇒ نجرّب
   #   مسارات SPA (دي بتخدم index.html للجميع) لحد ما نلاقي الختم.
   LIVE_BUILD=""
-  for BP in /tools /engine /filters /newsaxis; do
-    LIVE_BUILD=$(curl -s --max-time 25 -A 'Mozilla/5.0 (X11; Linux x86_64) octa-deploy-check' \
-      "$CHECK_URL$BP" | grep -oE "BUILD = 'v=[0-9]+'" | head -1 | grep -oE "v=[0-9]+" || true)
-    [ -n "$LIVE_BUILD" ] && break
+  # ⭐⭐⭐ 14 نوفمبر 2026 — إعادة محاولة قبل إعلان الفشل (مقيس).
+  # 📌 المشكلة: الفحص ده كان بيتنفّذ **ثانية واحدة** بعد النشر ⇒
+  #   الـedge لسه بيقدّم النسخة القديمة (cf-cache-status: HIT) ⇒
+  #   الفحص قال «النسخة قديمة» ⇒ السكربت عمل **تراجع تلقائي** ⇒
+  #   الكود الجديد اتدفن ورجعنا بالقديم! (مقيس 14/11/2026)
+  # ✅ الحل: 4 محاولات × 8 ثواني + كاش-باستر (?_=) عشان نقرا من الـorigin.
+  for ATTEMPT in 1 2 3 4; do
+    STAMP_Q="?_deploy=$(date +%s)-$ATTEMPT"
+    for BP in /tools /engine /filters /newsaxis; do
+      LIVE_BUILD=$(curl -s --max-time 25 -A 'Mozilla/5.0 (X11; Linux x86_64) octa-deploy-check' \
+        "$CHECK_URL$BP$STAMP_Q" | grep -oE "BUILD = 'v=[0-9]+'" | head -1 | grep -oE "v=[0-9]+" || true)
+      [ -n "$LIVE_BUILD" ] && break
+    done
+    if [ -n "$LIVE_BUILD" ] && [ "$LIVE_BUILD" = "$LOCAL_BUILD" ]; then
+      break
+    fi
+    if [ "$ATTEMPT" != "4" ]; then
+      echo "  ⏳ الختم لسه قديم ($LIVE_BUILD) — إعادة محاولة بعد 8 ثواني..."
+      sleep 8
+    fi
   done
   if [ -z "$LIVE_BUILD" ]; then
     echo "  ${R}✗ متقدرتش أقرأ ختم البناء من الصفحة المخدومة${N}"

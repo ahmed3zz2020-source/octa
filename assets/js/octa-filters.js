@@ -856,6 +856,14 @@ const FZ_TAB_FIVE = { id:'five', i:'⭐', n:'أفضل 5 فرص',
 const FZ_TAB_TRIPLE = { id:'triple', i:'📊', n:'أفضل 3 فرص',
   box:'fltThreeBox', init:'fzTripleInit', render:'fzTripleRender', row:2 };
 
+/* 📈 تبويب «الفني» — المُصفّي الفني (١٤ نوفمبر ٢٠٢٦)
+   ⛔ نفس الوحدة اللي في الذراع الفني (octa-techfilter.js) — مفيش نسخة
+      تانية من الحساب ولا من الأرقام. ⛔ الإضافة في صف ٢ بعد كل اللي موجود.
+   ⛔ شرط أحمد: ترتيب الـ8 وأسماؤها وأيقوناتها ما تتغيرش — التبهيل ده
+      جديد بالكامل ومكتوب في آخر الصف. */
+const FZ_TAB_TECH = { id:'tech', i:'📈', n:'الفني',
+  box:'fltTechBox', init:'fzTechInit', render:'fzTechRender', row:2 };
+
 /* 🌐 اسم القطاع بالعربي — ⛔ قبل كده كان بيطبع 'all' الإنجليزي في الواجهة.
    'all' قيمة داخلية (القيمة في <option>) مش نص للمستخدم. */
 function fzSectorName(v){
@@ -877,6 +885,8 @@ const FZ_TABS = [
   FZ_TAB_BEST,
   FZ_TAB_FIVE,
   FZ_TAB_TRIPLE,
+  /* 📈 المُصفّي الفني — واحد من نفس الوحدة (مفيش حساب تاني) */
+  FZ_TAB_TECH,
 ];
 let FZ_ACTIVE = 'safety';
 
@@ -898,6 +908,7 @@ function fzCount(){
   : (window[t.render] === fzCfwRender) ? fzCfwRows().length
   : (t.id==='best' || t.id==='five') ? fzBestRows().length
   : (window[t.render] === fzTripleRender) ? fzTripleRows().length
+  : (t.id==='tech') ? fzTechRows().length
   : null; } catch(e){ out[t.id] = null; }
   });
   return out;
@@ -3682,11 +3693,42 @@ function nzMountTriple(){
 }
 function fzTripleInit(){ /* التلاتة مش محتاجة set-up */ }
 
+/* 📈 المُصفّي الفني — تبويب صفحة الفلاتر (١٤ نوفمبر ٢٠٢٦)
+   ⛔ نفس الوحدة (octa-techfilter.js) اللي في الذراع الفني — نداء واحد.
+      ⛔ مافيش نسخة تانية من الحساب ولا من الأرقام. */
+function fzTechRows(){
+  try { return (typeof window.OCTATech === 'object') ? window.OCTATech.count() : 0; }
+  catch(e){ return 0; }
+}
+function fzTechInit(){ /* الداتا بتتحمّل مع الصفحة */ }
+function fzTechRender(){
+  const box = document.getElementById(FZ_TAB_TECH.box); if (!box) return;
+  if (typeof window.OCTATech === 'object'){
+    try { window.OCTATech.render(box); return; } catch(e){}
+  }
+  box.innerHTML = '<div class="flt-empty">⛔ الفلتر الفني مش متاح</div>';
+}
+
+/* 🆕 box الفلتر الفني — بيتعمل dynamic زي تلاتة الفرص */
+function nzMountTech(){
+  let bb = document.getElementById(FZ_TAB_TECH.box);
+  if (!bb){
+    const pane = document.getElementById('fzPane');
+    if (!pane) return false;
+    bb = document.createElement('div');
+    bb.id = FZ_TAB_TECH.box;
+    pane.appendChild(bb);
+  }
+  bb.style.display = 'none';
+  return true;
+}
+
 function nzBoot(){
   const saved = nzSortLoad();
   for (const k in saved){ if (NZ_SORT_COLS[k]) NZ_SORT[k] = saved[k]; }
   nzMountBest();
   nzMountTriple();
+  nzMountTech();
   nzRow2Host();
 }
 

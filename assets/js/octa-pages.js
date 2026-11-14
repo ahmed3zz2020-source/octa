@@ -2702,32 +2702,32 @@ function buildSectorHeatmap(stocks, sectorList) {
   </div>`;
 }
 
-/* ══════ ② الفني — كروت ══════ */
+/* ══════ ② الفني — المُصفّي الفني (أداة الفلتر) ══════
+   ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — تطوير الذراع الفني بالكامل.
+   📌 قبل: ٤ كروت مكرّرة من نفس /api/rank (و٢ منهم عن الأمان والقرار مش الفني)
+      ⇒ المستخدم كان بيشوف قوائم مكرّرة من غير أي مؤشر فني ولا سبب.
+   📌 دلوقتي: مُصفّي فني حقيقي — الرقم المعروض = المحور الفني (m) نفسه
+      (نفس الرقم اللي داخل في 20٪ من مجموع OCTA) + 8 معايير فنية + سطر
+      «ليه مختار؟» + مقارنة بالقطاع + تحليل كامل لكل سهم بزر 🔎.
+   ⛔ مفيش درجة ثانية بتتنافس مع المحور الفني.
+   ⛔ لو الوحدة مش موجودة (نسخة قديمة في الكاش) ⇒ نرجع لل OLD behavior. */
 async function armTechnical(box) {
-  const [rank, screen] = await Promise.all([
-  octaFetch(OCTA_API + '/api/rank?limit=20&decision=تجميع').then(r=>r.json()).catch(()=>({results:[]})),
-  octaFetch(OCTA_API + '/api/rank?limit=20&min_safety=65').then(r=>r.json()).catch(()=>({results:[]})),
-  ]);
+  if (typeof window.OCTATech === 'object'){
+    try {
+      /* compact = المؤشرات مطوية (عشان الجدول يبان فوراً على الموبايل) */
+      window.OCTATech.render(box, { compact: true });
+      await window.OCTATech.boot();
+    } catch(e){ console.warn('الفني:', e && e.message); }
+    return;
+  }
+  /* ⛔ احتياطي — النسخة القديمة (لحد ما الكاش يتحدّث) */
+  const rank = await octaFetch(OCTA_API + '/api/rank?limit=20&decision=تجميع').then(r=>r.json()).catch(()=>({results:[]}));
   const setups = (rank.results||[]);
-  const stable = (screen.results||[]);
-
   box.innerHTML =
   '<div class="ic-grid" style="--ac:#22c55e">' +
   ic('🎯', 'تركيب فني إيجابي', 'أسهم قرارها "إشارة إيجابية" من التحليل الفني',
   `<span>${setups.length} سهم</span>`,
   icRows(setups)) +
-
-  ic('🛡️', 'أمان عالي', 'أسهم أمانها ٦٥+ — حركة مستقرة',
-  `<span>${stable.length} سهم</span>`,
-  icRows(stable)) +
-
-  ic('📊', 'أعلى نتيجة فنية', 'الأقوى فنياً من كل الخيارات',
-  `<span>${setups.length} مرشح</span>`,
-  icRows(setups.slice(0,15))) +
-
-  ic('⚠️', 'أضعف فنياً', 'أسهم بنتيجة سلبية — احذر',
-  `<span>${setups.length}</span>`,
-  icRows((await octaFetch(OCTA_API + '/api/rank?limit=20&decision=بيع').then(r=>r.json()).catch(()=>({results:[]}))).results || [])) +
   '</div>';
 }
 

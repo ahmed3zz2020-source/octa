@@ -2874,6 +2874,44 @@
   font-size:.76rem; border:1px solid var(--line); background:var(--wash);
   color:var(--muted); align-self:end; }
   .flt-rst:hover { color:var(--red2); border-color:var(--red2); }
+  /* 📈 14 نوفمبر 2026 — صف الشرائح السريعة (المُصفّي الفني)
+     ⛔ كانت بتتعرض جوّه .flt-filters (شبكة) ⇒ كل شريحة سطر لوحده
+        وبتاخد 6 شاشات قبل الجدول على الموبايل. */
+  .flt-chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .flt-chips .dv-tab { flex:0 0 auto; padding:8px 12px; border-radius:999px; cursor:pointer;
+    font-family:inherit; font-size:.74rem; font-weight:800; white-space:nowrap;
+    background:var(--wash); border:1px solid var(--line); color:var(--muted); }
+  .flt-chips .dv-tab.on { color:#08131f; background:var(--gold); border-color:var(--gold); }
+  .flt-tune { margin-bottom:14px; border:1px solid var(--line); border-radius:13px;
+    background:var(--wash); overflow:hidden; }
+  .flt-tune > summary { cursor:pointer; padding:12px 15px; font-size:.82rem; font-weight:800;
+    color:var(--gold); list-style:none; }
+  .flt-tune > summary::-webkit-details-marker { display:none; }
+  .flt-tune[open] > summary { border-bottom:1px solid var(--line); }
+  .flt-tune .flt-filters { margin:0; border:0; border-radius:0; background:transparent; }
+  /* 🗂️ كروت الفلتر الفني — مفيش سحب أفقي على الموبايل
+     (نفس قرار صفحة «المناطق»: جدول عريض = مستخدم مبيعرفش يشوف الأعمدة). */
+  .tf-cards { display:grid; gap:10px; }
+  .tf-card { background:var(--wash); border:1px solid var(--line); border-radius:14px; padding:12px 13px; }
+  .tf-card-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .tf-card-code { font-family:ui-monospace,monospace; color:var(--gold); font-weight:900;
+    font-size:.9rem; cursor:pointer; }
+  .tf-card-name { font-size:.72rem; color:var(--muted); margin-top:2px; }
+  .tf-card-score { text-align:left; }
+  .tf-card-med { font-size:.66rem; color:var(--muted); margin-top:3px; white-space:nowrap; }
+  .tf-metrics { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .tf-metric { font-size:.68rem; padding:4px 8px; border-radius:9px; color:var(--muted);
+    border:1px solid var(--line); background:var(--pri2); white-space:nowrap; }
+  .tf-metric b { color:var(--txt); }
+  .tf-metric.ok { color:var(--sec); border-color:rgba(22,199,154,.34); }
+  .tf-metric.bad { color:var(--red2); border-color:rgba(255,82,82,.3); }
+  .tf-card-crit { font-size:.7rem; font-weight:800; margin-top:9px; color:var(--txt); }
+  .tf-why { font-size:.72rem; color:var(--muted); margin-top:6px; line-height:1.85; }
+  .tf-btn { margin-top:10px; width:100%; padding:9px 12px; border-radius:11px; cursor:pointer;
+    font-family:inherit; font-size:.76rem; font-weight:800; color:var(--gold);
+    background:rgba(212,175,55,.09); border:1px solid rgba(212,175,55,.35); }
+  .tf-btn:hover { background:rgba(212,175,55,.17); }
+  .tf-metric b i { font-style:normal; }
   /* ❓ كارت الشرح */
   .flt-help { margin-bottom:18px; }
   .flt-help-h { display:flex; align-items:center; justify-content:space-between; gap:10px;
@@ -4640,6 +4678,15 @@ body.light .b-hold{background:rgba(154,123,24,.13);color:#7a5f0e}
   body.light .flt-sl label { color:#55657a; }
   body.light .flt-sl label b { color:#8a6d12; }
   body.light .flt-rst { background:#fff; border-color:#e5e7eb; color:#55657a; }
+  body.light .flt-chips .dv-tab { background:#fff; border-color:#e5e7eb; color:#55657a; }
+  body.light .flt-tune { background:#f9fafb; border-color:#e5e7eb; }
+  body.light .flt-tune .flt-filters { background:transparent; }
+  body.light .tf-card { background:#fff; border-color:#e5e7eb; }
+  body.light .tf-metric { background:#f9fafb; border-color:#e5e7eb; color:#55657a; }
+  body.light .tf-metric b { color:#12344b; }
+  body.light .tf-card-code { color:#8a6d12; }
+  body.light .tf-btn { background:#fffbeb; border-color:#e8c65a; color:#8a6d12; }
+  body.light .tf-card-name, body.light .tf-card-med, body.light .tf-why { color:#55657a; }
   /* كارت الشرح */
   body.light .flt-help-h { background:#fffbeb; border-color:#e8c65a; color:#8a6d12; }
   body.light .flt-help-h:hover { background:#fef3c7; }
