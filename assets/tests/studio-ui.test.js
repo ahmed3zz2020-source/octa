@@ -74,6 +74,9 @@ function loadUI(fetchImpl) {
   const sb = mkSandbox(fetchImpl);
   const code = fs.readFileSync(path.join(ROOT, 'assets/js/octa-studio.js'), 'utf8');
   vm.runInContext(code, sb.ctx, { filename: 'octa-studio.js' });
+  /* ⭐ ١٤ نوفمبر ٢٠٢٦ — التهيئة بقت وقت **فتح الصفحة** (مش وقت تحميل
+     الملف) ⇒ الاختبار ينادي init() صراحةً (زي ما octaPageInit بيعمل). */
+  if (sb.win.OCTAStudio && typeof sb.win.OCTAStudio.init === 'function') sb.win.OCTAStudio.init();
   return sb;
 }
 

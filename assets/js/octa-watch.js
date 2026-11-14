@@ -211,9 +211,14 @@
 
   /* ── بدء: نقرأ من السيرفر بعد ما OS_DB يجهز ── */
   function boot() {
-  pullWatch();
-  /* إعادة رسم الأجراس كل ثانية — عشان لو الجدول اترسم بعدين */
+  /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ متأجل لحد ما صفحة الأسهم تفتح
+     📌 السبب (مقيس): /api/alerts/watch في «دلو الكتابة» (ميزانية
+     ٤/دقيقة!) ⇒ كان بياخد من ميزانية الحفظ مع كل زيارة ⛔.
+     📌 ✅ الحل: السحب من السيرفر بيحصل لما صفحة الأسهم تفتح
+     (octaPageInit في octa-core.js) ⇒ الحالة المحلية بتفضل
+     شغالة طول الوقت (localStorage) ⛔→✅. */  /* إعادة رسم الأجراس — بس بتتجيب واحد الأول (شغّال/مفيش) */
   setInterval(function () {
+  if (!document.querySelector('[data-bell]')) return;
   document.querySelectorAll('[data-bell]').forEach(function (el) {
   window.renderBell(el.getAttribute('data-bell'));
   });
@@ -225,6 +230,8 @@
   } else {
   boot();
   }
+  /* ⭐ سحب قائمة المتابعة من السيرفر (لما صفحة الأسهم تفتح) */
+  window.OCTAWatchPull = pullWatch;
 
   window.WATCH = WATCH;
   window.watchSave = save;

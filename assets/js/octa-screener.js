@@ -2011,8 +2011,13 @@
      (مرة هنا ومرة في switchPage نفسه). اتشال الغلاف —
      switchPage أصلاً بينادي scInit لوحده. */
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', window.scInit);
-  else setTimeout(window.scInit, 300);
+  /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ متحملش وقت فتح الصفحة
+     📌 السبب (مقيس): scInit بينادي octaLoadDB ⇒ كان بيحمّل
+     /api/data_full (**٣٢٠ ك.ب**) + /api/rank مع **كل** زيارة،
+     والصفحة دي (الفلتر) مش مفتوحة أصلاً ⛔.
+     📌 ✅ الحل: scInit بيشتغل بس لما المستخدم يفتح صفحة الفلتر
+     (octaPageInit في octa-core.js) ⛔→✅.
+     📌 ⚠️ الـscreener بيفتح من raccourci "الفلتر" ⇒ نفس المسار. */
 
 })();
 /* ══════════════════════════════════════════════════════════════

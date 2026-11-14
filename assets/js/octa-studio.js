@@ -355,15 +355,23 @@
      لو init() رمى استثناء ⇒ الـglobal كان بيضيع والصفحة
      «مش موجودة» من غير أي رسالة. دلوقتي الـglobal موجود دايماً
      والاستثناء بيتسجّل (assert+repr) بدل ما يختفي بصمت. */
+  /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ متحملش وقت فتح الصفحة
+     📌 السبب (مقيس): الصفحة دي **مش مفتوحة** ⇒
+     /api/studio/list كان بيطلع مع كل زيارة ⛔.
+     📌 ✅ الحل: التهيئة بتتعمل لما المستخدم يفتح الصفحة
+     (octaPageInit في octa-core.js) ⛔→✅. */
+  var _initDone = false;
+  function initOnce() {
+    if (_initDone) return;
+    _initDone = true;
+    init();
+  }
+
   window.OCTAStudio = {
+    init: initOnce,
     loadCode: loadCode,
     state: S,
     _test: { renderList: renderList, nameOf: nameOf, fmtPrice: fmtPrice }
   };
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
 })();

@@ -32,6 +32,14 @@
   const ORIG_FETCH = (typeof window !== 'undefined' && window.fetch)
   ? window.fetch.bind(window) : null;
   if (!ORIG_FETCH) { /* مفيش fetch — نخرج بهدوء */ return; }
+  /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ الـfetch الخام متاح للصفحات الحرجة
+     📌 السبب (مقيس): البوابة كانت بتطلب /api/auth/me **ورا** طابور
+     ~٣٥ طلب تاني ⇒ استنّى ٤٫٥ ثانية ⇒ «مهلة السماح» فتحت الشاشة
+     ⇒ المستخدم قعد قدام البوابة ٥٫٤ ثانية ⛔.
+     📌 ✅ الحل: طلب التحقق من الحساب يخرج **مباشرة** (من غير الخانق
+     ولا الطابور) ⇒ البوابة تفتح في ~٠٫٣ ثانية.
+     📌 ⚠️ الطلب لازم يكون GET عادي والترويسات بتتحط بنفسها. */
+  try { window.OCTA_RAW_FETCH = ORIG_FETCH; } catch (e) { }
 
   let active = -1;  /* رقم السيرفر اللي شغال */
   let fails = {};   /* عدّاد فشل لكل سيرفر */
@@ -553,9 +561,21 @@ function _octaFetchRetry(url, o, attempt) {
  📌 ⛌⛌⛌ الـcache busting (?_=Date.now) بيخلي الرابط مختلف كل مرة
  📌 ⛌⛌⛌ ⇒ بنمسح الـquery من الـkey عشان نلاقي التكرار.
  ════════════════════════════════════════════════════════════════ */
-var OCTA_CACHE = {};        /* url(من غير query) → {t, body, ct} */
+var OCTA_CACHE = {};        /* url(مع الـquery) → {t, body, ct} */
 var OCTA_CACHE_TTL = 20000; /* ٢٠ ثانية — كفاية للتجربة، ومنع للتكرار */
+/* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ اتساع قائمة المسارات المحميّة بالكاش
+   📌 السبب (مقيس): الصفحة الرئيسية بتطلب ~٣٧ طلب عند الفتح، فيها
+      طلبات **مكرّرة بالظبط**: /api/engine-weights ×٤ · /api/rank ×٢
+      · /api/prices ×٢ · /api/analyze ×٢ · /api/gold/signal ×٢
+      · /api/quotes ×٢ ⇒ ١٤ طلب زيادة + نفس البايتات.
+   📌 ✅ الحل: كاش قصير (٢٠ ثانية) بمفتاح = الرابط **بكل معاملاته**
+      (ما عدا الـcache-buster `?_=`) ⇒ الطلب المكرر بيرجّع من الذاكرة.
+   📌 ⛔ مهم: المفتاح لازم يحافظ على الـquery! قبل كده كان بيشيله
+      ⇒ /api/rank?limit=252 و /api/rank?limit=400 هياخدوا نفس الرد
+      (رقم غلط!) ⇒ دي كانت سبب إننا ما نقدرش نضيف /api/rank للكاش.
+   📌 ⛔ والأسعار كاش ٢٠ ثانية: التحديث الحقيقي كل ١٥ دقيقة ⇒ أأمن. */
 var OCTA_CACHE_PATHS = ['/api/intelligence/', '/api/explain/', '/api/technical/',
+                        '/api/engine-weights',
                         /* ⭐⭐ ٩ نوفمبر ٢٠٢٦ — طلب مكرّر (مقيس):
                            /api/engine-weights اتطلب ٥ مرات ⇒ ٥ من الـ٦
                            اتصالات المتوازية بتروح لطلب واحد.
@@ -563,13 +583,30 @@ var OCTA_CACHE_PATHS = ['/api/intelligence/', '/api/explain/', '/api/technical/'
                            بيشيل الـquery ⇒ limit=252 وlimit=400 هياخدوا
                            نفس الرد (خطأ!). الرتب بتتدمج لحظياً بس
                            (في الـdedupe) من غير كاش زمني. */
-                        '/api/engine-weights'];
+                        /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — بقى آمن بعد إصلاح المفتاح */
+                        '/api/rank', '/api/prices', '/api/ticker',
+                        '/api/quotes', '/api/dividends',
+                        '/api/dashboard', '/api/analyze', '/api/gold/signal',
+                        '/api/setups', '/api/challenges', '/api/studio/list',
+                        '/api/radar/history', '/api/tvquote'];
+/* ⛔⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐ شيلنا ٣ مسارات من الكاش **عن قصد**:
+   📌 /api/data_full — زرار «تحديث» لازم يجيب بيانات جديدة ⇒ الكاش
+     كان هيرجّع القديم ⇒ التحديث ما يعملش ⛔.
+   📌 /api/alerts/watch و /api/subscriptions/me — دول حالة المستخدم
+     (حفظ/اشتراك) ⇒ رد قديم بعد الحفظ = واجهة غلط ⛔.
+   📌 الـcache-buster `?_=` بيتشال من المفتاح ⇒ لازم نعتمد على
+     طلب جديد فعلياً ⇒ فالمسارات دي من غير كاش أحسن. */
 
 function _octaCacheKey(s) {
   try {
+    /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ المفتاح = المسار + **كل المعاملات**
+       📌 بنشيل الـcache-buster بس (`?_=1794…`) ⇒ نفس الطلب الحقيقي
+       بيلقى نفس المفتاح ⇒ الكاش بيشتغل ⛔.
+       📌 ⛔ قبل كده: بنشيل الـquery كله ⇒ /api/rank?limit=252
+       و /api/rank?limit=400 بياخدوا نفس الرد (رقم غلط) ⇒ كان
+       سبب إننا نقدرش نضيف /api/rank للكاش أصلاً. */
     var u = String(s || '');
-    var i = u.indexOf('?');
-    if (i >= 0) u = u.slice(0, i);
+    u = u.replace(/([?&])_=[0-9]+/g, '$1').replace(/[?&]+$/, '').replace(/\?&/, '?').replace(/&&+/g, '&');
     return u;
   } catch (e) { return String(s || ''); }
 }

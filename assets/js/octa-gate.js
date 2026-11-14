@@ -2812,7 +2812,15 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  📌   نقعد ٢٠ ثانية. ⛔ بس لازم تغطي cold start (≈١٢s) ⇒
  📌   الـworker بيعيد المحاولة جوه (٦s×٣) ⇒ هو اللي يرد. */
  var to = setTimeout(function () { if (ctrl) try { ctrl.abort(); } catch (e) { } }, 9000);
- return fetch(apiBase() + '/api/auth/me', {
+ /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ طلب التحقق يخرج **مباشرة**
+ 📌 السبب (مقيس): البوابة كانت بتطلب /api/auth/me و**الصفحة كلها**
+   بتطلب ~٣٥ طلب تاني ⇒ طلب البوابة وقف **ورا** الطابور ⇒ استنّى
+   ٤٫٥ ثانية ⇒ «مهلة السماح» فتحت الشاشة ⇒ المستخدم قعد قدام
+   البوابة **٥٫٤ ثانية** ⛔ (وأول زيارة بعد سكون كانت ٥٫٤).
+ 📌 ✅ الحل: نستخدم الـfetch الخام (window.OCTA_RAW_FETCH) ⇒ الطلب
+   يطلع في اللحظة ⇒ البوابة تفتح في ~٠٫٣ ثانية ⛔→✅.
+ 📌 ⚠️ الترويسات (Authorization) والـcookies بتتحط بنفسها كالمعتاد. */
+ return (function(){ try { return window.OCTA_RAW_FETCH || window.fetch; } catch(e){ return window.fetch; } })().call(window, apiBase() + '/api/auth/me', {
  headers: { 'Authorization': 'Bearer ' + t },
  credentials: 'include',
  cache: 'no-store',

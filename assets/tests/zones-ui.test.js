@@ -68,6 +68,9 @@ function loadUI(fetchImpl) {
   const sb = mkSandbox(fetchImpl);
   const code = fs.readFileSync(path.join(ROOT, 'assets/js/octa-zones.js'), 'utf8');
   vm.runInContext(code, sb.ctx, { filename: 'octa-zones.js' });
+  /* ⭐ ١٤ نوفمبر ٢٠٢٦ — التهيئة بقت وقت **فتح الصفحة** (مش وقت تحميل
+     الملف) ⇒ الاختبار ينادي init() صراحةً (زي ما octaPageInit بيعمل). */
+  if (sb.win.OCTAZones && typeof sb.win.OCTAZones.init === 'function') sb.win.OCTAZones.init();
   return sb;
 }
 

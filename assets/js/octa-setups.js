@@ -1157,13 +1157,21 @@
     if (!S.loaded) load();
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
+  /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ متحملش وقت فتح الصفحة
+     📌 السبب (مقيس): الصفحة دي **مش مفتوحة** ⇒ الطلبات بتطلع مع
+     كل زيارة ⛔ وبيأخروا طلبات مهمة.
+     📌 ✅ الحل: التهيئة بتتعمل لما المستخدم يفتح الصفحة
+     (octaPageInit في octa-core.js) — والصفحة بتفتح مرتين
+     (فتح + بعد البوابة) ⇒ الحماية تمنع التكرار ⛔→✅. */
+  var _initDone = false;
+  function initOnce() {
+    if (_initDone) { if (!S.loaded) load();; return; }
+    _initDone = true;
     init();
   }
 
   window.OCTASetups = {
+    init: initOnce,
     load: load,
     state: S,
     /* 🧪 خطّافات للاختبار (assets/tests/setups-ui.test.js) */

@@ -664,6 +664,12 @@ function octaPageInit(id) {
 
   // ═══ صفحة البحث — تحميل أول مرة ═══
   if (id === 'stocks' && typeof initStocksPage === 'function') initStocksPage();
+  /* 🔔 قائمة المتابعة — سحبها من السيرفر مع صفحة الأسهم
+     ⭐ ١٤ نوفمبر ٢٠٢٦: كانت بتتطلب مع كل فتح (وده مسار «الكتابة»
+     بميزانية ٤/دقيقة) ⇒ بقت مع الصفحة اللي محتاجاها بس. */
+  if (id === 'stocks' && typeof window.OCTAWatchPull === 'function') {
+  setTimeout(()=>{ try { window.OCTAWatchPull(); } catch(e){ console.warn('watch:', e.message); } }, 250);
+  }
   /* 💰 Smart Money — الفلتر + الكروت + الشارت
      ⛔ الـinit مرتين (فتح الصفحة + بعد البوابة) زي باقي الصفحات —
         أول مرة قبل الدخول بترجّع 401 فالداتا بتتحمّل تاني. */
@@ -673,14 +679,16 @@ function octaPageInit(id) {
   if (id === 'radar' && typeof radarInit === 'function') setTimeout(()=>{ try { radarInit(); } catch(e){ console.warn('radar:', e.message); } }, 180);
   /* 🧩 «نماذجي» — أنماط الكسر (٢٨ أكتوبر ٢٠٢٦)
      ⛔ الـinit مرتين (فتح الصفحة + بعد البوابة) — زي باقي الصفحات. */
-  if (id === 'setups' && typeof OCTASetups === 'object') setTimeout(()=>{ try { OCTASetups.load(); } catch(e){ console.warn('setups:', e.message); } }, 180);
-  /* 🎨 الاستوديو — الرسومات (٢٨ أكتوبر ٢٠٢٦) */
-  if (id === 'studio' && typeof OCTAStudio === 'object') setTimeout(()=>{ try { OCTAStudio._test && OCTAStudio._test.renderList(); } catch(e){ console.warn('studio:', e.message); } }, 180);
+  if (id === 'setups' && typeof OCTASetups === 'object') setTimeout(()=>{ try { (OCTASetups.init || OCTASetups.load)(); } catch(e){ console.warn('setups:', e.message); } }, 180);
+  /* 🎨 الاستوديو — الرسومات (٢٨ أكتوبر ٢٠٢٦)
+     ⭐ ١٤ نوفمبر ٢٠٢٦: بننادي init (مش _test.renderList) ⇒ الربط
+     + تحميل القائمة بيحصل فعلاً لما المستخدم يفتح الصفحة. */
+  if (id === 'studio' && typeof OCTAStudio === 'object') setTimeout(()=>{ try { (OCTAStudio.init || function(){})(); } catch(e){ console.warn('studio:', e.message); } }, 180);
   /* 🗺️ المناطق — خريطة المستويات (٢٨ أكتوبر ٢٠٢٦) */
-  if (id === 'zones' && typeof OCTAZones === 'object') setTimeout(()=>{ try { OCTAZones.load(); } catch(e){ console.warn('zones:', e.message); } }, 180);
+  if (id === 'zones' && typeof OCTAZones === 'object') setTimeout(()=>{ try { (OCTAZones.init || OCTAZones.load)(); } catch(e){ console.warn('zones:', e.message); } }, 180);
   /* 🎯 التحديات — تحدي اليوم + لوحة المتصدرين (٢٨ أكتوبر ٢٠٢٦)
      ⛔ الـinit مرتين (فتح الصفحة + بعد البوابة) — زي باقي الصفحات. */
-  if (id === 'challenges' && typeof OCTAChallenges === 'object') setTimeout(()=>{ try { OCTAChallenges.load(); } catch(e){ console.warn('challenges:', e.message); } }, 180);
+  if (id === 'challenges' && typeof OCTAChallenges === 'object') setTimeout(()=>{ try { (OCTAChallenges.init || OCTAChallenges.load)(); } catch(e){ console.warn('challenges:', e.message); } }, 180);
   if (id === 'compare') setTimeout(()=>{ if (typeof cmpInit==='function') cmpInit(); }, 150);
   /* 🔴⛔⛔ إصلاح 2026-10-15 — الباج اللي Ahmed صوّره.
      كان: `setTimeout(fzInit, 180)` — يعني بنستنى ١٨٠ مللي ثم نرسم.

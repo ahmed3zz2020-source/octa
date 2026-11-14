@@ -253,13 +253,21 @@
     load();
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
+  /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ متحملش وقت فتح الصفحة
+     📌 السبب (مقيس): الصفحة دي **مش مفتوحة** ⇒ الطلبات بتطلع مع
+     كل زيارة ⛔ وبيأخروا طلبات مهمة.
+     📌 ✅ الحل: التهيئة بتتعمل لما المستخدم يفتح الصفحة
+     (octaPageInit في octa-core.js) — والصفحة بتفتح مرتين
+     (فتح + بعد البوابة) ⇒ الحماية تمنع التكرار ⛔→✅. */
+  var _initDone = false;
+  function initOnce() {
+    if (_initDone) { load();; return; }
+    _initDone = true;
     init();
   }
 
   window.OCTAZones = {
+    init: initOnce,
     load: load, state: S,
     _test: { renderTable: renderTable, apply: apply }
   };

@@ -227,12 +227,43 @@ async function loadEgypt(){
   ════════════════════════════════════════════════════════════════ */
   let scoreMap = {};
   try {
-  /* ⛔ لو OS_DB لسه فاضي (الـcore لسه بيحمّل) ⇒ نستنى شوية */
-  if ((typeof OS_DB === 'undefined' || !OS_DB || !OS_DB.length) && typeof octaLoadDB === 'function') {
-  try { await octaLoadDB(); } catch (e) { }
-  }
+  /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ من غير /api/data_full (٣٢٠ ك.ب)
+     📌 السبب (مقيس): الصفحة الرئيسية كانت بتستنى `octaLoadDB`
+     ⇒ /api/data_full (٣٢٠ ك.ب!) كان بيتحمّل مع **كل** زيارة ⛔
+     ⇒ كروت الصفحة الرئيسية بتتأخر ⇒ البطء اللي Ahmed شاكي منه.
+     📌 ✅ الحل: نستخدم نفس مصدر الدرجات الحيّ (/api/rank) — وهو
+     **نفس المصدر** اللي OS_DB بياخد منه الدرجة والقرار ⛔⇒ نفس
+     الأرقام بالظبط (مفيش مصدر تاني للحقيقة).
+     📌 ⚠️ لو /api/rank فشل ⇒ نرجع لـoctaLoadDB زي ما كان (fallback). */
+  if ((typeof OS_DB === 'undefined' || !OS_DB || !OS_DB.length)) {
+    let rows = [];
+    try {
+      const rj = await fetchRetry(B + '/api/rank?limit=252')
+        .then(r => r.json()).catch(() => null);
+      rows = (rj && rj.results) || [];
+    } catch (e) { }
+    for (let k = 0; k < rows.length; k++) {
+      const r = rows[k];
+      if (!r || !r.code) continue;
+      scoreMap[r.code] = {
+        code: r.code,
+        price: r.price, change: r.change,
+        score: (r.final_score != null) ? r.final_score : r.score,
+        decision: r.decision,
+        conf: r.confidence,
+        safety: r.safety
+      };
+    }
+    if (!Object.keys(scoreMap).length && typeof octaLoadDB === 'function') {
+    try { await octaLoadDB(); } catch (e) { }
+    if (typeof OS_DB !== 'undefined' && OS_DB && OS_DB.length) {
+    for (var i=0;i<OS_DB.length;i++) scoreMap[OS_DB[i].code] = OS_DB[i];
+    }
+    }
+  } else {
   if (typeof OS_DB !== 'undefined' && OS_DB && OS_DB.length) {
   for (var i=0;i<OS_DB.length;i++) scoreMap[OS_DB[i].code] = OS_DB[i];
+  }
   }
   } catch (e) { }
   /* ⭐⭐⭐ OS_DB هو المصدر الموحّد: السعر + التغير + الدرجة + القرار

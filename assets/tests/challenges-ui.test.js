@@ -79,6 +79,9 @@ function loadUI(fetchImpl) {
   const sb = mkSandbox(fetchImpl);
   const code = fs.readFileSync(path.join(ROOT, 'assets/js/octa-challenges.js'), 'utf8');
   vm.runInContext(code, sb.ctx, { filename: 'octa-challenges.js' });
+  /* ⭐ ١٤ نوفمبر ٢٠٢٦ — التهيئة بقت وقت **فتح الصفحة** (مش وقت تحميل
+     الملف) ⇒ الاختبار ينادي init() صراحةً (زي ما octaPageInit بيعمل). */
+  if (sb.win.OCTAChallenges && typeof sb.win.OCTAChallenges.init === 'function') sb.win.OCTAChallenges.init();
   return sb;
 }
 
