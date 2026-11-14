@@ -29,13 +29,25 @@
   }
 
   function clearUser() {
+  /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⛔ الباج: كان بيمسح الـlocalStorage بس
+     ⛔ فالكوكي HttpOnly بيفضل موجود ⇒ الـWorker شايف جلسة ⇒ المستخدم
+     ⛔ بيدخل تاني فوراً بعد «تسجيل الخروج».
+     ⭐ الحل: نبلّغ السيرفر (/api/auth/logout) ⇒ هو يمسح الكوكي ويلغي
+     كل التوكنات القديمة (token_epoch) — ونستنى الرد قبل الـreload. */
+  /* ① مسح المتصفح **قبل** التنقل (التنقل بيوقف السكربت فوراً) */
   try {
   localStorage.removeItem('octa_token');
   localStorage.removeItem('octa_user');
   try { localStorage.removeItem('octa_uid'); } catch (e) { }
   window.OCTA_USER_ID = '';
   } catch (e) { }
-  location.reload();
+  var done = function () { try { location.reload(); } catch (e) { } };
+  /* ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⛔ الـfetch + reload كان بيموت قبل ما
+     يوصل السيرفر ⇒ الكوكي ما بيتمسحش ⇒ المستخدم بيدخل تاني.
+     ⭐ الحل: **تنقل حقيقي** لـ /api/auth/logout ⇒ الـWorker بيمسح
+     الكوكي ويرجّعنا للبوابة. (الكوكي HttpOnly ⇒ المتصفح ما يقدرش
+     يمسحه بنفسه — لازم السيرفر هو اللي يمسحه.) */
+  try { location.replace('/api/auth/logout'); } catch (e) { done(); }
   }
 
   function getUser() {

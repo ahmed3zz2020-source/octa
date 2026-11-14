@@ -226,8 +226,9 @@ let OPEN = localStorage.getItem('octa_sidebar') === '1';
   وكمان يفتح البوابة  عشان المستخدم يشوف أول مرة من جديد. */
  window.sbLogout = function () {
  if (!window.confirm('تسجيل الخروج؟ هتحتاج الـ4 أرقام تاني.')) return;
- try { localStorage.removeItem('octa_token'); } catch (e) {}
- try { localStorage.removeItem('octa_user'); } catch (e) {}
+ /* ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⛔ لازم نبلّغ السيرفر إنه يمسح كوكي الجلسة
+    (HttpOnly) — من غير كده المستخدم بيدخل تاني فوراً.
+    ⭐ clearUser (في octa-auth.js) بيعمل ده + الانتظار + الـreload. */
  try { sessionStorage.clear(); } catch (e) {}
  OPEN = false;
  try { localStorage.setItem('octa_sidebar', '0'); } catch (e) {}
@@ -240,9 +241,13 @@ let OPEN = localStorage.getItem('octa_sidebar') === '1';
  }
  } catch (e) {}
  if (typeof window.OCTAAuthFailShown !== 'undefined') window.OCTAAuthFailShown = false;
- /* ⛌ الـreload  لازم يبقى **بعد** ما البوابة ترسم 
-  كده الصفحة بتتحمّل  والتوكن مش موجود 
-  والبوابة بترسم لوحدها  ونتيجة مضمونة. */
+ /* ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⛔ النسخة القديمة كانت بتعمل reload بس ⇒
+  الكوكي HttpOnly بيفضل موجود ⇒ المستخدم بيدخل تاني فوراً.
+  ⭐ clearUser بيعمل navigation لـ /api/auth/logout ⇒ السيرفر بيمسح
+  الكوكي ويلغي التوكنات ویرجّعنا للبوابة. */
+ if (window.OCTAAuth && typeof window.OCTAAuth.logout === 'function') {
+ try { window.OCTAAuth.logout(); return; } catch (e) { }
+ }
  setTimeout(function () { window.location.reload(); }, 60);
  };
 

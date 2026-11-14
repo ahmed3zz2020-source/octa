@@ -1570,6 +1570,47 @@ async function handle(request, env, ctx) {
             و/api/risk/COMI و/api/sentiment/COMI كانوا 200 لغير المسجّلين.
          📌 المعيار: نفس كوكي البوابة (octa_token) — الباك بيفحصه كمان.
          ⛔ OPTIONS (preflight) بيعدّي عشان الكوكي مش بيوصل معاه. */
+      /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⛔ «تسجيل الخروج» مش شغال (المستخدم
+         بيدخل تاني فوراً). السبب: كوكي الجلسة HttpOnly ⇒ المتصفح
+         ما يقدرش يمسحه، والزرار كان بيمسح الـlocalStorage بس.
+         ⭐ الحل: مسار GET /api/auth/logout ⇒ الـWorker (١) يبلّغ الباك
+         فيلغي كل التوكنات القديمة (token_epoch) ويمسح الكوكي، (٢) يرجّع
+         المستخدم للبوابة. ⭐ التنقل (navigation) مش fetch — عشان الكوكي
+         يتمسح فعلاً قبل ما الصفحة الجديدة تفتح. */
+      if (url.pathname === '/api/auth/logout' && request.method === 'GET') {
+        /* ⭐ الرد يتحرّك فوراً (الكوكي يتمسح) — وإبطال التوكنات
+           (token_epoch) بيحصل في الخلفية (Railway ممكن يكون بطيء). */
+        try {
+          const bg = fetchApi(API + '/api/auth/logout', {
+            method: 'POST', headers: buildHeaders(request)
+          }).then((r) => r.text()).catch(() => null);
+          if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(bg);
+        } catch (e) { }
+        const h = new Headers();
+        h.set('Set-Cookie', SESSION_COOKIE + '=; Path=/; Max-Age=0; SameSite=None; Secure');
+        h.set('Location', '/gate.html');
+        h.set('Cache-Control', 'no-store');
+        return new Response(null, { status: 302, headers: h });
+      }
+      /* ⛔⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐ مسار التسجيل القديم اتقفل.
+         📌 السبب: /api/auth/register كان لسه شغال والإيميل فيه اختياري
+         ⛔ ⇒ حد يعمل حساب من غير إيميل و uid = هاش الكود بس ⇒
+         ⛔    منعرفش مين هو خالص. البوابة الجديدة (OTP) بتطلب إيميل.
+         ⛔ ده كان مفتوح ⇒ حد يعمل حسابات بلا هوية وبيلعب بلا حدود. */
+      if (url.pathname === '/api/auth/register') {
+        return new Response(JSON.stringify({
+          ok: false,
+          error: 'طريقة التسجيل القديمة اتقفلت — استخدم شاشة التسجيل الجديدة',
+          hint: 'لازم إيميل + كود تحقق',
+          code: 'legacy_register_disabled'
+        }), {
+          status: 410,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'no-store'
+          }
+        });
+      }
       if (request.method !== 'OPTIONS' && !isPublicApi(url.pathname)
         && !hasSession(request)) {
         return new Response(JSON.stringify({
@@ -1692,6 +1733,13 @@ async function handle(request, env, ctx) {
           if (!/SameSite/i.test(sc2)) sc2 += '; SameSite=None';
           if (!/Secure/i.test(sc2)) sc2 += '; Secure';
           out.set('Set-Cookie', sc2);
+        }
+        /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⛔ «تسجيل الخروج» مش شغال:
+           ⛔ الـSet-Cookie بتاع مسح الكوكي ممكن ما توصلش (أو رد الباك
+           ⛔ مالوش) ⇒ الكوكي بيفضل ⇒ الـWorker بيفتح التطبيق تاني.
+           ⭐ الحل: الـWorker نفسه يمسح الكوكي على مسار الخروج. */
+        if (url.pathname === '/api/auth/logout') {
+          out.set('Set-Cookie', SESSION_COOKIE + '=; Path=/; Max-Age=0; SameSite=None; Secure');
         }
         out.set('Cache-Control', 'no-store');
         /* ⛔⛔⛔ ضغط الردود الكبيرة (gzip) — ٢٣ أكتوبر ٢٠٢٦
