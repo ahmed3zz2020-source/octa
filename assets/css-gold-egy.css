@@ -560,3 +560,41 @@ body.eg-lock { overflow: hidden !important; }
   .gbar { grid-template-columns: 92px 1fr 76px; }
   .egmini-c { height: 118px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   ⭐ v4 — ١٥ نوفمبر ٢٠٢٦: سعر السوق المصري + الفرق عن السعر المرجعي
+   ══════════════════════════════════════════════════════════════════ */
+.egp-ref {
+  font-size: .68rem;
+  color: var(--muted);
+  font-weight: 700;
+  margin-top: 2px;
+}
+.egtile-ref {
+  font-size: .66rem;
+  color: var(--muted);
+  font-weight: 700;
+  margin-top: 3px;
+}
+.egmkt-top {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+  margin-bottom: var(--s3);
+}
+.egmkt-l { font-size: .68rem; color: var(--muted); font-weight: 700; }
+.egmkt-v {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: var(--gold);
+  line-height: 1.25;
+}
+.egmkt-v small { font-size: .62rem; color: var(--muted); font-weight: 700; }
+.egmkt-v2 { font-size: 1rem; font-weight: 900; line-height: 1.3; }
+.egmkt-v2 small { font-size: .62rem; color: var(--muted); font-weight: 700; }
+.egmkt-d { font-size: .68rem; font-weight: 800; }
+.egmkt-d.gup { color: var(--up); }
+.egmkt-d.gdown { color: var(--dn); }
+@media (max-width: 380px) {
+  .egmkt-top { grid-template-columns: 1fr; }
+}

@@ -74,15 +74,19 @@
       .catch(function () { return null; });
     var techP = jf('/api/gold/technical?instrument=gram')
       .catch(function () { return null; });
+    /* ⭐⭐⭐ سعر السوق المصري (مرجع تجاري) + السعر الحيّ المحسوب */
+    var localP = jf('/api/gold/local').catch(function () { return null; });
+    var liveP = jf('/api/gold').catch(function () { return null; });
 
     return Promise.all([
       jf('/api/gold/history'),
       jf('/api/indices/EGX30/analysis'),
       jf('/api/gold/factors'),
       jf('/api/gold/scenarios'),
-      certP, techP
+      certP, techP, localP, liveP
     ]).then(function (r) {
       var hist = r[0], idx = r[1], fac = r[2], sav = r[3], cert = r[4], tech = r[5];
+      var local = r[6], live = r[7];
       if (!hist || !hist.ok || !(hist.series || []).length) {
         throw new Error((hist && hist.error) || 'تاريخ الذهب غير متاح');
       }
@@ -94,6 +98,10 @@
         caveats: (sav && sav.caveats) || [],
         cert: cert,
         tech: (tech && tech.ok) ? tech : null,
+        /* ⭐ سوق الذهب المصري (مرجع تجاري) — للمقارنة بالسعر المرجعي المحسوب */
+        local: (local && local.ok) ? local : null,
+        /* ⭐ السعر المرجعي الحيّ (الذهب العالمي × سعر الصرف ÷ ٣١٫١٠٣٥) */
+        live: (live && live.gram_egp != null) ? live : null,
         snapshot: hist.snapshot_id || (sav && sav.snapshot_id) || null
       };
       /* الذهب + الدولار (نفس السلسلة ⇒ نفس المصدر) */
@@ -140,6 +148,20 @@
         break;
       }
       D.last.gramChangePct = chg;
+      /* ⭐ السعر المرجعي الحيّ (لو متاح ⇒ أدق من آخر نقطة في السلسلة) */
+      if (D.live && D.live.gram_egp != null) {
+        D.last.gramLive = Number(D.live.gram_egp);
+        D.last.ounceUsdLive = D.live.ounce_usd != null ? Number(D.live.ounce_usd) : null;
+        D.last.fxLive = D.live.egp_per_usd != null ? Number(D.live.egp_per_usd) : null;
+        D.last.liveAt = D.live.updated || null;
+      } else { D.last.gramLive = null; }
+      /* ⭐ سعر السوق المصري */
+      D.last.marketGram = (D.local && D.local.gram_24_reference != null)
+        ? Number(D.local.gram_24_reference) : null;
+      D.last.marketSource = D.local ? (D.local.source || '') : '';
+      D.last.marketAt = D.local ? (D.local.updated_text || '') : '';
+      D.last.marketFresh = D.local ? (D.local.freshness || null) : null;
+      D.last.marketUrl = D.local ? (D.local.source_url || '') : '';
       CACHE.data = D; CACHE.at = Date.now();
       return D;
     });
@@ -1096,6 +1118,7 @@
       '<div class="ghead">' +
       '<div class="ocm-row1"><div class="ghead-t">🥇 الذهب المصري</div>' +
       '<span class="egprice" id="egp-price">…</span></div>' +
+      '<div class="egp-ref" id="egp-ref"></div>' +
       '<div class="ocm-row2">' +
       '<span class="egchg" id="egp-chg"></span>' +
       /* ⭐⭐⭐ زرار الميزان جنب زرار الإغلاق */
@@ -1186,7 +1209,17 @@
       D = d;
       var p = document.getElementById('egp-price');
       var c = document.getElementById('egp-chg');
-      if (p) p.innerHTML = num(d.last.gram, 0) + ' <small>ج.م / جرام</small>';
+      var _mk = d.last.marketGram, _ref = (d.last.gramLive != null) ? d.last.gramLive : d.last.gram;
+      if (p) {
+        p.innerHTML = num(_mk != null ? _mk : _ref, 0) + ' <small>ج.م / جرام' +
+          (_mk != null ? ' · سعر السوق' : ' · مرجع محسوب') + '</small>';
+        var pr = document.getElementById('egp-ref');
+        if (pr && _mk != null && _ref) {
+          var df = (_mk / _ref - 1) * 100;
+          pr.innerHTML = 'المرجع المحسوب ' + num(_ref, 0) +
+            ' · السوق ' + (df >= 0 ? '+' : '−') + num(Math.abs(df), 2) + '٪';
+        }
+      }
       if (c) c.innerHTML = (d.last.gramChangePct == null ? '' :
         '<span class="' + sgnCls(d.last.gramChangePct) + '">' + sgn(d.last.gramChangePct, 2) + '</span>') +
         '<span class="egchg-d">الدولار ' + num(d.last.fx, 3) + ' · DXY ' + num(d.last.dxy, 2) + '</span>';
@@ -1204,6 +1237,7 @@
     var periods = buildPeriods(D);
     var cur = periods[0];
     body.innerHTML =
+      '<div class="egsec"><div class="egsec-h">🏪 سعر السوق المصري الآن</div><div id="egmarket"></div></div>' +
       '<div class="egsec"><div class="egsec-h">📊 سعر الجرام بالجنيه + مناطق الشراء والبيع</div>' +
       '<div class="egperiods" id="egperiods">' + periods.map(function (p, i) {
         return '<button class="egper' + (i === 0 ? ' is-on' : '') + '" data-p="' + p.key + '">' + esc(p.label) + '</button>';
@@ -1222,11 +1256,15 @@
       '<div class="egsec"><div class="egsec-h">🌍 العوامل اللي بتأثر على سعر الذهب المصري</div><div id="egfac"></div></div>' +
       '<div class="egsec eg-src" id="egsrc"></div>';
 
+    document.getElementById('egmarket').innerHTML = marketCardHtml(D);
     document.getElementById('egzones').innerHTML = zonesHtml(D, D.tech);
     document.getElementById('egfac').innerHTML = factorsHtml(D);
     document.getElementById('egsrc').innerHTML = '<div class="egsec-h">📎 المصادر</div>' +
-      '<div class="egsrc-i"><b>سعر الجرام:</b> TradingView (XAU/USD × EGP/USD ÷ ٣١٫١٠٣٥) — ' +
-      (D.goldFrom || '—') + ' → ' + (D.goldTo || '—') + ' (' + D.gold.length + ' يوم)</div>' +
+      '<div class="egsrc-i"><b>السعر المرجعي (المستخدم في التحليل):</b> TradingView — XAU/USD (الذهب العالمي) ' +
+      '× USD/EGP (سعر الصرف) ÷ ٣١٫١٠٣٥ جرام — ' + (D.goldFrom || '—') + ' → ' + (D.goldTo || '—') +
+      ' (' + D.gold.length + ' يوم). ⚠️ سعر مرجعي — من غير مصنعية ولا دمغة.</div>' +
+      '<div class="egsrc-i"><b>سعر السوق المصري:</b> ' + esc(D.last.marketSource || 'غير متاح') +
+      ' — ' + esc(D.last.marketAt || '') + (D.last.marketUrl ? ' · ' + esc(D.last.marketUrl) : '') + '</div>' +
       '<div class="egsrc-i"><b>الدعم والمقاومة:</b> ' +
       ((D.tech && D.tech.sr && D.tech.sr.window_note) || 'محسوب على آخر ٥٠٠ شمعة') + '</div>' +
       '<div class="egsrc-i"><b>المؤشرات الفنية:</b> ' +
@@ -1324,6 +1362,43 @@
   }
 
   /* ══════════════════════════════════════════════════════════
+     ⑪-ب سعر السوق المصري + الفرق عن السعر المرجعي
+     ══════════════════════════════════════════════════════════ */
+  function marketCardHtml(D) {
+    var mk = D.last.marketGram;
+    var ref = (D.last.gramLive != null) ? D.last.gramLive : D.last.gram;
+    if (mk == null || !ref) return '<div class="gmute">سعر السوق غير متاح دلوقتي.</div>';
+    var diff = (mk / ref - 1) * 100;
+    var K = (D.local && D.local.karats) || {}, G = (D.local && D.local.grams) || {};
+    var rows = ['14', '18', '21'].map(function (kk) {
+      var a = K[kk] || {}, g = G[kk] || {};
+      return '<tr><td class="gtl">عيار ' + kk + '</td>' +
+        '<td class="gtc">' + (a.buy != null ? num(a.buy, 0) : '—') + '</td>' +
+        '<td class="gtc">' + (a.sell != null ? num(a.sell, 0) : '—') + '</td>' +
+        '<td class="gtc gt-infl">' + (g.spread_pct != null ? num(g.spread_pct, 2) + '٪' : '—') + '</td></tr>';
+    }).join('');
+    var fresh = D.last.marketFresh || {};
+    return '<div class="egmkt">' +
+      '<div class="egmkt-top">' +
+      '<div><div class="egmkt-l">🏪 سعر السوق المصري (عيار ٢٤)</div>' +
+      '<div class="egmkt-v">' + num(mk, 2) + ' <small>ج.م / جرام</small></div></div>' +
+      '<div><div class="egmkt-l">🧮 السعر المرجعي المحسوب</div>' +
+      '<div class="egmkt-v2">' + num(ref, 2) + ' <small>ج.م</small></div>' +
+      '<div class="egmkt-d ' + (diff >= 0 ? 'gup' : 'gdown') + '">' +
+      (diff >= 0 ? '+' : '−') + num(Math.abs(diff), 2) + '٪ فوق المرجع</div></div>' +
+      '</div>' +
+      '<div class="gtbl-wrap"><table class="gtbl"><thead><tr><th>العيار</th><th>سعر الشراء</th>' +
+      '<th>سعر البيع</th><th>الفرق بين الشراء والبيع</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="egnote">🧮 <b>السعر المرجعي</b> = سعر الأونصة العالمي (XAU/USD) × سعر الدولار ÷ ٣١٫١٠٣٥ جرام — ' +
+      'يعني <b>من غير</b> مصنعية ولا دمغة ولا ربح التاجر. ' +
+      '<b>سعر السوق أعلى</b> لأن سعر الدولار في السوق الموازي أعلى من الرسمي، ولأن التاجر بينشر بهامش شراء وبيع. ' +
+      '⚠️ التحليل والشارت كله معمول على <b>السعر المرجعي</b> (سلسلة تاريخية متصلة) — سعر السوق نقطة لحظية بتتغير.' +
+      '<br>📌 مصدر السوق: ' + esc(D.last.marketSource || '') + ' · ' + esc(D.last.marketAt || '') +
+      (fresh.status ? ' (' + esc(fresh.status === 'delayed' ? 'متأخر' : fresh.status) + ')' : '') + '</div>' +
+      '</div>';
+  }
+
+  /* ══════════════════════════════════════════════════════════
      ⑫ الكارت — «الذهب المصري» في مؤشرات السوق المصري
      ══════════════════════════════════════════════════════════ */
   function tileHtml() {
@@ -1333,13 +1408,18 @@
       '<div class="mini-n">🥇 الذهب المصري</div>' +
       '<div class="mini-v" id="egtile-v">…</div>' +
       '<div class="mini-c" id="egtile-c">—</div>' +
+      '<div class="egtile-ref" id="egtile-ref"></div>' +
       '<div class="egtile-bal" id="egtile-bal"><span class="egtile-bal-t">⚖️ …</span></div>' +
       '<div class="mini-sub">اضغط للتحليل</div>' +
       '</div>';
   }
-  function paintTile() {
+  /* ⭐⭐⭐ الكارت بيتقفل/بيتعمل من جديد كل ما الداشبورد يعيد الرسم
+     ⇒ لازم نخزّن آخر الأرقام ونرسمها **فوراً** (مش مستنيين الشبكة)
+     ⇒ وإلا الكارت يفضل «…» لثواني (صعب يتضايق منه). */
+  var TILE_LAST = null;
+  function paintTileNow() {
     var v = document.getElementById('egtile-v');
-    if (!v) return;
+    if (!v) return false;
     var tile = v.closest('[data-eg-open]');
     if (tile && !tile.__wired) {
       tile.__wired = true;
@@ -1348,27 +1428,47 @@
         if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openEgy('analysis'); }
       });
     }
+    var L = TILE_LAST;
+    if (!L) return false;
+    v.textContent = num(L.v, 0);
+    var rf = document.getElementById('egtile-ref');
+    if (rf) rf.textContent = L.ref;
+    var c = document.getElementById('egtile-c');
+    if (c) {
+      c.className = 'mini-c ' + sgnCls(L.ch);
+      c.innerHTML = L.ch == null ? '—' : (L.ch >= 0 ? '▲ +' : '▼ ') + num(Math.abs(L.ch), 2) + '%';
+    }
+    var bal = document.getElementById('egtile-bal');
+    if (bal) bal.innerHTML = L.bal;
+    return true;
+  }
+  function paintTile() {
+    var v = document.getElementById('egtile-v');
+    if (!v) return;
+    if (paintTileNow()) return;      /* ⭐ بيانات مخزّنة ⇒ رسم فوري */
     load(false).then(function (D) {
-      var v2 = document.getElementById('egtile-v');
-      if (!v2) return;
-      v2.textContent = num(D.last.gram, 0);
-      var c = document.getElementById('egtile-c');
-      if (c) {
-        var ch = D.last.gramChangePct;
-        c.className = 'mini-c ' + sgnCls(ch);
-        c.innerHTML = ch == null ? '—' : (ch >= 0 ? '▲ +' : '▼ ') + num(Math.abs(ch), 2) + '%';
-      }
-      var bal = document.getElementById('egtile-bal');
-      if (!bal) return;
+      var mk = D.last.marketGram;
+      var ref = (D.last.gramLive != null) ? D.last.gramLive : D.last.gram;
+      var refTxt = (mk != null && ref)
+        ? ('سوق مصر · المرجع ' + num(ref, 0) + ' (' +
+          (mk >= ref ? '+' : '−') + num(Math.abs((mk / ref - 1) * 100), 1) + '٪)')
+        : 'السعر المرجعي المحسوب';
+      var balTxt = '<span class="egtile-bal-t">⚖️ …</span>';
       var p = buildPeriods(D);
       var one = p.filter(function (x) { return x.key === '1Y'; })[0] || p[0];
       var c2 = compare(D, one);
       var g = c2.rows[0], e = c2.rows[1];
-      if (g.nominal == null || e.nominal == null) { bal.innerHTML = '<span class="egtile-bal-t">⚖️ غير متاح</span>'; return; }
-      var win = g.nominal >= e.nominal;
-      bal.innerHTML = '<span class="egtile-bal-t">⚖️ ' +
-        (win ? 'الذهب' : 'EGX30') + ' أعلى على ' + esc(one.label) +
-        ' (<bdi dir="ltr">' + num(Math.max(g.nominal, e.nominal), 1) + '%</bdi>)</span>';
+      if (g.nominal == null || e.nominal == null) { balTxt = '<span class="egtile-bal-t">⚖️ غير متاح</span>'; }
+      else {
+        var win = g.nominal >= e.nominal;
+        balTxt = '<span class="egtile-bal-t">⚖️ ' +
+          (win ? 'الذهب' : 'EGX30') + ' أعلى على ' + esc(one.label) +
+          ' (<bdi dir="ltr">' + num(Math.max(g.nominal, e.nominal), 1) + '%</bdi>)</span>';
+      }
+      TILE_LAST = {
+        v: (mk != null ? mk : ref), ref: refTxt, ch: D.last.gramChangePct, bal: balTxt
+      };
+      paintTileNow();
     }).catch(function () {
       var v2 = document.getElementById('egtile-v');
       if (v2) v2.textContent = 'غير متاح';
@@ -1383,7 +1483,8 @@
     var t = null;
     function check() {
       var el = document.getElementById('egtile-v');
-      if (el && el.textContent === '…') paintTile();
+      if (!el) return;
+      if (el.textContent === '…') { paintTileNow() || paintTile(); }
     }
     try {
       var mo = new MutationObserver(function () {
