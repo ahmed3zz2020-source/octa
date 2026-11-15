@@ -21,8 +21,14 @@
 (function () {
   'use strict';
 
-  /* 🎯 السيرفر المباشر — احتياطي لو الـWorker وقع */
-  const SERVERS = [
+  /* 🎯 السيرفر المباشر — احتياطي لو الـWorker وقع
+     🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ قابل للضبط من الـworker ⬇️
+     📌 ⬇️ المعاينة: الـworker بيحقن القائمة ⇒ ما يلمسش الإنتاج ⬇️ ⬇️
+     📌 ⬇️ (لو الـworker وقع أثناء اختبار معزول) ⬇️ ⬇️
+     📌 ⬇️ الإنتاج: من غير حقن ⇒ القائمة الافتراضية (زي ما كان) ⬇️ ⬇️ */
+  const SERVERS = (window.OCTA_DIRECT_LIST && window.OCTA_DIRECT_LIST.length)
+  ? window.OCTA_DIRECT_LIST
+  : [
   { name: 'railway', url: 'https://octa-prices-production-4ccb.up.railway.app', on: true },
   /* ↑ سيرفر احتياطي (Render مثلاً) — حطّه هنا وخلي on:true */
   /* { name: 'render',  url: 'https://octa-prices.onrender.com',  on: false } */

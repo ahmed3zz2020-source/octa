@@ -32,7 +32,48 @@
      اللي بتمنع تنزيل الداتا فعلياً.
    ═══════════════════════════════════════════════════════════ */
 
-const API = 'https://octa-prices-production-4ccb.up.railway.app';
+/* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ — دفعة الأمان ٠٢ — ⛔ وجهة الـAPI من البيئة ⬇️
+   📌 ⬇️ قبل: الرابط **مكتوب** ⬇️ ⬇️ ⇒ المعاينة والإنتاج بيخدموا ⬇️
+   📌 ⬇️ نفس الباك دايماً ⬇️ ⬇️ ⇒ مستحيل نختبر الإصلاحات ⬇️ ⬇️
+   📌 ⬇️ على بيئة معزولة ⬇️ ⬇️
+   ✅ الحل: `env.OCTA_API_URL` ⬇️
+   ⛔ ⬇️ الإنتاج: مش متظبطلوش ⇒ الرابط الافتراضي (الإنتاج) ⬇️ ⬇️
+   ⛔ ⬇️ ⇒ ما فيش أي تغيير على سلوك الإنتاج ⬇️ ⬇️
+   ⛔ ⬇️ المعاينة: `OCTA_API_URL` = الباك التجريبي ⬇️ ⬇️ */
+const API_DEFAULT = 'https://octa-prices-production-4ccb.up.railway.app';
+/* ⛔ بيتحدّد في أول كل طلب (handle/scheduled) ⬇️ */
+let API = API_DEFAULT;
+
+/* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ — ⛔ قائمة الاتصال الاحتياطي ⬇️
+   📌 ⬇️ الواجهة عندها fallback مباشر للـRailway ⬇️ ⬇️
+   📌 ⬇️ (لو الـWorker وقع) ⬇️ ⬇️
+   📌 ⬇️ ⇒ لو الإنتاج مرتبط بحتمية ⬇️ ⬇️
+   📌 ⬇️ ⇒ المعاينة كانت هتلمس الإنتاج أثناء الاختبار ⬇️ ⬇️
+   ✅ الحل: الـworker يحقن القائمة في الصفحة ⬇️
+   ⛔ ⬇️ الإنتاج: من غير حقن ⇒ القائمة الافتراضية (الإنتاج) ⬇️ ⬇️ */
+function apiDirectList(env) {
+  const raw = env && env.OCTA_API_DIRECT ? String(env.OCTA_API_DIRECT) : '';
+  if (!raw) return '';
+  const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+  if (!parts.length) return '';
+  try {
+    const arr = parts.map((u, i) => ({ name: i === 0 ? 'staging' : 'alt' + i, url: u, on: true }));
+    return JSON.stringify(arr).replace(/</g, '\\u003c');
+  } catch (e) { return ''; }
+}
+
+function injectApiDirect(html, env) {
+  const list = apiDirectList(env);
+  if (!list) return html;
+  try {
+    const tag = '<script>window.OCTA_DIRECT_LIST=' + list + ';</script>';
+    if (String(html).indexOf('</head>') !== -1) {
+      return String(html).replace('</head>', tag + '</head>');
+    }
+    return tag + html;
+  } catch (e) { return html; }
+}
+
 const TRIES = 3;
 
 /* ⭐ محرك محور الأخبار (هالان) — نسخة مطابقة 1:1 من news_engine في الباك.
@@ -597,12 +638,48 @@ function hasSession(request) {
  📌 ✅ الحل: نستبدل نطاق الإنتاج بنطاق الطلب الحالي ⇒
     كل دومين بيبعت صورته الصح (و الإنتاج بيفضل زي ما هو).
  ════════════════════════════════════════════════════════════════ */
+/* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ قائمة الاتصال ⬇️
+   📌 ⬇️ بتتحقّق في كل صفحة HTML ⬇️ ⬇️ */
+let API_DIRECT_LIST = '';
+/* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ أول عنوان مباشر ⬇️
+   📌 ⬇️ بنستخدموه في تبديل رابط الإنتاج داخل HTML ⬇️ ⬇️
+   📌 ⬇️ (CSP connect-src + وضع التشخيص) ⬇️ ⬇️
+   📌 ⬇️ ⇒ المعاينة ما بتبقاش قادرة تلمس الإنتاج ⬇️ ⬇️ */
+let API_DIRECT_FIRST = '';
+
 function withSiteOrigin(html, origin) {
   try {
-    if (!origin) return html;
-    return String(html)
+    let out = html;
+    if (origin) {
+      out = String(out)
       .replace(/https:\/\/octashares\.com\/assets\//g, origin + '/assets/')
       .replace(/https:\/\/octashares\.com\//g, origin + '/');
+    }
+    /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ حقن ⬇️
+       📌 ⬇️ المعاينة: القائمة = الباك التجريبي ⬇️ ⬇️
+       📌 ⬇️ ⇒ لو الـWorker وقع، الواجهة ما يلمسش الإنتاج ⬇️ ⬇️
+       📌 ⬇️ الإنتاج: من غير حقن ⇒ القائمة الافتراضية (الإنتاج) ⬇️ ⬇️ */
+    if (API_DIRECT_LIST) {
+      const tag = '<script>window.OCTA_DIRECT_LIST=' + API_DIRECT_LIST + ';</script>';
+      out = String(out).indexOf('</head>') !== -1
+      ? String(out).replace('</head>', tag + '</head>')
+      : (tag + String(out));
+    }
+    /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔⛔⛔ العزل ⬇️
+       📌 ⬇️ ⬇️ الـHTML فيه رابط الإنتاج في مكانين ⬇️ ⬇️ ⬇️
+       📌 ⬇️ ⬇️ ① `<meta name="octa-csp-report" ... connect-src 'self' https://octa-prices-production-...` ⬇️ ⬇️ ⬇️
+       📌 ⬇️ ⬇️    (يعني المتصفح **يمنع** أي طلب للتجريبي) ⬇️ ⬇️ ⬇️
+       📌 ⬇️ ⬇️ ② وضع التشخيص (diag) في index.html ⇒ fallback للإنتاج ⬇️ ⬇️ ⬇️
+       📌 ⬇️ ⬇️ ⇒ المعاينة كانت هتلمس الإنتاج ⬇️ ⬇️ ⬇️
+       ✅ الحل: نستبدل رابط الإنتاج بعنوان التجريبي ⬇️ ⬇️
+       ⛔ الإنتاج: من غير حقن ⇒ مافيش استبدال ⇒ زي ما هو ⬇️ ⬇️ */
+    if (API_DIRECT_FIRST) {
+      out = String(out).replace(
+        /https:\/\/octa-prices-production-4ccb\.up\.railway\.app/g,
+        API_DIRECT_FIRST
+      );
+    }
+    return out;
   } catch (e) { return html; }
 }
 
@@ -831,11 +908,18 @@ export default {
    📌   "triggers": { "crons": [cron كل ٥ دقايق] }
    */
   async scheduled(event, env, ctx) {
+    /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ وجهة الـAPI ⬇️ */
+    API = (env && env.OCTA_API_URL) ? String(env.OCTA_API_URL) : API_DEFAULT;
     const target = API + '/api/health';
     let status = 'unknown';
     try {
+      /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ سر الـedge ⬇️
+         📌 ⬇️ الباك (staging) بيطلب السر ⬇️ ⬇️
+         📌 ⬇️ ⇒ من غيره الـkeepalive بيرجّع 403 ⬇️ ⬇️ */
+      const _kh = { 'User-Agent': 'octa-keepalive/1.0' };
+      if (env && env.OCTA_PROXY_SECRET) _kh['X-OCTA-Proxy'] = env.OCTA_PROXY_SECRET;
       const r = await fetch(target, {
-        headers: { 'User-Agent': 'octa-keepalive/1.0' }
+        headers: _kh
       });
       status = 'http ' + r.status;
       console.log('[keepalive]', new Date().toISOString(), status);
@@ -864,6 +948,16 @@ export default {
 };
 
 async function handle(request, env, ctx) {
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ وجهة الـAPI ⬇️ */
+  API = (env && env.OCTA_API_URL) ? String(env.OCTA_API_URL) : API_DEFAULT;
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ قائمة الاتصال ⬇️ */
+  API_DIRECT_LIST = apiDirectList(env);
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ أول عنوان ⬇️ */
+  try {
+    const _raw = env && env.OCTA_API_DIRECT ? String(env.OCTA_API_DIRECT) : '';
+    const _first = _raw.split(',').map(s => s.trim()).filter(Boolean)[0] || '';
+    API_DIRECT_FIRST = _first.replace(/\/$/, '');
+  } catch (e) { API_DIRECT_FIRST = ''; }
   const url = new URL(request.url);
 
   /* 🧹 التطهير: أي نسخة من سكربت التنظيف (بأي ?v=) ⇒ دايمًا الـkiller.

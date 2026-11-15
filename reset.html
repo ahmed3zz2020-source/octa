@@ -64,9 +64,16 @@
          ⛔ ⬇️ ⇒ المستخدم يفتكر إنه خرج بس هو داخل ⬇️ ⬇️
          ✅ الحل: نعيّط /api/auth/logout (إبطال على السيرفر) ⬇️ */
       try {
-        await fetch('/api/auth/logout', {
-          method: 'POST', credentials: 'include', keepalive: true
-        });
+        var _h = { credentials: 'include', keepalive: true };
+        /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — Bearer كمان ⬇️
+           📌 ⬇️ الباك بيطلب Bearer في الكتابة (حماية CSRF) ⬇️ ⬇️
+           📌 ⬇️ ⇒ نبعت التوكن لو موجود ⬇️ ⬇️
+           📌 ⬇️ (والكوكي لوحده مقبول على مسار الخروج بس) ⬇️ ⬇️ */
+        try {
+          var _t = localStorage.getItem('octa_token') || '';
+          if (_t) _h.headers = { 'Authorization': 'Bearer ' + _t };
+        } catch (e) {}
+        await fetch('/api/auth/logout', _h);
         log('تم إغلاق الجلسة على السيرفر');
       } catch (e) { log('تعذّر إغلاق الجلسة على السيرفر'); }
 
