@@ -28,6 +28,17 @@ bash tools/deploy.sh prod     # ⛔ الإنتاج — محتاج «ارفع ع�
 - ⛔ الـdeploy بيعمل **فحص حيّ** (٤ محاولات × ٨ ثواني + cache-buster) ⇒ لو فشل ⇒ **تراجع تلقائي** ✅.
 - ⛔ **الفرق الوحيد بين المعاينة والإنتاج = `name`** (المirea في `wrangler.jsonc` · الإنتاج في `wrangler-prod.jsonc`).
 - 🆕 **Batch 02**: `OCTA_FAIL_CLOSED=on` في **المعاينة بس** ⇒ لو `OCTA_API_URL` ناقص ⇒ 503 صريح بدل الرجوع للإنتاج.
+- 🔴🔴 **١٥ نوفمبر ٢٠٢٦ — درس `dist` (اتعلمناه بالغلط):**
+  - 📌 **الـassets بتنشر من `./dist`** (`wrangler.jsonc` → `"assets": {"directory": "./dist"}`) ⇒ **مش من مجلد المصدر**.
+  - ⛔⇒ **`npx wrangler deploy` لوحده بينشر `dist` قديم** ⇒ الإصلاح الجديد ما بيوصلش للمتصفح
+    (والفحص الحيّ بيروح نجح لأن الصفحة سليمة — بس بالنسخة القديمة!). ده بالظبط اللي حصل.
+  - ✅ **الحل: دايماً `bash tools/deploy.sh preview`** (بيعمل `npm run build:strict` ⇒ يبني `dist` + يختم + يفحص الأسرار)
+    ⇒ **ممنوع** `npx wrangler deploy` مباشر.
+  - 🧪 **فحص سريع بعد البناء:** `node tools/check-dist.js` + مقارنة `dist/assets/js/octa-api.js` بالمصدر.
+- 🆕 **١٥ نوفمبر ٢٠٢٦ — إغلاق ثغرة الاتصال المباشر:**
+  - ⛔ `octa-api.js` كان فيه اتصال احتياطي مباشر لـ Railway الإنتاج ⇒ في المعاينة كان بيلغي العزل لو ناقصت متغيرات الـstaging.
+  - ✅ الحل: `window.OCTA_FAIL_CLOSED=1` (بيحطّه الـworker في المعاينة) ⇒ قائمة فاضية ⇒ `OCTA_DIRECT=''` ⇒ **صفر اتصال بالإنتاج**.
+  - 🧪 الاختبار: `assets/tests/octa-api.failclosed.test.js` (٤) + `tools/test_preview_isolation.py` (٦ فحوص متصفح ٣٩٠px).
 
 ### ب) الباك (Railway)
 | الحالة | التفاصيل |
@@ -63,7 +74,7 @@ bash tools/staging/run_all.sh --stop
 | الـKV | العامل | البيانات |
 |---|---|---|
 | `HALAN_KV` | `halan-feed` (عامل منفصل) | أخبار هالان (بيانات عامة) |
-| — | `octa-preview` | ⛔ مافيش KV إلا `HALAN_KV` ⇐ نفس，الإنتاج ⬇️ |
+| — | `octa-preview` | ⛔ مافيش KV إلا `HALAN_KV` ⇐ نفس الإنتاج ⬇️ |
 
 ⚠️ **ملاحظة isolation:** `HALAN_KV` **مش** فيه بيانات مستخدمين — بس نفس الاسم موجود في المعاينة والإنتاج ⇐ أي كتابة عليه من المعاينة **تظهر** في الإنتاج ⬇️ (الإصلاح المقترح: KV منفصل للمعاينة `octa-preview-kv` — تكلفة: صفر).
 
