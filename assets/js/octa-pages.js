@@ -2968,6 +2968,20 @@ async function armOpportunity(box) {
   return armOpportunityLegacy(box);
 }
 
+/* ⭐⭐⭐ عقد درجة الفرصة — ⛔ الرد الحالي من /api/opportunities فيه
+   الحقل `score` · والنسخة القديمة كانت `opportunity` ⇒ قراءة الاسم
+   القديم كانت بتطلع «—» في كل بطاقة رغم وجود درجة.
+   ⛔ الحل: نقرأ الاثنين (الجديد أولاً) + تطبيع الأرقام.
+   📌 القيمة الفارغة (null/NaN/0) ⇒ null ⇒ بتعرض «—» مش صفر. */
+function oppScoreValue(s) {
+  if (!s) return null;
+  var v = (s.score !== undefined && s.score !== null && s.score !== '') ? s.score : s.opportunity;
+  if (v === undefined || v === null || v === '') return null;
+  var n = Number(v);
+  if (isNaN(n) || !isFinite(n) || n <= 0) return null;
+  return n;
+}
+
 /* ⛔⛔⛔ النسخة القديمة من الفلتر — بقت **fallback** بس.
    ⭐ ليش؟ لأن المحرّك الجديد لسه ما اتنشرش على الباك ⇒ لو ما كانش
       في fallback، الفلتر رقم ٨ في المعاينة كان هيبقى «ميت»
@@ -2988,13 +3002,15 @@ async function armOpportunityLegacy(box) {
   box.innerHTML =
   '<div class="arm-sect"><div class="arm-sect-h">🔎 فرص مبكرة — قبل ما تتحرك</div>' +
   (early.length ?
-  '<div class="opp-grid">' + early.slice(0,8).map(s =>
-  `<div class="opp-card" onclick="openStockModal('${s.code}')">
+  '<div class="opp-grid">' + early.slice(0,8).map(s => {
+  const sc = oppScoreValue(s);
+  return `<div class="opp-card" onclick="openStockModal('${s.code}')">
   <span class="opp-early-tag">${s.stage||'مبكرة'}</span>
   <div class="opp-code-2">${s.code}</div>
   <div class="opp-name-2">${(s.name||'').slice(0,16)}</div>
-  <div class="opp-score-2">${(s.opportunity>0)?((s.opportunity||0).toFixed(0)+'<small>/100</small>'):'—'}</div>
-  </div>`).join('') + '</div>'
+  <div class="opp-score-2">${sc!=null?(sc.toFixed(0)+'<small>/100</small>'):'—'}</div>
+  </div>`;
+  }).join('') + '</div>'
   : '<div class="opps-loading">لا توجد فرص مبكرة — راقب الأخبار الرسمية</div>') +
   '</div>' +
 
