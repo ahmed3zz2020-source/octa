@@ -1660,7 +1660,7 @@ function ensurePanel() {
   st.textContent =
   '@keyframes spIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}' +
   /* ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — لوحة السهم بقت **بالكامل الشاشة**
-     📌 السبب: كانت بتتحط في 流 الصفحة قبل صفحة السوق ⇒ المستخدم
+     📌 السبب: كانت بتتحط في أول الصفحة قبل صفحة السوق ⇒ المستخدم
         بيشوف صفحة السوق تحت التحليل (طلب المالك).
      📌 الحل: الـhost بقى طبقة fixed تغطي الشاشة كلها. */
   '#stockPanelHost{position:fixed;inset:0;z-index:230;background:var(--pri);' +

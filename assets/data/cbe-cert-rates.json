@@ -1,6 +1,14 @@
 {
  "source": "البنك المركزي المصري (CBE)",
- "note": "شهادة ٣ شهور = متوسط فائدة الودائع (أكثر من شهر و≤ ٣ شهور) — مرجّح على ~٨٠٪ منDeposits. شهادة سنة = شهادة الاستثمار لمدة ١٢ شهر (العائد التراكمي). الأرقام بت_RATE من نشرة البنك المركزي.",
+ "note": "شهادة ٣ شهور = متوسط فائدة الودائع (أكثر من شهر و≤ ٣ شهور). شهادة سنة = شهادة الاستثمار لمدة ١٢ شهر. السلسلة من الملحق الإحصائي (٢/٥/١) + نشرات الإحصاء الشهري ٣٤١→٣٥٢. ⚠️ النشرات بتدي قيمة آخر الشهر والملحق بيتوسط الشهر ⇒ فرق ≤ ٠٫٥٪ في الشهور دي.",
+ "coverage": {
+  "from": "2020-08",
+  "to": "2026-07",
+  "months": 68,
+  "gaps": [
+   "2020-08→2021-01"
+  ]
+ },
  "sources": [
   {
    "name": "البنك المركزي المصري — Economic Review Vol.66 (2025/2026), Statistical Annex (2/5/1)",
@@ -8,32 +16,79 @@
    "covers": "٢٠٢٣-٠١ → ٢٠٢٥-١٢"
   },
   {
+   "name": "البنك المركزي المصري — Monthly Statistical Bulletin (8/2025)",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/august/monthly-statistical-bulletin-341.pdf",
+   "covers": "شهر 8 عبر ٢٠٢١ → ٢٠٢٦"
+  },
+  {
+   "name": "البنك المركزي المصري — Monthly Statistical Bulletin (9/2025)",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/september/monthly-statistical-bulletin-342.pdf",
+   "covers": "شهر 9 عبر ٢٠٢١ → ٢٠٢٦"
+  },
+  {
+   "name": "البنك المركزي المصري — Monthly Statistical Bulletin (10/2025)",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/oct/monthly-statistical-bulletin-343.pdf",
+   "covers": "شهر 10 عبر ٢٠٢١ → ٢٠٢٦"
+  },
+  {
+   "name": "البنك المركزي المصري — Monthly Statistical Bulletin (11/2025)",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/nov/monthly-statistical-bulletin-344.pdf",
+   "covers": "شهر 11 عبر ٢٠٢١ → ٢٠٢٦"
+  },
+  {
+   "name": "البنك المركزي المصري — Monthly Statistical Bulletin (12/2025)",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/dec/monthly-statistical-bulletin-345.pdf",
+   "covers": "شهر 12 عبر ٢٠٢١ → ٢٠٢٦"
+  },
+  {
+   "name": "البنك المركزي المصري — Monthly Statistical Bulletin (1/2026)",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/jan/monthly-statistical-bulletin-346.pdf",
+   "covers": "شهر 1 عبر ٢٠٢١ → ٢٠٢٦"
+  },
+  {
+   "name": "البنك المركزي المصري — Monthly Statistical Bulletin (2/2026)",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/feb/monthly-statistical-bulletin-347.pdf",
+   "covers": "شهر 2 عبر ٢٠٢١ → ٢٠٢٦"
+  },
+  {
    "name": "البنك المركزي المصري — Monthly Statistical Bulletin (3/2026)",
-   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/3/monthly-statistical-bulletin-348.pdf",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/march/monthly-statistical-bulletin-348.pdf",
    "covers": "شهر 3 عبر ٢٠٢١ → ٢٠٢٦"
   },
   {
    "name": "البنك المركزي المصري — Monthly Statistical Bulletin (4/2026)",
-   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/4/monthly-statistical-bulletin-349.pdf",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/april/monthly-statistical-bulletin-349.pdf",
    "covers": "شهر 4 عبر ٢٠٢١ → ٢٠٢٦"
   },
   {
    "name": "البنك المركزي المصري — Monthly Statistical Bulletin (5/2026)",
-   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/5/monthly-statistical-bulletin-350.pdf",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/may/monthly-statistical-bulletin-350.pdf",
    "covers": "شهر 5 عبر ٢٠٢١ → ٢٠٢٦"
   },
   {
    "name": "البنك المركزي المصري — Monthly Statistical Bulletin (6/2026)",
-   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/6/monthly-statistical-bulletin-351.pdf",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/june/monthly-statistical-bulletin-351.pdf",
    "covers": "شهر 6 عبر ٢٠٢١ → ٢٠٢٦"
   },
   {
    "name": "البنك المركزي المصري — Monthly Statistical Bulletin (7/2026)",
-   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/7/monthly-statistical-bulletin-352.pdf",
+   "url": "https://www.cbe.org.eg/-/media/project/cbe/listing/monthly-statistical-bulletin/bulletin/july/monthly-statistical-bulletin-352.pdf",
    "covers": "شهر 7 عبر ٢٠٢١ → ٢٠٢٦"
   }
  ],
  "rates": {
+  "2020-08": {
+   "dep_3m": 6.9,
+   "cert_1y": 13.0
+  },
+  "2021-01": {
+   "dep_3m": 7.4,
+   "cert_1y": 6.0
+  },
+  "2021-02": {
+   "dep_3m": 7.4,
+   "cert_1y": 6.0
+  },
   "2021-03": {
    "dep_3m": 7.4,
    "cert_1y": 6.0
@@ -54,6 +109,34 @@
    "dep_3m": 7.4,
    "cert_1y": 6.0
   },
+  "2021-08": {
+   "dep_3m": 7.4,
+   "cert_1y": 6.0
+  },
+  "2021-09": {
+   "dep_3m": 7.4,
+   "cert_1y": 6.0
+  },
+  "2021-10": {
+   "dep_3m": 7.4,
+   "cert_1y": 6.0
+  },
+  "2021-11": {
+   "dep_3m": 7.4,
+   "cert_1y": 6.0
+  },
+  "2021-12": {
+   "dep_3m": 7.4,
+   "cert_1y": 6.0
+  },
+  "2022-01": {
+   "dep_3m": 8.6,
+   "cert_1y": 7.5
+  },
+  "2022-02": {
+   "dep_3m": 8.6,
+   "cert_1y": 7.5
+  },
   "2022-03": {
    "dep_3m": 8.6,
    "cert_1y": 7.5
@@ -71,6 +154,26 @@
    "cert_1y": 7.5
   },
   "2022-07": {
+   "dep_3m": 8.6,
+   "cert_1y": 7.5
+  },
+  "2022-08": {
+   "dep_3m": 8.6,
+   "cert_1y": 7.5
+  },
+  "2022-09": {
+   "dep_3m": 8.6,
+   "cert_1y": 7.5
+  },
+  "2022-10": {
+   "dep_3m": 8.6,
+   "cert_1y": 7.5
+  },
+  "2022-11": {
+   "dep_3m": 8.6,
+   "cert_1y": 7.5
+  },
+  "2022-12": {
    "dep_3m": 8.6,
    "cert_1y": 7.5
   },
@@ -216,6 +319,14 @@
   },
   "2025-12": {
    "dep_3m": 15.9,
+   "cert_1y": 14.0
+  },
+  "2026-01": {
+   "dep_3m": 15.9,
+   "cert_1y": 14.0
+  },
+  "2026-02": {
+   "dep_3m": 15.3,
    "cert_1y": 14.0
   },
   "2026-03": {

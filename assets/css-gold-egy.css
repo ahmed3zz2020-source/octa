@@ -333,7 +333,7 @@ body.eg-lock { overflow: hidden !important; }
   .gbal-pivot { top: 4px; height: 26px; }
   .gbal-stick { width: 96px; margin-inline-start: -48px; }
   /* ⛔ الموبايل: الشريطين (الأعلى/الأدنى) بيتراكبوا ⇒ هنخفيهم
-     ⭐ والنيج和大؟ لأ — الأشرطة اللي تحت بتوضّح كل الأصول بأرقامها. */
+     ⭐ والنتيجة؟ لأ — الأشرطة اللي تحت بتوضّح كل الأصول بأرقامها. */
   .gbal-scale { display: none; }
   .gbar { grid-template-columns: 96px 1fr 64px; font-size: .72rem; }
   .egkv-r { grid-template-columns: 1fr; }
@@ -506,3 +506,57 @@ body.eg-lock { overflow: hidden !important; }
   box-shadow: -1px 0 0 var(--line);
 }
 .gtbl.gym thead th:first-child { background: var(--wash); }
+
+/* ══════════════════════════════════════════════════════════════════
+   ⭐ v3 — ١٥ نوفمبر ٢٠٢٦: شارت لكل أصل (small multiples) + محور ٪
+   ══════════════════════════════════════════════════════════════════ */
+.egminis {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--s3);
+}
+@media (min-width: 560px) {
+  .egminis { grid-template-columns: 1fr 1fr; }
+}
+.egmini {
+  border: 1px solid var(--line);
+  border-radius: var(--r3);
+  background: var(--pri);
+  padding: var(--s3);
+}
+.egmini-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.egmini-n { font-weight: 800; font-size: .82rem; }
+.egmini-v { font-weight: 900; font-size: 1rem; white-space: nowrap; }
+.egmini-v.gup { color: var(--up); }
+.egmini-v.gdown { color: var(--dn); }
+.egmini-v.gflat { color: var(--muted); }
+.egmini-v.gt-na { color: var(--dim); font-size: .72rem; }
+.egmini-c { width: 100%; height: 132px; }
+.egmini-f {
+  font-size: .68rem;
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.6;
+}
+.egmini-cov { color: var(--gold); font-weight: 700; }
+/* سطر فرعي في شرائط الميزان (الاسمي + عدد الشهور) */
+.gbar-sub {
+  display: block;
+  font-size: .58rem;
+  font-weight: 700;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.gbar-cov { color: var(--dim); }
+/* ⭐ التبويبات مخفية في عرض المقارنة */
+.gtabs.is-hidden { display: none; }
+@media (max-width: 520px) {
+  .gbar { grid-template-columns: 92px 1fr 76px; }
+  .egmini-c { height: 118px; }
+}

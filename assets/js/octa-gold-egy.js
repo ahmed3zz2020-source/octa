@@ -209,7 +209,7 @@
     var keys = Object.keys(rates).sort();
     if (!keys.length) return null;
     var a = Date.parse(from + 'T00:00:00Z'), b = Date.parse(to + 'T00:00:00Z');
-    var used = 0, missed = 0, prod = 1, lastKey = null;
+    var used = 0, missed = 0, prod = 1, lastKey = null, firstKeyUsed = null;
     var y = new Date(a).getUTCFullYear(), m = new Date(a).getUTCMonth() + 1;
     var endY = new Date(b).getUTCFullYear(), endM = new Date(b).getUTCMonth() + 1;
     var guard = 0;
@@ -220,6 +220,7 @@
       if (r && r.dep_3m != null) {
         prod *= Math.pow(1 + Number(r.dep_3m) / 100, 1 / 12);
         used++; lastKey = key;
+        if (!firstKeyUsed) firstKeyUsed = key;
       } else { missed++; }
       m++; if (m > 12) { m = 1; y++; }
     }
@@ -230,7 +231,15 @@
     if (sy * 12 + sm < fy * 12 + fm) {
       return { unavailable: true, from: firstKey, monthsUsed: used, monthsMissed: missed };
     }
-    return { pct: (prod - 1) * 100, monthsUsed: used, monthsMissed: missed, lastKey: lastKey, partial: missed > 0 };
+    /* ⭐⭐⭐ التغطية: البنك المركزي بينشر بتأخير ⇒ آخر شهر متاح قبل نهاية الفترة.
+       بنحسب العائد على الشهور المتاحة بس + مكافئ سنوي عشان المقارنة تبقى apple-to-apple. */
+    var monthsInPeriod = Math.max(1, Math.round((b - a) / 86400000 / 30.44));
+    var annual = (Math.pow(1 + (prod - 1), monthsInPeriod / used) - 1) * 100;
+    return {
+      pct: (prod - 1) * 100, annual: annual, monthsUsed: used, monthsMissed: missed,
+      firstKey: firstKeyUsed, lastKey: lastKey, partial: missed > 0,
+      monthsInPeriod: monthsInPeriod, lagMonths: Math.max(0, monthsInPeriod - used)
+    };
   }
   function inflationFor(D, p) {
     if (p.row && p.row.real && p.row.real.inflation_pct != null) {
@@ -239,6 +248,9 @@
         label: 'البنك الدولي — CPI مصر · ' + (p.row.real.inflation_window || '')
       };
     }
+    /* ⭐⭐⭐ لو الباك عنده صف للفترة بس من غير تضخم (زي ٢٠ سنة) ⇒ مش بنخمّن
+       ⛔ لأن الرقم الحقيقي لو معروف كان المفروض يبقى موجود ⇒ نسيبه «غير متاح». */
+    if (p.row) return null;
     if (D.last.infl != null) {
       var yrs = Math.max(p.years, 1 / 365);
       return {
@@ -252,6 +264,12 @@
     if (nomPct == null || inflPct == null) return null;
     return ((1 + nomPct / 100) / (1 + inflPct / 100) - 1) * 100;
   }
+  /* ⭐⭐⭐ تحويل أي عائد لمعدّل مكافئ على عدد شهور معيّن
+     (بنستخدمه للشهادات بس: مصدرها متأخر ⇒ بتغطّي شهور أقل من الفترة) */
+  function scaleTo(pct, fromMonths, toMonths) {
+    if (pct == null || !fromMonths || !toMonths) return null;
+    return (Math.pow(1 + pct / 100, toMonths / fromMonths) - 1) * 100;
+  }
 
   var ASSETS = [
     { key: 'gold', name: 'الذهب المصري', unit: 'جرام عيار ٢٤ (ج.م)', color: '#d4af37', icon: '🥇' },
@@ -262,13 +280,28 @@
 
   function mk(key, meta, r, infl, p, extra) {
     var nominal = (r && !r.unavailable && r.pct != null) ? r.pct : null;
-    var real = realOf(nominal, infl && infl.pct != null ? infl.pct : null);
+    var months = p.days / 30.44;                 /* شهور الفترة */
+    var covered = months;                        /* الشهور المغطاة فعليًا */
+    var inflUsed = (infl && infl.pct != null) ? infl.pct : null;
+    var display = nominal;                       /* الرقم المعروض للمقارنة */
+    /* ⭐⭐⭐ الشهادات: البنك المركزي بينشر بتأخير ⇒ بتغطي شهور أقل من الفترة.
+       بنسوّي الرقم لعدد شهور الفترة + بنقسّم التضخم على نفس الشهور
+       ⇒ المقارنة تبقى صح (apples-to-apples) من غير ما نكبّر أرقام الفترات القصيرة. */
+    if (extra && extra.monthsUsed) {
+      covered = Math.max(1, extra.monthsUsed);
+      display = scaleTo(nominal, covered, months);
+      if (inflUsed != null && months > 0) {
+        inflUsed = (Math.pow(1 + inflUsed / 100, covered / months) - 1) * 100;
+      }
+    }
+    var real = realOf(display, inflUsed);
     var cagr = null;
     if (nominal != null && p.years > 0.35) {
       cagr = (Math.pow(1 + nominal / 100, 1 / p.years) - 1) * 100;
     }
     return {
-      key: key, meta: meta, nominal: nominal, real: real, cagr: cagr,
+      key: key, meta: meta, nominal: nominal, display: display, real: real,
+      cagr: cagr, coveredMonths: covered, inflUsed: inflUsed,
       start: r ? r.start : null, end: r ? r.end : null, extra: extra || null
     };
   }
@@ -283,7 +316,13 @@
     rows.push(mk('egx', ASSETS[1], e, infl, p));
     rows.push(mk('usd', ASSETS[2], fxv, infl, p));
     rows.push(mk('cert', ASSETS[3], c ? { pct: c.pct } : null, infl, p, c));
-    return { period: p, rows: rows, infl: infl };
+    return { period: p, rows: rows, infl: infl, certLast: lastCertMonth(D) };
+  }
+  /* ⭐ آخر شهر متاح في سلسلة شهادات البنك المركزي (المصدر بيتأخر) */
+  function lastCertMonth(D) {
+    var rates = (D && D.cert && D.cert.rates) || {};
+    var ks = Object.keys(rates).sort();
+    return ks.length ? ks[ks.length - 1] : null;
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -547,13 +586,14 @@
   }
 
   /* ── مقارنة الأصول (احترافي) ── */
-  function normSeries(series, tFrom, field, step) {
+  function normSeries(series, tFrom, tTo, field, step) {
     var v0 = valueAt(series, tFrom, field);
     if (v0 == null || !v0) return [];
     var out = [], last = -1e9;
     for (var i = 0; i < series.length; i++) {
       var s = series[i];
       if (s.t < tFrom) continue;
+      if (tTo && s.t > tTo) break;          /* ⭐⭐⭐ يقف عند نهاية الفترة */
       if (step && (s.t - last) < step * 86400000) continue;
       var v = field ? s[field] : s.v;
       if (v == null || !v) continue;
@@ -562,50 +602,78 @@
     }
     return out;
   }
-  function certIndex(D, tFrom) {
+  /* ⭐⭐⭐ سلسلة الشهادات على أساس ١٠٠ من بداية النافذة
+     ⛔ كانت بتتراكم من ٢٠٢١ (من غير إعادة ضبط) ⇒ الخط كان طاير فوق والرقم ١٧٨
+     ⛔ كمان: لازم تقف عند نهاية الفترة (p.to) زي باقي الأصول */
+  function certIndex(D, tFrom, tTo) {
     var rates = (D.cert && D.cert.rates) || {};
     var keys = Object.keys(rates).sort();
-    var out = [], prod = 1, started = false;
+    var prod = 1, base = null, out = [];
     for (var i = 0; i < keys.length; i++) {
       var k = keys[i];
       var t = Date.parse(k + '-15T00:00:00Z');
-      if (t < tFrom) { prod *= Math.pow(1 + Number(rates[k].dep_3m) / 100, 1 / 12); continue; }
-      started = true;
-      prod *= Math.pow(1 + Number(rates[k].dep_3m) / 100, 1 / 12);
-      out.push({ t: t, v: prod * 100 });
+      var f = Math.pow(1 + Number(rates[k].dep_3m) / 100, 1 / 12);
+      if (base === null) {
+        if (t < tFrom) { prod *= f; continue; }
+        base = prod;                                   // ⭐ نقطة البداية
+        out.push({ t: tFrom, v: 100 });
+      }
+      if (t > tTo) break;
+      prod *= f;
+      out.push({ t: t, v: (prod / base) * 100 });
     }
-    return started ? out : [];
+    return out;
+  }
+  /* ⭐ تحويل السلسلة لخط درج (الشهادة بتتراكم شهرياً مش خط مستقيم) */
+  function toStep(pts) {
+    var out = [];
+    for (var i = 0; i < pts.length; i++) {
+      out.push({ t: pts[i].t, v: pts[i].v });
+      if (i + 1 < pts.length) {
+        out.push({ t: pts[i + 1].t - 1000, v: pts[i].v });   // يفضل ثابت لحد الشهر اللي بعده
+      }
+    }
+    return out;
+  }
+  /* ⭐⭐⭐ تنسيق محور السعر كنسبة مئوية من نقطة البداية (١٠٠ = صفر٪) */
+  function pctFormatter(v) {
+    var d = (v - 100);
+    var s = (d > 0 ? '+' : (d < 0 ? '−' : ''));
+    return s + Math.abs(d).toFixed(Math.abs(d) < 10 ? 1 : 0) + '٪';
   }
   function drawCompareChart(host, D, p) {
-    if (!host) return;
+    if (!host) return [];
     var tFrom = Date.parse(p.from + 'T00:00:00Z');
+    var tTo = Date.parse(p.to + 'T00:00:00Z');
     var step = p.days > 900 ? 7 : (p.days > 200 ? 3 : 1);
     var series = [
-      { name: 'الذهب المصري', color: '#d4af37', data: normSeries(D.gold, tFrom, 'gram', step) },
-      { name: 'EGX30', color: '#38bdf8', data: normSeries(D.egx, tFrom, 'v', step) },
-      { name: 'الدولار/الجنيه', color: '#a78bfa', data: normSeries(D.gold, tFrom, 'fx', step) },
-      { name: 'شهادات الادخار', color: '#22c55e', data: certIndex(D, tFrom) }
+      { key: 'gold', name: ASSETS[0].name, color: ASSETS[0].color, data: normSeries(D.gold, tFrom, tTo, 'gram', step) },
+      { key: 'egx', name: ASSETS[1].name, color: ASSETS[1].color, data: normSeries(D.egx, tFrom, tTo, 'v', step) },
+      { key: 'usd', name: ASSETS[2].name, color: ASSETS[2].color, data: normSeries(D.gold, tFrom, tTo, 'fx', step) },
+      { key: 'cert', name: ASSETS[3].name, color: ASSETS[3].color, data: toStep(certIndex(D, tFrom, tTo)) }
     ].filter(function (s) { return s.data && s.data.length > 1; });
-    if (!series.length) { host.innerHTML = '<div class="gmute">مفيش بيانات كافية للرسم.</div>'; return; }
+    if (!series.length) { host.innerHTML = '<div class="gmute">مفيش بيانات كافية للرسم.</div>'; return []; }
     loadLib().then(function (lib) {
       try {
         host.innerHTML = '';
-        var chart = chartBase(host, Math.max(250, Math.min(360, Math.round(window.innerHeight * 0.36))));
-        var base = chart.addSeries(lib.LineSeries, {
-          color: 'rgba(139,158,176,.55)', lineWidth: 1, lineStyle: 2,
-          priceLineVisible: false, lastValueVisible: false
-        });
-        base.setData(series[0].data.map(function (q) {
-          return { time: Math.floor(q.t / 1000), value: 100 };
-        }));
+        var chart = chartBase(host, Math.max(250, Math.min(340, Math.round(window.innerHeight * 0.32))));
+        /* ⭐ خط الأساس: نقطة البداية = ١٠٠ (٠٪) */
         series.forEach(function (s) {
           var line = chart.addSeries(lib.LineSeries, {
-            color: s.color, lineWidth: 2, priceLineVisible: false, lastValueVisible: true
+            color: s.color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false,
+            priceFormat: { type: 'custom', formatter: pctFormatter, minMove: 0.01 }
           });
           line.setData(s.data.map(function (q) {
             return { time: Math.floor(q.t / 1000), value: Math.round(q.v * 100) / 100 };
           }));
         });
+        chart.addSeries(lib.LineSeries, {
+          color: 'rgba(139,158,176,.5)', lineWidth: 1, lineStyle: 2,
+          priceLineVisible: false, lastValueVisible: false,
+          priceFormat: { type: 'custom', formatter: pctFormatter, minMove: 0.01 }
+        }).setData(series[0].data.map(function (q) {
+          return { time: Math.floor(q.t / 1000), value: 100 };
+        }));
         chart.timeScale().fitContent();
         host.__chart = chart;
         window.addEventListener('resize', function () {
@@ -617,49 +685,125 @@
     }).catch(function () {
       host.innerHTML = '<div class="gmute">تعذّر تحميل مكتبة الرسم — الأرقام في الجدول تحت.</div>';
     });
+    return series;
+  }
+
+  /* ⭐⭐⭐⭐ شارت لكل أصل لوحده (أوضح بكتير من ٤ خطوط في شارت واحد) */
+  function drawMiniCharts(host, D, p, cmp) {
+    if (!host) return;
+    var tFrom = Date.parse(p.from + 'T00:00:00Z');
+    var tTo = Date.parse(p.to + 'T00:00:00Z');
+    var step = p.days > 900 ? 7 : (p.days > 200 ? 3 : 1);
+    var defs = [
+      { key: 'gold', name: ASSETS[0].name, icon: ASSETS[0].icon, color: ASSETS[0].color, data: normSeries(D.gold, tFrom, tTo, 'gram', step) },
+      { key: 'egx', name: ASSETS[1].name, icon: ASSETS[1].icon, color: ASSETS[1].color, data: normSeries(D.egx, tFrom, tTo, 'v', step) },
+      { key: 'usd', name: ASSETS[2].name, icon: ASSETS[2].icon, color: ASSETS[2].color, data: normSeries(D.gold, tFrom, tTo, 'fx', step) },
+      { key: 'cert', name: ASSETS[3].name, icon: ASSETS[3].icon, color: ASSETS[3].color, data: toStep(certIndex(D, tFrom, tTo)) }
+    ];
+    var byKey = {};
+    cmp.rows.forEach(function (r) { byKey[r.key] = r; });
+    host.innerHTML = '<div class="egminis">' + defs.map(function (d, i) {
+      var r = byKey[d.key] || {};
+      var pct = r.real;
+      var nom = (r.display != null) ? r.display : r.nominal;
+      var cov = (r.extra && r.extra.monthsUsed) ? r.extra.monthsUsed : null;
+      var sub = '';
+      if (nom == null) {
+        sub = '<div class="egmini-f">المصدر مش متاح للفترة دي</div>';
+      } else {
+        sub = '<div class="egmini-f">اسمي ' + sgn(nom, 1) +
+          (r.real != null ? ' · بعد التضخم ' + sgn(r.real, 1) : '') +
+          (cov ? ' · <span class="egmini-cov">' + num(cov, 0) + ' شهر من المصدر</span>' : '') + '</div>';
+      }
+      var badge = (pct == null) ? '<span class="egmini-v gt-na">غير متاح</span>'
+        : '<span class="egmini-v ' + sgnCls(pct) + '">' + sgn(pct, 1) + '</span>';
+      return '<div class="egmini">' +
+        '<div class="egmini-h"><span class="egmini-n">' + d.icon + ' ' + esc(d.name) + '</span>' + badge + '</div>' +
+        '<div class="egmini-c" id="egmini-' + d.key + '"></div>' + sub + '</div>';
+    }).join('') + '</div>' +
+      '<div class="egnote">📈 كل شارت لوحده بمقياسه (مش ده خطأ) — الرقم الكبير = العائد الحقيقي بعد التضخم. ' +
+      'الأساس في كلهم = نقطة بداية الفترة (٠٪).</div>';
+    loadLib().then(function (lib) {
+      defs.forEach(function (d) {
+        var el = document.getElementById('egmini-' + d.key);
+        if (!el || !d.data || d.data.length < 2) {
+          if (el) el.innerHTML = '<div class="gmute">مفيش بيانات للفترة دي.</div>';
+          return;
+        }
+        try {
+          var ch = chartBase(el, 132);
+          var line = ch.addSeries(lib.LineSeries, {
+            color: d.color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false,
+            priceFormat: { type: 'custom', formatter: pctFormatter, minMove: 0.01 }
+          });
+          line.setData(d.data.map(function (q) {
+            return { time: Math.floor(q.t / 1000), value: Math.round(q.v * 100) / 100 };
+          }));
+          var base = ch.addSeries(lib.LineSeries, {
+            color: 'rgba(139,158,176,.45)', lineWidth: 1, lineStyle: 2,
+            priceLineVisible: false, lastValueVisible: false,
+            priceFormat: { type: 'custom', formatter: pctFormatter, minMove: 0.01 }
+          });
+          base.setData(d.data.map(function (q) { return { time: Math.floor(q.t / 1000), value: 100 }; }));
+          ch.timeScale().fitContent();
+          ch.timeScale().applyOptions({ visible: false });
+          el.__chart = ch;
+        } catch (e) { el.innerHTML = '<div class="gmute">تعذّر الرسم.</div>'; }
+      });
+    }).catch(function () { });
   }
 
   /* ══════════════════════════════════════════════════════════
      ⑥ الميزان
      ══════════════════════════════════════════════════════════ */
+  /* ⭐⭐⭐ الترتيب بالمعدّل السنوي المكافئ الحقيقي (مش نفسه) عشان المقارنة
+     تكون على نفس المدة حتى لو مصدر أصل اقصر (زي الشهادات). */
+  function scoreOf(r) { return r.real; }
   function balanceHtml(cmp) {
-    var rows = cmp.rows.filter(function (r) { return r.real != null; });
+    var rows = cmp.rows.filter(function (r) { return scoreOf(r) != null; });
     if (rows.length < 2) {
       return '<div class="gbal-empty">مفيش أصول قابلة للمقارنة في الفترة دي.</div>';
     }
-    rows.sort(function (a, b) { return b.real - a.real; });
+    rows.sort(function (a, b) { return scoreOf(b) - scoreOf(a); });
     var best = rows[0], worst = rows[rows.length - 1];
-    var diff = Math.abs(best.real - worst.real);
+    var diff = Math.abs(scoreOf(best) - scoreOf(worst));
     var tilt = Math.max(2, Math.min(9, diff / 3));
+    var maxAbs = Math.max.apply(null, cmp.rows.map(function (x) {
+      var s = scoreOf(x); return s == null ? 0 : Math.abs(s);
+    }));
     return '<div class="gbal" role="img" aria-label="مقارنة الأصول">' +
       '<div class="gbal-beam">' +
       '<div class="gbal-pivot" style="transform:rotate(-' + tilt.toFixed(2) + 'deg)">' +
       '<div class="gbal-stick"></div></div>' +
       '<div class="gbal-scale gbal-scale-l">' +
       '<span class="gbal-sname">' + esc(worst.meta.icon + ' ' + worst.meta.name) + '</span>' +
-      '<span class="gbal-sval ' + sgnCls(worst.real) + '">' + sgn(worst.real, 1) + '</span>' +
+      '<span class="gbal-sval ' + sgnCls(scoreOf(worst)) + '">' + sgn(scoreOf(worst), 1) + '</span>' +
       '</div>' +
       '<div class="gbal-scale gbal-scale-r">' +
       '<span class="gbal-sname">' + esc(best.meta.icon + ' ' + best.meta.name) + '</span>' +
-      '<span class="gbal-sval ' + sgnCls(best.real) + '">' + sgn(best.real, 1) + '</span>' +
+      '<span class="gbal-sval ' + sgnCls(scoreOf(best)) + '">' + sgn(scoreOf(best), 1) + '</span>' +
       '</div>' +
       '<div class="gbal-base"></div></div>' +
       '<div class="gbal-winner ' + (best.key === 'gold' ? 'is-gold' : '') + '">' +
       '<span class="gbal-winner-n">' + best.meta.icon + ' ' + esc(best.meta.name) + '</span>' +
-      '<span class="gbal-winner-v ' + sgnCls(best.real) + '">' + sgn(best.real, 1) + '</span>' +
-      '<span class="gbal-winner-s">الأعلى عائداً حقيقياً (بعد التضخم) في الفترة دي</span></div>' +
+      '<span class="gbal-winner-v ' + sgnCls(scoreOf(best)) + '">' + sgn(scoreOf(best), 1) + '</span>' +
+      '<span class="gbal-winner-s">الأعلى عائداً حقيقياً (بعد التضخم) في نفس طول الفترة</span></div>' +
       '<div class="gbal-bars">' + cmp.rows.map(function (r) {
-        if (r.real == null) {
+        var sc = scoreOf(r);
+        if (sc == null) {
           return '<div class="gbar gbar-na"><span class="gbar-n">' + esc(r.meta.icon + ' ' + r.meta.name) +
             '</span><span class="gbar-v">غير متاح</span></div>';
         }
-        var max = Math.max.apply(null, cmp.rows.map(function (x) { return x.real == null ? 0 : Math.abs(x.real); }));
-        var w = max > 0 ? Math.max(3, Math.round(Math.abs(r.real) / max * 100)) : 0;
+        var w = maxAbs > 0 ? Math.max(3, Math.round(Math.abs(sc) / maxAbs * 100)) : 0;
+        var shown = (r.display != null) ? r.display : r.nominal;
+        var sub = (shown != null) ? ('<small class="gbar-sub">اسمي ' + sgn(shown, 1) + '</small>') : '';
+        var cov = (r.extra && r.extra.monthsUsed) ? ('<small class="gbar-sub gbar-cov">' + num(r.extra.monthsUsed, 0) + ' شهر متاح</small>') : '';
         return '<div class="gbar"><span class="gbar-n">' + esc(r.meta.icon + ' ' + r.meta.name) + '</span>' +
-          '<span class="gbar-track"><span class="gbar-fill ' + sgnCls(r.real) + '" style="width:' + w + '%"></span></span>' +
-          '<span class="gbar-v ' + sgnCls(r.real) + '">' + sgn(r.real, 1) + '</span></div>';
+          '<span class="gbar-track"><span class="gbar-fill ' + sgnCls(sc) + '" style="width:' + w + '%"></span></span>' +
+          '<span class="gbar-v ' + sgnCls(sc) + '">' + sgn(sc, 1) + sub + cov + '</span></div>';
       }).join('') + '</div>' +
-      '<div class="gbal-note">⚖️ الميزان يقارن العائد الحقيقي (بعد التضخم) — لأن ده العائد اللي بيفرق في جيبك فعلاً. والأرقام الاسمية تحت.</div>';
+      '<div class="gbal-note">⚖️ الميزان يقارن <b>العائد الحقيقي (بعد التضخم)</b> — لأن ده العائد اللي بيفرق في جيبك فعلاً. ' +
+      'ولأن مصدر الشهادات بيتأخر، بنحطّ رقمه على طول الفترة نفسه قبل المقارنة. والرقم تحت = العائد الاسمي.</div>';
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -783,20 +927,28 @@
      ⑩ جدول المقارنة + مثال ١٠٠ ألف + مصفوفة العوائد السنوية
      ══════════════════════════════════════════════════════════ */
   function tableHtml(cmp, allRows) {
-    var infl = cmp.infl;
     var head = '<tr><th>الفترة</th><th>الذهب المصري</th><th>EGX30</th><th>الدولار/الجنيه</th>' +
       '<th>شهادات الادخار</th><th>التضخم في الفترة</th><th>الأعلى (اسمي)</th></tr>';
     var body = allRows.map(function (r) {
       var best = null;
       r.cmp.rows.forEach(function (x) {
-        if (x.nominal == null) return;
-        if (!best || x.nominal > best.nominal) best = x;
+        var a = (x.display != null) ? x.display : x.nominal;
+        if (a == null) return;
+        if (!best || a > best._a) { best = x; best._a = a; }
       });
       return '<tr class="gtr' + (r.cmp.period.key === cmp.period.key ? ' is-on' : '') + '">' +
         '<td class="gtl">' + esc(r.cmp.period.label) +
         '<small>' + dtxt(r.cmp.period.from) + ' ← ' + dtxt(r.cmp.period.to) + '</small></td>' +
         r.cmp.rows.map(function (x) {
           if (x.nominal == null) return '<td class="gtc gt-na">غير متاح</td>';
+          /* ⭐ الشهادات: المصدر بيتأخر ⇒ بتغطي شهور أقل ⇒ بنعرض «مكافئ سنوي»
+             جنب العائد الفعلي للشهور المتاحة (وغير كده المقارنة مش صح). */
+          if (x.key === 'cert' && x.extra && x.extra.monthsUsed) {
+            var ann = x.display != null ? x.display : x.nominal;
+            return '<td class="gtc ' + sgnCls(ann) + '">' + sgn(ann, 1) +
+              '<small class="gt-part">معدّل الفترة · على ' + num(x.extra.monthsUsed, 0) + ' شهر: ' + sgn(x.nominal, 1) + '</small>' +
+              (x.real != null ? '<small>حقيقي ' + sgn(x.real, 1) + '</small>' : '') + '</td>';
+          }
           var ex = '';
           if (x.extra && x.extra.partial && x.extra.monthsUsed) {
             ex = '<small class="gt-part">محسوب على ' + num(x.extra.monthsUsed, 0) + ' شهر</small>';
@@ -804,11 +956,15 @@
           return '<td class="gtc ' + sgnCls(x.nominal) + '">' + sgn(x.nominal, 1) +
             (x.real != null ? '<small>حقيقي ' + sgn(x.real, 1) + '</small>' : '') + ex + '</td>';
         }).join('') +
-        '<td class="gtc gt-infl">' + (infl && infl.pct != null ? sgn(infl.pct, 1) : '—') + '</td>' +
+        '<td class="gtc gt-infl">' + (r.cmp.infl && r.cmp.infl.pct != null ? sgn(r.cmp.infl.pct, 1) : '—') + '</td>' +
         '<td class="gtc gt-win">' + (best ? esc(best.meta.icon + ' ' + best.meta.name.split(' ')[0]) : '—') + '</td>' +
         '</tr>';
     }).join('');
-    return '<div class="gtbl-wrap"><table class="gtbl"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>';
+    return '<div class="gtbl-wrap"><table class="gtbl"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' +
+      '<div class="egnote">📋 الأرقام = عائد الفترة (اسمي + الحقيقي بعد التضخم). ' +
+      '🏦 شهادات الادخار: البنك المركزي بينشر بتأخير ⇒ آخر شهر متاح <b>' +
+      esc(cmp.certLast || '—') + '</b> ⇒ بتغطّي شهور أقل من الفترة، ' +
+      'فنعرض «سنوي مكافئ» + العائد الفعلي للشهور المتاحة.</div>';
   }
   function exampleHtml(cmp) {
     var AMOUNT = 100000;
@@ -817,20 +973,29 @@
         return '<div class="gex gex-na"><div class="gex-n">' + esc(r.meta.icon + ' ' + r.meta.name) +
           '</div><div class="gex-v">غير متاح</div><div class="gex-s">المصدر مش متاح للفترة دي</div></div>';
       }
-      var nom = AMOUNT * (1 + r.nominal / 100);
-      var real = r.real == null ? null : AMOUNT * (1 + r.real / 100);
-      var exn = (r.extra && r.extra.partial && r.extra.monthsUsed)
-        ? '<div class="gex-s">محسوب على ' + num(r.extra.monthsUsed, 0) + ' شهر من المصدر</div>' : '';
+      /* ⭐ الشهادات: المصدر متأخر ⇒ نعرض المعدّل السنوي المكافئ (نفس المدة زي الباقي) */
+      var useAnn = (r.key === 'cert' && r.display != null);
+      var nomPct = useAnn ? r.display : r.nominal;
+      var realPct = r.real;
+      var nom = AMOUNT * (1 + nomPct / 100);
+      var real = realPct == null ? null : AMOUNT * (1 + realPct / 100);
+      var exn = '';
+      if (r.extra && r.extra.monthsUsed) {
+        exn = '<div class="gex-s">' + (useAnn ? 'معدّل الفترة · محسوب على' : 'محسوب على') + ' ' +
+          num(r.extra.monthsUsed, 0) + ' شهر من المصدر</div>';
+      }
       return '<div class="gex">' +
         '<div class="gex-n">' + esc(r.meta.icon + ' ' + r.meta.name) + '</div>' +
         '<div class="gex-v">' + num(nom, 0) + ' <small>ج.م</small></div>' +
-        '<div class="gex-s">من ' + num(AMOUNT, 0) + ' ج.م · ' + sgn(r.nominal, 1) + ' اسمي</div>' + exn +
-        (real != null ? '<div class="gex-r">بعد التضخم: ' + num(real, 0) + ' ج.م <small>(' + sgn(r.real, 1) + ')</small></div>' : '') +
+        '<div class="gex-s">من ' + num(AMOUNT, 0) + ' ج.م · ' + sgn(nomPct, 1) + ' اسمي</div>' + exn +
+        (real != null ? '<div class="gex-r">بعد التضخم: ' + num(real, 0) + ' ج.م <small>(' + sgn(realPct, 1) + ')</small></div>' : '') +
         '</div>';
     }).join('');
     return '<div class="gex-wrap">' + cards + '</div>' +
       '<div class="gex-note">💰 المثال: ' + num(AMOUNT, 0) + ' جنيه في بداية الفترة (' + dtxt(cmp.period.from) +
-      ') · قيمة اليوم (' + dtxt(cmp.period.to) + ') بالأسعار الفعلية — قبل أي رسوم أو ضرائب.</div>';
+      ') · قيمة اليوم (' + dtxt(cmp.period.to) + ') بالأسعار الفعلية — قبل أي رسوم أو ضرائب.' +
+      (cmp.certLast ? ' 🏦 رقم الشهادات معدّل على طول الفترة لأن آخر شهر متاح من البنك المركزي ' + esc(cmp.certLast) + '.' : '') +
+      '</div>';
   }
   /* ⭐⭐⭐ مصفوفة العوائد السنوية (لكل أصل × كل سنة) */
   function yearlyMatrixHtml(D) {
@@ -962,6 +1127,10 @@
         bs[i].classList.toggle('is-on', on);
         bs[i].setAttribute('aria-selected', on ? 'true' : 'false');
       }
+      /* ⭐⭐⭐ في عرض المقارنة التبويبات مخفية — عشان «تحليل الذهب» مايفضلش
+         باين مفعّل والمحتوى مختلف (كان بيلخبط المستخدم). */
+      var tr = w.querySelector('#egtabs');
+      if (tr) tr.classList.toggle('is-hidden', VIEW === 'compare');
     }
     function paintHead() {
       var btn = document.getElementById('egbal-btn');
@@ -991,7 +1160,7 @@
       renderAnalysis(b, D, w);
     }
     function setView(v) {
-      VIEW = v; paintHead();
+      VIEW = v; paintHead(); paintTabs();
       var b = w.querySelector('#egbody');
       if (!b) return;
       if (v === 'compare') { renderCompare(b, D, w); }
@@ -1098,8 +1267,10 @@
         return '<button class="egper' + (i === 0 ? ' is-on' : '') + '" data-p="' + p.key + '">' + esc(p.label) + '</button>';
       }).join('') + '</div>' +
       '<div id="egbal"></div></div>' +
-      '<div class="egsec"><div class="egsec-h">📈 كل الأصول على ١٠٠ (نفس البداية = ١٠٠)</div>' +
-      '<div class="egchart" id="egchart"></div>' +
+      '<div class="egsec"><div class="egsec-h">📈 كل أصل لوحده — أوضح من ٤ خطوط في شارت واحد</div>' +
+      '<div id="egminis"></div></div>' +
+      '<div class="egsec"><div class="egsec-h">📊 الكل في شارت واحد (نفس البداية = ٠٪)</div>' +
+      '<div class="egchart" id="egchartCmp"></div>' +
       '<div class="eglegend" id="eglegend"></div></div>' +
       '<div class="egsec"><div class="egsec-h">🎨 العوائد السنوية</div><div id="egym"></div></div>' +
       '<div class="egsec"><div class="egsec-h">📉 المخاطرة والعائد</div><div id="egrisk"></div></div>' +
@@ -1126,9 +1297,16 @@
       document.getElementById('egtable').innerHTML = tableHtml(c, allRows);
       document.getElementById('egex').innerHTML = exampleHtml(c);
       document.getElementById('egrisk').innerHTML = riskHtml(D, p);
-      drawCompareChart(document.getElementById('egchart'), D, p);
-      document.getElementById('eglegend').innerHTML = ASSETS.map(function (a) {
-        return '<span class="eglg"><i style="background:' + a.color + '"></i>' + esc(a.icon + ' ' + a.name) + '</span>';
+      drawMiniCharts(document.getElementById('egminis'), D, p, c);
+      var drawn = drawCompareChart(document.getElementById('egchartCmp'), D, p);
+      /* ⭐ الـlegend يعرض اللي اترسم فعلاً + العائد beside الاسم */
+      var byKey = {};
+      c.rows.forEach(function (x) { byKey[x.key] = x; });
+      document.getElementById('eglegend').innerHTML = drawn.map(function (s) {
+        var r = byKey[s.key] || {};
+        var pct = (r.key === 'cert' && r.display != null) ? r.display : r.nominal;
+        return '<span class="eglg"><i style="background:' + s.color + '"></i>' + esc(s.name) +
+          (pct != null ? ' <b class="' + sgnCls(pct) + '">' + sgn(pct, 1) + '</b>' : '') + '</span>';
       }).join('');
       var btns = body.querySelectorAll('#egperiods .egper');
       for (var i = 0; i < btns.length; i++) {
