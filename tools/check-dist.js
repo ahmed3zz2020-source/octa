@@ -128,6 +128,32 @@ if (strict) {
   }
 }
 
+/* ⛔⛔⛔ ١٥ نوفمبر ٢٠٢٦ — ⭐ حارس اللقطات في بناء الإنتاج
+   ⛌⛌⛌ المشكلة: `build:strict` كان فيه `OCTA_OPP_SNAPSHOT=1`
+   ⛌⛌⛌ و`deploy.sh` كان بيستعمل نفس البناء للمعاينة والإنتاج
+   ⛌⛌⛌ ⇒ ملفات `data/opp_snapshot.json` و`data/alpha_snapshot.json`
+   ⛌⛌⛌ كانت بتتنسخ في حزمة الإنتاج ⇒ وبتتقدّم على نطاق عام
+   ⛌⛌⛌ من غير تسجيل دخول.
+   ⛔ الحل: في بناء الإنتاج (OCTA_BUILD_TARGET=prod) أي لقطة موجودة
+   ⛔ في dist = بناء مرفوض. ⛔ الفحص بيطبع المسارات بس — مافيش محتوى. */
+const BUILD_TARGET = String(process.env.OCTA_BUILD_TARGET || '').toLowerCase();
+const IS_PROD_BUILD = (BUILD_TARGET === 'prod' || BUILD_TARGET === 'production');
+const SNAPSHOT_FILES = ['data/opp_snapshot.json', 'data/alpha_snapshot.json'];
+if (IS_PROD_BUILD) {
+  for (const f of SNAPSHOT_FILES) {
+    const hit = rel.filter(r => r === f || r.endsWith('/' + f));
+    if (hit.length) {
+      bad++;
+      console.error(`⛔⛔⛔ لقطة محرّك موجودة في بناء الإنتاج → ${hit.join(', ')}`);
+      console.error('   السبب: اللقطات ممنوعة في الإنتاج (تسريب عام). يشتغلوا في المعاينة بس.');
+    }
+  }
+  if (bad) {
+    console.error('\n⛔⛔⛔ البناء الإنتاجي مرفوض — فيه لقطات محرّك.');
+    process.exit(1);
+  }
+}
+
 console.log('🔒 حارس النشر: مفيش ملفات بيانات ممنوعة في dist ✅');
 console.log(`   ${rel.length} ملف · ${(files.reduce((a, f) => a + fs.statSync(f).size, 0) / 1024 / 1024).toFixed(2)} MB`);
 
