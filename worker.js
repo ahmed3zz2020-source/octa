@@ -509,7 +509,7 @@ async function alphaSnapshot(url, request, env) {
   });
 }
 
-function buildHeaders(request) {
+function buildHeaders(request, env) {
   const h = new Headers();
   h.set('Accept', 'application/json');
   /* ⛔ التوكن —Authorization (الباك بيقراه) */
@@ -527,10 +527,22 @@ function buildHeaders(request) {
   /* ⛌ الـIP — الباك بيقراه للrate limit */
   const cf = request.headers.get('CF-Connecting-IP');
   if (cf) h.set('X-Forwarded-For', cf);
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ — دفعة الأمان ٠١ — ⛔ سر الـEdge ⬇️
+     ⛔ ⬇️ الباك على Railway **مكشوف مباشرة** ⬇️ ⬇️
+     ⛔ ⬇️ ⇒ أي حد يقدر يتخطّى الـworker ويصطاد الـAPI ⬇️ ⬇️
+     ⛔ ⬇️ ⇒ ويقدر يكسر عدّادات المحاولات بالترويسات ⬇️ ⬇️
+     ✅ الحل: سر مشترك بين الـworker والباك ⬇️
+     ⛔ ⬇️ (Cloudflare **secret** + Railway variable — مش في الريبو) ⬇️ ⬇️
+     ⛔ ⬇️ + IP العميل الموثّق ⬇️ ⬇️
+     📌 لو الـsecret مش متظبطلوش ⬇️ ⇒ مافيش ترويسة ⬇️ (زي ما كان) ⬇️ */
+  const ps = env && env.OCTA_PROXY_SECRET;
+  if (ps) {
+    h.set('X-OCTA-Proxy', ps);
+    if (cf) h.set('X-OCTA-Client-IP', cf);
+  }
   return h;
 }
-
-/* ═══════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════
    🍪 فيه جلسة ولا لأ؟
    ───────────────────────────────────────────────────────────
    ⛌ بنفحص **وجود** الكوكي بس — مش صحته.
@@ -1570,7 +1582,7 @@ async function handle(request, env, ctx) {
     if (url.pathname === '/api/dividends') {
       try {
         const upTarget = API + url.pathname + url.search;
-        const up = await fetchApi(upTarget, { method: request.method, headers: buildHeaders(request) });
+        const up = await fetchApi(upTarget, { method: request.method, headers: buildHeaders(request, env) });
         const upTxt = await up.text();
         let merged;
         try { merged = JSON.parse(upTxt); } catch (e) { merged = { actions: [] }; }
@@ -1639,7 +1651,7 @@ async function handle(request, env, ctx) {
       const isNews = url.pathname.startsWith('/api/news/');
       try {
         const upTarget = API + url.pathname + url.search;
-        const up = await fetchApi(upTarget, { method: request.method, headers: buildHeaders(request) });
+        const up = await fetchApi(upTarget, { method: request.method, headers: buildHeaders(request, env) });
         const upTxt = await up.text();
         let upJson;
         try { upJson = JSON.parse(upTxt); } catch (e) { upJson = {}; }
@@ -1721,7 +1733,7 @@ async function handle(request, env, ctx) {
            (token_epoch) بيحصل في الخلفية (Railway ممكن يكون بطيء). */
         try {
           const bg = fetchApi(API + '/api/auth/logout', {
-            method: 'POST', headers: buildHeaders(request)
+            method: 'POST', headers: buildHeaders(request, env)
           }).then((r) => r.text()).catch(() => null);
           if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(bg);
         } catch (e) { }
@@ -1737,7 +1749,7 @@ async function handle(request, env, ctx) {
       if (url.pathname.startsWith('/api/opp/') && env && env.OCTA_OPP_SNAPSHOT === 'on') {
         try {
           const live = await fetch(API + url.pathname + url.search,
-            { method: 'GET', headers: buildHeaders(request) });
+            { method: 'GET', headers: buildHeaders(request, env) });
           if (live && live.status === 200) {
             const ct = (live.headers.get('content-type') || '');
             if (ct.indexOf('json') >= 0) {
@@ -1754,7 +1766,7 @@ async function handle(request, env, ctx) {
       if (url.pathname.startsWith('/api/alpha/') && env && env.OCTA_ALPHA_SNAPSHOT === 'on') {
         try {
           const live = await fetch(API + url.pathname + url.search,
-            { method: 'GET', headers: buildHeaders(request) });
+            { method: 'GET', headers: buildHeaders(request, env) });
           if (live && live.status === 200) {
             const ct = (live.headers.get('content-type') || '');
             if (ct.indexOf('json') >= 0) {
@@ -1779,7 +1791,7 @@ async function handle(request, env, ctx) {
       const target = API + url.pathname + url.search;
       const init = {
         method: request.method,
-        headers: buildHeaders(request)
+        headers: buildHeaders(request, env)
       };
       /* ⛔⛔ جسم الطلب — كان بيضيع خالص!
          ⛌ يعني كل POST (chat · analyze · charts · auth) كان

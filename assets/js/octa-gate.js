@@ -1342,6 +1342,26 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  ⛌ ⭐ دلوقتي  المستخدم هو اللي يدوس  وبShown أعرف السبب. */
  }
 
+ /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ — دفعة الأمان ٠١
+  📌 إشعار ثابت فوق الشاشة ⬇️ (toast) ⬇️
+  📌 ⬇️ السبب: `login(1)` بيعيد رسم الشاشة ⬇️ ⬇️
+  📌 ⬇️ ⇒ أي رسالة في #gtMsg بتمسح في نفس اللحظة ⬇️ ⬇️
+  📌 ⬇️ ⇒ المستخدم ما بيقراش السبب خالص ⬇️ ⬇️
+  ✅ الـtoast بيعدّي على إعادة الرسم ⬇️ (ثابت فوق الشاشة) ⬇️ */
+ function toast(msg, bad) {
+  try {
+  var t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);' +
+  'z-index:100002;background:' + (bad ? 'rgba(190,50,50,.96)' : 'rgba(16,185,129,.95)') + ';' +
+  'color:#fff;padding:12px 18px;border-radius:12px;' +
+  'font:700 .86rem/1.6 system-ui;max-width:92vw;text-align:center;' +
+  'box-shadow:0 8px 28px rgba(0,0,0,.45)';
+  document.body.appendChild(t);
+  setTimeout(function () { if (t.remove) t.remove(); }, 6000);
+  } catch (e) { }
+ }
+
  /* 📌 محاولة البصمة — أي فشل بيرجّعنا للوحة ٤ أرقام */
  function doBio(off) {
  off = off || function () { };
@@ -1378,10 +1398,16 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  var msg = '❌ البصمة مش هتنفع على الجهاز ده — استخدم ٤ أرقام';
  if (why === 'bio_not_found') msg = 'ℹ️ البصمة مش مسجّلة على الحساب ده — ادخل بـ٤ أرقام';
  else if (why === 'unauthorized') msg = '⛔ لازم تسجّل دخول الأول — ادخل بـ٤ أرقام';
+ /* 🐞 ١٥ نوفمبر ٢٠٢٦ — دفعة الأمان ٠١ — أسباب الرفض الجديدة */
+ else if (why === 'fingerprint_disabled') msg = '⛔ دخول البصمة موقوف مؤقتاً — استخدم ٤ أرقام';
+ else if (why === 'need_pin') msg = '⛔ لازم تتأكد بالرقم الأول — بعدين البصمة';
  var m = document.getElementById('gtMsg');
  if (m) { m.className = 'gt-msg no'; m.textContent = msg; }
  /* ⛌⛌⛔ ٢٥ أكتوبر — رجوع **فوري** للوحة الأرقام.
  ⛌ + الشاشة نفسها فيها زرار «ادخل بـ٤ أرقام» واضح. */
+ /* 🐞 ١٥ نوفمبر ٢٠٢٦ — ⛔ toast ⬇️ (عشان `login(1)` بيمسح
+ ⛌ #gtMsg ⇒ المستخدم مابقاش بيشوف السبب خالص) ⬇️ */
+ toast(msg, true);
  login(1);
  }).catch(function () {
  off();

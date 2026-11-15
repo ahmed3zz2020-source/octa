@@ -223,6 +223,27 @@
     } catch (e) { return String(s); }
   }
 
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ — دفعة الأمان ٠١ — ⛔ مسارات حالة المستخدم ⬇️
+     ⛔ ⬇️ الكاش العام كان بيخزّن **كل** GET ⬇️ ⬇️
+     ⛔ ⬇️ ⇒ بعد ما المستخدم يخرج ويسجّل دخول بحساب تاني ⬇️ ⬇️
+     ⛔ ⬇️ ⇒ ممكن يشوف بيانات الحساب القديم (محفظة · منبهات) ⬇️ ⬇️
+     ⛔ ⬇️ ⬇️ ⇒ تسريب بين المستخدمين على نفس الجهاز ⬇️ ⬇️
+     ✅ الحل: المسارات دي **بره الكاش** خالص ⬇️ */
+  const NO_CACHE_PATHS = [
+    '/api/auth/me', '/api/auth/refresh', '/api/portfolio',
+    '/api/dashboard', '/api/alerts/watch', '/api/alerts/state',
+    '/api/subscriptions/me', '/api/charts/list', '/api/stats'
+  ];
+
+  function _isUserState(path) {
+    const p = String(path || '');
+    for (let i = 0; i < NO_CACHE_PATHS.length; i++) {
+      const n = NO_CACHE_PATHS[i];
+      if (p === n || p.indexOf(n + '?') === 0) return true;
+    }
+    return false;
+  }
+
   /* 🩺 شغّل على السيرفر التاني لو الرئيسي واقع */
   const ORIG = ORIG_FETCH;
   window.fetch = function (url, opts) {
@@ -338,7 +359,7 @@
   /* ⭐⭐⭐ الكاش القصير: نفس GET اتطلب قبل كده (من غير تغيير في
      المعاملات ⇒ نفس البيانات) ⇒ نردّ من الذاكرة فوراً. */
   const _isGet = (String((opt && opt.method) || 'GET')).toUpperCase() === 'GET';
-  const _ckey = _isGet ? _inflightKey(s) : '';
+  const _ckey = (_isGet && !_isUserState(_pathOf(s))) ? _inflightKey(s) : '';
   if (_ckey) {
     const _hit = _octaCacheGet(_ckey);
     if (_hit) {
