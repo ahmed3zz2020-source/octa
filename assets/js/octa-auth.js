@@ -34,6 +34,11 @@
      ⛔ بيدخل تاني فوراً بعد «تسجيل الخروج».
      ⭐ الحل: نبلّغ السيرفر (/api/auth/logout) ⇒ هو يمسح الكوكي ويلغي
      كل التوكنات القديمة (token_epoch) — ونستنى الرد قبل الـreload. */
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ — ⛔ نجمع التوكن **قبل** المسح ⬇️
+     📌 ⬇️ (بعد المسح مفيش Bearer ⇒ الخروج يعتمد على الكوكي بس) ⬇️
+     📌 ⬇️ ⇒ لو الكوكي مش موجود ⇒ الخروج يفشل ⇒ نبيه المستخدم ⬇️ */
+  var _tok = '';
+  try { _tok = localStorage.getItem('octa_token') || ''; } catch (e) {}
   /* ① مسح المتصفح **قبل** التنقل (التنقل بيوقف السكربت فوراً) */
   try {
   localStorage.removeItem('octa_token');
@@ -42,12 +47,32 @@
   window.OCTA_USER_ID = '';
   } catch (e) { }
   var done = function () { try { location.reload(); } catch (e) { } };
-  /* ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⛔ الـfetch + reload كان بيموت قبل ما
-     يوصل السيرفر ⇒ الكوكي ما بيتمسحش ⇒ المستخدم بيدخل تاني.
-     ⭐ الحل: **تنقل حقيقي** لـ /api/auth/logout ⇒ الـWorker بيمسح
-     الكوكي ويرجّعنا للبوابة. (الكوكي HttpOnly ⇒ المتصفح ما يقدرش
-     يمسحه بنفسه — لازم السيرفر هو اللي يمسحه.) */
-  try { location.replace('/api/auth/logout'); } catch (e) { done(); }
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · المراجعة الأمنية) — ⛔⛔⛔ ⬇️
+     📌 ⬇️ ⛔ كان: تنقل GET ⇒ الرد كان بيرجع فوراً ⬇️ ⬇️ ⬇️
+     📌 ⬇️ ⛔ والإبطال في الخلفية ⇒ «خرج» والتوكن لسه صالح ⬇️ ⬇️ ⬇️
+     📌 ⬇️ ✅ الحل: POST + **ننتظر** الرد ⬇️ ⬇️ ⬇️
+     📌 ⬇️ ✅ ونتحقق إن `revoked=true` ⬇️ ⬇️ ⬇️
+     📌 ⬇️ ✅ ولو فشل ⇒ **مافيش** «نجاح» كاذب (نقوله للمستخدم) ⬇️ ⬇️ ⬇️
+     📌 ⬇️ (الكوكي HttpOnly ⇒ المتصفح ما يقدرش يمسحه بنفسه) ⬇️ ⬇️ ⬇️ */
+  var _fallback = function () {
+    try { location.replace('/api/auth/logout'); } catch (e) { done(); }
+  };
+  try {
+    var _h = { method: 'POST', credentials: 'include', keepalive: true };
+    var _t = _tok || '';
+    if (_t) _h.headers = { 'Authorization': 'Bearer ' + _t };
+    fetch('/api/auth/logout', _h).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (r.ok && j && j.revoked === true) {
+          try { location.replace('/gate.html'); } catch (e) { done(); }
+        } else {
+          /* ⛔ فشل ⇒ نقول الحقيقة ⬇️ (وماننظّفش حاجة) ⬇️ */
+          alert('ما قدرناش نقفل الجلسة على السيرفر.\nحاول تاني أو اعمل "تنظيف الموقع" من صفحة البوابة.');
+          done();
+        }
+      });
+    }).catch(function () { _fallback(); });
+  } catch (e) { _fallback(); }
   }
 
   function getUser() {

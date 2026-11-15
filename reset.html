@@ -64,7 +64,7 @@
          ⛔ ⬇️ ⇒ المستخدم يفتكر إنه خرج بس هو داخل ⬇️ ⬇️
          ✅ الحل: نعيّط /api/auth/logout (إبطال على السيرفر) ⬇️ */
       try {
-        var _h = { credentials: 'include', keepalive: true };
+        var _h = { method: 'POST', credentials: 'include', keepalive: true };
         /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — Bearer كمان ⬇️
            📌 ⬇️ الباك بيطلب Bearer في الكتابة (حماية CSRF) ⬇️ ⬇️
            📌 ⬇️ ⇒ نبعت التوكن لو موجود ⬇️ ⬇️
@@ -73,9 +73,22 @@
           var _t = localStorage.getItem('octa_token') || '';
           if (_t) _h.headers = { 'Authorization': 'Bearer ' + _t };
         } catch (e) {}
-        await fetch('/api/auth/logout', _h);
-        log('تم إغلاق الجلسة على السيرفر');
-      } catch (e) { log('تعذّر إغلاق الجلسة على السيرفر'); }
+        /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · مراجعة ChatGPT) — ⛔⛔⛔ ⬇️
+           📌 ⬇️ ⛔ كان: بنقول «تم إغلاق الجلسة» من غير ما نشوف الرد ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ⛔ ⇒ «نجاح» كاذب ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ✅ الحل: POST + نفحص `res.ok` **و** `revoked === true` ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ✅ ولو فشل ⇒ نقول الحقيقة ⬇️ ⬇️ ⬇️ */
+        var _r = await fetch('/api/auth/logout', _h);
+        var _ok = false, _why = '';
+        try {
+          var _j = await _r.json();
+          _ok = !!( _r.ok && _j && _j.revoked === true );
+          if (!_ok) _why = (_j && (_j.why || _j.error)) || ('http_' + _r.status);
+        } catch (e) { _ok = false; _why = 'bad_response'; }
+        if (_ok) log('تم إغلاق الجلسة على السيرفر');
+        else log('⚠️ ما قدرناش نأكد إن الجلسة اتقفلت على السيرفر'
+          + (_why ? ' (' + _why + ')' : ''));
+      } catch (e) { log('تعذّر الاتصال بالسيرفر لإغلاق الجلسة'); }
 
       /* ③ بيانات المتصفح المحلية (الجلسة بتتسجل تاني بالـPIN) */
       try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
