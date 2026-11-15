@@ -41,6 +41,36 @@
    ⛔ ⬇️ ⇒ ما فيش أي تغيير على سلوك الإنتاج ⬇️ ⬇️
    ⛔ ⬇️ المعاينة: `OCTA_API_URL` = الباك التجريبي ⬇️ ⬇️ */
 const API_DEFAULT = 'https://octa-prices-production-4ccb.up.railway.app';
+
+/* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ سياسة CSP (Report-Only) ⬇️
+   📌 ⬇️ نفس قواعد الـmeta في index.html ⬇️ ⬇️
+   📌 ⬇️ + 'unsafe-inline' مؤقتاً (لأن فيه onclick جوه الـHTML) ⬇️ ⬇️
+   📌 ⬇️ ⇒ لما نخلص نقل الـonclick ⇒ نشيلها ⇒ نحوّل لـenforce ⬇️ ⬇️
+   📌 📌 الخطة: doc/CSP-PLAN.md ⬇️ */
+function cspPolicy() {
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ — ⛔ الـCSP يتبع الوجهة ⬇️
+     📌 ⬇️ ⇒ المعاينة: connect-src = الـstaging (مش الإنتاج) ⬇️ ⬇️ */
+  let p = CSP_REPORT_ONLY;
+  if (API_DIRECT_FIRST) {
+    p = p.split('https://octa-prices-production-4ccb.up.railway.app').join(API_DIRECT_FIRST);
+  }
+  return p;
+}
+
+const CSP_REPORT_ONLY = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'self'",
+  "frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com https://s.tradingview.com https://www.tradingview.com",
+  "form-action 'self'",
+  "img-src 'self' data: blob: https://*.tradingview.com https://*.tradingview-widget.com https://s.tradingview.com",
+  "font-src 'self' data:",
+  "style-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline' https://s3.tradingview.com",
+  "connect-src 'self' https://octa-prices-production-4ccb.up.railway.app https://scanner.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://www.tradingview-widget.com https://news.google.com https://api.rss2json.com https://foudalens.com https://api.cors.lol",
+  "worker-src 'self' blob:",
+].join('; ');
 /* ⛔ بيتحدّد في أول كل طلب (handle/scheduled) ⬇️ */
 let API = API_DEFAULT;
 
@@ -372,6 +402,21 @@ const PROXY_TIMEOUT_FIRST_MS = 15000;
 const PROXY_TRIES = 3;
 
 /* 🔁 جلب من الـAPI مع إعادة محاولة — الخطأ البسيط بيتراجع لوحده */
+/* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · المراجعة الأمنية) — ⛔ رد واضح ⬇️
+   📌 ⬇️ بدل ما نرجع للإنتاج ⇒ نرجع 503 برسالة صريحة ⬇️ ⬇️
+   📌 ⬇️ (المستخدم بيفهم إن البيئة مش جاهزة — مش إن الموقع واقع) ⬇️ ⬇️ */
+function apiUnavailable() {
+  return new Response(JSON.stringify({
+    ok: false,
+    error: 'بيئة المعاينة مش جاهزة — مفيش خادم مربوط (Fail-Closed)',
+    why: 'api_not_configured',
+    hint: 'المطلوب ضبط OCTA_API_URL و OCTA_API_DIRECT للمعاينة'
+  }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
+  });
+}
+
 async function fetchApi(target, init) {
   let lastErr = null;
   for (let i = 0; i < PROXY_TRIES; i++) {
@@ -641,6 +686,14 @@ function hasSession(request) {
 /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ قائمة الاتصال ⬇️
    📌 ⬇️ بتتحقّق في كل صفحة HTML ⬇️ ⬇️ */
 let API_DIRECT_LIST = '';
+/* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · المراجعة الأمنية) — ⛔ fail-closed ⬇️
+   📌 ⬇️ المعاينة **لازم** تفشل بدل ما ترجع للإنتاج ⬇️ ⬇️
+   📌 ⬇️ ⛔ لو `OCTA_API_URL` ناقص ⬇️ ⬇️
+   📌 ⬇️ ⛔ ⇒ الباقي يستجيب للإنتاج ⬇️ ⬇️ ⬇️
+   📌 ⬇️ ⛔ ⇒ أي اختبار معزول بيلوث الإنتاج ⬇️ ⬇️ ⬇️
+   📌 ⬇️ ✅ الحل: `OCTA_FAIL_CLOSED=on` في **المعاينة بس** ⬇️ ⬇️
+   📌 ⬇️ ⛔ الإنتاج: من غير المتغيّر ⇒ سلوكه زي ما هو ⬇️ ⬇️ */
+let API_FAIL_CLOSED = false;
 /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ أول عنوان مباشر ⬇️
    📌 ⬇️ بنستخدموه في تبديل رابط الإنتاج داخل HTML ⬇️ ⬇️
    📌 ⬇️ (CSP connect-src + وضع التشخيص) ⬇️ ⬇️
@@ -665,6 +718,17 @@ function withSiteOrigin(html, origin) {
       ? String(out).replace('</head>', tag + '</head>')
       : (tag + String(out));
     }
+    /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · المراجعة الأمنية) — ⛔⛔⛔ ⬇️
+       📌 ⬇️ ⛔ المعاينة من غير خادم ⬇️ ⬇️ ⬇️
+       📌 ⬇️ ⛔ ⇒ القائمة الفاضية + منع رابط الإنتاج ⬇️ ⬇️ ⬇️
+       📌 ⬇️ ⛔ ⇒ الواجهة ما تروحش للاحتياطي الإنتاج ⬇️ ⬇️ ⬇️
+       📌 ⬇️ ⛔ ⇒ (octa-api.js) كان بيرجع للإنتاج لو القائمة فاضية ⬇️ ⬇️ ⬇️ */
+    if (API_FAIL_CLOSED) {
+      const fc = '<script>window.OCTA_FAIL_CLOSED=1;</script>';
+      out = String(out).indexOf('</head>') !== -1
+      ? String(out).replace('</head>', fc + '</head>')
+      : (fc + String(out));
+    }
     /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔⛔⛔ العزل ⬇️
        📌 ⬇️ ⬇️ الـHTML فيه رابط الإنتاج في مكانين ⬇️ ⬇️ ⬇️
        📌 ⬇️ ⬇️ ① `<meta name="octa-csp-report" ... connect-src 'self' https://octa-prices-production-...` ⬇️ ⬇️ ⬇️
@@ -677,6 +741,14 @@ function withSiteOrigin(html, origin) {
       out = String(out).replace(
         /https:\/\/octa-prices-production-4ccb\.up\.railway\.app/g,
         API_DIRECT_FIRST
+      );
+    } else if (API_FAIL_CLOSED) {
+      /* ⛔⛔⛔ مافيش عنوان ⇒ نستبدل رابط الإنتاج بـ**مضيف ميّت** ⬇️
+         📌 ⇒ المتصفح بيتصل بمضيف مش موجود ⇒ fail-closed ⬇️
+         📌 ⇒ مشProduction أبداً ⬇️ */
+      out = String(out).replace(
+        /https:\/\/octa-prices-production-4ccb\.up\.railway\.app/g,
+        'https://blocked.invalid'
       );
     }
     return out;
@@ -839,6 +911,19 @@ export default {
         'max-age=31536000; includeSubDomains; preload');
       h.set('Cross-Origin-Opener-Policy', 'same-origin');
       h.set('Cross-Origin-Resource-Policy', 'same-origin');
+      /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · مراجعة الأمان) — ⛔ CSP ⬇️
+         📌 ⬇️ ⛔ كان: مافيش CSP **إلا** meta في index.html ⬇️ ⬇️ ⬇️
+         📌 ⬇️ ⛔ ⇒ (meta مش بيلغي أي حاجة · المتصفح بيبلّغ بس) ⬇️ ⬇️ ⬇️
+         📌 ⬇️ ⛔ ⛔ وفيه ~٧٠ onclick جوه الـHTML ⬇️ ⬇️ ⬇️
+         📌 ⬇️ ⛔ ⛔ ⇒ تفعيل enforce دلوقتي هيكسر أزرار ⬇️ ⬇️ ⬇️
+         ✅ الحل (آمن): **Report-Only** ⬇️ ⬇️ ⬇️
+         📌 ⬇️ ⇒ المتصفح بيسجّل المخالفات من غير ما يكسر حاجة ⬇️ ⬇️
+         📌 ⬇️ ⇒ الخطة: نقل الـonclick لـaddEventListener ⬇️ ⬇️
+         📌 ⬇️ ⬇️ (doc/CSP-PLAN.md) ⇒ بعدين نتحوّل لـenforce ⬇️ ⬇️ */
+      try {
+        h.set('Content-Security-Policy-Report-Only', cspPolicy());
+        h.set('Report-To', '{"group":"csp"}');
+      } catch (e) { }
       /* ⛌⛌⛌ CORP على ردود الـAPI: الباك بيرد
          ⛌⛌⛌ cross-origin-resource-policy: same-site والـworker
          ⛌⛌⛌ بيربط الأصول ⇒ ما نكسرش الـfetch من workers.dev. */
@@ -909,7 +994,13 @@ export default {
    */
   async scheduled(event, env, ctx) {
     /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ وجهة الـAPI ⬇️ */
-    API = (env && env.OCTA_API_URL) ? String(env.OCTA_API_URL) : API_DEFAULT;
+    API_FAIL_CLOSED = !!(env && env.OCTA_FAIL_CLOSED === 'on');
+    API = (env && env.OCTA_API_URL) ? String(env.OCTA_API_URL)
+         : (API_FAIL_CLOSED ? '' : API_DEFAULT);
+    if (!API) {
+      console.log('[keepalive]', new Date().toISOString(), 'fail-closed: no API url');
+      return;
+    }
     const target = API + '/api/health';
     let status = 'unknown';
     try {
@@ -949,7 +1040,9 @@ export default {
 
 async function handle(request, env, ctx) {
   /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ وجهة الـAPI ⬇️ */
-  API = (env && env.OCTA_API_URL) ? String(env.OCTA_API_URL) : API_DEFAULT;
+  API_FAIL_CLOSED = !!(env && env.OCTA_FAIL_CLOSED === 'on');
+  API = (env && env.OCTA_API_URL) ? String(env.OCTA_API_URL)
+       : (API_FAIL_CLOSED ? '' : API_DEFAULT);
   /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ قائمة الاتصال ⬇️ */
   API_DIRECT_LIST = apiDirectList(env);
   /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ أول عنوان ⬇️ */
@@ -1822,20 +1915,59 @@ async function handle(request, env, ctx) {
          فيلغي كل التوكنات القديمة (token_epoch) ويمسح الكوكي، (٢) يرجّع
          المستخدم للبوابة. ⭐ التنقل (navigation) مش fetch — عشان الكوكي
          يتمسح فعلاً قبل ما الصفحة الجديدة تفتح. */
-      if (url.pathname === '/api/auth/logout' && request.method === 'GET') {
-        /* ⭐ الرد يتحرّك فوراً (الكوكي يتمسح) — وإبطال التوكنات
-           (token_epoch) بيحصل في الخلفية (Railway ممكن يكون بطيء). */
+      if (url.pathname === '/api/auth/logout'
+        && (request.method === 'GET' || request.method === 'POST')) {
+        /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · المراجعة الأمنية) — ⛔⛔⛔ ⬇️
+           📌 ⬇️ ⛔ كان: الرد يتحرّك فوراً ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ⛔ والإبطال (token_epoch) بيحصل في **الخلفية** ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ⛔ ⇒ المستخدم بيشوف «خرج» والتوكن لسه صالح ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ⛔ ⇒ (حد يقدر يطلب الصفحة بعد ثانية يدخل تاني) ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ✅ الحل: **ننتظر** الباك ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ✅ ونتحقق إن `revoked=true` ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ✅ ونمسح الكوكي **بس** لو الإبطال نجح ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ✅ لو فشل ⇒ 502 + رسالة (مافيش «نجاح» كاذب) ⬇️ ⬇️ ⬇️ */
+        if (!API) return apiUnavailable();
+        let okRevoked = false, why = 'unknown';
         try {
-          const bg = fetchApi(API + '/api/auth/logout', {
+          const up = await fetchApi(API + '/api/auth/logout', {
             method: 'POST', headers: buildHeaders(request, env)
-          }).then((r) => r.text()).catch(() => null);
-          if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(bg);
-        } catch (e) { }
+          });
+          const txt = await up.text();
+          try {
+            const j = JSON.parse(txt);
+            /* ⛔ «already» = مافيش جلسة ⇒ المستخدم فعلاً خارج ⬇️ ⇒ نجاح ⬇️ */
+            const _already = (j && j.already === true);
+            okRevoked = (!!j && (j.revoked === true || _already))
+              && up.status >= 200 && up.status < 300;
+            if (!okRevoked) why = (j && (j.why || j.error)) || ('http_' + up.status);
+          } catch (e) {
+            okRevoked = false; why = 'bad_response';
+          }
+        } catch (e) {
+          okRevoked = false;
+          why = 'backend_unreachable';
+          console.warn('[logout] الباك مش راد:', String(e && e.message || e));
+        }
+        if (!okRevoked) {
+          /* ⛔⛔⛔ فشل ⇒ مافيش «خرج» كاذب ⬇️
+             📌 ⛔ الكوكي بيفضل ⇒ الجلسة بتفضل ⇒ أأمن ⬇️ */
+          const eh = new Headers();
+          eh.set('Content-Type', 'application/json; charset=utf-8');
+          eh.set('Cache-Control', 'no-store');
+          return new Response(JSON.stringify({
+            ok: false, revoked: false, error: 'فشل إبطال الجلسة — لم يتم الخروج', why: why
+          }), { status: 502, headers: eh });
+        }
         const h = new Headers();
         h.set('Set-Cookie', SESSION_COOKIE + '=; Path=/; Max-Age=0; SameSite=None; Secure');
-        h.set('Location', '/gate.html');
         h.set('Cache-Control', 'no-store');
-        return new Response(null, { status: 302, headers: h });
+        if (request.method === 'GET') {
+          h.set('Location', '/gate.html');
+          return new Response(null, { status: 302, headers: h });
+        }
+        h.set('Content-Type', 'application/json; charset=utf-8');
+        return new Response(JSON.stringify({ ok: true, revoked: true }),
+          { status: 200, headers: h });
       }
       /* ⭐⭐ محرّك الفرص (OPP-001) — الباك الحيّ الأول، واللقطة fallback.
          ⛔ في الإنتاج الـOCTA_OPP_SNAPSHOT مش مفعّل ⇒ السلوك القديم
@@ -1882,6 +2014,11 @@ async function handle(request, env, ctx) {
         return new Response(JSON.stringify({ ok: false, error: 'bridge-off', msg: 'الجسر مش شغال' }),
           { status: 503, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
       }
+      /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · المراجعة الأمنية) — ⛔⛔⛔ ⬇️
+         📌 ⬇️ ⛔ مافيش وجهة API ⇒ **ممنوع** نرجع للإنتاج ⬇️ ⬇️ ⬇️
+         📌 ⬇️ ⛔ (المعاينة fail-closed) ⬇️ ⬇️ ⬇️
+         📌 ⬇️ ⛔ نرجع 503 برسالة صريحة ⬇️ ⬇️ ⬇️ */
+      if (!API) return apiUnavailable();
       const target = API + url.pathname + url.search;
       const init = {
         method: request.method,
