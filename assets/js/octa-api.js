@@ -26,13 +26,19 @@
      📌 ⬇️ المعاينة: الـworker بيحقن القائمة ⇒ ما يلمسش الإنتاج ⬇️ ⬇️
      📌 ⬇️ (لو الـworker وقع أثناء اختبار معزول) ⬇️ ⬇️
      📌 ⬇️ الإنتاج: من غير حقن ⇒ القائمة الافتراضية (زي ما كان) ⬇️ ⬇️ */
+  /* ⛔⛔⛔ ١٥ نوفمبر ٢٠٢٦ (المراجعة الأمنية) — وضع الإغلاق الآمن ⬇️
+     🐞 🐞 🐞 المعاينة بتحطّ `window.OCTA_FAIL_CLOSED=1` ⬇️⬇️
+     🐞 🐞 🐞 القائمة الفاضية = ممنوع الاتصال بالإنتاج ⬇️⬇️
+     🐞 🐞 🐞 المعاينة من غير وجهة ⇒ الواجهة ما تتصلش بالإنتاج ⬇️⬇️
+     🐞 🐞 🐞 الإنتاج: من غير العلامة ⇒ السلوك القديم (الاحتياطي) ⬇️⬇️ */
+  const FAIL_CLOSED = !!(window.OCTA_FAIL_CLOSED);
   const SERVERS = (window.OCTA_DIRECT_LIST && window.OCTA_DIRECT_LIST.length)
   ? window.OCTA_DIRECT_LIST
-  : [
+  : (FAIL_CLOSED ? [] : [
   { name: 'railway', url: 'https://octa-prices-production-4ccb.up.railway.app', on: true },
   /* ↑ سيرفر احتياطي (Render مثلاً) — حطّه هنا وخلي on:true */
   /* { name: 'render',  url: 'https://octa-prices.onrender.com',  on: false } */
-  ];
+  ]);
 
   /* نحفظ الـfetch الأصلي قبل ما نلفّه (لأن window.fetch بيتغيّر) */
   const ORIG_FETCH = (typeof window !== 'undefined' && window.fetch)
@@ -56,6 +62,8 @@
   if (SERVERS[i].on) { active = i; break; }
   }
   }
+  /* ⛔ مافيش سيرفرات ⇒ مافيش عنوان ⇒ مافيش اتصال بالإنتاج */
+  if (!SERVERS.length) return '';
   return SERVERS[active >= 0 ? active : 0].url;
   }
 
@@ -72,7 +80,7 @@
   /* 🔄 بدّل السيرفر النشط */
   window.OCTAServer = {
   list: SERVERS,
-  current: () => SERVERS[active >= 0 ? active : 0],
+  current: () => (SERVERS.length ? SERVERS[active >= 0 ? active : 0] : { name: 'none', url: '' }),
   /* لو السيرفر فشل n times → جرّب اللي بعده */
   failover: function () {
   fails[active] = (fails[active] || 0) + 1;
