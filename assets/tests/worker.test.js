@@ -237,8 +237,27 @@ test('الـquery string بيوصل للـAPI زي ما هو', async () => {
   };
   const w = makeWorker();
   const env = { ASSETS: makeAssets(FILES) };
-  await w.fetch(req('https://octashares.com/api/markets?market=egypt'), env);
-  assert.ok(seen.includes('market=egypt'), seen);
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ — ⛔ البوابة بقت تحمي مسارات /api ⬇️
+     📌 ⇒ طلب من غير جلسة بيرجّع 401 قبل ما يوصل الـAPI ⬇️
+     📌 ⇒ الاختبار لازم يبعت جلسة ⬇️ */
+  await w.fetch(req('https://octashares.com/api/markets?market=egypt', {
+    headers: { 'Cookie': 'octa_token=abc.def' },
+  }), env);
+  assert.ok(seen && seen.includes('market=egypt'), seen);
+});
+
+/* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · المراجعة الأمنية) — ⛔ توثيق ⬇️
+   📌 ⬇️ البوابة (gate) بقت تحمي مسارات /api على مستوى الـworker ⬇️
+   📌 ⬇️ ⇒ طلب /api من غير جلسة ⇒ 401 (مش 200 من الأصول) ⬇️
+   📌 ⬇️ ⇒ ده **سلوك مقصود** (١٤ نوفمبر ٢٠٢٦) ⬇️ */
+test('⛔ /api من غير جلسة ⇒ 401 (البوابة على مستوى الـworker)', async () => {
+  let called = 0;
+  globalThis.fetch = async () => { called++; return new Response('{}', { status: 200 }); };
+  const w = makeWorker();
+  const env = { ASSETS: makeAssets(FILES) };
+  const r = await w.fetch(req('https://octashares.com/api/prices'), env);
+  assert.equal(r.status, 401);
+  assert.equal(called, 0, 'مافيش طلب لازم يروح للـAPI');
 });
 
 /* ═══════════════════════════════════════════════════════════
@@ -308,7 +327,9 @@ test('⛔ سيرفر بطيء (٧ ثواني) ⇒ الـworker يرجّع ٢٠٠
   const w = makeWorker();
   const env = { ASSETS: makeAssets(FILES) };
   const t0 = Date.now();
-  const r = await w.fetch(req('https://octashares.com/api/prices'), env);
+  const r = await w.fetch(req('https://octashares.com/api/prices', {
+    headers: { 'Cookie': 'octa_token=abc.def' },
+  }), env);
   const dt = Date.now() - t0;
   assert.equal(r.status, 200,
     'السيرفر البطيء اتحوّل لخطأ بدل ما يرد — الرجوع: ' + r.status);
@@ -324,7 +345,9 @@ test('السيرفر واقع فعلاً ⇒ ٥٠٢ بعد ٣ محاولات (م
   };
   const w = makeWorker();
   const env = { ASSETS: makeAssets(FILES) };
-  const r = await w.fetch(req('https://octashares.com/api/prices'), env);
+  const r = await w.fetch(req('https://octashares.com/api/prices', {
+    headers: { 'Cookie': 'octa_token=abc.def' },
+  }), env);
   assert.equal(r.status, 502);
   const body = await r.text();
   assert.ok(body.includes('api-proxy-failed'), body.slice(0, 120));
@@ -344,7 +367,9 @@ test('السيرفر بيرجّع ٥٠٠ مرتين وبعدين ٢٠٠ ⇒ ال
   };
   const w = makeWorker();
   const env = { ASSETS: makeAssets(FILES) };
-  const r = await w.fetch(req('https://octashares.com/api/prices'), env);
+  const r = await w.fetch(req('https://octashares.com/api/prices', {
+    headers: { 'Cookie': 'octa_token=abc.def' },
+  }), env);
   assert.equal(r.status, 200, 'الـworker محاولش يرجع من الـ500');
   assert.equal(calls, 3, 'عدد المحاولات: ' + calls);
 });
