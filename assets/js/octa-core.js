@@ -2220,7 +2220,11 @@ function filterEngineStocks(q) {
   s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q)
   );
   if (f.length === 0) {
-  el.innerHTML = '<div style="padding: 12px; color: var(--muted); text-align: center;">لا توجد نتائج لـ "' + q + '"</div>';
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ XSS ⬇️
+     📌 ⬇️ ⛔ `q` = كلام المستخدم ⬇️ ⬇️
+     📌 ⬇️ ⛔ ⬇️ كان بيندرج من غير ترميز ⬇️ ⬇️
+     📌 ⬇️ ⛔ ⬇️ ⇒ `<img onerror=...>` من المستخدم = تنفيذ ⬇️ ⬇️ */
+  el.innerHTML = '<div style="padding: 12px; color: var(--muted); text-align: center;">لا توجد نتائج لـ "' + octaEsc(q) + '"</div>';
   return;
   }
   el.innerHTML = f.slice(0, 12).map(s => `

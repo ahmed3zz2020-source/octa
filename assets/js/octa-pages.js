@@ -1872,7 +1872,9 @@ function tvSearch(q) {
   (s.code||'').toUpperCase().includes(up) || (s.name||'').includes(q)
   ).slice(0, 15);
   if (!hits.length) {
-  box.innerHTML = '<div class="ds-empty">لا توجد نتائج لـ "' + q + '"</div>';
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ XSS ⬇️
+     📌 ⬇️ ⛔ `q` = كلام المستخدم ⬇️ ⬇️ ⇒ لازم ترميز ⬇️ ⬇️ */
+  box.innerHTML = '<div class="ds-empty">لا توجد نتائج لـ "' + ssEsc(q) + '"</div>';
   return;
   }
   box.innerHTML = hits.map((s,i) => {
@@ -3051,7 +3053,8 @@ function startOctaClock() {
   const age = lu ? Math.round((Date.now() - lu.getTime()) / 60000) : null;
   const txt = age === null ? '—' :
   age < 1 ? 'الآن' : age < 60 ? age + ' دقيقة' : Math.round(age/60) + ' ساعة';
-  el.innerHTML = '<b>' + txt + '</b>' + (d.market_phase === 'open' ? 'السوق مفتوح' : 'السوق مغلق');
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ — ⛔ XSS ⬇️ (نص من الـAPI) ⬇️ */
+  el.innerHTML = '<b>' + ssEsc(txt) + '</b>' + (d.market_phase === 'open' ? 'السوق مفتوح' : 'السوق مغلق');
   }).catch(() => { el.innerHTML = '<b>—</b>غير متصل'; });
   }
   tick();
@@ -4321,7 +4324,7 @@ function dvRender(){
   ? rows.slice(0, 200).map(dvItem).join('')
   : '<div class="dv-empty">📭 مفيش إجراءات في الفلتر ده.</div>';
   const src = document.getElementById('dvSrc');
-  if (src) src.innerHTML = '📡 المصدر: <b>' + (DV_DATA.source || 'إعلانات البورصة المصرية') + '</b> · ' +
+  if (src) src.innerHTML = '📡 المصدر: <b>' + ssEsc(DV_DATA.source || 'إعلانات البورصة المصرية') + '</b> · ' +
   (DV_DATA.actions||[]).length + ' إجراء · التحديث كل 6 ساعات';
   /* ⭐ آخر حاجة — بعد ما dvBook عمل الحاوية */
   if (typeof ipoRender === 'function') ipoRender();
