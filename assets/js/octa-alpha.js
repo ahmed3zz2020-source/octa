@@ -21,8 +21,14 @@
     alerts: null,
     decisions: null,
     loading: false,
-    error: ''
+    error: '',
+    unavailable: false
   };
+
+  /* ⭐⭐⭐ نص «المحرك غير متاح مؤقتًا» — معتمد من المالك.
+     📌 القاعدة: نوضح إن البيانات مش متجددة، بدل ما نعرض نتيجة
+     📌 قديمة كأنها نتيجة حالية. */
+  var ALPHA_UNAVAILABLE_MSG = 'محرّك المحفظة الذكية غير متاح مؤقتًا. نعمل على ربطه ببيانات متجددة. لن نعرض نتائج قديمة باعتبارها نتائج حالية.';
 
   /* ─────────── أدوات ─────────── */
   function esc(s) {
@@ -68,7 +74,14 @@
     return p.then(function (r) {
       var st = (r && r.status) ? r.status : 0;
       if (st === 401 || st === 403) throw new Error('انتهت الجلسة — سجّل دخولك تاني');
-      if (st === 404 || st === 405) throw new Error('محرّك Alpha غير متاح على السيرفر');
+      if (st === 404 || st === 405) {
+        /* ⛔⛔⛔ ١٥ نوفمبر ٢٠٢٦ — المحرك غير متاح = حالة معروفة
+           ومحددة، مش خطأ عام ⇒ بنعرض رسالة واضحة من غير زر
+           إعادة محاولة (إعادة المحاولة مش هتنفع لحد ما يننشر). */
+        var e0 = new Error(ALPHA_UNAVAILABLE_MSG);
+        e0.__engineUnavailable = true;
+        throw e0;
+      }
       if (st === 429) throw new Error('طلبات كتير في وقت قصير — استنى ثانيتين وحاول تاني');
       if (st >= 400) throw new Error('الخادم رجّع خطأ ' + st);
       return r.json().catch(function () { throw new Error('رد غير مفهوم من الخادم'); });
@@ -77,7 +90,7 @@
 
   /* ─────────── التحميل ─────────── */
   function load() {
-    S.loading = true; S.error = '';
+    S.loading = true; S.error = ''; S.unavailable = false;
     render();
     return Promise.all([
       fetchJSON(API + '/api/alpha/portfolio'),
@@ -95,7 +108,12 @@
       render();
     }).catch(function (e) {
       S.loading = false;
-      S.error = (e && e.message) ? e.message : 'خطأ غير متوقع';
+      if (e && e.__engineUnavailable) {
+        S.unavailable = true;
+        S.error = e.message || ALPHA_UNAVAILABLE_MSG;
+      } else {
+        S.error = (e && e.message) ? e.message : 'خطأ غير متوقع';
+      }
       render();
     });
   }
@@ -106,6 +124,13 @@
     if (!box) return;
     if (S.loading) {
       box.innerHTML = '<div class="alpha-wrap"><div class="opps-loading">⏳ بنحسب المحفظة…</div></div>';
+      return;
+    }
+    if (S.unavailable) {
+      /* ⛔⛔⛔ حالة صريحة: المحرك غير متاح مؤقتًا — من غير زر إعادة
+         ⛔ محاولة، وبنوضّح إن النتائج القديمة مش هتتعرض. */
+      box.innerHTML = '<div class="alpha-wrap"><div class="opps-error"><b>محرّك المحفظة الذكية غير متاح مؤقتًا</b>'
+        + '<p>نعمل على ربطه ببيانات متجددة. لن نعرض نتائج قديمة باعتبارها نتائج حالية.</p></div></div>';
       return;
     }
     if (S.error) {

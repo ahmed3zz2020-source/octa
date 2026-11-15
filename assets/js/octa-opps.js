@@ -53,7 +53,7 @@
         throw new Error('انتهت الجلسة — سجّل دخولك تاني');
       }
       if (st === 404 || st === 405) {
-        var e1 = new Error('محرّك الفرص غير متاح على السيرفر — يمكن يكون لسه ما اتنشرش');
+        var e1 = new Error('محرّك الاستراتيجيات الجديد غير متاح مؤقتًا. تُعرض النسخة الأساسية للفرص إلى حين اكتمال التحديث.');
         e1.__oppNotPublished = true;
         throw e1;
       }
@@ -554,8 +554,7 @@
       Promise.resolve(window.__oppsLegacy(box)).then(function () {
         var note = document.createElement('div');
         note.className = 'opps-stale';
-        note.textContent = '⚠️ محرّك الفرص الجديد (٩ استراتيجيات) لسه ما اتنشرش على السيرفر — '
-          + 'بتعرض النسخة القديمة مؤقتاً. جرّب تاني بعد النشر.';
+        note.textContent = '⚠️ محرّك الاستراتيجيات الجديد غير متاح مؤقتًا. تُعرض النسخة الأساسية للفرص إلى حين اكتمال التحديث.';
         if (box && box.firstChild) box.insertBefore(note, box.firstChild);
         else if (box) box.appendChild(note);
       }).catch(function () {
