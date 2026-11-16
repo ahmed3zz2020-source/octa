@@ -20,6 +20,8 @@
   var SRC_LAST_PRICE = 'آخر سعر متاح';
   var SRC_STALE_PRICE = 'سعر قديم';
   var SRC_LAST_KNOWN_AT = 'آخر سعر معروف';
+  /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٦) — عمر السعر */
+  var SRC_PRICE_AGE = 'عمر السعر';
 
   var S = {
     key: 'swing',
@@ -186,6 +188,14 @@
       h += '<span class="opps-price-l">' + esc(it.price_label) + '</span>';
     } else if (it.price_label) {
       h += '<span class="opps-price-l">' + esc(SRC_LAST_PRICE) + '</span>';
+    }
+    /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٦) — **عمر السعر نفسه** يبان للمستخدم:
+       «آخر سعر معروف» من غير «منذ قد إيه» ⇒ الكلام ناقص.
+       الباك بيبعت `price_age_label_ar` (عمر السعر من وقته هو
+       ⛔ مش من وقت استلامنا للبيانات) + `price_age_seconds`. */
+    if (it.price_age_seconds !== undefined && it.price_age_seconds !== null) {
+      h += '<span class="opps-price-t">' + esc(SRC_PRICE_AGE) + ': '
+        + esc(it.price_age_label_ar || '') + '</span>';
     }
     /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٥ · ملاحظة المالك) — الوقت
        بنعرضه لازم يكون الوقت الصح:
@@ -377,7 +387,12 @@
     var miss = it.missing || [];
     if (miss.length) {
       h += sec('معايير بدون بيانات كافية',
-        '<p class="opps-missing-note">الدرجة محسوبة من ' + num(it.coverage !== undefined && it.coverage !== null ? it.coverage : it.available_weight)
+        /* ⛔⛔⛔ الجولة ١٦ — شيلنا fallback على `available_weight`:
+           الباك بقى يبعت `coverage` (نسبة المعايير المتاحة) وبس.
+           `available_weight` كان **مجموع أوزان المعايير** ⇒ جزء من
+           بنية الأوزان ⇒ مافيش أي سبب نرجع ليه. */
+        '<p class="opps-missing-note">الدرجة محسوبة من '
+        + num(it.coverage !== undefined && it.coverage !== null ? it.coverage : 0)
         + '٪ من المعايير فقط — والباقي مستبعد ومعلن — مش متخيَّل.</p>');
     }
     return h;
@@ -484,10 +499,21 @@
     var _phase = (S.data && S.data.market_phase) || '';
     var _phaseAr = _phase === 'open' ? 'السوق مفتوح'
       : (_phase === 'closed' ? 'السوق مغلق' : '');
+    /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٦) — **الحداثة والتغطية منفصلين**:
+       · freshness  = fresh | stale | unavailable (عمر آخر جلب ناجح)
+       · coverage_status = complete | partial | unavailable (نسبة اللي اتجلب)
+       ⛔ قبل كنا بنقرا «partial» من `freshness` ⇒ بعد الجولة ١٦
+          `freshness` مبقاش بياخد «partial» أبداً. */
     var _stateAr = _fresh.freshness === 'fresh' ? 'بيانات حديثة'
       : (_fresh.freshness === 'stale' ? 'بيانات قديمة'
-        : (_fresh.freshness === 'partial' ? 'تغطية جزئية للبيانات'
-          : (_fresh.freshness === 'unavailable' ? 'البيانات غير متاحة' : '')));
+        : (_fresh.freshness === 'unavailable' ? 'البيانات غير متاحة' : ''));
+    var _covStatus = (S.data && (S.data.coverage_status
+      || _fresh.coverage_status)) || '';
+    if (_covStatus === 'partial') {
+      _stateAr = (_stateAr ? (_stateAr + ' · ') : '') + 'تغطية جزئية للبيانات';
+    } else if (_covStatus === 'unavailable' && !_stateAr) {
+      _stateAr = 'التغطية غير متاحة';
+    }
     /* ⛔⛔⛔ الجولة ١٤ — التغطية الجزئية: بتوضح كام اتحدّث وكام ناقص. */
     var _covAr = '';
     if (_fresh.coverage_pct !== undefined && _fresh.coverage_pct !== null) {

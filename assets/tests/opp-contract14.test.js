@@ -43,7 +43,9 @@ function makeOpp(state) {
   const src = names.map((n) => extract(OPPS, n).toString()).join('\n');
   /* ⛔ الثوابت (نصوص مصدر البيانات) — لازم تُستخرج معاها */
   const consts = ['SRC_NO_PRICE_TIME', 'SRC_DATA_UPDATED', 'SRC_PRICE_TIME',
-    'SRC_LAST_PRICE', 'SRC_STALE_PRICE', 'SRC_LAST_KNOWN_AT']
+    'SRC_LAST_PRICE', 'SRC_STALE_PRICE', 'SRC_LAST_KNOWN_AT',
+    /* ⛔ الجولة ١٦ — عمر السعر */
+    'SRC_PRICE_AGE']
     .map((n) => {
       const m = OPPS.match(new RegExp('var\\s+' + n + '\\s*=\\s*[^;]+;'));
       assert.ok(m, 'ثابت ' + n + ' مش موجود');
@@ -171,13 +173,18 @@ test('حالة «تغطية جزئية» معروضة + الأرقام', () => {
       summary: {},
       sources: [],
       market_phase: 'open',
+      /* ⛔⛔⛔ الجولة ١٦ — العقد الجديد: الحداثة والتغطية **منفصلين**.
+         `freshness` = fresh|stale|unavailable (عمر آخر جلب ناجح)
+         `coverage_status` = complete|partial|unavailable (نسبة اللي اتجلب) */
       data_freshness: {
-        freshness: 'partial',
+        freshness: 'fresh',
+        coverage_status: 'partial',
         coverage_pct: 1.05,
         requested: 286,
         updated: 3,
         missing: 283
-      }
+      },
+      coverage_status: 'partial'
     },
     open: {}, strategies: [st]
   };
