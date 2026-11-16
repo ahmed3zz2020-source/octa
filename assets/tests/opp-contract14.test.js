@@ -43,7 +43,7 @@ function makeOpp(state) {
   const src = names.map((n) => extract(OPPS, n).toString()).join('\n');
   /* ⛔ الثوابت (نصوص مصدر البيانات) — لازم تُستخرج معاها */
   const consts = ['SRC_NO_PRICE_TIME', 'SRC_DATA_UPDATED', 'SRC_PRICE_TIME',
-    'SRC_LAST_PRICE']
+    'SRC_LAST_PRICE', 'SRC_STALE_PRICE', 'SRC_LAST_KNOWN_AT']
     .map((n) => {
       const m = OPPS.match(new RegExp('var\\s+' + n + '\\s*=\\s*[^;]+;'));
       assert.ok(m, 'ثابت ' + n + ' مش موجود');
@@ -141,6 +141,27 @@ test('كارت السهم: لو الـAPI بعت تسمية بتدّعي «ال�
     'الواجهة عرضت ادعاء لحظية بلا توقيت من المصدر');
   assert.ok(html.includes('آخر سعر متاح'),
     'الواجهة ما صحّحتش التسمية');
+});
+
+test('كارت السهم: سعر قديم ⇒ وسم «سعر قديم» (مش معروض كأنه محدّث)', () => {
+  const S = { data: { summary: {} }, open: {}, strategies: [] };
+  const api = makeOpp(S);
+  const html = api.cardHTML(apiItem({
+    data_state: 'stale',
+    price_label: 'آخر سعر معروف',
+    source_as_of: '2026-11-15T09:00:00Z'
+  }), 0);
+  assert.ok(html.includes('سعر قديم'), 'مافيش وسم إن السعر قديم');
+  assert.ok(html.includes('آخر سعر معروف:'),
+    'مافيش وقت آخر سعر معروف');
+});
+
+test('كارت السهم: سعر محدّث ⇒ مافيش وسم «سعر قديم»', () => {
+  const S = { data: { summary: {} }, open: {}, strategies: [] };
+  const api = makeOpp(S);
+  const html = api.cardHTML(apiItem(), 0);
+  assert.ok(!html.includes('سعر قديم'),
+    'وسعنا وسم «سعر قديم» على سعر محدّث');
 });
 
 test('حالة «تغطية جزئية» معروضة + الأرقام', () => {

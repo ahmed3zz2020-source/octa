@@ -18,6 +18,8 @@
   var SRC_DATA_UPDATED = 'وقت تحديث البيانات';
   var SRC_PRICE_TIME = 'وقت السعر';
   var SRC_LAST_PRICE = 'آخر سعر متاح';
+  var SRC_STALE_PRICE = 'سعر قديم';
+  var SRC_LAST_KNOWN_AT = 'آخر سعر معروف';
 
   var S = {
     key: 'swing',
@@ -147,6 +149,17 @@
 
     h += '<div class="opps-badge-row">';
     h += badge('state', it.state ? stateAr(it.state) : '');
+    /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٥ · البند ٥) — السهم اللي
+       سعره قديم (من الكاش) لازم يبقى عليه وسم —
+       ما نعرضش كل الأسهم «.Sequence محدث». */
+    if (it.data_state === 'stale') {
+      h += badge('stale', SRC_STALE_PRICE);
+      if (it.source_as_of) {
+        h += '<span class="opps-badge opps-badge--stale">'
+          + esc(SRC_LAST_KNOWN_AT) + ': '
+          + esc(fmtDateAr(it.source_as_of)) + '</span>';
+      }
+    }
     h += badge('risk', it.risk_level_ar || '');
     h += badge('horizon', it.hold_days ? ('المدى: ' + it.hold_days) : '');
     h += badge('data', it.coverage !== undefined && it.coverage !== null
