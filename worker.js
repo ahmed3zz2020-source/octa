@@ -489,6 +489,26 @@ function snapshotFallbackAllowed(env) {
   return env.OCTA_SNAPSHOT_FALLBACK === 'on';
 }
 
+/* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٤) — منع تحميل اللقطات مباشرة.
+   📌 المسألة: تعطيل الـfallback داخل الـWorker **مش كفاية** —
+      لازم الملف نفسه ما ينفعش يتنزّل من الموقع ولا من الكاش.
+   📌 القياس (١٦ نوفمبر ٢٠٢٦): https://octashares.com/data/opp_snapshot.json
+      ⇒ HTTP 200 · ١,٤٦٠,١٦٤ بايت (وصف المحرّك + ١٧٧ سطر أسهم).
+   ⛔ الحل (طبقتان):
+      ① البناء الإنتاجي مش بينسخ الملفات دي أصلاً (tools/copy-data.js).
+      ② بلوك هنا ⇒ حتى لو الإصدار القديم اترجّع (فيه الملف)،
+         الطلب بيرجّع 404 — لأن الـWorker بيشتغل الأول (run_worker_first).
+*/
+const SNAPSHOT_PATHS = [
+  '/data/opp_snapshot.json',
+  '/data/alpha_snapshot.json'
+];
+
+function isSnapshotPath(pathname) {
+  const p = String(pathname || '').toLowerCase();
+  return SNAPSHOT_PATHS.indexOf(p) !== -1;
+}
+
 async function oppSnapshot(url, request, env) {
   if (!_oppSnap || (Date.now() - _oppSnapAt) > OPP_SNAP_TTL) {
     try {
@@ -2426,6 +2446,19 @@ async function handle(request, env, ctx) {
     /* ⛔ ملاحظة (٩ نوفمبر ٢٠٢٦): بلوك «أي HTML» اتشال من هنا —
        المسار الأعلى (سطر ١٣١٠) بيسخدم كل *.html وبيظبط روابط المشاركة
        ⇒ الكود هنا كان ميّت (لا بيترنّش أبداً). */
+
+    /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٤) — اللقطات ما تنزلش أبداً:
+       ⛔ من غير بلوك هنا ⇒ الملف بينزل مباشرة من الموقع (200).
+       ⛔ run_worker_first=true ⇒ الـWorker بيشتغل الأول ⇒ البلوك فعّال.
+    */
+    if (isSnapshotPath(url.pathname)) {
+      return new Response(JSON.stringify({
+        ok: false, error: 'not-found', why: 'snapshot_assets_blocked'
+      }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+      });
+    }
 
     return env.ASSETS.fetch(request);
 }

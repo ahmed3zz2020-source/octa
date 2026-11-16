@@ -154,7 +154,17 @@
     }
 
     h += '<div class="opps-card-foot">';
-    h += '<span class="opps-price">' + num(it.price) + ' ج.م</span>';
+    h += '<span class="opps-price">' + num(it.price) + ' ج.م';
+    /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٤) — وصف السعر:
+       «سعر التداول أثناء الجلسة» ما ينفعش يتسمّى «سعر إغلاق»،
+       والمصدر مابيعطيش وقت السعر ⇒ بنعلن ده بصراحة. */
+    if (it.price_label) {
+      h += '<span class="opps-price-l">' + esc(it.price_label) + '</span>';
+    }
+    if (it.price_time_source === 'not_provided') {
+      h += '<span class="opps-price-t">المصدر مابيعطيش وقت السعر</span>';
+    }
+    h += '</span>';
     if (it.change !== null && it.change !== undefined) {
       h += '<span class="opps-chg ' + (it.change >= 0 ? 'up' : 'down') + '">'
         + (it.change >= 0 ? '+' : '') + num(it.change) + '٪</span>';
@@ -438,7 +448,17 @@
       : (_phase === 'closed' ? 'السوق مغلق' : '');
     var _stateAr = _fresh.freshness === 'fresh' ? 'بيانات حديثة'
       : (_fresh.freshness === 'stale' ? 'بيانات قديمة'
-        : (_fresh.freshness === 'unavailable' ? 'البيانات غير متاحة' : ''));
+        : (_fresh.freshness === 'partial' ? 'تغطية جزئية للبيانات'
+          : (_fresh.freshness === 'unavailable' ? 'البيانات غير متاحة' : '')));
+    /* ⛔⛔⛔ الجولة ١٤ — التغطية الجزئية: بتوضح كام اتحدّث وكام ناقص. */
+    var _covAr = '';
+    if (_fresh.coverage_pct !== undefined && _fresh.coverage_pct !== null) {
+      _covAr = 'التغطية ' + num(_fresh.coverage_pct) + '٪'
+        + (_fresh.updated !== undefined && _fresh.updated !== null
+          ? (' · اتحدّث ' + num(_fresh.updated)
+            + (_fresh.missing ? (' · ناقص ' + num(_fresh.missing)) : ''))
+          : '');
+    }
     h += '<div class="opps-critcard-sec"><b>مصادر البيانات وتواريخ التحديث</b>'
       + '<div class="opps-src">' + _srcs.map(function (x) {
         return '<div class="opps-src-item"><b>' + esc(x.source || '') + '</b><span>'
@@ -447,6 +467,8 @@
       + ((_phaseAr || _stateAr)
         ? '<div class="opps-src-item"><b>' + esc(_phaseAr) + '</b><span>' + esc(_stateAr) + '</span></div>'
         : '')
+      + (_covAr ? '<div class="opps-src-item"><b>تغطية الجلب</b><span>'
+        + esc(_covAr) + '</span></div>' : '')
       + '</div></div>';
 
     h += '<div class="opps-critcard-sec"><b>رقم إصدار نموذج التقييم</b>'
@@ -466,6 +488,11 @@
     h += sumItem('فُحص', num(sum.scanned));
     h += sumItem('مؤهَّل', num(sum.eligible !== undefined ? sum.eligible : sum.total_eligible));
     h += sumItem('معروض', num(sum.shown));
+    /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٤) — حد الباقة:
+       بنقول «أفضل ٢٠» مش «كل المؤهل» — المحرك بيعرض حداً ثابت. */
+    if (S.data && S.data.limit_label_ar) {
+      h += sumItem('الحد', S.data.limit_label_ar);
+    }
     h += sumItem('آخر تحديث', sum.last_update ? fmtTime(sum.last_update) : '—');
     h += sumItem('نطاق البيانات', sum.data_from ? ('من ' + fmtDateAr(sum.data_from)) : '—');
     h += '</div>';
