@@ -509,8 +509,21 @@
         : (_fresh.freshness === 'unavailable' ? 'البيانات غير متاحة' : ''));
     var _covStatus = (S.data && (S.data.coverage_status
       || _fresh.coverage_status)) || '';
+    /* ⛔⛔⛔ الجولة ١٧ (R16-N2) — «تغطية مقبولة» ≠ «تغطية كاملة»:
+       الباك بيبعت `coverage_acceptable` (فوق عتبة القبول ٩٠٪).
+       التغطية الناقصة بس **مقبولة** بتتقال «مقبولة» مش «جزئية» —
+       والعكس: تحت العتبة ⇒ «جزئية». */
+    var _covAcceptable = false;
+    if (S.data && S.data.coverage_acceptable !== undefined
+        && S.data.coverage_acceptable !== null) {
+      _covAcceptable = S.data.coverage_acceptable === true;
+    } else if (_fresh.coverage_acceptable !== undefined
+        && _fresh.coverage_acceptable !== null) {
+      _covAcceptable = _fresh.coverage_acceptable === true;
+    }
     if (_covStatus === 'partial') {
-      _stateAr = (_stateAr ? (_stateAr + ' · ') : '') + 'تغطية جزئية للبيانات';
+      _stateAr = (_stateAr ? (_stateAr + ' · ') : '')
+        + (_covAcceptable ? 'تغطية مقبولة للبيانات' : 'تغطية جزئية للبيانات');
     } else if (_covStatus === 'unavailable' && !_stateAr) {
       _stateAr = 'التغطية غير متاحة';
     }
