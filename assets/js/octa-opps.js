@@ -377,7 +377,7 @@
     var miss = it.missing || [];
     if (miss.length) {
       h += sec('معايير بدون بيانات كافية',
-        '<p class="opps-missing-note">الدرجة محسوبة من ' + num(it.available_weight)
+        '<p class="opps-missing-note">الدرجة محسوبة من ' + num(it.coverage !== undefined && it.coverage !== null ? it.coverage : it.available_weight)
         + '٪ من المعايير فقط — والباقي مستبعد ومعلن — مش متخيَّل.</p>');
     }
     return h;
