@@ -478,6 +478,17 @@ let _oppSnap = null;
 let _oppSnapAt = 0;
 const OPP_SNAP_TTL = 10 * 60 * 1000;
 
+/* ⛔⛔⛔ 16 نوفمبر 2026 — سياسة القطعة:
+   · الافتراض: `OCTA_SNAPSHOT_FALLBACK=off` (الدفتري)
+     ⇒ لو الباك حي فشل ⇒ رد صريح (503) — مابترجعش لقطة قديمة.
+   · الإعطاء: `on` ⇒ السلوك الحالي (رجوع إلى القطة).
+   ⛔ التعديل في الفرع يحتاج المالك — تعديل الإنتاج يحتاج صراحة الرفع.
+   ⛔ المعاينة: مافيش تغيير — لا يقاعد تطبيق. */
+function snapshotFallbackAllowed(env) {
+  if (!env) return false;
+  return env.OCTA_SNAPSHOT_FALLBACK === 'on';
+}
+
 async function oppSnapshot(url, request, env) {
   if (!_oppSnap || (Date.now() - _oppSnapAt) > OPP_SNAP_TTL) {
     try {
@@ -1986,6 +1997,22 @@ async function handle(request, env, ctx) {
             }
           }
         } catch (e) { }
+        /* ⛔⛔⛔ 16 نوفمبر 2026 — مافيش رجوع إلقطة القديمة:
+           ⛔ الباك حي ماشبش (or مرد غير JSON)
+           ⇒ رد صريح 503 + سبب واضح — مابترجعش وصفة المحرّك وبيانات قديمة.
+           ⛔ السلوك القديم يُخلّق ولا يشتغلّل بسبب «on». */
+        if (!snapshotFallbackAllowed(env)) {
+          return new Response(JSON.stringify({
+            ok: false,
+            error: 'live_backend_unavailable',
+            why: 'backend_failed_no_stale_snapshot',
+            source: 'none',
+            note_ar: 'الباك الحي شاغل — مابعرشناش لقطة قديمة.'
+          }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+          });
+        }
         return await oppSnapshot(url, request, env);
       }
       /* ⭐⭐ OCTA Alpha (OPP-002) — نفس المنطق: الباك الحيّ الأول. */
@@ -2003,6 +2030,20 @@ async function handle(request, env, ctx) {
             }
           }
         } catch (e) { }
+        /* ⛔⛔⛔ 16 نوفمبر 2026 — مافيش رجوع إلقطة القديمة
+           (نفس السياسة) — رد صريح 503 بلا لقطة. */
+        if (!snapshotFallbackAllowed(env)) {
+          return new Response(JSON.stringify({
+            ok: false,
+            error: 'live_backend_unavailable',
+            why: 'backend_failed_no_stale_snapshot',
+            source: 'none',
+            note_ar: 'الباك الحي شاغل — مابعرشناش لقطة قديمة.'
+          }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+          });
+        }
         return await alphaSnapshot(url, request, env);
       }
       /* ⛔⛔ الجسور بتاعت المعاينة (tvscan/tvcandles) **ما بتروحلش**

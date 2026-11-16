@@ -279,7 +279,6 @@
     /* و — تفسير الدرجة */
     if (crit.length) {
       var rows = crit.map(function (c) {
-        var w = c.weight || c.points_max || 0;
         var ratio = (c.ratio === null || c.ratio === undefined) ? null : c.ratio;
         var pctFill = ratio === null ? 0 : Math.round(ratio * 100);
         var h2 = '<div class="opps-crit' + (ratio === null ? ' is-missing' : '') + '">';
@@ -288,8 +287,10 @@
         if (ratio === null) {
           h2 += '<div class="opps-crit-v opps-crit-empty">غير متاح</div>';
         } else {
-          h2 += '<div class="opps-crit-v">' + num(c.points) + ' من ' + num(c.points_max)
-            + ' <span class="opps-crit-w">(' + num(w) + '٪)</span></div>';
+          /* ⛔⛔⛔ 16 نوفمبر 2026 — عقد المحرّك الحيّ:
+             لا تُعرض نقاط المطابقة من المعيار — الأوزان والنقاط الحدية
+             سرّية، والنسبة هي الحد الوحيد. */
+          h2 += '<div class="opps-crit-v">' + num(Math.round(ratio * 100)) + '٪</div>';
         }
         if (c.note_ar) h2 += '<div class="opps-crit-note">' + esc(c.note_ar) + '</div>';
         h2 += '</div>';
@@ -403,11 +404,11 @@
     h += '<div class="opps-critcard-sec"><b>مدة الاستثمار المناسبة</b><p>' + esc(st.horizon_ar || '') + '</p></div>';
     h += '<div class="opps-critcard-sec"><b>نوع الأسهم التي يبحث عنها OCTA</b><p>' + esc(st.looks_for_ar || '') + '</p></div>';
 
-    h += '<div class="opps-critcard-sec"><b>معايير الاختيار وأوزانها</b>';
-    h += '<table class="opps-critcard-tbl"><thead><tr><th>المعيار</th><th>الوزن</th><th>الحد الأقصى</th></tr></thead><tbody>';
+    h += '<div class="opps-critcard-sec"><b>معايير الاختيار</b>';
+    h += '<table class="opps-critcard-tbl"><thead><tr><th>المعيار</th><th>المعلومات</th></tr></thead><tbody>';
     (st.criteria || []).forEach(function (cr) {
-      h += '<tr><td>' + esc(cr.label_ar) + '<div class="opps-critcard-hint">' + esc(cr.hint_ar || '') + '</div></td>'
-        + '<td>' + num(cr.weight) + '٪</td><td>' + num(cr.points_max) + '</td></tr>';
+      h += '<tr><td>' + esc(cr.label_ar || cr.key || '') + '<div class="opps-critcard-hint">' + esc(cr.hint_ar || '') + '</div></td>'
+        + '<td>' + esc(cr.hint_ar ? 'متاح' : 'معيار') + '</td></tr>';
     });
     h += '</tbody></table></div>';
 
@@ -422,18 +423,31 @@
       + (st.reject_ar || []).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>';
 
     h += '<div class="opps-critcard-sec"><b>الحد الأدنى لجودة البيانات</b>'
-      + '<p>لازم تتوافر معايير بوزن لا يقل عن ' + num(st.min_coverage)
-      + '٪ من إجمالي الأوزان، وإلا السهم مابيترشّحش للتاب ده.</p></div>';
+      + '<p>الدرجة بتتحسب على المعايير اللي توفّرت بياناتها كاملة،'
+      + ' والمعايير الناقصة بتتستبعد وبتعلن، مابتحسبش نص.</p></div>';
 
     h += '<div class="opps-critcard-sec"><b>أهم مخاطر هذه الاستراتيجية</b><ul class="opps-list-plain">'
       + (st.risk_ar || []).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>';
 
+    /* ⛔⛔⛔ 16 نوفمبر 2026 — عقد الحداثة:
+       «السوق مغلق» ≠ «البيانات حديثة» — بيتعرضوا منفصلين. */
+    var _srcs = (S.data && (S.data.sources || (S.data.summary && S.data.summary.sources))) || [];
+    var _fresh = (S.data && S.data.data_freshness) || {};
+    var _phase = (S.data && S.data.market_phase) || '';
+    var _phaseAr = _phase === 'open' ? 'السوق مفتوح'
+      : (_phase === 'closed' ? 'السوق مغلق' : '');
+    var _stateAr = _fresh.freshness === 'fresh' ? 'بيانات حديثة'
+      : (_fresh.freshness === 'stale' ? 'بيانات قديمة'
+        : (_fresh.freshness === 'unavailable' ? 'البيانات غير متاحة' : ''));
     h += '<div class="opps-critcard-sec"><b>مصادر البيانات وتواريخ التحديث</b>'
-      + '<div class="opps-src">' + (S.data && S.data.summary && S.data.summary.sources
-        ? S.data.summary.sources.map(function (x) {
-          return '<div class="opps-src-item"><b>' + esc(x.source || '') + '</b><span>'
-            + esc(x.as_of ? fmtDateAr(x.as_of) : '') + '</span></div>';
-        }).join('') : '') + '</div></div>';
+      + '<div class="opps-src">' + _srcs.map(function (x) {
+        return '<div class="opps-src-item"><b>' + esc(x.source || '') + '</b><span>'
+          + esc(x.as_of ? fmtDateAr(x.as_of) : '') + '</span></div>';
+      }).join('')
+      + ((_phaseAr || _stateAr)
+        ? '<div class="opps-src-item"><b>' + esc(_phaseAr) + '</b><span>' + esc(_stateAr) + '</span></div>'
+        : '')
+      + '</div></div>';
 
     h += '<div class="opps-critcard-sec"><b>رقم إصدار نموذج التقييم</b>'
       + '<p>OPP-' + esc((S.data && S.data.model_version) || '—') + '</p></div>';
