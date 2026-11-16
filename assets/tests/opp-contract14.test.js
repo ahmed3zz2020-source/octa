@@ -1,12 +1,10 @@
 /* ══════════════════════════════════════════════════════════════════════
-   🧪🛡️ الجولة ١٤ — عقد الواجهة: وصف السعر + التغطية الجزئية + حد الباقة
+   🧪🛡️ الجولة ١٥ — عقد الواجهة: وصف السعر الصادق + التغطية + حد الباقة
    ──────────────────────────────────────────────────────────────────────
-   ⛔ العيوب المقاسة (١٧ نوفمبر ٢٠٢٦):
-      · كارت السهم كان يعرض السعر بلا وصف (ولا يعرف إن ده سعر
-        التداول ولا سعر الإغلاق).
-      · حالة «تغطية جزئية» (جلب ناقص) ماكانش ليها تمثيل.
-      · حد الباقة (أفضل ٥ / أفضل ٢٠) ماكانش معروض ⇒ المستخدم يظن
-        إن القائمة «كل المؤهل».
+   ⛔ المطلوب (ملاحظة المالك على تقرير الجولة ١٤):
+      «وقت استلام البيانات» **مش** دليل على وقت آخر تداول.
+      ⇒ التسمية ما بتقولش «الآن» إلا لو في `price_time_source='source'`.
+      ⇒ مافيش توقيت ⇒ «المصدر مبيعطيش وقت السعر» + «وقت تحديث البيانات».
 
    📌 التشغيل:  node --test assets/tests/opp-contract14.test.js
    ══════════════════════════════════════════════════════════════════════ */
@@ -43,8 +41,17 @@ function makeOpp(state) {
     'fmtTime', 'sumItem', 'summaryHTML', 'scoreClass', 'cardHTML',
     'detailHTML', 'criteriaCardHTML'];
   const src = names.map((n) => extract(OPPS, n).toString()).join('\n');
+  /* ⛔ الثوابت (نصوص مصدر البيانات) — لازم تُستخرج معاها */
+  const consts = ['SRC_NO_PRICE_TIME', 'SRC_DATA_UPDATED', 'SRC_PRICE_TIME',
+    'SRC_LAST_PRICE']
+    .map((n) => {
+      const m = OPPS.match(new RegExp('var\\s+' + n + '\\s*=\\s*[^;]+;'));
+      assert.ok(m, 'ثابت ' + n + ' مش موجود');
+      return m[0];
+    }).join('\n');
   const fn = new Function('window', 'S', 'document', 'console', 'AR_MONTHS',
-    src + '\nreturn { cardHTML: cardHTML, summaryHTML: summaryHTML,'
+    consts + '\n' + src
+    + '\nreturn { cardHTML: cardHTML, summaryHTML: summaryHTML,'
     + ' criteriaCardHTML: criteriaCardHTML, detailHTML: detailHTML };');
   return fn(sandbox.window, state, sandbox.document, sandbox.console,
     sandbox.AR_MONTHS);
@@ -65,7 +72,7 @@ function apiItem(extra) {
     state: 'watch',
     reasons: ['الاتجاه الفني: مطابقة قوية (٩٥٪).'],
     data_state: 'live',
-    price_label: 'سعر التداول الآن',
+    price_label: 'آخر سعر متاح',
     price_time_source: 'not_provided',
     data_received_at: '2026-11-17T10:00:00Z',
     price_as_of: null,
@@ -75,29 +82,65 @@ function apiItem(extra) {
   }, extra || {});
 }
 
-test('كارت السهم: وصف السعر ظاهر (سعر التداول مش «سعر إغلاق»)', () => {
+test('كارت السهم: بلا توقيت مصدر ⇒ التسمية ما بتدّعيش لحظية', () => {
   const S = { data: { summary: {} }, open: {}, strategies: [] };
   const api = makeOpp(S);
   const html = api.cardHTML(apiItem(), 0);
+  assert.ok(html.includes('آخر سعر متاح'),
+    'وصف السعر مش ظاهر (المتوقّع «آخر سعر متاح»)');
+  assert.ok(!html.includes('الآن'),
+    'الكارت ادّعى «الآن» وفيه مافيش توقيت من المصدر');
+});
+
+test('كارت السهم: مع توقيت مصدر ⇒ «سعر التداول الآن» (مش «سعر إغلاق»)', () => {
+  const S = { data: { summary: {} }, open: {}, strategies: [] };
+  const api = makeOpp(S);
+  const html = api.cardHTML(apiItem({
+    price_time_source: 'source',
+    price_label: 'سعر التداول الآن',
+    price_as_of: '2026-11-17T09:59:00Z'
+  }), 0);
   assert.ok(html.includes('سعر التداول الآن'), 'وصف السعر مش ظاهر');
   assert.ok(!html.includes('سعر إغلاق'), 'سمّى سعر التداول «سعر إغلاق»');
 });
 
-test('كارت السهم: المصدر مابيعطيش وقت السعر ⇒ بنعلن ده', () => {
+test('كارت السهم: بلا توقيت ⇒ «وقت تحديث البيانات» مش «وقت السعر»', () => {
   const S = { data: { summary: {} }, open: {}, strategies: [] };
   const api = makeOpp(S);
   const html = api.cardHTML(apiItem(), 0);
-  assert.ok(html.includes('المصدر مابيعطيش وقت السعر'),
+  assert.ok(html.includes('وقت تحديث البيانات:'),
+    'مافيش عرض وقت تحديث البيانات');
+  assert.ok(!html.includes('وقت السعر:'),
+    'عرضنا «وقت السعر» وفيه مافيش توقيت من المصدر');
+  assert.ok(html.includes('المصدر مبيعطيش وقت السعر'),
     'مافيش إعلان إن وقت السعر مش متاح');
 });
 
-test('كارت السهم: لو المصدر بدي وقت السعر ⇒ ما نقولش الكلام ده', () => {
+test('كارت السهم: مع توقيت ⇒ «وقت السعر» ومش «وقت تحديث البيانات»', () => {
   const S = { data: { summary: {} }, open: {}, strategies: [] };
   const api = makeOpp(S);
-  const html = api.cardHTML(
-    apiItem({ price_time_source: 'source', price_as_of: '2026-11-17T09:59:00Z' }), 0);
-  assert.ok(!html.includes('المصدر مابيعطيش وقت السعر'),
-    '-announcement-خطأ-لما-المصدر-عطى-الوقت');
+  const html = api.cardHTML(apiItem({
+    price_time_source: 'source',
+    price_as_of: '2026-11-17T09:59:00Z'
+  }), 0);
+  assert.ok(html.includes('وقت السعر:'), 'مافيش وقت السعر');
+  assert.ok(!html.includes('وقت تحديث البيانات:'),
+    'عرضنا وقت تحديث البيانات رغم وجود وقت سعر');
+  assert.ok(!html.includes('المصدر مبيعطيش وقت السعر'),
+    'إعلان كاذب — المصدر عطى الوقت');
+});
+
+test('كارت السهم: لو الـAPI بعت تسمية بتدّعي «الآن» ⇒ الواجهة تصحّحها', () => {
+  const S = { data: { summary: {} }, open: {}, strategies: [] };
+  const api = makeOpp(S);
+  const html = api.cardHTML(apiItem({
+    price_label: 'سعر التداول الآن',
+    price_time_source: 'not_provided'
+  }), 0);
+  assert.ok(!html.includes('الآن'),
+    'الواجهة عرضت ادعاء لحظية بلا توقيت من المصدر');
+  assert.ok(html.includes('آخر سعر متاح'),
+    'الواجهة ما صحّحتش التسمية');
 });
 
 test('حالة «تغطية جزئية» معروضة + الأرقام', () => {

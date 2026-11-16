@@ -12,6 +12,13 @@
   var DEFAULT_SHOWN = 3;
   var MAX_SHOWN = 10;
 
+  /* 🧷 نصوص مصدر البيانات — معرّفة مرة واحدة (قاعدة: النص المتكرر
+     ⇒ ولّده في الكود) */
+  var SRC_NO_PRICE_TIME = 'المصدر مبيعطيش وقت السعر';
+  var SRC_DATA_UPDATED = 'وقت تحديث البيانات';
+  var SRC_PRICE_TIME = 'وقت السعر';
+  var SRC_LAST_PRICE = 'آخر سعر متاح';
+
   var S = {
     key: 'swing',
     strategies: [],
@@ -158,11 +165,29 @@
     /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٤) — وصف السعر:
        «سعر التداول أثناء الجلسة» ما ينفعش يتسمّى «سعر إغلاق»،
        والمصدر مابيعطيش وقت السعر ⇒ بنعلن ده بصراحة. */
-    if (it.price_label) {
+    /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٥) — الصدق في العرض:
+       «الآن» ما تظهرش إلا مع توقيت من المصدر —
+       حتى لو الـAPI بعت تسمية بتدّعي لحظية. */
+    var _hasSrcTime = (it.price_time_source === 'source');
+    if (it.price_label && _hasSrcTime) {
       h += '<span class="opps-price-l">' + esc(it.price_label) + '</span>';
+    } else if (it.price_label) {
+      h += '<span class="opps-price-l">' + esc(SRC_LAST_PRICE) + '</span>';
     }
+    /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٥ · ملاحظة المالك) — الوقت
+       بنعرضه لازم يكون الوقت الصح:
+       · في توقيت من المصدر ⇒ «وقت السعر» (وقت آخر تداول).
+       · مافيش ⇒ «وقت تحديث البيانات» (وقت استلامنا للبيانات) — وده
+         **مش** دليل على وقت آخر تداول ⇒ بنعلن الكلام ده صراحة. */
     if (it.price_time_source === 'not_provided') {
-      h += '<span class="opps-price-t">المصدر مابيعطيش وقت السعر</span>';
+      h += '<span class="opps-price-t">' + esc(SRC_NO_PRICE_TIME) + '</span>';
+      if (it.data_received_at) {
+        h += '<span class="opps-price-t">' + esc(SRC_DATA_UPDATED) + ': ' +
+          esc(fmtTime(it.data_received_at)) + '</span>';
+      }
+    } else if (it.price_as_of) {
+      h += '<span class="opps-price-t">' + esc(SRC_PRICE_TIME) + ': ' +
+        esc(fmtTime(it.price_as_of)) + '</span>';
     }
     h += '</span>';
     if (it.change !== null && it.change !== undefined) {
