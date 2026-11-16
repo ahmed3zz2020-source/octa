@@ -110,7 +110,7 @@ console.log('\n▸ توكن المسارات المحمية');
 
 const api = fs.readFileSync(path.join(ROOT, 'assets/js/octa-api.js'), 'utf8');
 /* ⛔⛔ ٢١ أكتوبر ٢٠٢٦ — الموديل اتغيّر:
-   التون�� مبعت مع **كل** نداء /api/* (مش ٨ مسارات بس)، لأن
+   التوكن مبعت مع **كل** نداء /api/* (مش ٨ مسارات بس)، لأن
    الباك بقى يقفل كل مسار بيانات ورا توكن. */
 const authBlock = api.slice(api.indexOf('const OPEN_PATHS'),
                             api.indexOf('/* 🩺 لو الـWorker وقع'));

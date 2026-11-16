@@ -177,7 +177,7 @@ POST /api/auth/pin/login كان بيبحث بالـPIN بس (_pin_find_by_index)
 |---|---|
 | الواجهة | `post('/api/auth/pin/login', { pin: p, device: bioSecret() })` |
 | الباك | جهاز مش مسجّل على الحساب ⇒ `401` + `why: new_device` + `need_code: true` |
-| الباك | `device` ناقص ⇒ اترفض (يمنع绕过 من clients قديمة) |
+| الباك | `device` ناقص ⇒ اترفض (يمنعتجاوز من clients قديمة) |
 | الباك | `signup/newpin` + `challenge/newpin` ⇒ يسجّلوا `bio_hash` |
 | الواجهة | `needCode()` بيعرف `new_device` + رسالة «دخول من جهاز جديد» |
 
@@ -245,7 +245,7 @@ _HIDDEN_KEYS_OUTPUT = (..., "why", ...)   # ⛔ كان فيه why
 ```
 **✅ الحل:** استثناء صريح — `/api/auth/` يرجّع `why`.
 
-### ③ `_shows_output` دايم�� False في Flask 3 ⭐ (تسريب/نقص)
+### ③ `_shows_output` دايمًا False في Flask 3 ⭐ (تسريب/نقص)
 ```python
 p = str(getattr(resp, "request", None).path or "")   # ⛔ None دايماً في Flask 3
 # ⇒ /api/rank و /api/data_full و /api/portfolio شالت الدرجات!

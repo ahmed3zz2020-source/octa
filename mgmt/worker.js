@@ -205,7 +205,7 @@ export default {
               });
               if (!wr.ok) return base;
               const wj = await wr.json();
-              /* ⛔ با�� في الباك (update_prices.py:12583): w_list جوّه اللوب
+              /* ⛔ باك في الباك (update_prices.py:12583): w_list جوّه اللوب
                  ⇒ القائمة كلها بتترجع مع كل عنصر ⇒ ٦ أسهم = ٣٦ سطر.
                  هنا بنخلي أول ظهور بس لكل كود. */
               const seen = {}, list = [];

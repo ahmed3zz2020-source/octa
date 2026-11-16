@@ -2016,6 +2016,21 @@ async function handle(request, env, ctx) {
               });
             }
           }
+          /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٤) — خطأ المصادقة مش «الباك ميت».
+             📌 العيب المقاس: الباك الحيّ شغّال ويردّ 401 «محتاج تسجيل دخول»
+                ⇒ الـworker كان بيعتبر ده فشل ⇒ بيردّ 503 «الباك الحي شاغل»
+                ⇒ **رسالة كاذبة** (الباك شغّال فعلاً).
+             ⛔ الحل: 401/403 تُمرَّر زي ما هي (هي الحقيقة).
+                503 «الباك غير متاح» بس عند فشل الشبكة/5xx/رد مش JSON. */
+          if (live && (live.status === 401 || live.status === 403)) {
+            return new Response(live.body, {
+              status: live.status,
+              headers: {
+                'Content-Type': live.headers.get('Content-Type') || 'application/json',
+                'Cache-Control': 'no-store'
+              }
+            });
+          }
         } catch (e) { }
         /* ⛔⛔⛔ 16 نوفمبر 2026 — مافيش رجوع إلقطة القديمة:
            ⛔ الباك حي ماشبش (or مرد غير JSON)
@@ -2048,6 +2063,16 @@ async function handle(request, env, ctx) {
                 headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
               });
             }
+          }
+          /* ⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٤) — نفس قاعدة المصادقة (فوق). */
+          if (live && (live.status === 401 || live.status === 403)) {
+            return new Response(live.body, {
+              status: live.status,
+              headers: {
+                'Content-Type': live.headers.get('Content-Type') || 'application/json',
+                'Cache-Control': 'no-store'
+              }
+            });
           }
         } catch (e) { }
         /* ⛔⛔⛔ 16 نوفمبر 2026 — مافيش رجوع إلقطة القديمة

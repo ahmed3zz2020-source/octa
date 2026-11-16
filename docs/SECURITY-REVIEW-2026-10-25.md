@@ -111,7 +111,7 @@
 | `octa-gate.js:2205` `logoutLocal()` | **idle ٣٠ دقيقة** | ⛔ **السبب الرئيسي** |
 | `octa-gate.js:2153` `logoutLocal()` | `renew()` ⇒ 401 ⇒ `/api/auth/me` ⇒ برضو 401 | ⛔ المسار التاني (بصراحة: مظبوط) |
 | `octa-gate.js:2247` `logoutLocal()` | `window.OCTAAuthFail` — سيرفر رجّع 401 | ⛔ تالت (مظبوط) |
-| `octa-gate.js:166-171` `logoutLocal()` |本体 — `removeItem('octa_token')` + `removeItem('octa_user')` | ✅ مفيش `localStorage.clear()` خالص |
+| `octa-gate.js:166-171` `logoutLocal()` |أساسي — `removeItem('octa_token')` + `removeItem('octa_user')` | ✅ مفيش `localStorage.clear()` خالص |
 | `octa-gate.js:1898` `put(d.token, d.user)` | «نسيت الباسورد» ⇒ **بيستبدل** التوكن | ⚠️ شوف ②-ج |
 | `update_prices.py:4640` `token_epoch` BUMP | **حذف الحساب** بس | ✅ |
 | `update_prices.py:3798` `token_epoch` BUMP | **إنشاء حساب جديد** بس | ✅ |
@@ -309,7 +309,7 @@ octa-gate.js:71-77  function renewDelayMs(expiresInSec) {
 | | `update_prices.py:4765` `@app.route("/api/auth/logout", methods=["POST"])` — **مافيش حماية** |
 | **الأثر** | ① `/api/charts/list` بيرجّع **قائمة شارتات المستخدمين** — محتمل إنها فيها أسماء/معرّفات شارتات ⇒ تسريب بيانات + كشف النشاط. ② `/api/auth/logout` مفتوح: أي حد يقدر يبعت POST بـ`octa_token` (من كوكي) ⇒ يعمل logout لحد تاني = **DoS صغير** + session invalidation. |
 | **مُختبَر** | ✅ `/api/charts/list` → **200** بدون توكن (و`/api/charts` → 401) |
-| **الإصلاح المقترح** | `require_user()` على `/api/charts/list`. وعلى `/api/auth/logout`: اقرأ التوكن من `Authorization` أو الكوكي، وبطلّل الكوكي **بس** لو طابق الـuid بتاعه (وإلا ��لخبط) — أو اعمله POST-only مع CSRF token. |
+| **الإصلاح المقترح** | `require_user()` على `/api/charts/list`. وعلى `/api/auth/logout`: اقرأ التوكن من `Authorization` أو الكوكي، وبطّل الكوكي **بس** لو طابق الـuid بتاعه — أو اعمله POST-only مع CSRF token. |
 
 ---
 
@@ -347,7 +347,7 @@ octa-gate.js:71-77  function renewDelayMs(expiresInSec) {
 | د | `admin` × ١٠ مسارات بتكرر نفس كود التوكن | `update_prices.py:12356, 12178, 12202, 12236, 12284, 12319, 12358, 12412, 12455` | نسخة واحدة من الكود = أقل خطأ. **ماشي** (`compare_digest` بـ`.encode("utf-8","replace")` ✅) |
 | هـ | `hmac.compare_digest` على `str` | `:465` (`ADMIN_KEY` vs header)، `:1114`/`:1158`/`:2324`/`:3604` (توقيع hex ✅)، `:1545`/`:2274`/`:2514`/`:2550`/`:2739`/`:2807`/`:3285`/`:3888` (هاش hex ✅) | ⚠️ **مستوى الخطر منخفض** — الـASCII صح. بس `:465` لو `ADMIN_KEY` اتظبط على قيمة عربية ⇒ `TypeError` ⇒ 500 بدل 401/403. **الإصلاح:** `got.encode("utf-8","replace")` زي الباقي. |
 | و | `PREVIEW_HOST_RE` يسمح بأي subdomain على `*.space.minimax.io` | `update_prices.py:37-39` | CORS بيقبل أي preview ⇒ لو حد رفع preview فيه كود، يقدر يقرا الـAPI. **مقبول** — بس راجعه. |
-| ز | `octa-core.js:3057` — `${r}` (reasons) من غير escape | `octa-core.js:3057` | ⚠️ **مش مؤكد**它是 ثغرة حالية: الـ`reasons` مبنية في الباك من أرقام (`update_prices.py:6049-6052`). بس لو الـAI رجّع نص، `update_prices.py:4904` هو prompt بس. **الإصلاح الآمن:** `octaEsc(r)` — تكلفة صفر. |
+| ز | `octa-core.js:3057` — `${r}` (reasons) من غير escape | `octa-core.js:3057` | ⚠️ **مش مؤكد**إنها ثغرة حالية: الـ`reasons` مبنية في الباك من أرقام (`update_prices.py:6049-6052`). بس لو الـAI رجّع نص، `update_prices.py:4904` هو prompt بس. **الإصلاح الآمن:** `octaEsc(r)` — تكلفة صفر. |
 
 ---
 
@@ -408,7 +408,7 @@ octa-gate.js:71-77  function renewDelayMs(expiresInSec) {
 الـidle (٣٠ دقيقة) هو السبب الحقيقي — اتصلح. الـTTL ٣٠ يوم **فضل** لأن:
 - القفل الحقيقي موجود (عمر التوكن + `token_epoch` عند تغيير الباسورد + بصمة الجهاز + كوكي HttpOnly)
 - ٧ أيام هتسبب نفس المشكلة بالظبط (المستخدم بيرجع بعد أسبوع ولقى البوابة)
-- **لو في疑虑 أمني ⇒ `token_epoch` bump + `logout` server-side هما الحل — مش تقصير العمر**
+- **لو فيقلق أمني ⇒ `token_epoch` bump + `logout` server-side هما الحل — مش تقصير العمر**
 
 ### 🔎 الـidle بعد الإصلاح
 ```
@@ -512,7 +512,7 @@ API errors  : صفر ✅
 | «القرار —» فاضي | `intel.decision` مخفي في `/api/intelligence` | `octaStockMeta(code).decision` من `OS_DB` |
 | المحاور إنجليزي | `k` مباشرة بدل `AR_MS[k]` | `AR_MS` (٧ محاور عربي) |
 | `rgba(255,255,255,...)` في الكارت | inline styles مش متحوّلة | `var(--wash)` |
-| كارت لوحده في آخر صف | `auto-fit minmax(130px)` مع ٧ عناصر | `repeat(3,1fr)` للكر��ت + `repeat(2,1fr)` للمحاور |
+| كارت لوحده في آخر صف | `auto-fit minmax(130px)` مع ٧ عناصر | `repeat(3,1fr)` للكرت + `repeat(2,1fr)` للمحاور |
 
 ### 🧪 نتيجة الفحص النهائي (production، موبايل ٣٩٠px)
 ```
