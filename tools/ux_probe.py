@@ -205,6 +205,64 @@ JS_OVERFLOW = """
 """
 
 
+# 🛡️ الجولة ٢٠ (R20 · المرحلة ٥) — تدقيق الوصولية + السرعة ⭐
+JS_A11Y = r"""(() => {
+  const out = { lang: false, title: '', imgsMissingAlt: 0, inputsNoLabel: 0,
+                headingJumps: [], landmarks: [], namelessButtons: 0,
+                focusVisible: false };
+  try {
+    out.lang = !!document.documentElement.getAttribute('lang');
+    out.title = (document.title || '').trim();
+    document.querySelectorAll('img').forEach((im) => {
+      if (!im.hasAttribute('alt')) out.imgsMissingAlt++;
+    });
+    document.querySelectorAll('input, select, textarea').forEach((el) => {
+      const hasLabel = el.getAttribute('aria-label') || el.getAttribute('aria-labelledby')
+        || (el.id && document.querySelector('label[for="' + el.id + '"]'))
+        || el.closest('label');
+      if (!hasLabel) out.inputsNoLabel++;
+    });
+    const hs = [...document.querySelectorAll('h1,h2,h3,h4,h5,h6')]
+      .filter(h => h.offsetParent !== null || h.getClientRects().length);
+    let prev = 0;
+    hs.forEach(h => {
+      const lvl = parseInt(h.tagName.slice(1), 10) || 0;
+      if (prev && lvl > prev + 1) out.headingJumps.push(prev + '-' + lvl);
+      prev = lvl;
+    });
+    out.landmarks = ['main','nav','header','footer','aside','[role="main"]','[role="navigation"]']
+      .filter(s => document.querySelector(s));
+    document.querySelectorAll('button, a[href]').forEach((b) => {
+      const name = (b.innerText || '').trim() || b.getAttribute('aria-label')
+        || b.getAttribute('title') || (b.querySelector('img') || {}).alt;
+      if (!name) out.namelessButtons++;
+    });
+    let css = '';
+    for (const ss of document.styleSheets) {
+      let rules; try { rules = ss.cssRules; } catch (e) { continue; }
+      for (const r of rules) {
+        if (r.selectorText && r.selectorText.indexOf(':focus-visible') > -1) css += r.cssText;
+      }
+    }
+    out.focusVisible = css.length > 0;
+  } catch (e) { out.error = String(e).slice(0, 120); }
+  return out;
+})()"""
+
+JS_SPEED = r"""(() => {
+  try {
+    const t = performance.getEntriesByType('navigation')[0] || {};
+    const res = performance.getEntriesByType('resource') || [];
+    return {
+      dcl: Math.round(t.domContentLoadedEventEnd || 0),
+      load: Math.round(t.loadEventEnd || 0),
+      resources: res.length,
+      bytes: res.reduce((a, r) => a + (r.transferSize || r.encodedBodySize || 0), 0)
+    };
+  } catch (e) { return { error: String(e).slice(0, 120) }; }
+})()"""
+
+
 def find_wide_elements(limit=6):
     """أعرض العناصر اللي بتعدّي عرض الشاشة — سبب التمدد."""
     return """
@@ -285,6 +343,15 @@ def run_probe(base_url, routes, widths, out_json, headed=False):
                     rec["wide"] = page.evaluate(find_wide_elements())
                     rec["text_len"] = len(page.inner_text("body") or "")
                     rec["title"] = page.title()
+                    # 🛡️ الجولة ٢٠ — الوصولية + السرعة ⭐
+                    try:
+                        rec["a11y"] = page.evaluate(JS_A11Y)
+                    except Exception as e:
+                        rec["a11y"] = {"error": str(e)[:120]}
+                    try:
+                        rec["speed"] = page.evaluate(JS_SPEED)
+                    except Exception as e:
+                        rec["speed"] = {"error": str(e)[:120]}
                 except Exception as e:
                     rec["errors"].append({"kind": "probe", "msg": str(e)[:300]})
                 finally:
@@ -385,8 +452,33 @@ def summarize(payload):
                    "page_ok": ok_page, "overflow": over,
                    "overflow_px": (ov.get("scrollW", 0) or 0) - (ov.get("innerW", 0) or 0),
                    "errors": errs, "api_offline": r.get("api_offline", 0),
-                   "text_len": r.get("text_len", 0)}
+                   "text_len": r.get("text_len", 0),
+                   "a11y": r.get("a11y") or {}, "speed": r.get("speed") or {}}
             rows.append(row)
+            # 🛡️ الجولة ٢٠ — تدقيق الوصولية ⭐ (لكل صفحة/عرض) ⭐
+            _a = row["a11y"]
+            if _a:
+                if not _a.get("lang"):
+                    defects.append(("a11y-lang", route, w, "مفيش lang على <html>"))
+                if not _a.get("title"):
+                    defects.append(("a11y-title", route, w, "<title> فاضي"))
+                if _a.get("imgsMissingAlt"):
+                    defects.append(("a11y-alt", route, w,
+                                    "%d صورة من غير alt" % _a["imgsMissingAlt"]))
+                if _a.get("inputsNoLabel"):
+                    defects.append(("a11y-label", route, w,
+                                    "%d حقل من غير label" % _a["inputsNoLabel"]))
+                if _a.get("headingJumps"):
+                    defects.append(("a11y-heading", route, w,
+                                    "قفز في العناوين: %s" % _a["headingJumps"][:3]))
+                if not _a.get("landmarks"):
+                    defects.append(("a11y-landmark", route, w, "مافيش landmark"))
+                if _a.get("namelessButtons"):
+                    defects.append(("a11y-name", route, w,
+                                    "%d زر/رابط من غير اسم" % _a["namelessButtons"]))
+                if not _a.get("focusVisible"):
+                    defects.append(("a11y-focus", route, w,
+                                    "مافيش :focus-visible في CSS"))
             if not ok_page:
                 defects.append(("wrong-page", route, w, f"{want} مش ظاهرة (ظهر: {vis})"))
             if over:

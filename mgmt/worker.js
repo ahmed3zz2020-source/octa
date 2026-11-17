@@ -41,6 +41,57 @@ const RENEW_BEFORE = 2 * 60 * 60; // ساعتين
       كانت سليمة ٣٠ يوم! ⇒ دلوقتي الخادم نفسه بيبطل الجلسة فورًا. */
 const REVOKED = new Map(); // raw ← وقت انتهاء الإبطال
 
+/* 🛡️ الجولة ٢٠ (R20) — إبطال الجلسة عبر **أكتر من نسخة** من الـWorker ⬇️
+   📌 المشكلة: `REVOKED` كان **في الذاكرة** ⇒ ⛔ كل نسخة من الـWorker
+     عندها قائمتها ⭐ ⇒ ⛔ الخروج على نسخة A **ما بيمبطلش** نفس
+     الجلسة على نسخة B ⭐ ⇒ ⛔ النسخة المنسوخة من الكوكي كانت
+     سليمة على أي نسخة تانية ⭐ (وهو بالظبط التهديد اللي R18-A01
+     قصد يوقفه) ⭐.
+   ✅ الحل: **مخزن مشترك** (Cloudflare KV) ⬇️
+     ⭐ الإبطال يكتب `rev:<hash>` ⇒ أي نسخة تانية تشوفه ⬇️
+     ⭐ ⛔ المفتاح **هاش موقّع** (مش الكوكي نفسه) ⇒ مافيش bearer
+       token في أسماء مفاتيح KV ⭐
+     ⭐ ⛔ لو الـKV مش مربوط ⇒ fallback للذاكرة (سلوك نسخة واحدة)
+       + **تنبيه صريح** في /api/health (booleans) ⭐
+   ⛔ ملاحظة: KV اتساقه **متأخر** (حتى ~٦٠ ثانية) ⇒ الإبطال بين
+     النسخ بيبقى فعّال خلال دقيقة ⭐ (والعمر ٨ ساعات يقلّل الأثر) ⭐
+   ⭐ الحل الأقوى (Do) محتاج مورد جديد ⇒ ⛔ ممنوع بدون موافقة المالك ⭐ */
+const REVOKE_PREFIX = "rev:";
+
+async function revokeKey(env, raw) {
+  if (!raw) return null;
+  try {
+    return REVOKE_PREFIX + (await sign(raw, String(env.SESSION_SECRET || "")));
+  } catch (e) {
+    return null;
+  }
+}
+
+async function kvRevoke(env, raw) {
+  if (!env.REVOKE_KV || !raw) return false;
+  const k = await revokeKey(env, raw);
+  if (!k) return false;
+  try {
+    await env.REVOKE_KV.put(k, "1", {
+      expirationTtl: Math.max(60, Math.floor(SESSION_TTL / 60) + 1),
+    });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function kvIsRevoked(env, raw) {
+  if (!env.REVOKE_KV || !raw) return false;
+  const k = await revokeKey(env, raw);
+  if (!k) return false;
+  try {
+    return !!(await env.REVOKE_KV.get(k));
+  } catch (e) {
+    return false;
+  }
+}
+
 function revokeSession(raw) {
   if (!raw) return;
   REVOKED.set(raw, Date.now() + SESSION_TTL * 1000);
@@ -142,13 +193,17 @@ async function makeSession(secret) {
   return `${exp}.${sig}`;
 }
 
-async function validSession(req, secret) {
+async function validSession(req, secret, env) {
   /* 🛡️ من غير سر ⇒ مافيش جلسة صالحة أبداً (لا ت trusting for undefined) */
   if (!secret) return false;
   const raw = parseCookies(req)[COOKIE];
   if (!raw) return false;
   /* 🛡️ الجولة ١٩ (R18-A01) — جلسة مُبطلة من جهة السيرفر ⇒ مرفوضة */
   if (isRevoked(raw)) return false;
+  /* 🛡️ الجولة ٢٠ (R20) — الإبطال عبر النسخ ⬇️
+     ⛔ الذاكرة لوحدها ما بتغطّيش نسخة تانية من الـWorker ⭐
+     ⭐ ⇒ نفحص المخزن المشترك (KV) كمان ⬇️ */
+  if (env && await kvIsRevoked(env, raw)) return false;
   const dot = raw.lastIndexOf(".");
   if (dot < 1) return false;
   const exp = raw.slice(0, dot);
@@ -335,7 +390,7 @@ export default {
       /* 🛡️ الجولة ١٨ (P0): ⛔ أي مسار API غير عام ⇒ لازم جلسة صالحة
          (يتحقق **قبل** أي طلب للباك — ⛔ صفر تسريب قبل التحقق). */
       if (!PUBLIC_API.has(path)) {
-        const authed = await validSession(request, env.SESSION_SECRET);
+        const authed = await validSession(request, env.SESSION_SECRET, env);
         if (!authed) return json({ ok: false, error: ERR_AUTH }, 401);
       }
 
@@ -366,7 +421,11 @@ export default {
         /* 🛡️ الجولة ١٩ (R18-A01) — إبطال من جهة السيرفر:
            ⛔ قبل كده كان بينظّف الكوكي في المتصفح بس ⇒ أي نسخة منسوخة
               كانت بتفضل صالحة. دلوقتي: السيرفر نفسه بيبطلها فورًا. */
-        revokeSession(parseCookies(request)[COOKIE]);
+        const _raw = parseCookies(request)[COOKIE];
+        revokeSession(_raw);
+        /* 🛡️ الجولة ٢٠ (R20) — نفس الإبطال في المخزن المشترك ⬇️
+           ⭐ ⇒ نسخة تانية من الـWorker بترفض نفس الجلسة ⭐ */
+        await kvRevoke(env, _raw);
         return json({ ok: true }, 200, {
           "Set-Cookie": `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`,
         });
@@ -374,7 +433,7 @@ export default {
 
       /* ── حالة الجلسة ── */
       if (path === "/api/session") {
-        const ok = await validSession(request, env.SESSION_SECRET);
+        const ok = await validSession(request, env.SESSION_SECRET, env);
         return json(ok ? { ok: true, ts: Date.now() } : { ok: false }, ok ? 200 : 401);
       }
 
@@ -385,6 +444,10 @@ export default {
           ok: true,
           has_admin: !!env.OCTA_ADMIN_TOKEN,
           has_password: !!env.APP_PASSWORD,
+          /* 🛡️ الجولة ٢٠ (R20) — ⛔ booleans بس (مافيش أي اسم متغيّر) ⬇️
+             ⭐ `revoke_shared` = الإبطال بيشتغل عبر أكتر من نسخة ⭐
+             ⛔ `false` ⇒ الإبطال في الذاكرة بس ⇒ نسخة واحدة ⭐ */
+          revoke_shared: !!env.REVOKE_KV,
         });
       }
 
@@ -393,7 +456,7 @@ export default {
          كلهم من السيرفر. الكاش ٣٠ دقيقة (البيانات مش بتتغير كل ثانية).
          ⛔ الجولة ١٨: ⛔ التحقق من الجلسة *قبل* أي طلب للباك. */
       if (path === "/api/prefs") {
-        const authed = await validSession(request, env.SESSION_SECRET);
+        const authed = await validSession(request, env.SESSION_SECRET, env);
         if (!authed) return json({ ok: false, error: ERR_AUTH }, 401);
         if (!env.OCTA_ADMIN_TOKEN) return json({ ok: false, error: "التوكن غير مهيّأ" }, 500);
         try {
@@ -450,7 +513,7 @@ export default {
 
       /* ── التمرير ── */
       if (path === "/api/proxy") {
-        const authed = await validSession(request, env.SESSION_SECRET);
+        const authed = await validSession(request, env.SESSION_SECRET, env);
         if (!authed) return json({ ok: false, error: ERR_AUTH }, 401);
         const target = url.searchParams.get("path") || "";
         const method = (request.method || "GET").toUpperCase();
@@ -492,7 +555,7 @@ export default {
        ⛔ ممنوع يطلع 200 فيه بيانات لزائر. */
     const isPublic = PUBLIC_FILES.has(path);
     if (!isPublic) {
-      const authed = await validSession(request, env.SESSION_SECRET);
+      const authed = await validSession(request, env.SESSION_SECRET, env);
       if (!authed) {
         if (wantsHtml(request)) return loginRedirect(url);
         return json({ ok: false, error: ERR_AUTH }, 401);

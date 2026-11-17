@@ -46,3 +46,7 @@ __pycache__/
 # 🔐 أسرار تطبيق تقرير الزوار
 mgmt/.app-password
 mgmt/.wrangler/
+
+# 🛡️ الجولة ٢٠ — مخرجات مولّدة (مش بتتكود)
+r20_xss.json
+r20_xss_triage.json

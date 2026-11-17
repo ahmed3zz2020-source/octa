@@ -1,0 +1,56 @@
+name: OCTA Interface Check
+
+# 🛡️ الجولة ٢٠ (R20 · AZ31) — ⛔ كان مافيش CI للواجهة خالص ⬇️
+# 📌 الباك كان عنده workflow بيعمل **فحص syntax** بس ⬇️
+# 📌 ⛔⛔ أي حد ي推送 كود للواجهة من غير ما ي تشغيل الاختبارات ⬇️
+# ⛔ ⛔ ⛔ (٤٨٥ اختبار + حارس النصوص + حارس XSS).
+# ✅ الحل: workflow بيُشغّل **الاختبارات الحقيقية** + بوابات الجودة ⬇️
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  interface-check:
+    name: 🖥️ اختبارات الواجهة + بوابات الجودة
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 تحميل الكود
+        uses: actions/checkout@v4
+
+      - name: 🟢 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📦 تثبيت الاعتماديات
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: 🔤 حارس النصوص (حروف تالفة / أسماء أدوات)
+        run: npm run check:hygiene
+
+      - name: 🧪 الاختبارات الكاملة (الواجهة)
+        run: node --test "assets/tests/*.test.js"
+
+      - name: 🛡️ جرد XSS + التصنيف
+        run: node tools/xss-inventory.js --triage
+
+      - name: 🧾 حارس البناء (نسخة الإنتاج)
+        run: npm run build
+
+      - name: 🔎 التأكد إن مافيش اختبارات في نسخة الإنتاج
+        run: |
+          if [ -d dist/assets/tests ]; then
+            echo "⛔ ملفات اختبارات داخل dist — البناء مرفوض"
+            exit 1
+          fi
+          echo "✅ مافيش اختبارات في نسخة الإنتاج"
+
+      - name: 📊 ملخص
+        run: |
+          echo ""
+          echo "╔══════════════════════════════╗"
+          echo "║   ✅ الواجهة سليمة — ينفع تندمج ║"
+          echo "╚══════════════════════════════╝"

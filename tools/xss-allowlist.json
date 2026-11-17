@@ -1,0 +1,42 @@
+{
+  "_note": "🛡️ الجولة ٢٠ (R20) — مواضع XSS «المتوسطة» الباقية بعد الجولة ١٩ ⭐ كلها **إيجابية كاذبة** ⭐ (مُرمَّزة أو متحوّلة لرقم) ⭐ — كل واحد وسببه موثّق هنا ⭐. ⛔ أي موضع جديد متوسط/عالي لازم يتقيّد بـالـguard ⭐.",
+  "_guard": "tools/xss-allowlist-check.js — ⛔ يفشل لو (أ) أي موضع متوسط/عالي مش مغطّى ⭐ (ب) أي سطر في القائمة اتغيّر ⭐ (يعني الكود اتعدّل والقائمة بقت قديمة) ⭐",
+  "entries": [
+    {
+      "file": "assets/js/octa-pages.js",
+      "line": 221,
+      "why": "الإيميل/الكود بيتمرّر على ssEsc(a.code) ⭐ والرقم على Number(a.value).toFixed(2) ⭐ ⇒ مافيش نص API خام في HTML ⭐",
+      "fingerprint": "ssEsc(a.code)"
+    },
+    {
+      "file": "assets/js/octa-pages.js",
+      "line": 3501,
+      "why": "كل الأرقام متحوّلة بعلامة + ( coercing ) ⇒ NaN مش نص ⭐ ⇒ مافيش حقن ⭐",
+      "fingerprint": "r.depth?.bids"
+    },
+    {
+      "file": "assets/js/octa-pages.js",
+      "line": 4501,
+      "why": "اسم السهم على ssEsc(intel.name || '') ⭐ ⇒ مُرمَّز ⭐",
+      "fingerprint": "ssEsc(intel.name || '')"
+    },
+    {
+      "file": "assets/js/octa-pages.js",
+      "line": 4557,
+      "why": "الـstyle فيه لون محسوب من مقارنة رقمية (chg2>=0) ⭐ مش نص من الـAPI ⭐",
+      "fingerprint": "chg2>=0?'var(--sec)':'var(--red2)'"
+    },
+    {
+      "file": "assets/js/octa-pages.js",
+      "line": 4560,
+      "why": "القيمة السوقية على toFixed(1) ⇒ رقم ⭐ (مش نص) ⭐",
+      "fingerprint": "(intel.liquidity?.metrics?."
+    },
+    {
+      "file": "assets/js/octa-settings.js",
+      "line": 828,
+      "why": "s.ic و s.t من ثابت SECS الثابت في الكود ⭐ (مش API ولا مدخل مستخدم) ⭐",
+      "fingerprint": "s.ic"
+    }
+  ]
+}

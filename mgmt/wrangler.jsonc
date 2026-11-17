@@ -9,6 +9,14 @@
     "binding": "ASSETS",
     "run_worker_first": true
   },
+  // 🛡️ الجولة ٢٠ (R20) — إبطال الجلسات عبر أكتر من نسخة من الـWorker.
+  // ⛔ نفس الـnamespace بتاع المحتوى (HALAN_KV) ⭐ بس بمفتاح مختلف تمامًا
+  //   (`rev:*`) ⭐ ⇒ مافيش تصادم ⭐
+  // ⚠️ ⛔ ده **ملف إعدادات** في الكود — ⛔ مافيش نشر ولا تغيير إعدادات
+  //    حية حصل ⭐ (التأثير بيبدأ أول نشر فقط) ⭐
+  "kv_namespaces": [
+    { "binding": "REVOKE_KV", "id": "8c9beca8ef09451b9767819d3060fb55" }
+  ],
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
