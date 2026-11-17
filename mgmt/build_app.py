@@ -1,10 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""🔧 تحوّل داشبورد الزوار إلى تطبيق PWA كامل"""
-import re, os
+"""🔧 تحوّل داشبورد الزوار إلى تطبيق PWA كامل
 
-SRC = "/workspace/output/octa-visitors-dashboard.html"
-DST = "/workspace/mgmt/public/index.html"
+🛡️ الجولة ١٨ (P0): ⛔ مافيش أي بيانات مستخدمين في الملف النهائي.
+   ١) البيانات المدمجة بتتشال (الصفحة بتفرّغ والداتا بتيجي من /api/* بعد الجلسة).
+   ٢) أقسام لوحة الإدارة (٨) بتتحقن.
+   ٣) حارس البناء بيشتغل آخر حاجة ⇒ لو الملف اتلمس ⇒ **فشل بصوت عالي**.
+"""
+import re, os, sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "tools"))
+from strip_embedded_data import strip  # noqa: E402
+
+SRC = os.environ.get("MGMT_SRC", "/workspace/output/octa-visitors-dashboard.html")
+DST = os.environ.get("MGMT_DST", "/workspace/mgmt/public/index.html")
+PANEL_HTML = os.path.join(HERE, "tools", "panel_sections.html")
+GUARD = os.path.join(HERE, "check_build_clean.py")
 
 s = open(SRC, encoding="utf-8").read()
 
@@ -303,5 +315,34 @@ s = s.replace("/* ══ تشغيل ══ */", FN + "\n/* ══ تشغيل ═
 s = s.replace("renderFunnel(); renderGaps(); }", "renderFunnel(); renderGaps(); renderRaw(); }")
 
 os.makedirs(os.path.dirname(DST), exist_ok=True)
+
+# ═══ ٨) الجولة ١٨ — شيل البيانات المدمجة + حقن لوحة الإدارة ═══
+s, rep = strip(s)
+print("🧹 بيانات مدمجة اتشالت:", rep["had_data"], "· pull() قديمة اتشالت:", rep["had_pull"])
+
+PANEL = open(PANEL_HTML, encoding="utf-8").read() if os.path.exists(PANEL_HTML) else ""
+if PANEL and "secDaily" not in s:
+    s = s.replace("</div>\n\n<footer>", PANEL + "\n</div>\n\n<footer>", 1)
+    print("🛡️ أقسام لوحة الإدارة اتحقنت (٨ أقسام)")
+if '<link rel="stylesheet" href="/panel.css">' not in s:
+    s = s.replace('<link rel="icon" href="/icons/favicon.png" type="image/png">',
+                  '<link rel="icon" href="/icons/favicon.png" type="image/png">\n'
+                  '<link rel="stylesheet" href="/panel.css">')
+if '<script src="/panel.js"></script>' not in s:
+    s = s.replace('<script src="/app.js"></script>',
+                  '<script src="/app.js"></script>\n<script src="/panel.js"></script>')
+if '<div id="loadingBox">' not in s:
+    s = s.replace('<div class="wrap">',
+                  '<div class="wrap">\n\n<!-- ═══ جاري التحميل (لما مفيش بيانات بعد) ═══ -->\n'
+                  '<div id="loadingBox">⏳ جاري تحميل البيانات… (بعد تسجيل الدخول)</div>')
+
 open(DST, "w", encoding="utf-8").write(s)
 print("✅ اتكتب:", DST, os.path.getsize(DST), "بايت")
+
+# ═══ ٩) الجولة ١٨ — حارس البناء: ⛔ فشل بصوت عالي لو الملف اتلمس ═══
+import subprocess
+rc = subprocess.call([sys.executable, GUARD, DST])
+if rc != 0:
+    print("❌ حارس البناء فشل — الملف فيه بيانات شخصية مدمجة (راجع السطر فوق).")
+    sys.exit(rc)
+print("✅ حارس البناء: نظيف")

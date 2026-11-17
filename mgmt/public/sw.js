@@ -1,26 +1,37 @@
-/* ══════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════════════
    🛡️ OCTA-MGMT — Service Worker
-   ──────────────────────────────────────────────────────────────
+   ──────────────────────────────────────────────────────────────────────
    🎯 الهدف: التطبيق يبقى «زي الأپلكيشن» —
       يفتح فوراً حتى من غير نت، ويحدّث نفسه لوحده لما ينزل نسخة جديدة.
-   ══════════════════════════════════════════════════════════════ */
 
-const VERSION = 'octa-mgmt-v2.1.1';
+   🛡️ الجولة ١٨ (P0):
+   ⛔ ١) صفحة الـshell (index.html) **مش بتتخزّن** — لأنها محمية بجلسة،
+         وتخزينها معناه إن نسخة قديمة بتتعرض.
+   ⛔ ٢) طلبات الـAPI دايماً من الشبكة (⛔ مافيش تخزين لبيانات شخصية).
+   ⛔ ٣) التثبيت ما بيفشلش لو بعض الملفات محمية (بالجلسة) ⇒ كل ملف لوحده.
+   ══════════════════════════════════════════════════════════════════════ */
+
+const VERSION = 'octa-mgmt-v2.2.0';
+/* ⛔ ملاحظة: '/' و '/index.html' مش في الكاش وقت التثبيت (محميين بجلسة،
+   والتثبيت من غير جلسة كان بيفشل) — بس بيتخزّنوا بعد أول تحميل ناجح. */
 const SHELL = [
-  '/',
-  '/index.html',
   '/app.js',
+  '/panel.js',
+  '/panel.css',
   '/manifest.webmanifest',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/icon-maskable-512.png',
   '/icons/favicon.png'
 ];
+/* ⛔ بيتخزّن بعد نجاح الطلب: الصفحة + الأصول (عشان وضع الأوفلاين يشتغل) */
+const CACHEABLE = SHELL.concat(['/', '/index.html']);
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(VERSION)
-      .then((c) => c.addAll(SHELL).catch(() => c.add('/')))
+      /* ⛔ كل ملف لوحده: ملف واحد محمي ما يوقّفش التثبيت كله */
+      .then((c) => Promise.all(SHELL.map((u) => c.add(u).catch(() => null))))
       .then(() => self.skipWaiting())
   );
 });
@@ -68,7 +79,9 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(
     fetch(req)
       .then((res) => {
-        if (res && res.ok && (req.mode === 'navigate' || SHELL.includes(url.pathname))) {
+        /* ⛔ الجولة ١٨: بنخزّن الصفحة والأصول بعد نجاح الطلب فقط —
+           (⛔ مافيش تخزين لطلبات الـAPI — البيانات دايماً من الشبكة). */
+        if (res && res.ok && CACHEABLE.includes(url.pathname)) {
           const copy = res.clone();
           caches.open(VERSION).then((c) => c.put(req, copy)).catch(() => { });
         }

@@ -1,0 +1,88 @@
+<!-- ══════════════════════════════════════════════════════════════════
+     🔐 لوحة الإدارة — الجولة ١٨ (٨ أقسام)
+     ⛔ كل قسم بيشتغل بعد التحقق من الجلسة، والبيانات كلها من /api/*
+     ══════════════════════════════════════════════════════════════════ -->
+
+<section id="secDaily">
+  <div class="sec-hd">
+    <h2>🔐 ١. ملخّص يومي</h2>
+    <span class="note">النهاردة · آخر ١٤ يوم · حالة الاتصال</span>
+  </div>
+  <div id="dailyBox"></div>
+</section>
+
+<section id="secUsers">
+  <div class="sec-hd">
+    <h2>👥 ٢. إدارة المستخدمين والباقات</h2>
+    <span class="note">الباقة معروفة من سجل الاشتراكات · كل إجراء بيطلب تأكيد صريح</span>
+  </div>
+  <div id="usersBox"></div>
+</section>
+
+<section id="secLogin">
+  <div class="sec-hd">
+    <h2>🔑 ٣. تسجيل الدخول والجلسات</h2>
+    <span class="note">حالة الجلسة · طرق الدخول · حدود الإدارة</span>
+  </div>
+  <div id="loginBox"></div>
+</section>
+
+<section id="secPrices">
+  <div class="sec-hd">
+    <h2>💰 ٤. الأسعار</h2>
+    <span class="note">أسعار الباقات من سجل الاشتراكات · مؤشرات السوق</span>
+  </div>
+  <div id="pricesBox"></div>
+</section>
+
+<section id="secIncidents">
+  <div class="sec-hd">
+    <h2>🩺 ٥. الأعطال</h2>
+    <span class="note">مؤشرات مشتقة · ⛔ مافيش سجل أعطال في الباك</span>
+  </div>
+  <div id="incidentsBox"></div>
+</section>
+
+<section id="secAudit">
+  <div class="sec-hd">
+    <h2>🛡️ ٦. سجل الصلاحيات</h2>
+    <span class="note">فحص المسارات المحمية · سجل أفعال الأدمن</span>
+  </div>
+  <div id="permBox"></div>
+  <div id="auditBox" style="margin-top:12px"></div>
+</section>
+
+<section id="secDecisions">
+  <div class="sec-hd">
+    <h2>🧭 ٧. مركز القرارات</h2>
+    <span class="note">قرارات محتاجة قرار المالك</span>
+  </div>
+  <div id="decisionsBox"></div>
+</section>
+
+<section id="secAlerts">
+  <div class="sec-hd">
+    <h2>🔔 ٨. التنبيهات</h2>
+    <span class="note">منبهات الأسعار وحالتها مقابل السعر الحالي</span>
+  </div>
+  <div id="alertsBox"></div>
+</section>
+
+<!-- ═══ نافذة التأكيد (كل إجراء تعديلي) ═══ -->
+<div class="pmodal" id="pmodal">
+  <div class="pmodal-in">
+    <h3 id="pmodalTitle">تأكيد</h3>
+    <div class="pb" id="pmodalBody"></div>
+    <div class="pwarn" id="pmodalWarn" style="display:none"></div>
+    <label class="pcheck" id="pmodalCheck" style="display:none">
+      <input type="checkbox" id="pmodalCheckBox">
+      <span>أنا متأكد — الإجراء ده نهائي ومش قابل للتراجع.</span>
+    </label>
+    <div class="pbtns">
+      <button class="pbtn" id="pmodalCancel" type="button">إلغاء</button>
+      <button class="pbtn primary" id="pmodalOk" type="button">تأكيد</button>
+    </div>
+  </div>
+</div>
+
+

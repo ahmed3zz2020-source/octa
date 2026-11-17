@@ -7,6 +7,17 @@ D = json.load(open("/workspace/output/octa-report-data.json", encoding="utf-8"))
 K, U = D["kpi"], D["users"]
 OUT_HTML = "/workspace/output/OCTA-VISITORS-REPORT-2026-11-14.html"
 
+# 🛡️ الجولة ١٨ (P0) — ⛔ التقرير المطبوع فيه بيانات شخصية (أسماء/إيميلات/IP)
+#   ⇒ لازم يفضل في مسار خاص — ممنوع يتكتب في مجلد public أو assets.
+def _assert_private_output(path):
+    p = os.path.abspath(path).replace(os.sep, "/")
+    if "/public" in p or "/assets" in p or "/dist" in p:
+        raise SystemExit(
+            "❌ ⛔ التقرير المطبوع (فيه بيانات شخصية) مينفعش يتكتب في %s" % path)
+    return p
+
+_assert_private_output(OUT_HTML)
+
 def e(s): return html.escape(str(s if s is not None else ""))
 def hm(m):
     m = int(round(m or 0))

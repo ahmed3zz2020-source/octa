@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""🧪 اختبار شامل للتطبيق الحيّ — octa-mgmt"""
+"""🧪 اختبار شامل للتطبيق الحيّ — octa-mgmt
+
+🛡️ الجولة ١٨ (P0): التطبيق بقى **محمي بالكامل** — أي صفحة/ملف ثابت
+   بيطلب جلسة. ⇒ الاختبار بيبدأ بالتحقق من البوابة (زائر ⇒ 401/302).
+"""
 from playwright.sync_api import sync_playwright
-import json, sys
+import json, sys, urllib.request, urllib.error, ssl
 
 EXE = '/root/.cache/ms-playwright/chromium-1243/chrome-linux/chrome'
 U = 'https://octa-mgmt.ahmed3zz2020.workers.dev'
@@ -15,6 +19,36 @@ def chk(name, cond, extra=""):
         PASS += 1; print(f"  ✅ {name}" + (f" — {extra}" if extra else ""))
     else:
         FAIL += 1; print(f"  ❌ {name}" + (f" — {extra}" if extra else ""))
+
+_ctxssl = ssl.create_default_context(); _ctxssl.check_hostname = False; _ctxssl.verify_mode = ssl.CERT_NONE
+
+def raw(path, headers=None, method="GET"):
+    """⛔ من غير تحويل (no redirect) — عشان نشوف 302/401 كويس."""
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+    op = urllib.request.build_opener(NoRedirect)
+    req = urllib.request.Request(U + path, method=method, headers=headers or {})
+    try:
+        with op.open(req, context=_ctxssl, timeout=25) as f:
+            return f.status, dict(f.headers), f.read().decode('utf-8', 'replace')
+    except urllib.error.HTTPError as e:
+        return e.code, dict(e.headers), e.read().decode('utf-8', 'replace')
+
+print("\n🔐 ٠) البوابة (زائر من غير جلسة)")
+st, hd, body = raw('/index.html')
+chk("GET /index.html من غير جلسة ⇒ 401", st == 401, f"status={st}")
+st, hd, body = raw('/', headers={'Accept': 'text/html'})
+chk("GET / (متصفح) من غير جلسة ⇒ 302", st == 302, f"status={st}")
+loc = {str(k).lower(): v for k, v in hd.items()}.get('location', '')
+chk("التحويل بيوصّل لصفحة الدخول", '/login.html' in loc, loc or '—')
+import re as _re
+_em = _re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+_ip = _re.compile(r"(?<![\w.])(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?![\w.])")
+chk("جسم رد الزائر مافيشوش إيميلات", len(_em.findall(body)) == 0, f"عدد={len(_em.findall(body))}")
+chk("جسم رد الزائر مافيشوش IP", len(_ip.findall(body)) == 0, f"عدد={len(_ip.findall(body))}")
+st, hd, body = raw('/login.html')
+chk("صفحة الدخول مفتوحة (public)", st == 200, f"status={st}")
 
 with sync_playwright() as pw:
     b = pw.chromium.launch(executable_path=EXE, args=['--no-sandbox', '--disable-dev-shm-usage'])
@@ -30,12 +64,15 @@ with sync_playwright() as pw:
     p.on('response', lambda r: bad.append((r.status, r.url[:80])) if r.status >= 400 else None)
 
     p.goto(U, wait_until='domcontentloaded', timeout=60000); p.wait_for_timeout(2500)
-    chk("شاشة الدخول ظاهرة", p.evaluate("document.querySelector('#login').classList.contains('on')"))
+    chk("زائر اتحوّل لصفحة الدخول", p.url.endswith('/login.html'), p.url)
+    chk("شاشة الدخول ظاهرة", p.evaluate("!!document.querySelector('#pw')"))
+    p.goto(U + '/manifest.webmanifest', wait_until='domcontentloaded', timeout=30000)
+    p.wait_for_timeout(800)
     chk("الـmanifest مفيش أخطاء", p.evaluate("""async () => { const r = await fetch(document.querySelector('link[rel=manifest]').href); const j = await r.json(); return !j.errors; }"""))
-    chk("الـService Worker نشط", p.evaluate("!!navigator.serviceWorker.controller"))
-
-    p.fill('#pw', PW); p.click('#loginBtn'); p.wait_for_timeout(4500)
-    chk("الدخول نجح والواجهة ظهرت", not p.evaluate("document.querySelector('#login').classList.contains('on')"))
+    p.goto(U, wait_until='domcontentloaded', timeout=60000); p.wait_for_timeout(1500)
+    p.fill('#pw', PW); p.click('#loginBtn'); p.wait_for_timeout(6000)
+    chk("الدخول نجح والواجهة ظهرت", not p.url.endswith('/login.html'), p.url)
+    p.wait_for_timeout(4000)
     chk("نافذة الإعدادات مقفوشة", not p.evaluate("document.querySelector('#settings').classList.contains('on')"))
 
     r = p.evaluate("""()=>({
@@ -59,7 +96,11 @@ with sync_playwright() as pw:
       countdown:document.querySelector('#countdown').innerText,
       st:document.querySelector('#st').innerText,
       nav: getComputedStyle(document.querySelector('#nav')).display,
-      kpiVals:[...document.querySelectorAll('#kpis .kpi .v')].map(x=>x.innerText)
+      kpiVals:[...document.querySelectorAll('#kpis .kpi .v')].map(x=>x.innerText),
+      panel:['dailyBox','usersBox','loginBox','pricesBox','incidentsBox','auditBox','decisionsBox','alertsBox']
+        .map(id=>{const e=document.getElementById(id); return e?e.innerText.trim().length:-1;}),
+      panelSections:['secDaily','secUsers','secLogin','secPrices','secIncidents','secAudit','secDecisions','secAlerts']
+        .map(id=>{const e=document.getElementById(id); return e?e.innerText.trim().length:-1;})
     })""")
     chk("٩ مؤشرات", r['kpis'] == 9, str(r['kpiVals']))
     chk("١٣ بطاقة مستخدم", r['cards'] == 13)
@@ -69,7 +110,9 @@ with sync_playwright() as pw:
     chk("أعمدة الصفحات مرسومة", r['pages'] == 12 and r['pbarW'] > 50, f"عرض {r['pbarW']}px")
     chk("القمع ٦ خطوات", r['fun'] == 6)
     chk("٦ فجوات موثّقة", r['gaps'] == 6)
-    chk("١٠ أقسام كلها فيها محتوى", r['sections'] == 10 and r['emptySections'] == 0)
+    chk("١٨ قسم كلها فيها محتوى", r['sections'] == 18 and r['emptySections'] == 0, f"أقسام={r['sections']} فاضية={r['emptySections']}")
+    chk("الأقسام الثمانية بتاعة لوحة الإدارة فيها محتوى",
+        all(v > 40 for v in r['panelSections']), str(r['panelSections']))
     chk("مفيش تمرير أفقي", r['overflow'] == 0)
     chk("شريط التنقل السفلي ظاهر", r['nav'] == 'block')
     chk("الاتصال شغّال", 'متصل' in r['live'], r['live'])
@@ -218,7 +261,7 @@ with sync_playwright() as pw:
           emptySections:[...document.querySelectorAll('section')].filter(s=>s.innerText.trim().length<60).length,
           tbl:document.querySelectorAll('#tUsers tbody tr').length})""")
         chk("١٣ مستخدم", rr['cards'] == 13)
-        chk("١٠ أقسام فيها محتوى", rr['sections'] == 10 and rr['emptySections'] == 0)
+        chk("١٨ قسم فيها محتوى", rr['sections'] == 18 and rr['emptySections'] == 0)
         chk("مفيش تمرير أفقي", rr['overflow'] == 0)
         chk("صفر أخطاء JS", not e2)
         if vw['width'] > 1000:
@@ -232,15 +275,25 @@ with sync_playwright() as pw:
     print("\n📦 ٣) الأصول وPWA")
     import urllib.request, ssl
     ctxssl = ssl.create_default_context(); ctxssl.check_hostname = False; ctxssl.verify_mode = ssl.CERT_NONE
-    for path, expect in [('/', 200), ('/app.js', 200), ('/sw.js', 200), ('/manifest.webmanifest', 200),
-                         ('/icons/icon-192.png', 200), ('/icons/icon-512.png', 200),
-                         ('/icons/icon-maskable-512.png', 200), ('/icons/favicon.png', 200)]:
-        try:
-            req = urllib.request.Request(U + path, headers={'User-Agent': 'test'})
-            with urllib.request.urlopen(req, context=ctxssl, timeout=25) as f:
-                chk(f"{path}", f.status == expect, f"{f.status} · {len(f.read())}B")
-        except Exception as e:
-            chk(path, False, str(e)[:60])
+    print("\n🔐 ٣-ب) الأصول محمية: 401 من غير جلسة · 200 بجلسة")
+    assets = ['/', '/index.html', '/app.js', '/panel.js', '/panel.css', '/sw.js',
+              '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png',
+              '/icons/icon-maskable-512.png', '/icons/favicon.png']
+    for path in assets:
+        st, hd, _b = raw(path)
+        chk(f"{path} من غير جلسة ⇒ 401/302", st in (401, 302), f"status={st}")
+    # 🔑 جلسة عبر urllib ⇒ الأصول ترجع 200
+    try:
+        req = urllib.request.Request(U + '/api/login', method='POST',
+                                     data=json.dumps({'password': PW}).encode(),
+                                     headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, context=ctxssl, timeout=25) as f:
+            cookie = f.headers.get('Set-Cookie', '').split(';')[0]
+        for path in assets:
+            st, hd, _b = raw(path, headers={'Cookie': cookie})
+            chk(f"{path} بجلسة ⇒ 200", st == 200, f"status={st}")
+    except Exception as e:
+        chk("جلسة urllib + الأصول", False, str(e)[:80])
     b.close()
 
 print("\n" + "=" * 58)
