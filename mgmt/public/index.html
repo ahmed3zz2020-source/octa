@@ -13,6 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="OCTA">
 <link rel="icon" href="/icons/favicon.png" type="image/png">
+<link rel="stylesheet" href="/panel.css">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <style>
 :root{
@@ -441,6 +442,9 @@ body[data-view="table"] #cardsBox{display:none!important}
 
 <div class="wrap">
 
+<!-- ═══ جاري التحميل (لما مفيش بيانات بعد) ═══ -->
+<div id="loadingBox">⏳ جاري تحميل البيانات… (بعد تسجيل الدخول)</div>
+
 <!-- ═══ KPI ═══ -->
 <section style="margin-top:24px">
   <div class="kpis" id="kpis"></div>
@@ -605,6 +609,93 @@ body[data-view="table"] #cardsBox{display:none!important}
   <div id="gaps"></div>
 </section>
 
+<!-- ══════════════════════════════════════════════════════════════════
+     🔐 لوحة الإدارة — الجولة ١٨ (٨ أقسام)
+     ⛔ كل قسم بيشتغل بعد التحقق من الجلسة، والبيانات كلها من /api/*
+     ══════════════════════════════════════════════════════════════════ -->
+
+<section id="secDaily">
+  <div class="sec-hd">
+    <h2>🔐 ١. ملخّص يومي</h2>
+    <span class="note">النهاردة · آخر ١٤ يوم · حالة الاتصال</span>
+  </div>
+  <div id="dailyBox"></div>
+</section>
+
+<section id="secUsers">
+  <div class="sec-hd">
+    <h2>👥 ٢. إدارة المستخدمين والباقات</h2>
+    <span class="note">الباقة معروفة من سجل الاشتراكات · كل إجراء بيطلب تأكيد صريح</span>
+  </div>
+  <div id="usersBox"></div>
+</section>
+
+<section id="secLogin">
+  <div class="sec-hd">
+    <h2>🔑 ٣. تسجيل الدخول والجلسات</h2>
+    <span class="note">حالة الجلسة · طرق الدخول · حدود الإدارة</span>
+  </div>
+  <div id="loginBox"></div>
+</section>
+
+<section id="secPrices">
+  <div class="sec-hd">
+    <h2>💰 ٤. الأسعار</h2>
+    <span class="note">أسعار الباقات من سجل الاشتراكات · مؤشرات السوق</span>
+  </div>
+  <div id="pricesBox"></div>
+</section>
+
+<section id="secIncidents">
+  <div class="sec-hd">
+    <h2>🩺 ٥. الأعطال</h2>
+    <span class="note">مؤشرات مشتقة · ⛔ مافيش سجل أعطال في الباك</span>
+  </div>
+  <div id="incidentsBox"></div>
+</section>
+
+<section id="secAudit">
+  <div class="sec-hd">
+    <h2>🛡️ ٦. سجل الصلاحيات</h2>
+    <span class="note">فحص المسارات المحمية · سجل أفعال الأدمن</span>
+  </div>
+  <div id="permBox"></div>
+  <div id="auditBox" style="margin-top:12px"></div>
+</section>
+
+<section id="secDecisions">
+  <div class="sec-hd">
+    <h2>🧭 ٧. مركز القرارات</h2>
+    <span class="note">قرارات محتاجة قرار المالك</span>
+  </div>
+  <div id="decisionsBox"></div>
+</section>
+
+<section id="secAlerts">
+  <div class="sec-hd">
+    <h2>🔔 ٨. التنبيهات</h2>
+    <span class="note">منبهات الأسعار وحالتها مقابل السعر الحالي</span>
+  </div>
+  <div id="alertsBox"></div>
+</section>
+
+<!-- ═══ نافذة التأكيد (كل إجراء تعديلي) ═══ -->
+<div class="pmodal" id="pmodal">
+  <div class="pmodal-in">
+    <h3 id="pmodalTitle">تأكيد</h3>
+    <div class="pb" id="pmodalBody"></div>
+    <div class="pwarn" id="pmodalWarn" style="display:none"></div>
+    <label class="pcheck" id="pmodalCheck" style="display:none">
+      <input type="checkbox" id="pmodalCheckBox">
+      <span>أنا متأكد — الإجراء ده نهائي ومش قابل للتراجع.</span>
+    </label>
+    <div class="pbtns">
+      <button class="pbtn" id="pmodalCancel" type="button">إلغاء</button>
+      <button class="pbtn primary" id="pmodalOk" type="button">تأكيد</button>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <footer>
@@ -639,9 +730,18 @@ body[data-view="table"] #cardsBox{display:none!important}
 </div>
 
 <script>
-const DATA = {"generated":"2026-11-04 05:19 UTC","snapshot":"20261104-050637-fa01","api":"https://octa-prices-production-4ccb.up.railway.app","kpi":{"users":13,"pin_users":11,"events":2640,"events7":425,"logins":59,"login_events":47,"devices":16,"ips":6,"active7":6,"active30":12,"tracked":1201,"untracked":1439,"untracked_pct":54.5,"tracked_pct":45.5,"sessions":25,"guests":2,"pages":[["stocks",424],["screener",291],["filter",271],["markets",259],["dash",190],["radar",166],["arms",158],["engine",156],["money",102],["octasearch",91],["pick",85],["setups",72]],"by_event":[["page_view",2632],["signup",7],["action",1]],"actions":[["test",1],["taqa",1]],"growth":[["2026-10",11],["2026-11",2]]},"users":[{"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","created":"2026-10-20 22:30","hits":695,"first_seen":"2026-10-27 09:21","last_seen":"2026-11-04 00:08","last_seen_ts":1793750880,"session_min_bug":19866,"login_count":32,"logins_kept":20,"sessions":11,"srows":[{"start":"2026-10-27 09:21","start_ts":1793085708,"end":"2026-10-27 12:27","end_ts":1793096860,"min":186,"bound":"upper","long":false,"logins":2,"vias":["challenge","pin"],"dev":["0fce82c1caaa"]},{"start":"2026-10-27 12:27","start_ts":1793096860,"end":"2026-10-27 15:30","end_ts":1793107824,"min":183,"bound":"upper","long":false,"logins":1,"vias":["pin"],"dev":["928d9c7701fc"]},{"start":"2026-10-27 15:30","start_ts":1793107824,"end":"2026-10-29 01:22","end_ts":1793229744,"min":2032,"bound":"upper","long":true,"logins":1,"vias":["pin"],"dev":["928d9c7701fc"]},{"start":"2026-10-29 01:22","start_ts":1793229744,"end":"2026-10-29 02:50","end_ts":1793235035,"min":88,"bound":"upper","long":false,"logins":4,"vias":["challenge","pin"],"dev":["0fce82c1caaa","20ccf4f3cc28","3745af437ad0","6688759922ff"]},{"start":"2026-10-29 02:50","start_ts":1793235035,"end":"2026-10-30 00:09","end_ts":1793311799,"min":1279,"bound":"upper","long":true,"logins":3,"vias":["challenge","pin"],"dev":["0fce82c1caaa","1dc0002d6bcd","71fe15a3ae55"]},{"start":"2026-10-30 00:09","start_ts":1793311799,"end":"2026-10-30 13:24","end_ts":1793359490,"min":795,"bound":"upper","long":true,"logins":2,"vias":["pin"],"dev":["71fe15a3ae55"]},{"start":"2026-10-30 13:24","start_ts":1793359490,"end":"2026-10-31 20:24","end_ts":1793471044,"min":1859,"bound":"upper","long":true,"logins":2,"vias":["pin"],"dev":["71fe15a3ae55"]},{"start":"2026-10-31 20:24","start_ts":1793471044,"end":"2026-11-01 04:14","end_ts":1793499282,"min":471,"bound":"upper","long":true,"logins":1,"vias":["pin"],"dev":["0fce82c1caaa"]},{"start":"2026-11-01 04:14","start_ts":1793499282,"end":"2026-11-01 19:06","end_ts":1793552760,"min":891,"bound":"upper","long":true,"logins":2,"vias":["pin"],"dev":["71fe15a3ae55"]},{"start":"2026-11-01 19:06","start_ts":1793552760,"end":"2026-11-04 01:33","end_ts":1793748836,"min":3268,"bound":"upper","long":true,"logins":1,"vias":["pin"],"dev":["71fe15a3ae55"]},{"start":"2026-11-04 01:33","start_ts":1793748836,"end":"2026-11-04 02:08","end_ts":1793750880,"min":34,"bound":"actual","long":false,"logins":1,"vias":["pin"],"dev":["71fe15a3ae55"]}],"dwell_last":34,"dwell_total":11086,"avg_dwell":1008,"span_days":14.1,"devices":["0fce82c1caaa","1dc0002d6bcd","20ccf4f3cc28","3745af437ad0","6688759922ff","71fe15a3ae55","928d9c7701fc"],"n_dev":7,"ips":["212.102.36.193","212.102.36.194","79.127.178.81","79.127.178.82"],"n_ips":4,"newdev":6,"pin":true,"a7":true,"a30":true,"guest":false,"watch":1,"keys":30,"logins":[{"t":1793085708,"ts":"2026-10-27 09:21","via":"pin","dev":"0fce82c1caaa","ip":"79.127.178.82","newdev":false},{"t":1793085767,"ts":"2026-10-27 09:22","via":"challenge","dev":"0fce82c1caaa","ip":"79.127.178.81","newdev":true},{"t":1793096860,"ts":"2026-10-27 12:27","via":"pin","dev":"928d9c7701fc","ip":"79.127.178.82","newdev":false},{"t":1793107824,"ts":"2026-10-27 15:30","via":"pin","dev":"928d9c7701fc","ip":"79.127.178.82","newdev":false},{"t":1793229744,"ts":"2026-10-29 01:22","via":"challenge","dev":"6688759922ff","ip":"79.127.178.82","newdev":true},{"t":1793230166,"ts":"2026-10-29 01:29","via":"pin","dev":"0fce82c1caaa","ip":"79.127.178.81","newdev":false},{"t":1793230254,"ts":"2026-10-29 01:30","via":"challenge","dev":"20ccf4f3cc28","ip":"79.127.178.81","newdev":true},{"t":1793230932,"ts":"2026-10-29 01:42","via":"challenge","dev":"3745af437ad0","ip":"212.102.36.193","newdev":true},{"t":1793235035,"ts":"2026-10-29 02:50","via":"challenge","dev":"1dc0002d6bcd","ip":"212.102.36.194","newdev":true},{"t":1793235139,"ts":"2026-10-29 02:52","via":"challenge","dev":"71fe15a3ae55","ip":"79.127.178.81","newdev":true},{"t":1793236137,"ts":"2026-10-29 03:08","via":"pin","dev":"0fce82c1caaa","ip":"79.127.178.82","newdev":false},{"t":1793311799,"ts":"2026-10-30 00:09","via":"pin","dev":"71fe15a3ae55","ip":"79.127.178.82","newdev":false},{"t":1793313078,"ts":"2026-10-30 00:31","via":"pin","dev":"71fe15a3ae55","ip":"212.102.36.193","newdev":false},{"t":1793359490,"ts":"2026-10-30 13:24","via":"pin","dev":"71fe15a3ae55","ip":"79.127.178.82","newdev":false},{"t":1793359490,"ts":"2026-10-30 13:24","via":"pin","dev":"71fe15a3ae55","ip":"79.127.178.81","newdev":false},{"t":1793471044,"ts":"2026-10-31 20:24","via":"pin","dev":"0fce82c1caaa","ip":"79.127.178.82","newdev":false},{"t":1793499282,"ts":"2026-11-01 04:14","via":"pin","dev":"71fe15a3ae55","ip":"79.127.178.82","newdev":false},{"t":1793499283,"ts":"2026-11-01 04:14","via":"pin","dev":"71fe15a3ae55","ip":"79.127.178.82","newdev":false},{"t":1793552760,"ts":"2026-11-01 19:06","via":"pin","dev":"71fe15a3ae55","ip":"79.127.178.81","newdev":false},{"t":1793748836,"ts":"2026-11-04 01:33","via":"pin","dev":"71fe15a3ae55","ip":"79.127.178.81","newdev":false}]},{"name":"هبة الزرقا","email":"hebaelzarka1983@gmail.com","uid":"a3c872ff500231fa8dd1","created":"2026-10-24 22:54","hits":320,"first_seen":"2026-10-25 00:54","last_seen":"2026-11-04 00:04","last_seen_ts":1793750640,"session_min_bug":14468,"login_count":11,"logins_kept":11,"sessions":6,"srows":[{"start":"2026-10-25 00:54","start_ts":1792882492,"end":"2026-10-25 05:55","end_ts":1792900554,"min":301,"bound":"upper","long":false,"logins":2,"vias":["pin","signup"],"dev":["ff9171535ad6"]},{"start":"2026-10-25 05:55","start_ts":1792900554,"end":"2026-10-26 02:04","end_ts":1792973065,"min":1209,"bound":"upper","long":true,"logins":1,"vias":["pin"],"dev":["ff9171535ad6"]},{"start":"2026-10-26 02:04","start_ts":1792973065,"end":"2026-10-28 00:23","end_ts":1793139803,"min":2779,"bound":"upper","long":true,"logins":3,"vias":["challenge","pin"],"dev":["88aca22cd494"]},{"start":"2026-10-28 00:23","start_ts":1793139803,"end":"2026-10-30 06:52","end_ts":1793335921,"min":3269,"bound":"upper","long":true,"logins":3,"vias":["pin"],"dev":["88aca22cd494"]},{"start":"2026-10-30 06:52","start_ts":1793335921,"end":"2026-11-01 01:26","end_ts":1793489187,"min":2554,"bound":"upper","long":true,"logins":1,"vias":["pin"],"dev":["88aca22cd494"]},{"start":"2026-11-01 01:26","start_ts":1793489187,"end":"2026-11-04 02:04","end_ts":1793750640,"min":4358,"bound":"actual","long":true,"logins":1,"vias":["pin"],"dev":["ff9171535ad6"]}],"dwell_last":4358,"dwell_total":14470,"avg_dwell":2412,"span_days":10.0,"devices":["88aca22cd494","ff9171535ad6"],"n_dev":2,"ips":["79.127.178.81","79.127.178.82"],"n_ips":2,"newdev":2,"pin":true,"a7":true,"a30":true,"guest":false,"watch":0,"keys":27,"logins":[{"t":1792882492,"ts":"2026-10-25 00:54","via":"signup","dev":"ff9171535ad6","ip":"79.127.178.81","newdev":true},{"t":1792882497,"ts":"2026-10-25 00:54","via":"pin","dev":"ff9171535ad6","ip":"79.127.178.81","newdev":false},{"t":1792900554,"ts":"2026-10-25 05:55","via":"pin","dev":"ff9171535ad6","ip":"79.127.178.81","newdev":false},{"t":1792973065,"ts":"2026-10-26 02:04","via":"challenge","dev":"88aca22cd494","ip":"79.127.178.82","newdev":true},{"t":1792973117,"ts":"2026-10-26 02:05","via":"pin","dev":"88aca22cd494","ip":"79.127.178.82","newdev":false},{"t":1792973118,"ts":"2026-10-26 02:05","via":"pin","dev":"88aca22cd494","ip":"79.127.178.82","newdev":false},{"t":1793139803,"ts":"2026-10-28 00:23","via":"pin","dev":"88aca22cd494","ip":"79.127.178.81","newdev":false},{"t":1793139803,"ts":"2026-10-28 00:23","via":"pin","dev":"88aca22cd494","ip":"79.127.178.81","newdev":false},{"t":1793139803,"ts":"2026-10-28 00:23","via":"pin","dev":"88aca22cd494","ip":"79.127.178.81","newdev":false},{"t":1793335921,"ts":"2026-10-30 06:52","via":"pin","dev":"88aca22cd494","ip":"79.127.178.82","newdev":false},{"t":1793489187,"ts":"2026-11-01 01:26","via":"pin","dev":"ff9171535ad6","ip":"79.127.178.81","newdev":false}]},{"name":"Mohmad Ezz","email":"mohmadezz24@gmail.com","uid":"843dbc23b55c0b74192f","created":"2026-10-14 22:28","hits":141,"first_seen":"2026-11-01 02:28","last_seen":"2026-10-23 23:07","last_seen_ts":1792796820,"session_min_bug":12997,"login_count":3,"logins_kept":3,"sessions":1,"srows":[{"start":"2026-11-01 02:28","start_ts":1793492909,"end":"2026-11-01 02:28","end_ts":1793492909,"min":0,"bound":"actual","long":false,"logins":3,"vias":["pin","signup"],"dev":["9a5ceb0589d5"]}],"dwell_last":0,"dwell_total":0,"avg_dwell":0,"span_days":9.0,"devices":["9a5ceb0589d5"],"n_dev":1,"ips":["79.127.178.81","79.127.178.82"],"n_ips":2,"newdev":1,"pin":true,"a7":false,"a30":true,"guest":false,"watch":6,"keys":23,"logins":[{"t":1793492909,"ts":"2026-11-01 02:28","via":"signup","dev":"9a5ceb0589d5","ip":"79.127.178.82","newdev":true},{"t":1793492917,"ts":"2026-11-01 02:28","via":"pin","dev":"9a5ceb0589d5","ip":"79.127.178.81","newdev":false},{"t":1793492984,"ts":"2026-11-01 02:29","via":"pin","dev":"9a5ceb0589d5","ip":"79.127.178.81","newdev":false}]},{"name":"Kandil","email":"dr_ahmedkandil85@yahoo.com","uid":"c758d4722c360d66cd6e","created":"2026-11-01 23:01","hits":14,"first_seen":"2026-11-02 01:01","last_seen":"2026-11-02 05:30","last_seen_ts":1793597400,"session_min_bug":388,"login_count":4,"logins_kept":4,"sessions":2,"srows":[{"start":"2026-11-02 01:01","start_ts":1793574088,"end":"2026-11-02 07:18","end_ts":1793596715,"min":377,"bound":"upper","long":true,"logins":3,"vias":["pin","signup"],"dev":["8aed69f1d41b"]},{"start":"2026-11-02 07:18","start_ts":1793596715,"end":"2026-11-02 07:30","end_ts":1793597400,"min":11,"bound":"actual","long":false,"logins":1,"vias":["pin"],"dev":["8aed69f1d41b"]}],"dwell_last":11,"dwell_total":388,"avg_dwell":194,"span_days":0.3,"devices":["8aed69f1d41b"],"n_dev":1,"ips":["79.127.178.81","79.127.178.82"],"n_ips":2,"newdev":1,"pin":true,"a7":true,"a30":true,"guest":false,"watch":0,"keys":22,"logins":[{"t":1793574088,"ts":"2026-11-02 01:01","via":"signup","dev":"8aed69f1d41b","ip":"79.127.178.81","newdev":true},{"t":1793574095,"ts":"2026-11-02 01:01","via":"pin","dev":"8aed69f1d41b","ip":"79.127.178.81","newdev":false},{"t":1793574727,"ts":"2026-11-02 01:12","via":"pin","dev":"8aed69f1d41b","ip":"79.127.178.82","newdev":false},{"t":1793596715,"ts":"2026-11-02 07:18","via":"pin","dev":"8aed69f1d41b","ip":"79.127.178.81","newdev":false}]},{"name":"hassn ahmed","email":"hassnahmedmohmed7@gmail.com","uid":"15133d6f012d6341dc16","created":"2026-10-30 06:18","hits":13,"first_seen":"2026-10-30 08:23","last_seen":"2026-10-30 08:17","last_seen_ts":1793348220,"session_min_bug":8,"login_count":2,"logins_kept":2,"sessions":1,"srows":[{"start":"2026-10-30 08:23","start_ts":1793341435,"end":"2026-10-30 10:17","end_ts":1793348220,"min":113,"bound":"actual","long":false,"logins":2,"vias":["pin","signup"],"dev":["4de1d6888ea8"]}],"dwell_last":113,"dwell_total":113,"avg_dwell":113,"span_days":0.1,"devices":["4de1d6888ea8"],"n_dev":1,"ips":["79.127.178.82"],"n_ips":1,"newdev":1,"pin":true,"a7":true,"a30":true,"guest":false,"watch":0,"keys":22,"logins":[{"t":1793341435,"ts":"2026-10-30 08:23","via":"signup","dev":"4de1d6888ea8","ip":"79.127.178.82","newdev":true},{"t":1793341443,"ts":"2026-10-30 08:24","via":"pin","dev":"4de1d6888ea8","ip":"79.127.178.82","newdev":false}]},{"name":"Youssef","email":"youssefmahmoudhi@gmail.com","uid":"1fababe25c5a45343238","created":"2026-10-31 04:58","hits":5,"first_seen":"2026-10-31 06:59","last_seen":"2026-10-31 05:01","last_seen_ts":1793422860,"session_min_bug":1,"login_count":2,"logins_kept":2,"sessions":1,"srows":[{"start":"2026-10-31 06:59","start_ts":1793422742,"end":"2026-10-31 07:01","end_ts":1793422860,"min":2,"bound":"actual","long":false,"logins":2,"vias":["pin","signup"],"dev":["73aa2c79dec6"]}],"dwell_last":2,"dwell_total":2,"avg_dwell":2,"span_days":0.0,"devices":["73aa2c79dec6"],"n_dev":1,"ips":["79.127.178.81","79.127.178.82"],"n_ips":2,"newdev":1,"pin":true,"a7":true,"a30":true,"guest":false,"watch":0,"keys":22,"logins":[{"t":1793422742,"ts":"2026-10-31 06:59","via":"signup","dev":"73aa2c79dec6","ip":"79.127.178.81","newdev":true},{"t":1793422746,"ts":"2026-10-31 06:59","via":"pin","dev":"73aa2c79dec6","ip":"79.127.178.82","newdev":false}]},{"name":"Mohammed Rabea","email":"ragab202021@gmail.com","uid":"925da0d50bfa16082b45","created":"2026-10-15 13:25","hits":4,"first_seen":"2026-10-29 06:11","last_seen":"2026-10-29 04:13","last_seen_ts":1793247180,"session_min_bug":19608,"login_count":1,"logins_kept":1,"sessions":1,"srows":[{"start":"2026-10-29 06:11","start_ts":1793247108,"end":"2026-10-29 06:13","end_ts":1793247180,"min":1,"bound":"actual","long":false,"logins":1,"vias":["pin"],"dev":["88c8b76a81d1"]}],"dwell_last":1,"dwell_total":1,"avg_dwell":1,"span_days":13.6,"devices":["88c8b76a81d1"],"n_dev":1,"ips":["79.127.178.82"],"n_ips":1,"newdev":0,"pin":true,"a7":true,"a30":true,"guest":false,"watch":0,"keys":21,"logins":[{"t":1793247108,"ts":"2026-10-29 06:11","via":"pin","dev":"88c8b76a81d1","ip":"79.127.178.82","newdev":false}]},{"name":"زائر","email":"","uid":"a414eed0aac445f9d8a8","created":"2026-10-24 18:16","hits":4,"first_seen":"—","last_seen":"2026-10-24 18:23","last_seen_ts":1792866180,"session_min_bug":7,"login_count":0,"logins_kept":0,"sessions":0,"srows":[],"dwell_last":0,"dwell_total":0,"avg_dwell":0,"span_days":0.0,"devices":[],"n_dev":0,"ips":[],"n_ips":0,"newdev":0,"pin":false,"a7":false,"a30":true,"guest":true,"watch":0,"keys":10,"logins":[]},{"name":"Housam Saleh","email":"var.hos90@gmail.com","uid":"cd5542a0c6fc5654baf6","created":"2026-10-20 08:41","hits":3,"first_seen":"—","last_seen":"2026-10-20 08:46","last_seen_ts":1792485960,"session_min_bug":1,"login_count":0,"logins_kept":0,"sessions":0,"srows":[],"dwell_last":0,"dwell_total":0,"avg_dwell":0,"span_days":0.0,"devices":[],"n_dev":0,"ips":[],"n_ips":0,"newdev":0,"pin":true,"a7":false,"a30":true,"guest":false,"watch":0,"keys":17,"logins":[]},{"name":"Mohammed Atef Elsayed Ashour","email":"mohammed.elsayed81@gmail.com","uid":"dc23057488d65f72e3a1","created":"2026-10-26 05:03","hits":1,"first_seen":"2026-10-26 07:03","last_seen":"2026-10-26 05:05","last_seen_ts":1792991100,"session_min_bug":0,"login_count":2,"logins_kept":2,"sessions":1,"srows":[{"start":"2026-10-26 07:03","start_ts":1792991004,"end":"2026-10-26 07:05","end_ts":1792991100,"min":2,"bound":"actual","long":false,"logins":2,"vias":["pin","signup"],"dev":["89fda2ae59e9"]}],"dwell_last":2,"dwell_total":2,"avg_dwell":2,"span_days":0.0,"devices":["89fda2ae59e9"],"n_dev":1,"ips":["152.233.13.165","152.233.13.166"],"n_ips":2,"newdev":1,"pin":true,"a7":false,"a30":true,"guest":false,"watch":0,"keys":22,"logins":[{"t":1792991004,"ts":"2026-10-26 07:03","via":"signup","dev":"89fda2ae59e9","ip":"152.233.13.165","newdev":true},{"t":1792991012,"ts":"2026-10-26 07:03","via":"pin","dev":"89fda2ae59e9","ip":"152.233.13.166","newdev":false}]},{"name":"زائر","email":"","uid":"54b5c1413a5567f05f4b","created":"2026-10-24 15:21","hits":1,"first_seen":"—","last_seen":"2026-10-24 15:21","last_seen_ts":1792855260,"session_min_bug":0,"login_count":0,"logins_kept":0,"sessions":0,"srows":[],"dwell_last":0,"dwell_total":0,"avg_dwell":0,"span_days":0.0,"devices":[],"n_dev":0,"ips":[],"n_ips":0,"newdev":0,"pin":false,"a7":false,"a30":true,"guest":true,"watch":0,"keys":8,"logins":[]},{"name":"احمد","email":"ahmedalsery1122@gmail.com","uid":"9cb3960bccdc544332c1","created":"2026-11-02 19:25","hits":0,"first_seen":"2026-11-02 21:25","last_seen":"—","last_seen_ts":0,"session_min_bug":0,"login_count":2,"logins_kept":2,"sessions":1,"srows":[{"start":"2026-11-02 21:25","start_ts":1793647539,"end":"2026-11-02 21:25","end_ts":1793647539,"min":0,"bound":"actual","long":false,"logins":2,"vias":["pin","signup"],"dev":["7b9937257d1d"]}],"dwell_last":0,"dwell_total":0,"avg_dwell":0,"span_days":0,"devices":["7b9937257d1d"],"n_dev":1,"ips":["79.127.178.82"],"n_ips":1,"newdev":1,"pin":true,"a7":false,"a30":false,"guest":false,"watch":0,"keys":22,"logins":[{"t":1793647539,"ts":"2026-11-02 21:25","via":"signup","dev":"7b9937257d1d","ip":"79.127.178.82","newdev":true},{"t":1793647551,"ts":"2026-11-02 21:25","via":"pin","dev":"7b9937257d1d","ip":"79.127.178.82","newdev":false}]},{"name":"محمد عبدربه","email":"mohammedabdrabou44@gmail.com","uid":"0243e422a94312441950","created":"2026-10-15 13:32","hits":0,"first_seen":"—","last_seen":"—","last_seen_ts":0,"session_min_bug":0,"login_count":0,"logins_kept":0,"sessions":0,"srows":[],"dwell_last":0,"dwell_total":0,"avg_dwell":0,"span_days":0,"devices":[],"n_dev":0,"ips":[],"n_ips":0,"newdev":0,"pin":true,"a7":false,"a30":false,"guest":false,"watch":0,"keys":17,"logins":[]}],"timeline":[{"t":1793748836,"ts":"2026-11-04 01:33","via":"pin","dev":"71fe15a3ae55","ip":"79.127.178.81","newdev":false,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793647551,"ts":"2026-11-02 21:25","via":"pin","dev":"7b9937257d1d","ip":"79.127.178.82","newdev":false,"name":"احمد","email":"ahmedalsery1122@gmail.com","uid":"9cb3960bccdc544332c1","guest":false},{"t":1793647539,"ts":"2026-11-02 21:25","via":"signup","dev":"7b9937257d1d","ip":"79.127.178.82","newdev":true,"name":"احمد","email":"ahmedalsery1122@gmail.com","uid":"9cb3960bccdc544332c1","guest":false},{"t":1793596715,"ts":"2026-11-02 07:18","via":"pin","dev":"8aed69f1d41b","ip":"79.127.178.81","newdev":false,"name":"Kandil","email":"dr_ahmedkandil85@yahoo.com","uid":"c758d4722c360d66cd6e","guest":false},{"t":1793574727,"ts":"2026-11-02 01:12","via":"pin","dev":"8aed69f1d41b","ip":"79.127.178.82","newdev":false,"name":"Kandil","email":"dr_ahmedkandil85@yahoo.com","uid":"c758d4722c360d66cd6e","guest":false},{"t":1793574095,"ts":"2026-11-02 01:01","via":"pin","dev":"8aed69f1d41b","ip":"79.127.178.81","newdev":false,"name":"Kandil","email":"dr_ahmedkandil85@yahoo.com","uid":"c758d4722c360d66cd6e","guest":false},{"t":1793574088,"ts":"2026-11-02 01:01","via":"signup","dev":"8aed69f1d41b","ip":"79.127.178.81","newdev":true,"name":"Kandil","email":"dr_ahmedkandil85@yahoo.com","uid":"c758d4722c360d66cd6e","guest":false},{"t":1793552760,"ts":"2026-11-01 19:06","via":"pin","dev":"71fe15a3ae55","ip":"79.127.178.81","newdev":false,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793499283,"ts":"2026-11-01 04:14","via":"pin","dev":"71fe15a3ae55","ip":"79.127.178.82","newdev":false,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793499282,"ts":"2026-11-01 04:14","via":"pin","dev":"71fe15a3ae55","ip":"79.127.178.82","newdev":false,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793492984,"ts":"2026-11-01 02:29","via":"pin","dev":"9a5ceb0589d5","ip":"79.127.178.81","newdev":false,"name":"Mohmad Ezz","email":"mohmadezz24@gmail.com","uid":"843dbc23b55c0b74192f","guest":false},{"t":1793492917,"ts":"2026-11-01 02:28","via":"pin","dev":"9a5ceb0589d5","ip":"79.127.178.81","newdev":false,"name":"Mohmad Ezz","email":"mohmadezz24@gmail.com","uid":"843dbc23b55c0b74192f","guest":false},{"t":1793492909,"ts":"2026-11-01 02:28","via":"signup","dev":"9a5ceb0589d5","ip":"79.127.178.82","newdev":true,"name":"Mohmad Ezz","email":"mohmadezz24@gmail.com","uid":"843dbc23b55c0b74192f","guest":false},{"t":1793489187,"ts":"2026-11-01 01:26","via":"pin","dev":"ff9171535ad6","ip":"79.127.178.81","newdev":false,"name":"هبة الزرقا","email":"hebaelzarka1983@gmail.com","uid":"a3c872ff500231fa8dd1","guest":false},{"t":1793471044,"ts":"2026-10-31 20:24","via":"pin","dev":"0fce82c1caaa","ip":"79.127.178.82","newdev":false,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793422746,"ts":"2026-10-31 06:59","via":"pin","dev":"73aa2c79dec6","ip":"79.127.178.82","newdev":false,"name":"Youssef","email":"youssefmahmoudhi@gmail.com","uid":"1fababe25c5a45343238","guest":false},{"t":1793422742,"ts":"2026-10-31 06:59","via":"signup","dev":"73aa2c79dec6","ip":"79.127.178.81","newdev":true,"name":"Youssef","email":"youssefmahmoudhi@gmail.com","uid":"1fababe25c5a45343238","guest":false},{"t":1793359490,"ts":"2026-10-30 13:24","via":"pin","dev":"71fe15a3ae55","ip":"79.127.178.82","newdev":false,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793359490,"ts":"2026-10-30 13:24","via":"pin","dev":"71fe15a3ae55","ip":"79.127.178.81","newdev":false,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793341443,"ts":"2026-10-30 08:24","via":"pin","dev":"4de1d6888ea8","ip":"79.127.178.82","newdev":false,"name":"hassn ahmed","email":"hassnahmedmohmed7@gmail.com","uid":"15133d6f012d6341dc16","guest":false},{"t":1793341435,"ts":"2026-10-30 08:23","via":"signup","dev":"4de1d6888ea8","ip":"79.127.178.82","newdev":true,"name":"hassn ahmed","email":"hassnahmedmohmed7@gmail.com","uid":"15133d6f012d6341dc16","guest":false},{"t":1793335921,"ts":"2026-10-30 06:52","via":"pin","dev":"88aca22cd494","ip":"79.127.178.82","newdev":false,"name":"هبة الزرقا","email":"hebaelzarka1983@gmail.com","uid":"a3c872ff500231fa8dd1","guest":false},{"t":1793313078,"ts":"2026-10-30 00:31","via":"pin","dev":"71fe15a3ae55","ip":"212.102.36.193","newdev":false,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793311799,"ts":"2026-10-30 00:09","via":"pin","dev":"71fe15a3ae55","ip":"79.127.178.82","newdev":false,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793247108,"ts":"2026-10-29 06:11","via":"pin","dev":"88c8b76a81d1","ip":"79.127.178.82","newdev":false,"name":"Mohammed Rabea","email":"ragab202021@gmail.com","uid":"925da0d50bfa16082b45","guest":false},{"t":1793236137,"ts":"2026-10-29 03:08","via":"pin","dev":"0fce82c1caaa","ip":"79.127.178.82","newdev":false,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793235139,"ts":"2026-10-29 02:52","via":"challenge","dev":"71fe15a3ae55","ip":"79.127.178.81","newdev":true,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793235035,"ts":"2026-10-29 02:50","via":"challenge","dev":"1dc0002d6bcd","ip":"212.102.36.194","newdev":true,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793230932,"ts":"2026-10-29 01:42","via":"challenge","dev":"3745af437ad0","ip":"212.102.36.193","newdev":true,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793230254,"ts":"2026-10-29 01:30","via":"challenge","dev":"20ccf4f3cc28","ip":"79.127.178.81","newdev":true,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793230166,"ts":"2026-10-29 01:29","via":"pin","dev":"0fce82c1caaa","ip":"79.127.178.81","newdev":false,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793229744,"ts":"2026-10-29 01:22","via":"challenge","dev":"6688759922ff","ip":"79.127.178.82","newdev":true,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793139803,"ts":"2026-10-28 00:23","via":"pin","dev":"88aca22cd494","ip":"79.127.178.81","newdev":false,"name":"هبة الزرقا","email":"hebaelzarka1983@gmail.com","uid":"a3c872ff500231fa8dd1","guest":false},{"t":1793139803,"ts":"2026-10-28 00:23","via":"pin","dev":"88aca22cd494","ip":"79.127.178.81","newdev":false,"name":"هبة الزرقا","email":"hebaelzarka1983@gmail.com","uid":"a3c872ff500231fa8dd1","guest":false},{"t":1793139803,"ts":"2026-10-28 00:23","via":"pin","dev":"88aca22cd494","ip":"79.127.178.81","newdev":false,"name":"هبة الزرقا","email":"hebaelzarka1983@gmail.com","uid":"a3c872ff500231fa8dd1","guest":false},{"t":1793107824,"ts":"2026-10-27 15:30","via":"pin","dev":"928d9c7701fc","ip":"79.127.178.82","newdev":false,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793096860,"ts":"2026-10-27 12:27","via":"pin","dev":"928d9c7701fc","ip":"79.127.178.82","newdev":false,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793085767,"ts":"2026-10-27 09:22","via":"challenge","dev":"0fce82c1caaa","ip":"79.127.178.81","newdev":true,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1793085708,"ts":"2026-10-27 09:21","via":"pin","dev":"0fce82c1caaa","ip":"79.127.178.82","newdev":false,"name":"Ahmed","email":"ahmed3zz2020@gmail.com","uid":"881110a67b61a0284863","guest":false},{"t":1792991012,"ts":"2026-10-26 07:03","via":"pin","dev":"89fda2ae59e9","ip":"152.233.13.166","newdev":false,"name":"Mohammed Atef Elsayed Ashour","email":"mohammed.elsayed81@gmail.com","uid":"dc23057488d65f72e3a1","guest":false},{"t":1792991004,"ts":"2026-10-26 07:03","via":"signup","dev":"89fda2ae59e9","ip":"152.233.13.165","newdev":true,"name":"Mohammed Atef Elsayed Ashour","email":"mohammed.elsayed81@gmail.com","uid":"dc23057488d65f72e3a1","guest":false},{"t":1792973118,"ts":"2026-10-26 02:05","via":"pin","dev":"88aca22cd494","ip":"79.127.178.82","newdev":false,"name":"هبة الزرقا","email":"hebaelzarka1983@gmail.com","uid":"a3c872ff500231fa8dd1","guest":false},{"t":1792973117,"ts":"2026-10-26 02:05","via":"pin","dev":"88aca22cd494","ip":"79.127.178.82","newdev":false,"name":"هبة الزرقا","email":"hebaelzarka1983@gmail.com","uid":"a3c872ff500231fa8dd1","guest":false},{"t":1792973065,"ts":"2026-10-26 02:04","via":"challenge","dev":"88aca22cd494","ip":"79.127.178.82","newdev":true,"name":"هبة الزرقا","email":"hebaelzarka1983@gmail.com","uid":"a3c872ff500231fa8dd1","guest":false},{"t":1792900554,"ts":"2026-10-25 05:55","via":"pin","dev":"ff9171535ad6","ip":"79.127.178.81","newdev":false,"name":"هبة الزرقا","email":"hebaelzarka1983@gmail.com","uid":"a3c872ff500231fa8dd1","guest":false},{"t":1792882497,"ts":"2026-10-25 00:54","via":"pin","dev":"ff9171535ad6","ip":"79.127.178.81","newdev":false,"name":"هبة الزرقا","email":"hebaelzarka1983@gmail.com","uid":"a3c872ff500231fa8dd1","guest":false},{"t":1792882492,"ts":"2026-10-25 00:54","via":"signup","dev":"ff9171535ad6","ip":"79.127.178.81","newdev":true,"name":"هبة الزرقا","email":"hebaelzarka1983@gmail.com","uid":"a3c872ff500231fa8dd1","guest":false}],"devices":[{"dev":"71fe15a3ae55","users":["Ahmed"],"logins":9,"ips":["212.102.36.193","79.127.178.81","79.127.178.82"],"first":"2026-10-29 02:52","last":"2026-11-04 01:33","new":1},{"dev":"88aca22cd494","users":["هبة الزرقا"],"logins":7,"ips":["79.127.178.81","79.127.178.82"],"first":"2026-10-26 02:04","last":"2026-10-30 06:52","new":1},{"dev":"0fce82c1caaa","users":["Ahmed"],"logins":5,"ips":["79.127.178.81","79.127.178.82"],"first":"2026-10-27 09:21","last":"2026-10-31 20:24","new":1},{"dev":"8aed69f1d41b","users":["Kandil"],"logins":4,"ips":["79.127.178.81","79.127.178.82"],"first":"2026-11-02 01:01","last":"2026-11-02 07:18","new":1},{"dev":"ff9171535ad6","users":["هبة الزرقا"],"logins":4,"ips":["79.127.178.81"],"first":"2026-10-25 00:54","last":"2026-11-01 01:26","new":1},{"dev":"9a5ceb0589d5","users":["Mohmad Ezz"],"logins":3,"ips":["79.127.178.81","79.127.178.82"],"first":"2026-11-01 02:28","last":"2026-11-01 02:29","new":1},{"dev":"7b9937257d1d","users":["احمد"],"logins":2,"ips":["79.127.178.82"],"first":"2026-11-02 21:25","last":"2026-11-02 21:25","new":1},{"dev":"73aa2c79dec6","users":["Youssef"],"logins":2,"ips":["79.127.178.81","79.127.178.82"],"first":"2026-10-31 06:59","last":"2026-10-31 06:59","new":1},{"dev":"4de1d6888ea8","users":["hassn ahmed"],"logins":2,"ips":["79.127.178.82"],"first":"2026-10-30 08:23","last":"2026-10-30 08:24","new":1},{"dev":"928d9c7701fc","users":["Ahmed"],"logins":2,"ips":["79.127.178.82"],"first":"2026-10-27 12:27","last":"2026-10-27 15:30","new":0},{"dev":"89fda2ae59e9","users":["Mohammed Atef Elsayed Ashour"],"logins":2,"ips":["152.233.13.165","152.233.13.166"],"first":"2026-10-26 07:03","last":"2026-10-26 07:03","new":1},{"dev":"88c8b76a81d1","users":["Mohammed Rabea"],"logins":1,"ips":["79.127.178.82"],"first":"2026-10-29 06:11","last":"2026-10-29 06:11","new":0},{"dev":"1dc0002d6bcd","users":["Ahmed"],"logins":1,"ips":["212.102.36.194"],"first":"2026-10-29 02:50","last":"2026-10-29 02:50","new":1},{"dev":"3745af437ad0","users":["Ahmed"],"logins":1,"ips":["212.102.36.193"],"first":"2026-10-29 01:42","last":"2026-10-29 01:42","new":1},{"dev":"20ccf4f3cc28","users":["Ahmed"],"logins":1,"ips":["79.127.178.81"],"first":"2026-10-29 01:30","last":"2026-10-29 01:30","new":1},{"dev":"6688759922ff","users":["Ahmed"],"logins":1,"ips":["79.127.178.82"],"first":"2026-10-29 01:22","last":"2026-10-29 01:22","new":1}],"ips":[{"ip":"79.127.178.82","users":["Ahmed","Kandil","Mohammed Rabea","Mohmad Ezz","Youssef","hassn ahmed","احمد","هبة الزرقا"],"logins":22,"devs":11},{"ip":"79.127.178.81","users":["Ahmed","Kandil","Mohmad Ezz","Youssef","هبة الزرقا"],"logins":20,"devs":8},{"ip":"212.102.36.193","users":["Ahmed"],"logins":2,"devs":2},{"ip":"212.102.36.194","users":["Ahmed"],"logins":1,"devs":1},{"ip":"152.233.13.166","users":["Mohammed Atef Elsayed Ashour"],"logins":1,"devs":1},{"ip":"152.233.13.165","users":["Mohammed Atef Elsayed Ashour"],"logins":1,"devs":1}],"hourly":[7,9,8,1,2,1,4,3,2,2,0,0,1,2,0,1,0,0,0,1,1,2,0,0],"daily":[{"d":"2026-10-25","n":3},{"d":"2026-10-26","n":5},{"d":"2026-10-27","n":4},{"d":"2026-10-28","n":3},{"d":"2026-10-29","n":8},{"d":"2026-10-30","n":7},{"d":"2026-10-31","n":3},{"d":"2026-11-01","n":7},{"d":"2026-11-02","n":6},{"d":"2026-11-04","n":1}],"funnel":[{"step":"زيارات مسجّلة (events)","n":2640},{"step":"زيارات منسوبة لمستخدم (uid)","n":1201},{"step":"مستخدمين اتسجلوا","n":13},{"step":"حطوا باسورد","n":11},{"step":"دخول فعلي (login_count>0)","n":9},{"step":"نشط آخر ٧ أيام","n":6}]};
+const DATA = null; /* R18-NO-EMBEDDED-DATA — مافيش بيانات مستخدمين مدمجة: الداتا كلها بتيجي من /api/* بعد التحقق من الجلسة */
 /* ══ الحالة ══ */
-var D = DATA, sortKey = 'hits', sortDir = -1, sortUsers = null;
+var D = null, sortKey = 'hits', sortDir = -1, sortUsers = null;
+/* R18-NO-EMBEDDED-DATA — الهيكل الفاضي: merge() يبني عليه (مافيش استنساخ من D) */
+const BASE = {
+  generated:'-', snapshot:'', api:'',
+  kpi:{users:0,pin_users:0,events:0,events7:0,login_events:0,login_count:0,
+      devices:0,ips:0,active7:0,active30:0,tracked:0,untracked:0,tracked_pct:0,
+      untracked_pct:0,sessions:0,guests:0,pages:[],by_event:[],actions:[],growth:[]},
+  users:[], timeline:[], devices:[], ips:[], hourly:new Array(24).fill(0),
+  daily:[], funnel:[]
+};
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -892,29 +992,6 @@ function openUser(uid){
 function closeM(){ $('#modal').classList.remove('on'); }
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeM(); });
 
-/* ══ التحديث الحي ══ */
-async function pull(){
-  if (window.__octaAppPull) return window.__octaAppPull();
-  const tok = $('#tok') ? $('#tok').value.trim() : '';
-  if(!tok){ setSt('لازم توكن الأدمن','err'); return; }
-  setSt('جاري السحب…','');
-  const base = D.api||'https://octa-prices-production-4ccb.up.railway.app';
-  try{
-    const g = async (p) => {
-      const r = await fetch(base+p, {headers:{'X-OCTA-Admin':tok}, cache:'no-store'});
-      if(!r.ok) throw new Error(p+' → HTTP '+r.status);
-      return r.json();
-    };
-    const [monthly, users, logins] = await Promise.all([g('/api/admin/monthly'), g('/api/admin/users'), g('/api/admin/logins')]);
-    D = merge(monthly, users, logins);
-    $('#bLive').className='badge live'; $('#bLive').innerHTML='<span class="dot"></span> متصل بالدير';
-    setSt('تم التحديث · '+new Date().toLocaleTimeString('ar-EG'),'ok');
-    renderAll();
-  }catch(e){
-    setSt('فشل: '+e.message,'err');
-    $('#bLive').className='badge off'; $('#bLive').textContent='غير متصل';
-  }
-}
 function setSt(m,c){ const s=$('#st'); s.textContent=m; s.className='status '+(c||''); }
 
 /* ══ دمج بيانات حية ══ */
@@ -929,7 +1006,7 @@ function merge(monthly, usersJ, loginsJ, prefsJ){
   (monthly.users||[]).forEach(m=>mu[m.id]=m);
   (usersJ.users||[]).forEach(u=>uu[u.uid]=u);
   const an = monthly.analytics||{};
-  const out = JSON.parse(JSON.stringify(D));
+  const out = JSON.parse(JSON.stringify(BASE)); /* R18-NO-EMBEDDED-DATA */
   out.kpi.users = monthly.total; out.kpi.pin_users = monthly.pin_set_n;
   out.kpi.events = an.events_total; out.kpi.events7 = an.events_7d;
   out.kpi.active7 = an.active_7d; out.kpi.active30 = an.active_30d;
@@ -1412,7 +1489,7 @@ function setView(v){
 }
 
 /* ══ تشغيل ══ */
-function renderAll(){ DASH.browse = computeBrowse(); kpis(); renderUsers(); renderTL(); renderDev(); renderBehavior(); renderPages(); renderFunnel(); renderGaps(); renderRaw(); renderBrowse(); renderCards(); }
+function renderAll(){ if(!D){ var l=$('#loadingBox'); if(l) l.classList.add('on'); return; } DASH.browse = computeBrowse(); kpis(); renderUsers(); renderTL(); renderDev(); renderBehavior(); renderPages(); renderFunnel(); renderGaps(); renderRaw(); renderBrowse(); renderCards(); }
 document.addEventListener('DOMContentLoaded', ()=>{
   /* 🆕 ربط البحث + تبديل العرض + Escape (١٤ نوفمبر) */
   var us = document.getElementById('uSearch');
@@ -1425,8 +1502,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
   document.addEventListener('keydown', function(e){
     if (e.key === 'Escape'){ closeSheet(); closeM(); }
   });
-  $('#gen').textContent = 'توليد: ' + D.generated + ' · لقطة: ' + (D.snapshot||'—');
-  $('#footSnap').textContent = 'لقطة ' + (D.snapshot||'—');
+  $('#gen').textContent = D ? ('توليد: ' + D.generated + ' · لقطة: ' + (D.snapshot||'—')) : 'جاري تحميل البيانات…';
+  $('#footSnap').textContent = D ? ('لقطة ' + (D.snapshot||'—')) : '—';
   ['fUser','fVia','fNew'].forEach(id=>{ const el=document.getElementById(id); el.addEventListener('input',renderTL); el.addEventListener('change',renderTL); });
   renderAll();
 });
@@ -1546,6 +1623,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
     <button onclick="document.querySelector('#hchart').scrollIntoView()"><span class="ic">📈</span>السلوك</button>
     <button onclick="document.querySelector('#fun').scrollIntoView()"><span class="ic">🎯</span>القمع</button>
     <button onclick="document.querySelector('#gaps').scrollIntoView()"><span class="ic">🔧</span>الفجوات</button>
+    <button onclick="document.querySelector('#secDaily').scrollIntoView()"><span class="ic">🔐</span>لوحة الإدارة</button>
+    <button onclick="document.querySelector('#secUsers').scrollIntoView()"><span class="ic">🎫</span>الباقات</button>
+    <button onclick="document.querySelector('#secDecisions').scrollIntoView()"><span class="ic">🧭</span>قرارات</button>
+    <button onclick="document.querySelector('#secAlerts').scrollIntoView()"><span class="ic">🔔</span>تنبيهات</button>
     <button id="navRefresh" onclick="pull(false)"><span class="ic">🔄</span>تحديث</button>
     <button id="navSettings" onclick="document.getElementById('settings').classList.add('on')"><span class="ic">⚙️</span>إعدادات</button>
   </div>
@@ -1553,5 +1634,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 <script src="/xlsx.js"></script>
 <script src="/app.js"></script>
+<script src="/panel.js"></script>
 </body>
 </html>

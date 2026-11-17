@@ -10,8 +10,19 @@ import json, os, ssl, urllib.request, datetime, collections, calendar
 API = "https://octa-prices-production-4ccb.up.railway.app"
 ADMIN = os.environ["OCTA_ADMIN_TOKEN"]
 OUT = "/workspace/output"
-GAP_CAP = 1800          # ٣٠ دقيقة: بعد كده счита إن المستخدم ساب
+GAP_CAP = 1800          # ٣٠ دقيقة: بعد كده بنحسب إن المستخدم ساب
 SESSION_GAP = 2700      # ٤٥ دقيقة: فجوة أكتر ⇒ جلسة جديدة
+
+# 🛡️ الجولة ١٨ (P0) — ⛔ التقرير ده فيه بيانات شخصية (إيميلات/IP/أسماء)
+#   ⇒ لازم يفضل في مسار خاص (مش في مجلد public ولا في مجلد الـassets).
+def _assert_private_output(path):
+    p = os.path.abspath(path).replace(os.sep, "/")
+    if "/public" in p or "/assets" in p or "/dist" in p:
+        raise SystemExit(
+            "❌ ⛔ مافيش report ينكتب في %s — بيانات المستخدمين هتتسرّب للموقع." % path)
+    return p
+
+_assert_private_output(OUT)
 
 _ctx = ssl.create_default_context(); _ctx.check_hostname = False; _ctx.verify_mode = ssl.CERT_NONE
 

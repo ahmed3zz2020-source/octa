@@ -79,29 +79,52 @@
     if (state.busy) return Promise.resolve();
     state.busy = true;
     if (!silent) setStatus('جاري التحديث…', '');
-    var jobs = [
-      pullRemote('/api/admin/monthly'),
-      pullRemote('/api/admin/users'),
-      pullRemote('/api/admin/logins')
-    ];
-    /* ⭐ تفضيلات كل مستخدم (الأسهم اللي بيتابعها) — اختياري: لو فشل ما بيأثرش.
-       ⛔ مسارWorker نفسه (مش /api/proxy — البوكس ده بيسمح بـ/api/admin بس). */
-    jobs.push(fetch('/api/prefs', { cache: 'no-store', credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .catch(function () { return null; }));
+    /* ⭐ الجولة ١٨ — مصادر مسمّاة (مش بترتيب) عشان مافيش خلط بين المصادر. */
+    var P = {
+      monthly: pullRemote('/api/admin/monthly'),
+      users: pullRemote('/api/admin/users'),
+      logins: pullRemote('/api/admin/logins'),
+      /* ⭐ تفضيلات كل مستخدم (الأسهم اللي بيتابعها) — اختياري: لو فشل ما بيأثرش.
+         ⛔ مسارWorker نفسه (مش /api/proxy — البوكس ده بيسمح بـ/api/admin بس). */
+      prefs: fetch('/api/prefs', { cache: 'no-store', credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; }),
+      /* 🛡️ الجولة ١٨ — مصادر لوحة الإدارة (اختيارية ⇒ لو مش موجودة: «غير متاح») */
+      subs: pullRemote('/api/subscriptions/log').catch(function () { return null; }),
+      ticker: pullRemote('/api/ticker').catch(function () { return null; }),
+      alerts: fetch('/api/panel/alerts', { cache: 'no-store', credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; }),
+      health: fetch('/api/health', { cache: 'no-store', credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; })
+    };
     /* ⛔ السجل الخام: مسار اختياري — لو مش موجود نتجاه ونمشي */
     if (!state.rawUnavailable) {
-      jobs.push(pullRemote('/api/admin/events').then(function (v) { if (v === null) state.rawUnavailable = true; return v; }).catch(function () { state.rawUnavailable = true; return null; }));
+      P.raw = pullRemote('/api/admin/events').then(function (v) { if (v === null) state.rawUnavailable = true; return v; }).catch(function () { state.rawUnavailable = true; return null; });
     }
-    return Promise.all(jobs).then(function (r) {
+    var keys = ['monthly', 'users', 'logins', 'prefs', 'subs', 'ticker', 'alerts', 'health', 'raw'];
+    return Promise.all(keys.map(function (k) { return P[k]; })).then(function (r) {
+      var g = {};
+      keys.forEach(function (k, i) { g[k] = r[i]; });
       if (typeof window.merge === 'function') {
-        window.D = window.merge(r[0], r[1], r[2], r[3]);
+        window.D = window.merge(g.monthly, g.users, g.logins, g.prefs);
       }
-      if (r[3] && r[3].events) {
-        window.D.raw_events = r[3].events;
-        window.D.raw_n = r[3].n || r[3].events.length;
+      /* ⛔ الجولة ١٨ — السجل الخام جاي من مفتاحه (كان بيتقرا من prefs ⇒ ضايع) */
+      if (g.raw && g.raw.events) {
+        window.D.raw_events = g.raw.events;
+        window.D.raw_n = g.raw.n || g.raw.events.length;
       }
       if (typeof window.renderAll === 'function') window.renderAll();
+      /* 🛡️ الجولة ١٨ — تغذية لوحة الإدارة (٨ أقسام) */
+      state.lastError = '';
+      if (window.Panel) {
+        window.Panel.setData({
+          subs: g.subs, ticker: g.ticker, alerts: g.alerts, health: g.health,
+          lastSync: Date.now(), lastError: ''
+        });
+        window.Panel.render();
+      }
       state.lastSync = Date.now();
       saveSnap();
       paintLive();
@@ -109,8 +132,13 @@
       if (!silent) toast('✅ تم التحديث', 'ok');
       return true;
     }).catch(function (e) {
-      setStatus('تعذّر التحديث: ' + e.message, 'err');
-      if (!silent) toast('⚠️ ' + e.message, 'err');
+      state.lastError = String(e && e.message || e);
+      setStatus('تعذّر التحديث: ' + state.lastError, 'err');
+      if (!silent) toast('⚠️ ' + state.lastError, 'err');
+      if (window.Panel) {
+        window.Panel.setData({ lastSync: state.lastSync, lastError: state.lastError });
+        window.Panel.render();
+      }
       return false;
     }).then(function (r) { state.busy = false; return r; });
   }
@@ -195,8 +223,13 @@
       });
   }
   function doLogout() {
+    /* 🛡️ الجولة ١٨ — الخروج بيمسح اللقطة المحلية (بيانات شخصية على الجهاز) */
+    try {
+      localStorage.removeItem(LS_SNAP);
+      localStorage.removeItem('octa_mgmt_audit');
+    } catch (e) { }
     fetch('/api/logout', { method: 'POST', credentials: 'same-origin' })
-      .then(function () { location.reload(); });
+      .then(function () { location.replace('/login.html'); });
   }
 
   /* ══ الإعدادات ══ */
@@ -347,7 +380,11 @@
 
     /* فحص الجلسة */
     fetch('/api/session', { credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? boot2() : maybeOffline(); })
+      .then(function (r) {
+        var ok = r.ok;
+        if (window.Panel) window.Panel.setData({ session: { ok: ok } });
+        return ok ? boot2() : maybeOffline();
+      })
       .catch(function () { maybeOffline(); });
 
     registerSW();

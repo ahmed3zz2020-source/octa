@@ -16,8 +16,16 @@
  *   POST /api/logout                     ⇒ مسح الكوكي
  *   GET  /api/session                    ⇒ {ok:true} أو 401
  *   GET  /api/proxy?path=/api/admin/x   ⇒ تمرير للـRailway مع التوكن
- *   GET  /api/health                     ⇒ حالة الوسيط
- *   *                                    ⇒ الملفات الثابتة (PWA)
+ *   GET  /api/health                     ⇒ حالة الوسيط (booleans بس)
+ *   *                                    ⇒ الملفات الثابتة (PWA) — ⛔ جلسة مطلوبة
+ *
+ * 🛡️ الجولة ١٨ (P0) — «إغلاق التسرّب العلني»:
+ *   ⛔ ١) أي صفحة/ملف ثابت ⇒ **جلسة صالحة**. بدونها ⇒ 302 لصفحة الدخول
+ *        (لو المتصفح طلب HTML) أو 401 (لو طلب ملف). ⛔ مافيش محتوى الصفحة.
+ *   ⛔ ٢) `/api/health` ⇒ booleans بس (has_admin/has_password) — ⛔ مافيش
+ *        عنوان الـbackend ولا أسماء متغيّرات.
+ *   ⛔ ٣) رسائل الأخطاء ⇒ **عامة**. التفاصيل الداخلية تروح لوج الـWorker بس.
+ *   ⛔ ٤) المسارات المسموحة للتمرير ⇒ قائمة بيضاء صريحة (منع SSRF).
  */
 
 const ORIGIN = "https://octa-prices-production-4ccb.up.railway.app";
@@ -25,6 +33,32 @@ const ORIGIN = "https://octa-prices-production-4ccb.up.railway.app";
 let PREFS_CACHE = null;
 const COOKIE = "octa_mgmt_sess";
 const SESSION_TTL = 60 * 60 * 24 * 30; // ٣٠ يوم
+
+/* 🛡️ الجولة ١٨ — الأخطاء: رسالة عامة للمستخدم + تفصيل في لوج الـWorker فقط */
+const ERR_UPSTREAM = "تعذّر الوصول للسيرفر — جرّب تاني بعد شوية";
+const ERR_AUTH = "لازم تسجيل دخول";
+
+/* 🛡️ الجولة ١٨ — الأصول العامة (من غير جلسة).
+   ⛔ مافيش هنا غير صفحة الدخول — ⛔ مافيش أي صفحة فيها بيانات. */
+const PUBLIC_FILES = new Set(["/login.html", "/icons/favicon.png"]);
+
+/* 🛡️ الجولة ١٨ — مسارات الـAPI المفتوحة (من غير جلسة) — مافيش بيانات شخصية */
+const PUBLIC_API = new Set(["/api/login", "/api/logout", "/api/session", "/api/health"]);
+
+/* 🛡️ الجولة ١٨ — القائمة البيضاء للتمرير.
+   الشكل: method + نمط. ⛔ أي مسار برّه القائمة ⇒ 400 (منع SSRF). */
+const PROXY_ALLOW = [
+  { m: "GET", re: /^\/api\/admin\/[A-Za-z0-9_\/-]*$/ },
+  { m: "GET", re: /^\/api\/subscriptions\/log$/ },
+  { m: "GET", re: /^\/api\/ticker$/ },
+  { m: "POST", re: /^\/api\/subscriptions\/activate$/ },
+  { m: "POST", re: /^\/api\/admin\/(reset_chal|set_device|trust_device)$/ },
+  { m: "DELETE", re: /^\/api\/admin\/user\/[A-Za-z0-9_.@\-]{1,120}$/ },
+];
+
+function proxyAllowed(method, target) {
+  return PROXY_ALLOW.some((r) => r.m === method && r.re.test(target));
+}
 
 /* ── أدوات ── */
 const enc = new TextEncoder();
@@ -77,6 +111,8 @@ async function makeSession(secret) {
 }
 
 async function validSession(req, secret) {
+  /* 🛡️ من غير سر ⇒ مافيش جلسة صالحة أبداً (لا ت trusting for undefined) */
+  if (!secret) return false;
   const raw = parseCookies(req)[COOKIE];
   if (!raw) return false;
   const dot = raw.lastIndexOf(".");
@@ -102,13 +138,26 @@ function noteFail(ip) {
   attempts.set(ip, rec);
 }
 
-/* ── تمرير الطلب للـRailway ── */
-async function proxyToRailway(path, token) {
+/* ── تمرير الطلب للـRailway ──
+   ⛔ الجولة ١٨: method + body مدعومين (للأفعال) — والردود 5xx بتتحوّل لرسالة
+   عامة (⭐ تفصيلها في لوج الـWorker بس — ⛔ ما بتظهرش للمستخدم). */
+async function proxyToRailway(path, token, method, bodyText) {
   const url = ORIGIN + path;
-  const res = await fetch(url, {
+  const init = {
+    method: method || "GET",
     headers: { "X-OCTA-Admin": token, "Accept": "application/json" },
-  });
+  };
+  if (bodyText) {
+    init.body = bodyText;
+    init.headers["Content-Type"] = "application/json";
+  }
+  const res = await fetch(url, init);
   const body = await res.text();
+  if (res.status >= 500) {
+    /* ⛔ مافيش تفاصيل السيرفر في الرد — لوج بس */
+    console.error("[octa-mgmt] upstream error", { path, status: res.status, body: body.slice(0, 300) });
+    return json({ ok: false, error: "السيرفر مرجع خطأ — التفاصيل في سجل الـWorker" }, 502);
+  }
   return new Response(body, {
     status: res.status,
     headers: {
@@ -116,6 +165,93 @@ async function proxyToRailway(path, token) {
       "Cache-Control": "no-store",
     },
   });
+}
+
+/* ── 🛡️ الجولة ١٨ — جلب متابعات المستخدمين (كاش ٣٠ دقيقة) ──
+   ⛔ كل mint_session بيتم في السيرفر — المتصفح ما بياخدش أي توكن. */
+async function fetchPrefs(env) {
+  const now = Date.now();
+  if (PREFS_CACHE && (now - PREFS_CACHE.ts) < 1800000) return PREFS_CACHE.users;
+  const up = await proxyToRailway("/api/admin/users", env.OCTA_ADMIN_TOKEN, "GET", null);
+  if (!up.ok) throw new Error("users fetch failed");
+  const uj = await up.json();
+  const items = await Promise.all((uj.users || []).map(async (u) => {
+    const email = String(u.email || "").trim();
+    const base = { uid: u.uid, name: u.name, email: email, watch: [], n: 0 };
+    if (!email) return base;
+    try {
+      const mr = await fetch(ORIGIN + "/api/admin/mint_session", {
+        method: "POST",
+        headers: { "X-OCTA-Admin": env.OCTA_ADMIN_TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email }),
+      });
+      if (!mr.ok) return base;
+      const mj = await mr.json();
+      if (!mj.token) return base;
+      const wr = await fetch(ORIGIN + "/api/alerts/watch", {
+        headers: { Authorization: "Bearer " + mj.token },
+      });
+      if (!wr.ok) return base;
+      const wj = await wr.json();
+      /* ⛔ باك في الباك (update_prices.py:12583): w_list جوّه اللوب
+         ⇒ القائمة كلها بتترجع مع كل عنصر ⇒ ٦ أسهم = ٣٦ سطر.
+         هنا بنخلي أول ظهور بس لكل كود. */
+      const seen = {}, list = [];
+      (wj.items || []).forEach((i) => {
+        if (!i || !i.code || seen[i.code]) return;
+        seen[i.code] = 1;
+        list.push({ code: i.code, hi: i.hi, lo: i.lo, at: i.at });
+      });
+      return { uid: u.uid, name: u.name, email: email, watch: list, n: list.length };
+    } catch (e) {
+      console.error("[octa-mgmt] prefs item failed", { uid: u.uid, err: String(e && e.message || e) });
+      return base;
+    }
+  }));
+  PREFS_CACHE = { ts: now, users: items };
+  return items;
+}
+
+/* ── 🛡️ الجولة ١٨ — خريطة الأسعار (كاش ٥ دقايق) ──
+   ⛔ /api/prices حجمه ~٦٩٠ ك.ب ⇒ بنفلتره في السيرفر ونبعت للمتصفح
+      الأكواد اللي المستخدمين متابعينها بس. */
+let PRICE_CACHE = null;
+async function fetchPriceMap(env) {
+  const now = Date.now();
+  if (PRICE_CACHE && (now - PRICE_CACHE.ts) < 300000) return PRICE_CACHE.map;
+  const res = await fetch(ORIGIN + "/api/prices", {
+    headers: { "X-OCTA-Admin": env.OCTA_ADMIN_TOKEN, "Accept": "application/json" },
+  });
+  if (!res.ok) throw new Error("prices fetch failed");
+  const j = await res.json();
+  const map = {};
+  (j.egx30 || []).forEach((r) => {
+    const c = String((r && r.code) || "").trim();
+    const p = Number(r && r.price);
+    if (c && isFinite(p) && p > 0) {
+      map[c] = p;
+      const base = c.split(".")[0];
+      if (base && map[base] === undefined) map[base] = p;
+    }
+  });
+  PRICE_CACHE = { ts: now, map };
+  return map;
+}
+
+/* 🛡️ الجولة ١٨ — بوابة الملفات الثابتة */
+function loginRedirect(url) {
+  const to = new URL("/login.html", url);
+  const next = url.pathname;
+  if (next && next !== "/" && next !== "/index.html") to.searchParams.set("next", next);
+  return new Response(null, {
+    status: 302,
+    headers: { "Location": to.toString(), "Cache-Control": "no-store" },
+  });
+}
+
+function wantsHtml(request) {
+  const a = (request.headers.get("Accept") || "").toLowerCase();
+  return a.includes("text/html") || a.includes("application/xhtml");
 }
 
 export default {
@@ -126,6 +262,13 @@ export default {
     /* ═══ API ═══ */
     if (path.startsWith("/api/")) {
       const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+
+      /* 🛡️ الجولة ١٨ (P0): ⛔ أي مسار API غير عام ⇒ لازم جلسة صالحة
+         (يتحقق **قبل** أي طلب للباك — ⛔ صفر تسريب قبل التحقق). */
+      if (!PUBLIC_API.has(path)) {
+        const authed = await validSession(request, env.SESSION_SECRET);
+        if (!authed) return json({ ok: false, error: ERR_AUTH }, 401);
+      }
 
       /* ── تسجيل الدخول ── */
       if (path === "/api/login" && request.method === "POST") {
@@ -162,11 +305,11 @@ export default {
         return json(ok ? { ok: true, ts: Date.now() } : { ok: false }, ok ? 200 : 401);
       }
 
-      /* ── حالة الوسيط ── */
+      /* ── حالة الوسيط ──
+         ⛔ الجولة ١٨: ⛔ مافيش عنوان الـbackend ولا أسماء متغيّرات — booleans بس. */
       if (path === "/api/health") {
         return json({
-          ok: true, service: "octa-mgmt",
-          upstream: ORIGIN,
+          ok: true,
           has_admin: !!env.OCTA_ADMIN_TOKEN,
           has_password: !!env.APP_PASSWORD,
         });
@@ -174,84 +317,108 @@ export default {
 
       /* ── ⭐ تفضيلات المستخدمين: الأسهم اللي بيتابعها كل واحد ──
          ⛔ الـadmin token مش بيوصلش للمتصفح ⇒mint_session + alerts/watch
-         كلهم من السيرفر. الكاش ٣٠ دقيقة (البيانات مش بتتغير كل ثانية). */
+         كلهم من السيرفر. الكاش ٣٠ دقيقة (البيانات مش بتتغير كل ثانية).
+         ⛔ الجولة ١٨: ⛔ التحقق من الجلسة *قبل* أي طلب للباك. */
       if (path === "/api/prefs") {
         const authed = await validSession(request, env.SESSION_SECRET);
-        if (!authed) return json({ ok: false, error: "لازم تسجيل دخول" }, 401);
+        if (!authed) return json({ ok: false, error: ERR_AUTH }, 401);
         if (!env.OCTA_ADMIN_TOKEN) return json({ ok: false, error: "التوكن غير مهيّأ" }, 500);
-        const now = Date.now();
-        if (PREFS_CACHE && (now - PREFS_CACHE.ts) < 1800000) {
-          return json({ ok: true, cached: 1, users: PREFS_CACHE.users }, 200);
-        }
         try {
-          const up = await proxyToRailway("/api/admin/users", env.OCTA_ADMIN_TOKEN);
-          if (!up.ok) return json({ ok: false, error: "تعذّر جلب المستخدمين" }, 502);
-          const uj = await up.json();
-          const items = await Promise.all((uj.users || []).map(async (u) => {
-            const email = String(u.email || "").trim();
-            const base = { uid: u.uid, name: u.name, email: email, watch: [], n: 0 };
-            if (!email) return base;
-            try {
-              const mr = await fetch(ORIGIN + "/api/admin/mint_session", {
-                method: "POST",
-                headers: { "X-OCTA-Admin": env.OCTA_ADMIN_TOKEN, "Content-Type": "application/json" },
-                body: JSON.stringify({ email: email }),
-              });
-              if (!mr.ok) return base;
-              const mj = await mr.json();
-              if (!mj.token) return base;
-              const wr = await fetch(ORIGIN + "/api/alerts/watch", {
-                headers: { Authorization: "Bearer " + mj.token },
-              });
-              if (!wr.ok) return base;
-              const wj = await wr.json();
-              /* ⛔ باك في الباك (update_prices.py:12583): w_list جوّه اللوب
-                 ⇒ القائمة كلها بتترجع مع كل عنصر ⇒ ٦ أسهم = ٣٦ سطر.
-                 هنا بنخلي أول ظهور بس لكل كود. */
-              const seen = {}, list = [];
-              (wj.items || []).forEach((i) => {
-                if (!i || !i.code || seen[i.code]) return;
-                seen[i.code] = 1;
-                list.push({ code: i.code, hi: i.hi, lo: i.lo, at: i.at });
-              });
-              return { uid: u.uid, name: u.name, email: email, watch: list, n: list.length };
-            } catch (e) {
-              return base;
-            }
-          }));
-          PREFS_CACHE = { ts: now, users: items };
-          return json({ ok: true, cached: 0, users: items }, 200);
+          const items = await fetchPrefs(env);
+          const cached = !!(PREFS_CACHE && Date.now() - PREFS_CACHE.ts < 1800000);
+          return json({ ok: true, cached: cached ? 1 : 0, users: items }, 200);
         } catch (e) {
-          return json({ ok: false, error: String((e && e.message) || e) }, 502);
+          /* ⛔ الجولة ١٨: ⛔ ما بنردّش بتفاصيل الداخلية */
+          console.error("[octa-mgmt] prefs failed", { err: String(e && e.message || e) });
+          return json({ ok: false, error: ERR_UPSTREAM }, 502);
+        }
+      }
+
+      /* ── 🔔 الجولة ١٨ — تنبيهات الأسعار (للوحة الإدارة) ──
+         ⛔ كل الشغل ده جوه الـWorker: prices (٦٩٠ ك.ب) مش بتوصلش للمتصفح،
+            المتصفح بياخد بس {code, price, state} لكل منبه. */
+      if (path === "/api/panel/alerts") {
+        if (!env.OCTA_ADMIN_TOKEN) return json({ ok: false, error: "التوكن غير مهيّأ" }, 500);
+        try {
+          const items = await fetchPrefs(env);
+          const map = await fetchPriceMap(env);
+          const alerts = [];
+          let hi = 0, lo = 0;
+          (items || []).forEach((u) => {
+            (u.watch || []).forEach((w) => {
+              const code = String(w.code || "");
+              const px = map[code] !== undefined ? map[code]
+                : (map[code.split(".")[0]] !== undefined ? map[code.split(".")[0]] : null);
+              const h = Number(w.hi), l = Number(w.lo);
+              let state = "none", label = "مفيش حد";
+              if (px !== null && isFinite(h) && h > 0 && px >= h) { state = "hi"; label = "عدّى الحد الأعلى"; hi += 1; }
+              else if (px !== null && isFinite(l) && l > 0 && px <= l) { state = "lo"; label = "وصل الحد الأدنى"; lo += 1; }
+              alerts.push({
+                uid: u.uid, name: u.name, email: u.email, code: code,
+                hi: w.hi, lo: w.lo, at: w.at, price: px, state: state, label: label,
+              });
+            });
+          });
+          return json({
+            ok: true, alerts: alerts,
+            summary: {
+              total: alerts.length, triggered_hi: hi, triggered_lo: lo,
+              users: (items || []).length,
+              priced: alerts.filter((a) => a.price !== null).length,
+            },
+          }, 200);
+        } catch (e) {
+          console.error("[octa-mgmt] alerts failed", { err: String(e && e.message || e) });
+          return json({ ok: false, error: ERR_UPSTREAM }, 502);
         }
       }
 
       /* ── التمرير ── */
       if (path === "/api/proxy") {
         const authed = await validSession(request, env.SESSION_SECRET);
-        if (!authed) return json({ ok: false, error: "لازم تسجيل دخول" }, 401);
+        if (!authed) return json({ ok: false, error: ERR_AUTH }, 401);
         const target = url.searchParams.get("path") || "";
-        // ⛔ منع الـSSRF — المسارات المسموحة بس
-        if (!/^\/api\/admin\/[a-zA-Z0-9_\/<>-]*$/.test(target)) {
+        const method = (request.method || "GET").toUpperCase();
+        /* ⛔ منع الـSSRF — القائمة البيضاء بس (method + path) */
+        if (!proxyAllowed(method, target)) {
           return json({ ok: false, error: "مسار غير مسموح" }, 400);
         }
         if (!env.OCTA_ADMIN_TOKEN) return json({ ok: false, error: "التوكن غير مهيّأ" }, 500);
+        let bodyText = null;
+        if (method === "POST") {
+          try { bodyText = await request.text(); } catch (e) { bodyText = null; }
+          if (!bodyText) bodyText = "{}";
+        }
         try {
-          const up = await proxyToRailway(target, env.OCTA_ADMIN_TOKEN);
+          const up = await proxyToRailway(target, env.OCTA_ADMIN_TOKEN, method, bodyText);
           /* ⛔ المسار لسه مش موجود على السيرفر ⇒ 204 (مش خطأ — ميزة مستقبلية) */
           if (up.status === 404 || up.status === 405) {
             return new Response("", { status: 204, headers: { "X-OCTA-Missing": "1" } });
           }
           return up;
         } catch (e) {
-          return json({ ok: false, error: "تعذّر الوصول للسيرفر: " + String(e && e.message || e) }, 502);
+          /* ⛔ الجولة ١٨: ⛔ رسالة عامة للمستخدم — التفصيل في لوج الـWorker بس */
+          console.error("[octa-mgmt] proxy failed", { path: target, method, err: String(e && e.message || e) });
+          return json({ ok: false, error: ERR_UPSTREAM }, 502);
         }
       }
 
       return json({ ok: false, error: "مسار غير معروف" }, 404);
     }
 
-    /* ═══ الملفات الثابتة (PWA) ═══ */
+    /* ═══ الملفات الثابتة (PWA) ═══
+       🛡️ الجولة ١٨ (P0): ⛔ أي صفحة/ملف ثابت ⇒ جلسة صالحة.
+       بدون جلسة ⇒ 302 لصفحة الدخول (لو المتصفح طلب HTML) أو 401 (لو طلب ملف).
+       ⛔ ممنوع يطلع 200 فيه بيانات لزائر. */
+    const isPublic = PUBLIC_FILES.has(path);
+    if (!isPublic) {
+      const authed = await validSession(request, env.SESSION_SECRET);
+      if (!authed) {
+        if (wantsHtml(request)) return loginRedirect(url);
+        return json({ ok: false, error: ERR_AUTH }, 401);
+      }
+    }
+
     /* ⛔ لازم يبقى index.html للروابط الداخلية (SPA) */
     const res = await env.ASSETS.fetch(request);
     if (res.status === 404 && request.method === "GET" &&
