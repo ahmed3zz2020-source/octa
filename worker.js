@@ -401,6 +401,13 @@ const PROXY_TIMEOUT_FIRST_MS = 15000;
    ✅   دافي وبترد في ثانية ⇒ البيانات بتوصل بدل ما تفشل. */
 const PROXY_TRIES = 3;
 
+/* ═══════════════════════════════════════════════════════════════
+   🩺 الجولة ١٨ (P3) — مهلة فحص الجاهزية ⬇️
+   📌 الفحص لازم يردّ **سريع** (المالك بيفتح الرابط وبيتنى) ⇒ ٣ ثواني
+   📌   (مش ١٥ زي الطلبات العادية — دي مش بيانات، دي تشخيص).
+   ═══════════════════════════════════════════════════════════════ */
+const PREFLIGHT_TIMEOUT_MS = 3000;
+
 /* 🔁 جلب من الـAPI مع إعادة محاولة — الخطأ البسيط بيتراجع لوحده */
 /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · المراجعة الأمنية) — ⛔ رد واضح ⬇️
    📌 ⬇️ بدل ما نرجع للإنتاج ⇒ نرجع 503 برسالة صريحة ⬇️ ⬇️
@@ -415,6 +422,116 @@ function apiUnavailable() {
     status: 503,
     headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
   });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   🩺 الجولة ١٨ (P3) — ⛔ خطأ واحد واضح بدل 530 ⬇️
+   ───────────────────────────────────────────────────────────────
+   📌 العيب المقاس (تشخيص حيّ · ١٧ نوفمبر ٢٠٢٦ · ٠٣:٤٧ UTC):
+      المعاينة كانت بترجّع **530** (Cloudflare 1016 «Origin DNS error»)
+      على **كل** مسارات الـAPI ⇒ المتصفح شاف صفحة إنجليزية
+      («error code: 1016») بدل رسالة واضحة.
+      ⛌⇐ وبما إن رد الـedge مش JSON ⇒ الواجهة فسّرته «باسورد غلط»
+      ⇒ المستخدم اتّهم بإيمه والسبب الحقيقي (البنية) مستخبي.
+
+   ⛔ القاعدة: أي فشل في جلب الـAPI ⇒ رد واحد ثابت:
+      503 + {ok:false, error:'الخدمة مؤقتًا غير متاحة', why:'api_unreachable'}
+   ⛔ ممنوع: عنوان الـAPI الداخلي · أي مفتاح · رسالة الاستثناء
+      (في الرد أو في اللوج) — كل ده بيسيلّم البنية للمهاجم.
+   ═══════════════════════════════════════════════════════════════ */
+function apiUnreachable() {
+  return new Response(JSON.stringify({
+    ok: false,
+    error: 'الخدمة مؤقتًا غير متاحة',
+    why: 'api_unreachable'
+  }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
+  });
+}
+
+/* ⛔ لو رد الـedge نفسه قال «الوجهة مش موجودة» (530/1016 · 502 · 504)
+   ⇒ نفس الرسالة الصريحة (مش 530 ولا HTML). */
+function isOriginUnreachable(status) {
+  return status === 530 || status === 502 || status === 504;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   🔇 الجولة ١٨ (P3) — ⛔ لوج بلا عنوان ⬇️
+   ───────────────────────────────────────────────────────────────
+   📌 رسالة الاستثناء بتقدر تحوي عنوان الوجهة الداخلية
+      (مثل «Fetch API cannot resolve host: …trycloudflare.com»)
+      ⇒ بتسريب عنوان الـAPI في لوج الـworker (وعبر الـdashboard).
+   ⛔ الحل: نسجّل **مفتاح** ثابت (timeout / dns / error) بدل العنوان.
+   ═══════════════════════════════════════════════════════════════ */
+function apiLogKey(err) {
+  const m = String((err && err.message) || err || '');
+  if (/timeout|timed out|abort/i.test(m)) return 'timeout';
+  if (/resolve|host|dns|ENOTFOUND|EAI_AGAIN/i.test(m)) return 'dns';
+  return 'error';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   🩺 الجولة ١٨ (P3) — تقرير الجاهزية (read-only)
+   ───────────────────────────────────────────────────────────────
+   📌 بيرجّع ٤ حقول بس: ok · api · mail · checked_at
+   ⛔ ما بيقراش بيانات مستخدمين · ما بيطلعش أسرار · ما بيعملش كتابة.
+   ⛔ الطلب المرسل: GET /api/health بس — بدون كوكي المستخدم
+      (مالوش لازمة · وبيقلّل تسريب الجلسة) وبسر الـedge لو موجود.
+   📌 mail من حقل mail_configured في رد الـhealth:
+      ⛔ boolean/سلسلة بسيطة بس ⇒ «on»/«off»/«unknown»
+      ⛔ أي قيمة تانية ⇒ «unknown» (مافيش تخمين · مافيش تسريب).
+   ═══════════════════════════════════════════════════════════════ */
+async function preflightReport(env) {
+  const out = {
+    ok: true,
+    api: 'down',
+    mail: 'unknown',
+    checked_at: new Date().toISOString(),
+  };
+  /* ⛔ مافيش وجهة ⇒ down (من غير أي طلب خارجي) */
+  if (!API) return out;
+  let res = null;
+  try {
+    const h = new Headers();
+    h.set('Accept', 'application/json');
+    h.set('Accept-Encoding', 'identity');
+    h.set('User-Agent', 'octa-preflight/1.0');
+    /* ⛔ سر الـedge (لو موجود) — عشان الـstaging يردّ 200 بدل 403.
+       ⛌ والسر ده مش بيتكتبش في أي رد ولا لوج. */
+    if (env && env.OCTA_PROXY_SECRET) h.set('X-OCTA-Proxy', String(env.OCTA_PROXY_SECRET));
+    const init = { method: 'GET', headers: h };
+    /* ⛔ مهلة قصيرة (٣ ثواني) ⇒ timeout واضح ⇒ down (مش تعليق) */
+    if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
+      init.signal = AbortSignal.timeout(PREFLIGHT_TIMEOUT_MS);
+    }
+    res = await fetch(API + '/api/health', init);
+  } catch (e) {
+    /* ⛔⛔⛔ ممنوع عنوان الـAPI الداخلي في اللوج ⬇️ (مفتاح بس) */
+    console.warn('[preflight] api_unreachable (' + apiLogKey(e) + ')');
+    return out;
+  }
+  const st = res && res.status;
+  /* ⛔ 401/403 ⇒ الخادم شغّال بس محمي ⇒ up + unknown */
+  if (st === 401 || st === 403) {
+    out.api = 'up';
+    out.mail = 'unknown';
+    return out;
+  }
+  /* ⛔ أي حالة تانية غير 2xx ⇒ الباك مش شغّال (timeout/server error) */
+  if (!(st >= 200 && st < 300)) return out;
+  out.api = 'up';
+  try {
+    const txt = await res.text();
+    const j = JSON.parse(txt);
+    const mc = j ? j.mail_configured : undefined;
+    if (mc === true || mc === 'true' || mc === 'on' || mc === 1) out.mail = 'on';
+    else if (mc === false || mc === 'false' || mc === 'off' || mc === 0) out.mail = 'off';
+    else out.mail = 'unknown';
+  } catch (e) {
+    out.mail = 'unknown';
+  }
+  return out;
 }
 
 async function fetchApi(target, init) {
@@ -678,6 +795,9 @@ function isPublicApi(path) {
   if (!path) return false;
   /* ⛔ OPTIONS (preflight) — مافيش كوكي ⇒ لازم يعدّي */
   if (path === '/api/health') return true;
+  /* 🩺 الجولة ١٨ (P3) — فحص الجاهزية (تشخيص) — مفتاح بلا تسجيل دخول.
+     ⛔ مافيش بيانات مستخدمين · مافيش أسرار · مافيش كتابة. */
+  if (path === '/api/preflight') return true;
   if (path === '/api/track') return true;          /* التتبّع لازم يفضل مفتوح */
   if (path.indexOf('/api/auth/') === 0) return true; /* التوثيق (تسجيل/دخول/كود) */
   if (path === '/api/quotes') return true;          /* صفحة السوق العامة */
@@ -1046,7 +1166,9 @@ export default {
       status = 'http ' + r.status;
       console.log('[keepalive]', new Date().toISOString(), status);
     } catch (e) {
-      status = 'err ' + ((e && e.message) || 'unknown');
+      /* ⛔⛔⛔ الجولة ١٨ (P3) — ⛔ ممنوع عنوان الوجهة في اللوج ⬇️
+         📌 كان: 'err ' + e.message ⇒ ممكن يفضح العنوان الداخلي. */
+      status = 'err ' + apiLogKey(e);
       console.log('[keepalive]', new Date().toISOString(), status);
     }
     /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ marker قابل للقياس
@@ -1236,6 +1358,29 @@ async function handle(request, env, ctx) {
           'Content-Type': 'application/json; charset=utf-8',
           'Cache-Control': 'no-store',
           'X-OCTA-Auth': 'required'
+        }
+      });
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       🩺 الجولة ١٨ (P3) — فحص الجاهزية — /api/preflight
+       ────────────────────────────────────────────────────────────────
+       📌 الغرض: نقطة تشخيص واحدة بتقول الحقيقة في ثانية:
+          «الـAPI شغّال؟ · والإيميل مضبوط؟»
+       ⛔ قراءة بس: مافيش كتابة · مافيش بيانات مستخدمين · مافيش أسرار.
+       ⛔ الرد: ٤ حقول بالظبط (api · mail · ok · checked_at)
+          ⛔ ممنوع: عنوان الـAPI الداخلي · اسم المضيف · أي مفتاح.
+       ⛔ متاح بلا تسجيل دخول (تشخيص) — عبر isPublicApi.
+       ⛔ ملاحظة: الرد بيتحسب جوّه الـworker نفسه (مش من الباك)
+          ⇒ لو الـAPI واقع ⇒ الفحص لسه بيردّ (api:down) وده المطلوب.
+       ════════════════════════════════════════════════════════════════ */
+    if (url.pathname === '/api/preflight') {
+      const rep = await preflightReport(env);
+      return new Response(JSON.stringify(rep), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store'
         }
       });
     }
@@ -1977,7 +2122,7 @@ async function handle(request, env, ctx) {
         } catch (e) {
           okRevoked = false;
           why = 'backend_unreachable';
-          console.warn('[logout] الباك مش راد:', String(e && e.message || e));
+          console.warn('[logout] الباك مش راد (' + apiLogKey(e) + ')');
         }
         if (!okRevoked) {
           /* ⛔⛔⛔ فشل ⇒ مافيش «خرج» كاذب ⬇️
@@ -2134,6 +2279,21 @@ async function handle(request, env, ctx) {
           await sleep(12000);
         }
         const upstream = await fetchApi(target, init);
+        /* ════════════════════════════════════════════════════════════════
+           🩺 الجولة ١٨ (P3) — ⛔ 530 (Cloudflare 1016) ⇐ رد صريح ⬇️
+           ────────────────────────────────────────────────────────────────
+           📌 القياس الحيّ (١٧ نوفمبر ٢٠٢٦): المعاينة كانت بتروّج رد
+              530 (نص إنجليزي «error code: 1016») ⇒ المستخدم مش فاهم
+              حاجة ⇒ والواجهة فسّرته «باسورد غلط».
+           ⛔ الحل: 530/502/504 (الوجهة مش موجودة · البوابة فاشلة)
+              ⇒ نفس الرد الثابت: 503 + why:api_unreachable.
+           ⛔ الردود 5xx العادية من الباك نفسه (زي 503 mail_down)
+              بتعدّي زي ما هي — السبب (*why*) بيقول الحقيقة.
+           ════════════════════════════════════════════════════════════════ */
+        if (isOriginUnreachable(upstream && upstream.status)) {
+          console.warn('[api-proxy] api_unreachable (upstream ' + upstream.status + ')');
+          return apiUnreachable();
+        }
         let body = await upstream.text();
         /* ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — تصحيح نسبة اليوم (مرجع قديم بعد تعديل
            سعر السهم). ⛔ Fail-safe: لو فشل ⇒ الرد زي ما هو. */
@@ -2203,10 +2363,17 @@ async function handle(request, env, ctx) {
         out.delete('Content-Length');
         return new Response(body, { status: upstream.status, headers: out });
       } catch (e) {
-        return new Response(JSON.stringify({ error: 'api-proxy-failed', message: String(e && e.message || e) }), {
-          status: 502,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        /* ════════════════════════════════════════════════════════════════
+           🩺 الجولة ١٨ (P3) — ⛔ الاستثناء ⇒ رد واحد واضح ⬇️
+           ────────────────────────────────────────────────────────────────
+           📌 كان: 502 + {error:'api-proxy-failed', message:<نص الاستثناء>}
+              ⛌⇐ **تسريب**: رسالة الاستثناء بتحوي عنوان الوجهة الداخلية
+                 (مثل «cannot resolve host: …trycloudflare.com») ⇒
+                 العنوان بيطلع للمتصفح (وفي اللوج كمان).
+           ⛔ الحل: 503 + why:api_unreachable — بلا عنوان وبلا رسالة خام.
+           ════════════════════════════════════════════════════════════════ */
+        console.warn('[api-proxy] api_unreachable (' + apiLogKey(e) + ')');
+        return apiUnreachable();
       }
     }
 

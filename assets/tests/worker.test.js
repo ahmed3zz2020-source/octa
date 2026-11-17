@@ -337,7 +337,12 @@ test('⛔ سيرفر بطيء (٧ ثواني) ⇒ الـworker يرجّع ٢٠٠
   assert.ok(dt < 14000, 'استنى وقت طويل أوي: ' + dt + 'ms');
 });
 
-test('السيرفر واقع فعلاً ⇒ ٥٠٢ بعد ٣ محاولات (مش indefinite)', async () => {
+test('السيرفر واقع فعلاً ⇒ ٥٠٣ api_unreachable بعد ٣ محاولات (مش indefinite)', async () => {
+  /* 🩺 الجولة ١٨ (P3) — ⛔ العقد الجديد ⬇️
+     📌 كان: 502 + {error:'api-proxy-failed', message:<نص الاستثناء>}
+        ⛌⇐ نص الاستثناء كان بيسيلّم عنوان الوجهة الداخلية للمتصفح.
+     ⛔ بقى: 503 + {ok:false, error:'الخدمة مؤقتًا غير متاحة', why:'api_unreachable'}
+        ⛌⇐ مافيش عنوان · مافيش رسالة خام. */
   let calls = 0;
   globalThis.fetch = async () => {
     calls++;
@@ -348,9 +353,11 @@ test('السيرفر واقع فعلاً ⇒ ٥٠٢ بعد ٣ محاولات (م
   const r = await w.fetch(req('https://octashares.com/api/prices', {
     headers: { 'Cookie': 'octa_token=abc.def' },
   }), env);
-  assert.equal(r.status, 502);
+  assert.equal(r.status, 503);
   const body = await r.text();
-  assert.ok(body.includes('api-proxy-failed'), body.slice(0, 120));
+  assert.ok(body.includes('api_unreachable'), body.slice(0, 120));
+  assert.ok(!body.includes('connection refused'),
+    'رسالة الاستثناء اتسرّبت في الرد: ' + body.slice(0, 120));
   assert.equal(calls, 3, 'عدد المحاولات لازم ٣ (PROXY_TRIES) — دلوقتي: ' + calls);
 });
 
