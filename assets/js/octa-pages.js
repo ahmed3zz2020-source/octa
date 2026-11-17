@@ -77,15 +77,16 @@ function openTradingView(code, name) {
   wrap.id = 'tv-chart-modal';
   wrap.className = 'tv-modal-overlay';
   wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
+  /* 🐞🛡️ SEC-024 (الجولة ١٨ · P1) — ⛔ الرمز والاسم جايين من elsewhere ⬇️ */
   wrap.innerHTML = `
   <div class="tv-modal-box">
   <div class="tv-modal-head">
   <div>
-  <div class="tv-modal-title">${code}${name ? ' — ' + name : ''}</div>
-  <div class="tv-modal-sub">📈 EGX:${code} • (TradingView)</div>
+  <div class="tv-modal-title">${ssEsc(code)}${name ? ' — ' + ssEsc(name) : ''}</div>
+  <div class="tv-modal-sub">📈 EGX:${ssEsc(code)} • (TradingView)</div>
   </div>
   <div class="tv-modal-actions">
-  <a href="https://www.tradingview.com/chart/?symbol=EGX:${code}" target="_blank" rel="noopener"
+  <a href="https://www.tradingview.com/chart/?symbol=EGX:${ssEsc(code)}" target="_blank" rel="noopener"
   class="tv-btn">🔗 فتح في موقع التحليل</a>
   <button class="tv-btn ghost" onclick="document.getElementById('tv-chart-modal').remove()">✕</button>
   </div>
@@ -447,7 +448,7 @@ function intelScoreGuide(score, dec) {
     '<p>' + INTEL_COPY.guideL4 + '</p>' +
     mkt +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.78rem;margin:10px 0">' +
-    '<span class="si-score dec ' + cls + '" style="padding:6px 12px;border-radius:8px">' + decTxt + '</span>' +
+    '<span class="si-score dec ' + cls + '" style="padding:6px 12px;border-radius:8px">' + ssEsc(decTxt) + '</span>' +
     (score != null ? '<span style="padding:6px 12px;border-radius:8px;background:var(--slot);color:var(--gold)">النتيجة <b>' + score + '</b>/100</span>' : '') +
     '</div>' +
     '<p class="flt-h-note">' + INTEL_COPY.guideLimit + '</p>' +
@@ -595,7 +596,9 @@ function renderIntel(d) {
   const t = d.technical || {}, fq = d.fundamental || {}, l = d.liquidity || {};
   function listHTML(arr, cls) {
   if (!arr || !arr.length) return '';
-  return '<ul class="fact-list">' + arr.slice(0, 5).map(x => '<li class="' + cls + '">' + x + '</li>').join('') + '</ul>';
+  /* 🐞🛡️ SEC-024 (الجولة ١٨ · P1) — ⛔ القوائم دي **نص حرّ من الـAPI** ⬇️
+     📌 قبل: `' + x + '` خام ⇒ HTML من الـAPI = إدراج مباشر. */
+  return '<ul class="fact-list">' + arr.slice(0, 5).map(x => '<li class="' + cls + '">' + ssEsc(x) + '</li>').join('') + '</ul>';
   }
 
   // مستوى المخاطرة
@@ -605,10 +608,11 @@ function renderIntel(d) {
   if (typeof renderStrategies === 'function') { /* ⛔ بينادي بعد بناء الـHTML — تحت */ }
   document.getElementById('intelBody').innerHTML =
   // ═══ الهيدر ═══
+  /* 🐞🛡️ SEC-024 (الجولة ١٨ · P1) — ⛔ الحقول دي من الـAPI ⬇️ */
   '<div class="intel-hero">' +
-  '<div class="intel-code">' + d.code + '</div>' +
-  '<div class="intel-name">' + (d.name || '') + '</div>' +
-  '<div class="intel-sector">' + (d.sector || '—') + '</div>' +
+  '<div class="intel-code">' + ssEsc(d.code) + '</div>' +
+  '<div class="intel-name">' + ssEsc(d.name || '') + '</div>' +
+  '<div class="intel-sector">' + ssEsc(d.sector || '—') + '</div>' +
   '<div class="intel-price">' + Number(d.price).toFixed(2) +
   '<span class="intel-chg ' + (d.change >= 0 ? 'pos' : 'neg') + '">' +
   (d.change >= 0 ? '▲ +' : '▼ ') + Number(d.change).toFixed(2) + '%</span></div>' +
@@ -617,9 +621,9 @@ function renderIntel(d) {
   '<div class="score-circle blue"><div class="sc-val">' + (d.confidence ?? '—') + '%</div><div class="sc-label">الثقة</div></div>' +
   '</div>' +
   '<div style="margin-top:18px">' +
-  '<div class="intel-decision ' + decClass + '">' + dec +
-  '<small>' + (f.valuation_status ? 'التقييم: ' + f.valuation_status : '') + '</small></div>' +
-  '<div style="margin-top:12px">مستوى المخاطرة: <span class="risk-badge ' + riskCls + '">' + rl + '</span></div>' +
+  '<div class="intel-decision ' + decClass + '">' + ssEsc(dec) +
+  '<small>' + (f.valuation_status ? 'التقييم: ' + ssEsc(f.valuation_status) : '') + '</small></div>' +
+  '<div style="margin-top:12px">مستوى المخاطرة: <span class="risk-badge ' + riskCls + '">' + ssEsc(rl) + '</span></div>' +
   '</div>' +
   '<button onclick="closeIntel()" style="margin-top:20px;padding:9px 26px;background:rgba(255,255,255,0.07);' +
   'border:1px solid rgba(212,175,55,0.3);border-radius:10px;color:var(--gold);font-weight:700">← رجوع</button>' +
@@ -638,7 +642,7 @@ function renderIntel(d) {
   '<div class="intel-grid-2">' +
   // الفني
   '<div class="why-box">' +
-  '<div class="why-title">📈 التحليل الفني (' + (t.score ?? '—') + '/100 — ' + (t.signal || '') + ')</div>' +
+  '<div class="why-title">📈 التحليل الفني (' + (t.score ?? '—') + '/100 — ' + ssEsc(t.signal || '') + ')</div>' +
   (t.positives && t.positives.length ? '<div style="font-size:0.82rem;color:var(--muted);margin-bottom:6px">✅ إيجابيات</div>' + listHTML(t.positives, 'pos') : '') +
   (t.negatives && t.negatives.length ? '<div style="font-size:0.82rem;color:var(--muted);margin:10px 0 6px">❌ سلبيات</div>' + listHTML(t.negatives, 'neg') : '') +
   (t.positives && t.positives.length && t.negatives && t.negatives.length ? '' :
@@ -649,7 +653,7 @@ function renderIntel(d) {
   '</div>' +
   // الأساسي
   '<div class="why-box">' +
-  '<div class="why-title">📊 التحليل الأساسي (' + (f.score ?? '—') + '/100 — ' + (f.valuation_status || '') + ')</div>' +
+  '<div class="why-title">📊 التحليل الأساسي (' + (f.score ?? '—') + '/100 — ' + ssEsc(f.valuation_status || '') + ')</div>' +
   (f.positives && f.positives.length ? listHTML(f.positives, 'pos') : '') +
   (f.negatives && f.negatives.length ? listHTML(f.negatives, 'neg') : '') +
   (f.sector_peers && f.sector_peers['متوسط P/E'] ? 
@@ -659,7 +663,7 @@ function renderIntel(d) {
   '</div>' +
   // السيولة
   '<div class="why-box">' +
-  '<div class="why-title">💧 السيولة (' + (l.score ?? '—') + '/100 — ' + (l.risk_level || '') + ')</div>' +
+  '<div class="why-title">💧 السيولة (' + (l.score ?? '—') + '/100 — ' + ssEsc(l.risk_level || '') + ')</div>' +
   (l.positives && l.positives.length ? listHTML(l.positives, 'pos') : '') +
   (l.negatives && l.negatives.length ? listHTML(l.negatives, 'neg') : '') +
   (l.max_safe_position_egp ? '<div style="margin-top:10px;font-size:0.84rem;color:var(--muted)">' +
@@ -681,9 +685,9 @@ function renderIntel(d) {
   '<span style="color:' + (v > 15 ? 'var(--red2)' : v > 8 ? '#ff9800' : 'var(--gold)') + ';font-weight:800">' + v + '</span></div>';
   }
   }
-  var risks = (rk.top_risks || []).map(function(r){ return '<li class="neg">' + r.الوصف + '</li>'; }).join('');
+  var risks = (rk.top_risks || []).map(function(r){ return '<li class="neg">' + ssEsc(r.الوصف) + '</li>'; }).join('');
   return '<div class="why-box" style="grid-column: 1 / -1">' +
-  '<div class="why-title">⚠️ المخاطر المتقدمة — أمان ' + ((rk.safety_score != null) ? rk.safety_score : ((rk.risk_score != null) ? rk.risk_score : '—')) + '/100 (' + rk.risk_level + ')</div>' +
+  '<div class="why-title">⚠️ المخاطر المتقدمة — أمان ' + ((rk.safety_score != null) ? rk.safety_score : ((rk.risk_score != null) ? rk.risk_score : '—')) + '/100 (' + ssEsc(rk.risk_level) + ')</div>' +
   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">' +
   '<div>' + rows + (rk.risk_adjusted_opportunity ?
   '<div style="margin-top:10px;padding:8px;background:rgba(212,175,55,0.08);border-radius:8px;font-size:0.85rem">' +
@@ -795,10 +799,11 @@ async function loadEarlyOpps(force) {
   return;
   }
   grid.innerHTML = list.map(s =>
-  '<div class="opp-card" onclick="openIntel(\'' + s.code + '\')">' +
-  '<span class="opp-early-tag">' + (s.stage || 'فرصة مبكرة') + '</span>' +
-  '<div class="opp-code-2">' + s.code + '</div>' +
-  '<div class="opp-name-2">' + (s.name || '') + '</div>' +
+  /* 🐞🛡️ SEC-024 (الجولة ١٨ · P1) — ⛔ حقول الـAPI (الرمز/الاسم/المرحلة) ⬇️ */
+  '<div class="opp-card" onclick="openIntel(\'' + ssEsc(s.code) + '\')">' +
+  '<span class="opp-early-tag">' + ssEsc(s.stage || 'فرصة مبكرة') + '</span>' +
+  '<div class="opp-code-2">' + ssEsc(s.code) + '</div>' +
+  '<div class="opp-name-2">' + ssEsc(s.name || '') + '</div>' +
   '<div class="opp-score-2">' + ((s.score > 0) ? (s.score.toFixed(0) + '<small>/100</small>') : '—') + '</div>' +
   '<div class="opp-name-2" style="margin-top:5px">فني ' + (s.technical_score ?? 0).toFixed(0) + ' · نهائي ' + (s.final_score ?? 0).toFixed(0) + '</div>' +
   '</div>'
@@ -844,8 +849,8 @@ async function renderStrategies(code) {
   }
   const s = STRAT_CACHE[code][CUR_STRAT];
   const tabs = '<div class="strat-tabs">' + list.map(x =>
-  '<button class="strat-tab ' + (x.key === CUR_STRAT ? 'active' : '') + '" onclick="pickStrategy(\'' + x.key + '\')">' +
-  x.name + '</button>').join('') + '</div>';
+  '<button class="strat-tab ' + (x.key === CUR_STRAT ? 'active' : '') + '" onclick="pickStrategy(\'' + ssEsc(x.key) + '\')">' +
+  ssEsc(x.name) + '</button>').join('') + '</div>';
   if (!s) { box.innerHTML = tabs + '<div class="opps-loading">—</div>'; return; }
   const vc = octaDecCls(s.decision);
   /* الأعمدة = نتيجة كل محور (s.axes).
@@ -859,20 +864,21 @@ async function renderStrategies(code) {
   '<span class="comp-val">' + Math.round(av) + '</span></div>';
   }
   box.innerHTML = tabs +
+  /* 🐞🛡️ SEC-024 (الجولة ١٨ · P1) — ⛔ حقول الـAPI (اسم/.focus/القرار) ⬇️ */
   '<div class="strat-info">' +
-  '<h4>' + s.strategy_name + '</h4>' +
-  '<div class="meta">⏱️ ' + s.timeframe + '</div>' +
-  '<div class="focus">' + s.focus + '</div>' +
+  '<h4>' + ssEsc(s.strategy_name) + '</h4>' +
+  '<div class="meta">⏱️ ' + ssEsc(s.timeframe) + '</div>' +
+  '<div class="focus">' + ssEsc(s.focus) + '</div>' +
   '<div class="strat-score-row">' +
-  '<span class="strat-score-big">' + s.score + '</span>' +
-  '<span class="strat-verdict ' + vc + '">' + (s.decision || '—') + '</span>' +
-  '<span style="color:var(--muted);font-size:.8rem">ثقة ' + s.confidence + '%</span>' +
+  '<span class="strat-score-big">' + ssEsc(s.score) + '</span>' +
+  '<span class="strat-verdict ' + vc + '">' + ssEsc(s.decision || '—') + '</span>' +
+  '<span style="color:var(--muted);font-size:.8rem">ثقة ' + ssEsc(s.confidence) + '%</span>' +
   '</div>' +
   '<div style="display:flex;gap:14px;margin-top:10px;font-size:.8rem;color:var(--muted)">' +
-  '<span>قبل الخصم: ' + s.base + '</span><span>خصم مخاطرة: ' + Math.abs(s.risk_penalty || 0) + '</span></div>' +
+  '<span>قبل الخصم: ' + ssEsc(s.base) + '</span><span>خصم مخاطرة: ' + Math.abs(s.risk_penalty || 0) + '</span></div>' +
   (s.filter_notes && s.filter_notes.length ?
   '<div style="margin-top:10px">' + s.filter_notes.map(n =>
-  '<div style="font-size:.8rem;color:#ff9800;padding:4px 0">⚠️ ' + n + '</div>').join('') + '</div>' : '') +
+  '<div style="font-size:.8rem;color:#ff9800;padding:4px 0">⚠️ ' + ssEsc(n) + '</div>').join('') + '</div>' : '') +
   '</div>' +
   '<div class="comp-bars">' +
   '<div style="font-size:.75rem;color:var(--muted);margin-bottom:6px">نتيجة كل محور من ١٠٠</div>' +
@@ -2845,7 +2851,11 @@ async function armNews(box) {
   if (!events.length) return '<div class="opps-loading">لا توجد أحداث معلنة</div>';
   let h = '<table class="mini-table"><thead><tr><th>التاريخ</th><th>الشركة</th><th>الرمز</th><th>النوع</th><th>القيمة</th></tr></thead><tbody>';
   for (const e of events.slice(0,15)) {
-  h += `<tr><td>${e.date||e.distributionDate||'—'}</td><td>${(e.nameAr||e.company||'—').slice(0,20)}</td><td><b>${e.code||'—'}</b></td><td>${e.kindAr||e.kind||'—'}</td><td>${e.value||'—'}</td></tr>`;
+  /* 🐞🛡️ SEC-024 (الجولة ١٨ · P1) — ⛔ كل الحقول دي من الـAPI ⬇️
+     📌 قبل: `${e.nameAr}` و `${e.code}` … خام ⇒ HTML من الـAPI =
+        إدراج مباشر. 📌 دلوقتي: ssEsc() على كل قيمة نصية.
+        📌 (الأرقام والتواريخ rendered زي ما هي — الترقيم ما بيتأثرش). */
+  h += `<tr><td>${ssEsc(e.date||e.distributionDate||'—')}</td><td>${ssEsc((e.nameAr||e.company||'—').slice(0,20))}</td><td><b>${ssEsc(e.code||'—')}</b></td><td>${ssEsc(e.kindAr||e.kind||'—')}</td><td>${ssEsc(e.value||'—')}</td></tr>`;
   }
   return h + '</tbody></table>';
   })() +
@@ -3900,7 +3910,7 @@ function dvTabs(){
   box.innerHTML =
   '<div class="dv-quik">' +
   '<div class="dv-quik-l"><span class="dv-quik-t">📌 أقرب استحقاق</span>' +
-  (topUp ? '<b>' + topUp.code + '</b><span>' + (topUp.nameAr||'') + '</span>' +
+  (topUp ? '<b>' + ssEsc(topUp.code) + '</b><span>' + ssEsc(topUp.nameAr || '') + '</span>' +
   '<em>القيد ' + dvDate(topUp.recordDate).d + ' · بعد ' + dvDays(topUp.recordDate) + ' يوم</em>'
   : '<span class="dv-muted">مفيش استحقاق قادم</span>') + '</div>' +
   '<div class="dv-search"><input id="dvQ" type="search" placeholder="🔍 دوّر بالاسم أو الكود — مثل MICH" ' +
@@ -4445,7 +4455,7 @@ function renderStockPage() {
   // — المخاطر
   const rk = intel.risk_engine || {};
   const risks = (rk.top_risks || []).map(r =>
-  `<div class="si-fact neg"><span class="fi">⚠️</span><div>${r.الوصف || r.description || ''}</div></div>`).join('');
+  `<div class="si-fact neg"><span class="fi">⚠️</span><div>${ssEsc(r.الوصف || r.description || '')}</div></div>`).join('');
 
   // القيمة العادلة
   const f = intel.fundamental || {};
@@ -4467,15 +4477,15 @@ function renderStockPage() {
   <div class="si-hero">
   <div class="si-top">
   <div class="si-id">
-  <div class="si-badge">${SI_CODE.slice(0,2)}</div>
+  <div class="si-badge">${ssEsc(SI_CODE.slice(0,2))}</div>
   <div>
-  <div class="si-code">${SI_CODE}</div>
-  <div class="si-name">${intel.name || ''}</div>
+  <div class="si-code">${ssEsc(SI_CODE)}</div>
+  <div class="si-name">${ssEsc(intel.name || '')}</div>
   <div class="si-tags">
-  <span class="si-tag sector">${intel.sector || 'غير محدد'}</span>
+  <span class="si-tag sector">${ssEsc(intel.sector || 'غير محدد')}</span>
   <span class="si-tag">💧 سيولة ${(intel.liquidity?.score ?? 0).toFixed(0)}</span>
   <span class="si-tag">🛡️ أمان ${(rk.safety_score ?? 0).toFixed(0)}</span>
-  ${intel.data_ts ? `<span class="si-tag">🕐 ${intel.data_ts.slice(11,16)}</span>` : ''}
+  ${intel.data_ts ? `<span class="si-tag">🕐 ${ssEsc(intel.data_ts.slice(11,16))}</span>` : ''}
   </div>
   </div>
   </div>
@@ -4495,8 +4505,8 @@ function renderStockPage() {
   <div class="sl">ثقة التحليل</div>
   </div>
   <div class="si-score dec ${decCls}">
-  <div class="sv">${dec}</div>
-  <div class="sl">${f.valuation_status || 'التقييم غير محدد'}</div>
+  <div class="sv">${ssEsc(dec)}</div>
+  <div class="sl">${ssEsc(f.valuation_status || 'التقييم غير محدد')}</div>
   </div>
   ${fvHtml}
   <button class="si-score" onclick="closeStock()" style="cursor:pointer">
@@ -4521,7 +4531,7 @@ function renderStockPage() {
   <div class="si-panel active" id="si-p-chart">
   <div class="si-chart-box">
   <div class="si-sect-h">📊 التحليل البياني <small>مصدر: ${src}</small></div>
-  <div class="si-chart-sym">${SI_CODE} — ${intel.name || ''}</div>
+  <div class="si-chart-sym">${ssEsc(SI_CODE)} — ${ssEsc(intel.name || '')}</div>
   <div id="si-tv-chart"></div>
   </div>
   <div class="si-sect">
@@ -4531,7 +4541,7 @@ function renderStockPage() {
   <td>التغير</td><td class="${chg2>=0?'':''}" style="color:${chg2>=0?'var(--sec)':'var(--red2)'}">${chg2.toFixed(2)}%</td></tr>
   <tr><td>القيمة السوقية</td><td>${(intel.fundamental?.sector_peers ? '' : '') || (intel.liquidity?.metrics?.['القيمة السوقية'] ? (intel.liquidity.metrics['القيمة السوقية']/1e9).toFixed(1)+' مليار' : '—')}</td>
   <td>التذبذب</td><td>${(intel.technical?.atr_pct ?? 0).toFixed(2)}% يومياً</td></tr>
-  <tr><td>مضاعف الربحية</td><td>${(f.sector_peers && intel.fundamental?.breakdown) ? (intel.raw_pe ?? '—') : '—'}</td>
+  <tr><td>مضاعف الربحية</td><td>${ssEsc((f.sector_peers && intel.fundamental?.breakdown) ? (intel.raw_pe ?? '—') : '—')}</td>
   <td>القيمة العادلة</td><td>${f.fair_value ? Number(f.fair_value).toFixed(2) : '—'}</td></tr>
   </tbody></table>
   </div>
@@ -4615,7 +4625,7 @@ function renderStockPage() {
   <div class="si-facts">
   ${exRaw.what_could_change_score.slice(0, 6).map(t =>
   '<div class="si-fact neu"><span class="fi">🔄</span><div>' +
-  (typeof t === 'string' ? t : (t.text || t.what || t.condition || String(t))) + '</div></div>').join('')}
+  ssEsc(typeof t === 'string' ? t : (t.text || t.what || t.condition || String(t))) + '</div></div>').join('')}
   </div>
   </div>` : ''}
 
@@ -4625,7 +4635,7 @@ function renderStockPage() {
   <div class="si-facts">
   ${exRaw.missing_data.slice(0, 6).map(m =>
   '<div class="si-fact inv"><span class="fi">⛔</span><div>' +
-  (typeof m === 'string' ? m : (m.field || m.axis || m.name || String(m))) + '</div></div>').join('')}
+  ssEsc(typeof m === 'string' ? m : (m.field || m.axis || m.name || String(m))) + '</div></div>').join('')}
   </div>
   </div>` : ''}
 
@@ -4655,10 +4665,10 @@ function renderStockPage() {
   <div class="si-sect-h">📋 الإفصاحات الرسمية <small>من إعلانات البورصة المصرية</small></div>
   ${stockNews.length ? `<div class="si-news">${stockNews.map(a => `
   <div class="si-news-item ${a.status === 'upcoming' ? 'upcoming' : ''}">
-  <div class="si-news-date">${a.distributionDate || a.date || '—'}</div>
-  <div class="si-news-title">${a.kindAr || a.kind || 'حدث'}${a.value ? ' بقيمة ' + a.value + ' ج.م' : ''}</div>
+  <div class="si-news-date">${ssEsc(a.distributionDate || a.date || '—')}</div>
+  <div class="si-news-title">${ssEsc(a.kindAr || a.kind || 'حدث')}${a.value ? ' بقيمة ' + ssEsc(a.value) + ' ج.م' : ''}</div>
   <div class="si-news-meta">
-  <span>النوع: ${a.kind || '—'}</span>
+  <span>النوع: ${ssEsc(a.kind || '—')}</span>
   <span>الحالة: ${a.status === 'upcoming' ? 'قادم' : 'مؤكد'}</span>
   ${a.yieldPct ? `<span>العائد: ${a.yieldPct}%</span>` : ''}
   <span class="si-news-src">المصدر: إعلانات البورصة الرسمية (foudalens)</span>
@@ -4851,7 +4861,7 @@ async function openAudit() {
   <div class="arm-stat"><div class="as-v">${cr.worst_band||'—'}</div><div class="as-l">أسوأ شريحة</div></div>
   <div class="arm-stat"><div class="as-v">${cr.worst_band_count||0}</div><div class="as-l">سهم فيها</div></div>
   </div>
-  <div style="font-size:.8rem;color:var(--muted);margin-top:8px">${cr.note||''}</div>
+  <div style="font-size:.8rem;color:var(--muted);margin-top:8px">${ssEsc(cr.note||'')}</div>
   </div>
 
   <div class="aud-sect">

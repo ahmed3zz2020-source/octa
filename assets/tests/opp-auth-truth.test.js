@@ -61,8 +61,20 @@ function jsonRes(status, payload) {
   });
 }
 
+/* 🐞🛡️ SEC-001 (الجولة ١٨) — البوابة بتسأل صاحب الصلاحية قبل الخدمة
+   📌 ⇒ نميّز نداء التحقق (/api/auth/me) عن نداء البيانات.
+   📌 ndiDataStatus = حالة ردّ **البيانات** (اللي بنختبرها). */
+function makeBackend(dataStatus, payload) {
+  return async (target) => {
+    if (String(target).indexOf('/api/auth/me') > -1) {
+      return jsonRes(200, { ok: true, user: { id: 'u1' } });
+    }
+    return jsonRes(dataStatus, payload);
+  };
+}
+
 test('401 من الباك الحي ⇒ يمرّ زي ما هو (مش 503 «الباك ميت»)', async () => {
-  const w = makeWorker(async () => jsonRes(401, { ok: false, error: 'محتاج تسجيل دخول' }));
+  const w = makeWorker(makeBackend(401, { ok: false, error: 'محتاج تسجيل دخول' }));
   const res = await w.fetch(req('https://preview.example.test/api/opp/strategies'),
     env(), {});
   assert.equal(res.status, 401, 'ردّ المصادقة اتحوّل لغيره');
@@ -71,7 +83,7 @@ test('401 من الباك الحي ⇒ يمرّ زي ما هو (مش 503 «ال�
 });
 
 test('403 من الباك ⇒ يمرّ زي ما هو', async () => {
-  const w = makeWorker(async () => jsonRes(403, { ok: false, error: 'forbidden' }));
+  const w = makeWorker(makeBackend(403, { ok: false, error: 'forbidden' }));
   const res = await w.fetch(req('https://preview.example.test/api/opp/strategies'),
     env(), {});
   assert.equal(res.status, 403);

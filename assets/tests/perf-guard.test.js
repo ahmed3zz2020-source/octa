@@ -69,12 +69,17 @@ test('البوابة بتستخدم الـfetch الخام (مش الطابور)
    /api/rank?limit=400 هياخدوا نفس الرد (رقم غلط). */
 test('مفتاح الكاش بيحافظ على المعاملات', () => {
   const a = read('assets/js/octa-api.js');
-  const fn = a.match(/function _octaCacheKey\(s\) \{[\s\S]*?\n\}/);
+  /* 🐞🛡️ SEC-025 (الجولة ١٨) — التوقيع بقى (s, headers)
+     (عشان هوية المستخدم تدخل في المفتاح) ⇒ الـregex يتحدّث. */
+  const fn = a.match(/function _octaCacheKey\(s[^)]*\) \{[\s\S]*?\n\}/);
   assert.ok(fn, 'مالقيناش _octaCacheKey');
   assert.ok(fn[0].indexOf("indexOf('?')") < 0,
     'الكاش لسه بيشيل الـquery ⇒ روابط مختلفة هتاخد نفس الرد');
   assert.ok(fn[0].indexOf('_=[0-9]+') >= 0,
     'لازم نشيل الـcache-buster بس');
+  /* 🐞🛡️ SEC-025 — لازم هوية المستخدم تكون جزء من المفتاح */
+  assert.ok(fn[0].indexOf('_octaUserScope') > -1,
+    'مفتاح الكاش مافيهوش هوية المستخدم (تسريب بين المستخدمين)');
 });
 
 test('مسارات التحديث ما تتكاشش', () => {

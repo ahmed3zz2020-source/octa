@@ -136,6 +136,50 @@
   }
 
   /* ═══════════════════════════════════════════════════════════
+  🐞🛡️ SEC-025 (الجولة ١٨ · P1) — هوية المستخدم **في مفتاح الكاش**
+  ───────────────────────────────────────────────────────────
+  📌 العيب: مفتاح الكاش كان = المسار + المعاملات بس ⛔
+     ⇒ نفس المسار بيرجّع ردّ المستخدم **الأول** لأي مستخدم تاني
+       على نفس الجهاز (خصوصاً بعد تبديل الحساب).
+  📌 الحل: المفتاح = (هوية المستخدم) + (المسار + المعاملات).
+     ⛔ الهوية مش بتتسجّل بالتوكن الخام — هاش قصير بس.
+     ⛔ لو معرّف المستخدم مش معروف (مافيش توكن في الواجهة)
+        ⇒ مسارات حالة المستخدم **بره الكاش** خالص (fail-closed).
+  ═══════════════════════════════════════════════════════════ */
+  function _octaScopeHash(s) {
+  try {
+  let h = 5381, h2 = 52711;
+  const t = String(s || '');
+  for (let i = 0; i < t.length; i++) {
+  const c = t.charCodeAt(i);
+  h = ((h << 5) + h + c) >>> 0;          /* djb2 */
+  h2 = (((h2 << 5) + h2) ^ c) >>> 0;      /* sdbm-xor */
+  }
+  return h.toString(16) + '-' + h2.toString(16);
+  } catch (e) { return 'x'; }
+  }
+
+  /* ⛔ 'anon' = معرّف المستخدم مش معروف ⇒ مافيش تمييز بين مستخدمين */
+  function _octaUserScope(headers) {
+  try {
+  if (headers && headers.get) {
+  const a = headers.get('Authorization') || '';
+  if (/^bearer\s+/i.test(a)) {
+  return 'u' + _octaScopeHash(a.replace(/^bearer\s+/i, '').trim());
+  }
+  }
+  } catch (e) { }
+  const t = _token();
+  if (t) return 'u' + _octaScopeHash(t);
+  return 'anon';
+  }
+
+  /* ⛔ معرّف معروف؟ (يعني نقدر نفصل بين مستخدمين) */
+  function _octaScopeKnown(headers) {
+  return _octaUserScope(headers) !== 'anon';
+  }
+
+  /* ═══════════════════════════════════════════════════════════
   ⭐⭐⭐ ٢٤ أكتوبر ٢٠٢٦ — ⭐ تمييز نداءاتنا عن أي URL خارجي
   ───────────────────────────────────────────────────────────
   ⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔⛔
@@ -219,8 +263,10 @@
     }
     return false;
   }
-  /* ⭐ المفتاح = المسار + المعاملات، من غير الـcache-buster (_=) */
-  function _inflightKey(s) {
+  /* ⭐ المفتاح = (هوية المستخدم) + المسار + المعاملات، من غير الـcache-buster (_=)
+     🐞🛡️ SEC-025 (الجولة ١٨ · P1) — هوية المستخدم داخل المفتاح ⬇️
+        📌 قبل: المفتاح = المسار بس ⇒ مستخدم B بياخد ردّ مستخدم A. */
+  function _inflightKey(s, headers) {
     try {
       /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ نشيل الأصل (الدومين) من المفتاح
          📌 السبب (مقيس): نفس المسار كان بيتطلب مرتين — مرة من
@@ -228,12 +274,13 @@
          ⇒ مفتاحين مختلفين ⇒ مفيش دمج ⇒ الطلب اتكرر ⛔.
          📌 ✅ الحل: نطبّع الأصل ⇒ نفس المسار = نفس المفتاح ⛔→✅.
          📌 ⚠️ الداتا واحدة (نفس السيرفر) ⇒ الدمج آمن. */
-      return String(s)
+      const path = String(s)
         .replace(/^https?:\/\/[^/]+/i, '')
         .replace(/([?&])_=[0-9]+/g, '$1')
         .replace(/[?&]+$/, '')
         .replace(/\?&/, '?')
         .replace(/&&+/g, '&');
+      return _octaUserScope(headers) + '|' + path;
     } catch (e) { return String(s); }
   }
 
@@ -246,7 +293,11 @@
   const NO_CACHE_PATHS = [
     '/api/auth/me', '/api/auth/refresh', '/api/portfolio',
     '/api/dashboard', '/api/alerts/watch', '/api/alerts/state',
-    '/api/subscriptions/me', '/api/charts/list', '/api/stats'
+    '/api/subscriptions/me', '/api/charts/list', '/api/stats',
+    /* 🐞🛡️ SEC-025 — الاستوديو: «scope=mine» = رسومات المستخدم (خاصة).
+       ⛔ كان في كاش الـoctaFetch (المفتاح = المسار بس) ⇒ مستخدم تاني
+          على نفس الجهاز بيشوف رسومات الأول. */
+    '/api/studio/list'
   ];
 
   function _isUserState(path) {
@@ -273,7 +324,7 @@
   let method = 'GET';
   try { method = String((opt && opt.method) || 'GET').toUpperCase(); } catch (e) { }
   if (method === 'GET' && _dedupeOk(s)) {
-    const key = _inflightKey(s);
+    const key = _inflightKey(s, opt && opt.headers);
     let rec = OCTA_INFLIGHT[key];
     if (!rec) {
       /* ⭐ الطلب المشترك مالهوش signal بتاع مستهلك واحد
@@ -373,7 +424,10 @@
   /* ⭐⭐⭐ الكاش القصير: نفس GET اتطلب قبل كده (من غير تغيير في
      المعاملات ⇒ نفس البيانات) ⇒ نردّ من الذاكرة فوراً. */
   const _isGet = (String((opt && opt.method) || 'GET')).toUpperCase() === 'GET';
-  const _ckey = (_isGet && !_isUserState(_pathOf(s))) ? _inflightKey(s) : '';
+  /* 🐞🛡️ SEC-025 — المفتاح فيه هوية المستخدم + مسارات حالة المستخدم
+     بره الكاش خالص (زي ما كانت بالظبط) + المعرّف المجهول ⇒ بره الكاش. */
+  const _ckey = (_isGet && !_isUserState(_pathOf(s)))
+    ? _inflightKey(s, opt && opt.headers) : '';
   if (_ckey) {
     const _hit = _octaCacheGet(_ckey);
     if (_hit) {
@@ -680,20 +734,22 @@ var OCTA_CACHE_PATHS = ['/api/intelligence/', '/api/explain/', '/api/technical/'
    📌 الـcache-buster `?_=` بيتشال من المفتاح ⇒ لازم نعتمد على
      طلب جديد فعلياً ⇒ فالمسارات دي من غير كاش أحسن. */
 
-function _octaCacheKey(s) {
+function _octaCacheKey(s, headers) {
   try {
     /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ المفتاح = المسار + **كل المعاملات**
        📌 بنشيل الـcache-buster بس (`?_=1794…`) ⇒ نفس الطلب الحقيقي
        بيلقى نفس المفتاح ⇒ الكاش بيشتغل ⛔.
        📌 ⛔ قبل كده: بنشيل الـquery كله ⇒ /api/rank?limit=252
        و /api/rank?limit=400 بياخدوا نفس الرد (رقم غلط) ⇒ كان
-       سبب إننا نقدرش نضيف /api/rank للكاش أصلاً. */
+       سبب إننا نقدرش نضيف /api/rank للكاش أصلاً.
+       🐞🛡️ SEC-025 (الجولة ١٨ · P1) — ⛔ فوق ده: **هوية المستخدم**
+          ⇒ مفتاح واحد لكل مستخدم ⇒ مافيش تسرّب بين المستخدمين. */
     var u = String(s || '');
     /* ⭐ ١٤ نوفمبر ٢٠٢٦ — نشيل الأصل برضه (نفس السبب: طلبان
        من دومينين = نفس الداتا ⇒ نفس المفتاح) */
     u = u.replace(/^https?:\/\/[^/]+/i, '');
     u = u.replace(/([?&])_=[0-9]+/g, '$1').replace(/[?&]+$/, '').replace(/\?&/, '?').replace(/&&+/g, '&');
-    return u;
+    return _octaUserScope(headers) + '|' + u;
   } catch (e) { return String(s || ''); }
 }
 
@@ -723,9 +779,16 @@ window.octaFetch = function (url, opts) {
     }
   } catch (e) { }
 
-  /* ⛔⛔⛔ الكاش — المسارات الغالية بس (مش الأسعار، عشان تبقى حيّة) */
-  if (_octaIsCacheable(s, o && o.method)) {
-    var key = _octaCacheKey(s);
+  /* ⛔⛔⛔ الكاش — المسارات الغالية بس (مش الأسعار، عشان تبقى حيّة)
+     🐞🛡️ SEC-025 (الجولة ١٨ · P1) — ⛔ شرطين إضافيين:
+        ① المفتاح فيه **هوية المستخدم** (مستخدمان = مفتاحان).
+        ② مسارات حالة المستخدم (/api/dashboard · /api/studio/list …)
+           ⇒ **بره الكاش** خالص — زي ما هو في الـfetch العام.
+        ⛔ ولما معرّف المستخدم مش معروف (مافيش توكن) ⇒ بره الكاش. */
+  var _userState = _isUserState(_pathOf(s));
+  var _scopeKnown = _octaScopeKnown(o && o.headers);
+  if (_octaIsCacheable(s, o && o.method) && !_userState && _scopeKnown) {
+    var key = _octaCacheKey(s, o && o.headers);
     var hit = OCTA_CACHE[key];
     var now = Date.now();
     if (hit && (now - hit.t) < OCTA_CACHE_TTL) {
