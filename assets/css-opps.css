@@ -27,6 +27,7 @@
       .opps-critcard .opps-critcard-hd .opps-critcard-ico .opps-critcard-bd
       .opps-critcard-sec .opps-critcard-tbl
       .opps-src .opps-src-item .opps-limits
+      .opps-cov-warn
 
    📌 كلاسات إضافية بتستخدمها الجافاسكربت (مغطّاة هنا كمان):
       .opps-hero .opps-hero-ico .opps-hero-t .opps-hero-s
@@ -35,6 +36,7 @@
       .opps-crit-note .opps-crit-w .opps-crit.is-missing
       .opps-critcard-t .opps-critcard-arrow .opps-critcard-hint
       .opps-src-st .opps-missing-note
+      .opps-cov-warn (تحذير تناقض أرقام التغطية)
 
    📌 خطّافات اختيارية للجافاسكربت (مش إجبارية — الشكل الأساسي
       شغّال من غيرها):
@@ -1254,6 +1256,27 @@ select.opps-sort { padding-inline-end: 26px; }
   color: var(--txt);
 }
 .opps-src-item span { display: block; }
+
+/* ── تحذير تناقض أرقام التغطية (الجولة ١٧ · R17-V2-02) ── */
+.opps-cov-warn {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r2);
+  background: var(--opps-warn-soft);
+  border: 1px solid color-mix(in srgb, var(--opps-warn) 34%, transparent);
+  font-size: .76rem;
+  line-height: 1.8;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.opps-cov-warn b {
+  display: block;
+  margin-bottom: 4px;
+  font-size: .8rem;
+  font-weight: 800;
+  color: var(--opps-warn-ink);
+}
+.opps-cov-warn span { display: block; }
 
 .opps-src-st {
   display: inline-block !important;

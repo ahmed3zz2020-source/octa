@@ -528,6 +528,20 @@
         && _fresh.coverage_acceptable !== null) {
       _covAcceptable = _fresh.coverage_acceptable === true;
     }
+    /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٧ · R17-V2-02) — **تناقض أرقام التغطية
+       لازم يبان للمستخدم**:
+       الباك بينشر `data_freshness.coverage_consistent=false` وبيحطّ
+       «أرقام التغطية غير متسقة» جوه `freshness_summary_ar` — بس الواجهة
+       بترسم حالتها بنفسها ⇒ التنبيه كان **بيضيع** والمستخدم بيشوف «تغطية
+       جزئية» بس (مش عارف إن الأرقام نفسها متناقضة).
+       ⛔ نفس قاعدة الباك (opp_engine.py): وقت التناقض ممنوع ادّعاء
+       «تغطية كاملة» ولا «مقبولة» ⇒ التغطية «جزئية» + **تحذير** ظاهر.
+       ⛔ الافتراضي (من غير `coverage_consistent`) ⇒ مافيش تحذير (مافيش كذب). */
+    var _covInconsistent = (_fresh.coverage_consistent === false);
+    if (_covInconsistent) {
+      if (_covStatus === 'complete') _covStatus = 'partial';
+      _covAcceptable = false;
+    }
     if (_covStatus === 'partial') {
       _stateAr = (_stateAr ? (_stateAr + ' · ') : '')
         + (_covAcceptable ? 'تغطية مقبولة للبيانات' : 'تغطية جزئية للبيانات');
@@ -543,6 +557,36 @@
             + (_fresh.missing ? (' · ناقص ' + num(_fresh.missing)) : ''))
           : '');
     }
+    /* ⛔⛔⛔ R17-V2-02 — **تحذير تناقض أرقام التغطية** (مكمّل لوسم
+       «تغطية جزئية» — مش بديل عنه):
+       الأرقام المعروضة **من الحقول المنشورة بس**
+       (`coverage_pct` · `requested` · `updated` · `missing` ·
+       `coverage_implied_pct`) — من غير تنقيط ولا اختلاق. */
+    var _covWarn = '';
+    if (_covInconsistent) {
+      var _cw = [];
+      if (_fresh.coverage_pct !== undefined && _fresh.coverage_pct !== null) {
+        _cw.push('التغطية المعلنة ' + num(_fresh.coverage_pct) + '٪');
+      }
+      if (_fresh.requested !== undefined && _fresh.requested !== null) {
+        _cw.push('المطلوب ' + num(_fresh.requested));
+      }
+      if (_fresh.updated !== undefined && _fresh.updated !== null) {
+        _cw.push('اتحدّث ' + num(_fresh.updated));
+      }
+      if (_fresh.missing !== undefined && _fresh.missing !== null) {
+        _cw.push('ناقص ' + num(_fresh.missing));
+      }
+      if (_fresh.coverage_implied_pct !== undefined
+          && _fresh.coverage_implied_pct !== null) {
+        _cw.push('النسبة المحسوبة من الأعداد '
+          + num(_fresh.coverage_implied_pct) + '٪');
+      }
+      _covWarn = '<div class="opps-cov-warn" role="note">'
+        + '<b>تحذير: أرقام التغطية غير متسقة</b>'
+        + (_cw.length ? ('<span>' + esc(_cw.join(' · ')) + '</span>') : '')
+        + '</div>';
+    }
     h += '<div class="opps-critcard-sec"><b>مصادر البيانات وتواريخ التحديث</b>'
       + '<div class="opps-src">' + _srcs.map(function (x) {
         return '<div class="opps-src-item"><b>' + esc(x.source || '') + '</b><span>'
@@ -553,7 +597,9 @@
         : '')
       + (_covAr ? '<div class="opps-src-item"><b>تغطية الجلب</b><span>'
         + esc(_covAr) + '</span></div>' : '')
-      + '</div></div>';
+      + '</div>'
+      + (_covWarn ? _covWarn : '')
+      + '</div>';
 
     h += '<div class="opps-critcard-sec"><b>رقم إصدار نموذج التقييم</b>'
       + '<p>OPP-' + esc((S.data && S.data.model_version) || '—') + '</p></div>';
