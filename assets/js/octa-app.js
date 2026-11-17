@@ -414,7 +414,7 @@ function renderTabs(){
   $('tabs').innerHTML=Object.keys(MARKETS).map(k=>{
   const m=MARKETS[k];
   return'<button class="tab'+(k===MK?' active':'')+'" onclick="setMK(\''+k+'\')">'+
-  '<span class="ic">'+m.flag+'</span>'+m.name+'</button>';
+  '<span class="ic">'+ m.flag +'</span>'+ esc(m.name) +'</button>';
   }).join('');
 }
 
@@ -423,7 +423,7 @@ function renderFilters(){
   $('filters').innerHTML=FILTERS[MK].map(f=>{
   // {n} بتتحل لعدد الأسهم الكلي
   const label = f.t.replace('{n}', total ? '('+total+')' : '');
-  if (f.id !== 'all') return '<button class="fbtn'+(f.id===FILTER?' on':'')+'" onclick="setFilter(\''+f.id+'\')">'+label+'</button>';
+  if (f.id !== 'all') return '<button class="fbtn'+(f.id===FILTER?' on':'')+'" onclick="setFilter(\''+ f.id +'\')">'+ esc(label) +'</button>';
   return '<button class="fbtn'+(f.id===FILTER?' on':'')+'" onclick="setFilter(\''+f.id+'\')">'+label+'</button>';
   }).join('');
 }
@@ -641,8 +641,23 @@ async function openCard(code,row,mk){
   }catch(e){
   $('mTtl').textContent='كارت القرار';
   $('mBody').innerHTML='<div class="err">⚠️ '+esc(e.message||'فشل جلب البيانات')+
-  '<br><br><button class="mbtn" onclick="openCard(\''+code+'\',null,\''+MC.mk+'\')">🔄 إعادة المحاولة</button></div>';
+  '<br><br><button class="mbtn" onclick="openCard(\''+octaJsArg(code)+'\',null,\''+octaJsArg(MC.mk)+'\')">🔄 إعادة المحاولة</button></div>';
   }
+}
+
+/* 🛡️ الجولة ١٩ (R18-A06 / SEC-024) — تمرير قيمة لـinline handler بأمان:
+   ⛔ القيمة بتتحط جوّه JS string جوّه HTML attribute ⇒ لازم:
+      ① تهريب الـ`&` الأول ② الـbackslash ③ علامة الاقتباس المفردة
+      ④ علامات HTML الخطيرة (`"` `<` `>`).
+   ⛔ الترتيب مهم: `&` الأول عشان ما نخرّبش &quot; اللي بنولّده بعدين. */
+function octaJsArg(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 /* ── كارت السوق المصري ── */
@@ -1605,7 +1620,7 @@ async function openStockModal(code) {
   const tn = (t.negatives||[]).slice(0,2).map(x=>'<div class="dc-fact neg">📉 ' + x + '</div>').join('');
   body.innerHTML =
   '<div class="dc-result"><div class="dcr-top">' +
-  '<div><div class="dcr-code">' + code + '</div><div class="dcr-name">' + (intel.name||'') + '</div>' +
+  '<div><div class="dcr-code">' + esc(code) + '</div><div class="dcr-name">' + (intel.name||'') + '</div>' +
   '<div class="dcr-sect">' + (intel.sector||'') + '</div></div>' +
   '<div class="dcr-price"><div class="dcr-p">' + Number(intel.price||0).toFixed(2) + '</div>' +
   '<div class="dcr-c ' + (chg>=0?'pos':'neg') + '">' + (chg>=0?'▲ +':'▼ ') + chg.toFixed(2) + '%</div></div>' +
@@ -2032,8 +2047,8 @@ function cmpRender(){
 
   out.innerHTML =
   '<div class="cmp-verdict">' +
-  '<div class="cmp-vtitle">🎯 '+V.label+'</div>' +
-  '<div class="cmp-vsub">'+V.top.s.code+' — '+(V.top.s.name||'')+' · '+V.top.pct+'% توافق · '+V.top.wins+' مؤشر</div>' +
+  '<div class="cmp-vtitle">🎯 '+ esc(V.label) +'</div>' +
+  '<div class="cmp-vsub">'+ esc(V.top.s.code) +' — '+(V.top.s.name||'')+' · '+ V.top.pct +'% توافق · '+ V.top.wins +' مؤشر</div>' +
   '<div class="cmp-vnote">لكل مؤشر بنحسب ترتيب كل سهم داخل المقارنة دي ونجمعه. الأعلى = فايز. ' +
   'المؤشرات ناقصة على بعض الأسهم — فالمقارنة بتتعمل على الموجود بس.</div>' +
   '</div>' +
@@ -2341,7 +2356,7 @@ function pickRenderList(q){
   const inP = PICK.indexOf(s.code)>=0;
   const col = inP ? pickColor(PICK.indexOf(s.code)) : '#6b7d8f';
   return '<button class="pick-sg'+(inP?' on':'')+'" style="--slot:'+col+'" ' +
-  'data-code="'+s.code+'" title="'+escPick(s.name||'')+'">' +
+  'data-code="'+ esc(s.code) +'" title="'+escPick(s.name||'')+'">' +
   '<b>'+s.code+'</b>' +
   '<span class="pick-sg-t"><span>'+escPick((s.name||'').slice(0,32))+'</span>' +
   '<em>'+(s.score!=null?Math.round(s.score)+' من 100':'—')+'</em></span>' +
@@ -2458,7 +2473,7 @@ function pickRenderCards(){
   out.innerHTML = (PICK_ABOUT ? pickAbout() : '') + ptRenderFilters() + ptRenderTable() +
   '<div class="cmp-sec-h">🎯 الخلاصة — إيه اللي نعمله؟</div>' +
   (S ? ('<div class="pick-sum"><div class="pick-sum-grid">' +
-  (S.strongest?'<div class="psg best" onclick="openStock(\''+S.strongest.code+'\')"><span>🐙 الأقوى</span><b>'+S.strongest.code+'</b><em>'+escPick(S.strongest.name||'')+'</em></div>':'') +
+  (S.strongest?'<div class="psg best" onclick="openStock(\''+ esc(S.strongest.code) +'\')"><span>🐙 الأقوى</span><b>'+ esc(S.strongest.code) +'</b><em>'+escPick(S.strongest.name||'')+'</em></div>':'') +
   (S.safest?  '<div class="psg" onclick="openStock(\''+S.safest.code+'\')"><span>🛡️ الأقل مخاطرة</span><b>'+S.safest.code+'</b><em>هبوط '+(S.safest.mdd!=null?Number(S.safest.mdd).toFixed(0)+'%':'—')+'</em></div>':'') +
   (S.cheapest? '<div class="psg" onclick="openStock(\''+S.cheapest.code+'\')"><span>💎 الأرخص</span><b>'+S.cheapest.code+'</b><em>P/E '+(S.cheapest.pe!=null?Number(S.cheapest.pe).toFixed(1):'—')+'</em></div>':'') +
   (S.momentum? '<div class="psg" onclick="openStock(\''+S.momentum.code+'\')"><span>⚡ فرصة</span><b>'+S.momentum.code+'</b><em>RSI '+(S.momentum.rsi!=null?Number(S.momentum.rsi).toFixed(0):'—')+'</em></div>':'') +

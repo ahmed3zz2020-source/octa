@@ -1868,7 +1868,7 @@ function renderAiLoading(code) {
   barsEl.innerHTML = `
   <div style="text-align:center;padding:30px 16px;">
   <div style="font-size:2.6rem;animation:pulse 1.4s ease-in-out infinite;">🐙</div>
-  <div style="color:var(--sec2);font-weight:800;margin-top:12px;">OCTA بيفكّر في ${code}...</div>
+  <div style="color:var(--sec2);font-weight:800;margin-top:12px;">OCTA بيفكّر في ${octaEsc(code)}...</div>
   <div style="color:var(--muted);font-size:0.84rem;margin-top:6px;">محرك OCTA بيحلل ٨ محاور</div>
   </div>`;
   }
@@ -2169,34 +2169,66 @@ function renderEngineStocksTable() {
   data.sort((a, b) => b.volume - a.volume);
   }
 
-  tbody.innerHTML = data.map(s => `
-  <tr data-code="${s.code}" onclick="analyzeStock('${s.code}'); document.getElementById('engineSearch').value='${s.code}';">
-  <td class="th-action"><span class="engine-stock-trash" title="سلة" onclick="event.stopPropagation()">🗑️</span></td>
-  <td class="th-action"><span class="engine-stock-trash" title="إشعار" onclick="event.stopPropagation()">🔔</span></td>
-  <td style="color: ${s.percentage.startsWith('-') ? 'var(--red2)' : (parseInt(s.percentage) > 100 ? 'var(--sec)' : 'var(--muted)')}; font-weight: 700;">${s.percentage}</td>
-  <td>${s.quantity}</td>
-  <td>${s.trades}</td>
-  <td>${s.value}</td>
-  <td>${s.volume.toLocaleString('en-US')}</td>
+  /* 🛡️ الجولة ١٩ (R18-A06 / SEC-024) — ⛔ كل القيم من الـAPI تتتهرب:
+     ⛔ قبل كده: `s.code` كان داخل `data-code` و **onclick** (السطر قابل لكسر
+        السلسلة) ⇒ حقن HTML/JS من رد الـAPI. و`s.name`/`s.color` خام كمان.
+     ⛔ دلوقتي: `octaEsc` لكل قيمة + اللون يتحقّق منه (hex بس) +
+        ⛔ **مافيش onclick inline** (نفس نمط الـCSP: data-attribute + addEventListener). */
+  const safeColor = (c) => {
+    const v = String(c || '');
+    return /^#[0-9a-fA-F]{3,8}$/.test(v) ? v : '#4dabf7';
+  };
+  tbody.innerHTML = data.map(s => {
+  const code = octaEsc(s.code);
+  /* ⛔ الـid بيتنضَّف (حروف/أرقام/._- بس) ⇒ مافيش id معطوب من بيانات الـAPI */
+  const safeId = String(s.code == null ? '' : s.code).replace(/[^A-Za-z0-9._-]/g, '');
+  const pct = octaEsc(s.percentage);
+  const col = safeColor(s.color);
+  return `
+  <tr data-code="${code}" data-analyze="1">
+  <td class="th-action"><span class="engine-stock-trash" title="سلة" data-stop="1">🗑️</span></td>
+  <td class="th-action"><span class="engine-stock-trash" title="إشعار" data-stop="1">🔔</span></td>
+  <td style="color: ${s.percentage.startsWith('-') ? 'var(--red2)' : (parseInt(s.percentage) > 100 ? 'var(--sec)' : 'var(--muted)')}; font-weight: 700;">${pct}</td>
+  <td>${octaEsc(s.quantity)}</td>
+  <td>${octaEsc(s.trades)}</td>
+  <td>${octaEsc(s.value)}</td>
+  <td>${octaEsc(s.volume.toLocaleString('en-US'))}</td>
   <td class="change-cell">
-  <div id="live-change-${s.code}" class="live-change-cell" data-code="${s.code}">▲ +${s.change.toFixed(2)}%</div>
+  <div id="live-change-${safeId}" class="live-change-cell" data-code="${code}">▲ +${octaEsc(Number(s.change).toFixed(2))}%</div>
   </td>
   <td class="price-cell">
-  <div id="live-price-${s.code}" class="live-price-cell" data-code="${s.code}">${s.price.toFixed(2)}</div>
+  <div id="live-price-${safeId}" class="live-price-cell" data-code="${code}">${octaEsc(Number(s.price).toFixed(2))}</div>
   </td>
   <td class="th-name" style="font-size: 0.82rem;">
   <div class="engine-stock-name-cell" style="display: flex; align-items: center; gap: 8px;">
-  <span class="engine-stock-logo-circle" style="background: linear-gradient(135deg, ${s.color}, ${s.color}dd); color: #fff; font-weight: 800; box-shadow: 0 2px 6px ${s.color}40;">${s.short}</span>
-  <span>${s.name}</span>
+  <span class="engine-stock-logo-circle" style="background: linear-gradient(135deg, ${col}, ${col}dd); color: #fff; font-weight: 800; box-shadow: 0 2px 6px ${col}40;">${octaEsc(s.short)}</span>
+  <span>${octaEsc(s.name)}</span>
   </div>
   </td>
   <td class="th-code">
   <div class="engine-stock-code-cell" style="justify-content: center;">
-  <span>${s.code}</span>
+  <span>${code}</span>
   </div>
   </td>
   </tr>
-  `).join('');
+  `;
+  }).join('');
+
+  /* ⛔ الربط بالأحداث (بدل onclick inline) — نفس النمط المعتمد في المشروع */
+  if (!tbody.__octaBound) {
+    tbody.__octaBound = true;
+    tbody.addEventListener('click', function (ev) {
+      const stop = ev.target.closest('[data-stop]');
+      if (stop) { ev.stopPropagation(); return; }
+      const tr = ev.target.closest('tr[data-code]');
+      if (!tr) return;
+      const code = tr.getAttribute('data-code');
+      if (!code) return;
+      if (typeof window.analyzeStock === 'function') window.analyzeStock(code);
+      const inp = document.getElementById('engineSearch');
+      if (inp) inp.value = code;
+    });
+  }
 }
 
 function sortEngineStocks(criteria) {
@@ -2398,6 +2430,9 @@ function updateCompareTVWidgets(stocks) {
 window.OCTA_CALC_PREFILL = null;
 
 function renderCalc(type = 'profit') {
+  /* 🛡️ الجولة ١٩ — ⛔ الـtype لازم يكون مفتاح معروف في السجل
+     (fail-closed) — مش أي نص منLogic تانية. */
+  if (!Object.prototype.hasOwnProperty.call(CALCS, type)) type = 'profit';
   const c = CALCS[type];
   document.getElementById('calcContainer').innerHTML = `
   <h3 style="color:var(--gold);margin-bottom:16px;">${c.title}</h3>
@@ -2438,11 +2473,11 @@ function runCalc(type) {
 
 function renderArms() {
   document.getElementById('armsList').innerHTML = ARMS.map(a => `
-  <div class="arm-card" onclick="openArmModal(${a.id})">
+  <div class="arm-card" onclick="openArmModal(${Number(a.id) || 0})">
   <div class="arm-num">${a.num}</div>
   <div class="arm-info">
   <div class="arm-name">${a.name}</div>
-  <div class="arm-desc">${a.desc}</div>
+  <div class="arm-desc">${octaEsc(a.desc)}</div>
   </div>
   <div class="arm-arrow">←</div>
   </div>
@@ -2475,7 +2510,7 @@ function openInvestorModal(id) {
   <h4>📋 قواعده</h4>
   <ul>${inv.rules.map(r => `<li>${r}</li>`).join('')}</ul>
   <h4>💬 مقولته</h4>
-  <div class="example">${inv.quote}</div>
+  <div class="example">${octaEsc(inv.quote)}</div>
   <h4>🏆 أشهر استثماراته</h4>
   <p style="color:var(--muted);">${inv.famous}</p>
   `);
@@ -2936,7 +2971,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================
-// 3 NEW FEATURES: Stock Screener + Search + Best Pick
+// 3 NEW FEATURES: Stock Screener + octaEsc(Search) + Best Pick
 // ============================================
 
 // ============ أكبر 50 سهم EGX متاحين على TradingView ============
@@ -3210,7 +3245,7 @@ function bpInfoHTML(d) {
      📌 إن السهم مالهوش بيانات وبيquit. */
   if (d && d.__fail) {
     const why = d.status ? ('HTTP ' + d.status) : 'مشكلة شبكة';
-    return '<div class="opps-loading">⛔ تعذر تحميل بيانات السهم (' + why +
+    return '<div class="opps-loading">⛔ تعذر تحميل بيانات السهم (' + octaEsc(why) +
       ') — المشكلة في الاتصال مش في بيانات السهم. جرّب تحديث الصفحة.</div>';
   }
   if (!d || !d.code) return '<div class="opps-loading">لا توجد بيانات لهذا السهم</div>';
@@ -3437,8 +3472,8 @@ function renderEngineBars(scores, finalScore, extra) {
   let action = 'السهم في منطقة شراء جيدة';
   if (finalScore < 50) { verdict = '⚠️ حذر'; action = 'السهم يحتاج مراقبة'; }
   else if (finalScore < 70) { verdict = '🟡 تجميع'; action = 'ممكن تجمع على دفعات'; }
-  dec.innerHTML = `<div class="verdict">${verdict}</div>
-  <div class="action">${action} — مرجح من 8 محاور</div>
+  dec.innerHTML = `<div class="verdict">${octaEsc(verdict)}</div>
+  <div class="action">${octaEsc(action)} — مرجح من 8 محاور</div>
   <div class="conf">🐙 نسبة الأخطبوط: <strong>${finalScore}%</strong></div>`;
   return;
   }

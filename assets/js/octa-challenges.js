@@ -415,7 +415,7 @@
         '<div><span>تاريخ الهدف</span><b dir="ltr">' + fmtDate(tgtAt) + '</b></div>' +
         '<div><span>تاريخ الوقف</span><b dir="ltr">' + fmtDate(stpAt) + '</b></div>' +
       '</div>' +
-      (verdict ? '<p class="ch-verdict">' + verdict + '</p>' : '') +
+      (verdict ? '<p class="ch-verdict">' + esc(verdict) + '</p>' : '') +
       '<p class="ch-resnote">⛔ التصحيح بيتحسب من محرك OCTA على شموع يومية حقيقية — مش توصية شراء أو بيع.</p>' +
     '</div>';
   }

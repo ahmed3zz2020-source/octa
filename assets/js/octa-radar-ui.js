@@ -772,7 +772,7 @@
     });
 
     box.innerHTML = '<div class="rd-tablewrap"><table class="rd-table">' +
-      '<thead>' + head + frow + '</thead><tbody>' + body + '</tbody></table></div>';
+      '<thead>' + head + frow + '</thead><tbody>' + esc(body) + '</tbody></table></div>';
 
     /* 🔀 زرار الترتيب */
     box.querySelectorAll('[data-sort]').forEach(b => {

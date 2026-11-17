@@ -603,7 +603,7 @@
       const why = (j && j.error === 'candles-failed')
         ? 'مفيش تاريخ شموع متاح لهذا السهم من المصدر — جرّب سهم تاني.'
         : 'مقدرتش أجيب شموع السهم — المؤشرات الذكية مش متاحة دلوقتي.';
-      box.innerHTML = '<div class="sm-loading">⚠️ ' + why + '</div>';
+      box.innerHTML = '<div class="sm-loading">⚠️ ' + esc(why) + '</div>';
       return;
     }
     const SM = window.OCTA_SM;

@@ -221,7 +221,7 @@ function renderHomeDividends() {
   ? `<span class="div-val-cash">${Number(a.value).toFixed(2)} EGP</span>`
   : `<span class="div-val-stock">+${(a.ratio || {}).pct}% أسهم</span>`;
   return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 9px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:0.78rem;">
-  <span style="display:flex;align-items:center;gap:6px;font-weight:800;">${stockLogo(a.code)}${typeBadge(a)} ${a.code}</span>
+  <span style="display:flex;align-items:center;gap:6px;font-weight:800;">${stockLogo(a.code)}${typeBadge(a)} ${ssEsc(a.code)}</span>
   <span style="color:var(--muted);font-size:0.7rem;">${d !== null ? d + ' يوم' : ''}</span>
   <span>${v}</span>
   </div>`;
@@ -744,9 +744,9 @@ async function loadOpportunities(force) {
   grid.innerHTML = list.map((s, i) => {
   const dec = octaDecCls(s.decision);
   const up = s.upside;
-  return '<div class="opp-card" onclick="openIntel(\'' + s.code + '\')">' +
+  return '<div class="opp-card" onclick="openIntel(\'' + octaJsArg(s.code) + '\')">' +
   '<div class="opp-rank">' + (i + 1) + '</div>' +
-  '<div class="opp-code">' + s.code + '</div>' +
+  '<div class="opp-code">' + ssEsc(s.code) + '</div>' +
   '<div class="opp-name">' + (s.name || '') + '</div>' +
   '<div class="opp-score-row">' +
   '<span class="opp-score">' + (s.score ?? 0).toFixed(0) + '</span>' +
@@ -1887,7 +1887,7 @@ function tvSearch(q) {
   const c = s.change || 0;
   return '<div class="ds-row" data-i="' + i + '" onclick="tvPick(' + i + ')">' +
   '<div class="ds-badge">' + (s.code||'').slice(0,2) + '</div>' +
-  '<div class="ds-info"><div class="ds-code">' + s.code + '</div>' +
+  '<div class="ds-info"><div class="ds-code">' + ssEsc(s.code) + '</div>' +
   '<div class="ds-name">' + (s.name||'').slice(0,28) + '</div></div>' +
   '<div class="ds-price"><div class="ds-p">' + Number(s.price||0).toFixed(2) + '</div>' +
   '<div class="ds-c ' + (c>=0?'pos':'neg') + '">' + (c>=0?'+':'') + c.toFixed(2) + '%</div></div>' +
@@ -2308,7 +2308,7 @@ function vRenderCard(d,exRaw,tech){
   '</div>'+
   '<div class="vcard"><div class="vsec-h">🦞 الأذرع الثمانية — بأوزانك</div>'+arms+
   '<div class="vnote">محور التقييم مستنتج من القيمة العادلة — مش محور مستقل في المحرك، فلو طلع — يبقى ده فجوة بيانات.</div></div>'+
-  '<div class="vcard"><div class="vsec-h">🔍 ليه القرار ده</div><div class="vwhy">'+why+'</div>'+
+  '<div class="vcard"><div class="vsec-h">🔍 ليه القرار ده</div><div class="vwhy">'+ ssEsc(why) +'</div>'+
   (ex.formula?'<div class="vnote">المعادلة: '+vEsc(ex.formula)+'</div>':'')+'</div>'+
   techHtml+ riskHtml +
   '<div class="vcard"><div class="vsec-h">🎯 مناطق الدخول</div>'+entry+
@@ -2706,7 +2706,7 @@ function buildAssetArticle(ticker) {
   <div class="read-h" style="font-size:.9rem">🔗 العلاقات المهمة دلوقتي</div>
   ${rels.map(r => `<div class="read-rel ${r.v==='same'?'up':(r.v==='inv'?'down':'')}">
   <span class="rr-a">${r.a} ↔ ${r.b}</span>
-  <span class="rr-t">${r.why}</span>
+  <span class="rr-t">${ssEsc(r.why)}</span>
   </div>`).join('')}
   </div>
 
@@ -2735,7 +2735,7 @@ function buildSectorHeatmap(stocks, sectorList) {
 
   return `<div class="heat-grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
   ${items.map(s => `<div class="heat-cell" style="${heatColor(s.avg)}">
-  <div class="hc-n">${s.name}</div>
+  <div class="hc-n">${ssEsc(s.name)}</div>
   <div>
   <div class="hc-v">${s.avg>=0?'+':''}${s.avg.toFixed(2)}%</div>
   <div class="hc-c">${s.count} سهم</div>
@@ -3191,7 +3191,7 @@ async function openStock(code) {
   '</div>' +
   (f.valuation_status ? '<div style="margin-top:14px;padding:12px;background:rgba(212,175,55,.08);' +
   'border:1px solid rgba(212,175,55,.25);border-radius:11px;font-size:.86rem">' +
-  '<b style="color:var(--gold)">التقييم:</b> ' + f.valuation_status +
+  '<b style="color:var(--gold)">التقييم:</b> ' + ssEsc(f.valuation_status) +
   (f.upside_pct != null ? ' · فرصة ' + (f.upside_pct>0?'+':'') + Number(f.upside_pct).toFixed(1) + '%' : '') +
   '</div>' : '');
   }
@@ -3226,6 +3226,21 @@ function closeStock() {
 }
 
 /* ══════════ أخبار السهم الحيّة — مصادر مجانية بلا مفاتيح ══════════ */
+/* 🛡️ الجولة ١٩ (R18-A06 / SEC-024) — تمرير قيمة لـinline handler بأمان:
+   ⛔ القيمة بتتحط جوّه JS string جوّه HTML attribute ⇒ لازم:
+      ① تهريب الـ`&` الأول ② الـbackslash ③ علامة الاقتباس المفردة
+      ④ علامات HTML الخطيرة (`"` `<` `>`).
+   ⛔ الترتيب مهم: `&` الأول عشان ما نخرّبش &quot; اللي بنولّده بعدين. */
+function octaJsArg(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 const SI_NEWS_CACHE = {};
 
 async function rssFetch(query){
@@ -3318,7 +3333,7 @@ async function loadStockNews(code, name){
   }
 
   const row = n => '<a class="si-nws-item" href="' + n.link + '" target="_blank" rel="noopener noreferrer">' +
-  '<div class="si-nws-t">' + n.title + '</div>' +
+  '<div class="si-nws-t">' + ssEsc(n.title) + '</div>' +
   '<div class="si-nws-m">' + (newsAgo(n.date) ? newsAgo(n.date) + ' · ' : '') + 'Google News</div></a>';
 
   let html = '';
@@ -3687,7 +3702,7 @@ function spChips(){
   : c === 'safe' ? (s.vol1y!=null && s.vol1y<30 && s.mdd!=null && s.mdd<45)
   : true).length;
   const mk = (id,label,n) => '<button class="sp-chip' + (SP_FILTER===id?' on':'') +
-  '" onclick="spFilter(\'' + id + '\')">' + label + ' <b>' + n + '</b></button>';
+  '" onclick="spFilter(\'' + id + '\')">' + ssEsc(label) + ' <b>' + n + '</b></button>';
   box.innerHTML =
   mk('all','📋 الكل',VIEW.length)
   + mk('buy','🟢 تجميع',dec('buy'))
@@ -4344,7 +4359,7 @@ function dvRender(){
   const label = DV_TYPE !== 'all' ? (LBL[DV_TYPE] || DV_TYPE)
   : DV_STATUS === 'upcoming' ? 'القادمة' : DV_STATUS === 'recent' ? 'آخر 30 يوم' : DV_STATUS === 'past' ? 'المنتهية' : 'الكل';
   const h = document.getElementById('dvSecH');
-  if (h) h.innerHTML = '📋 ' + label + ' <span class="dv-s">' + rows.length + ' إجراء</span>';
+  if (h) h.innerHTML = '📋 ' + ssEsc(label) + ' <span class="dv-s">' + rows.length + ' إجراء</span>';
   const box = document.getElementById('dvList');
   if (box) box.innerHTML = rows.length
   ? rows.slice(0, 200).map(dvItem).join('')
@@ -5061,8 +5076,8 @@ function ic(icon, title, desc, stats, more, badge) {
   return `<div class="ic" onclick="icToggle(this)">
   ${badge ? '<div class="ic-badge">'+badge+'</div>' : ''}
   <span class="ic-ico">${icon}</span>
-  <div class="ic-t">${title}</div>
-  <div class="ic-d">${desc}</div>
+  <div class="ic-t">${ssEsc(title)}</div>
+  <div class="ic-d">${ssEsc(desc)}</div>
   ${stats ? '<div class="ic-stat">'+stats+'</div>' : ''}
   <div class="ic-more">${more || ''}</div>
   </div>`;
@@ -5309,7 +5324,7 @@ function openMarketGauge(){
     '<button class="mg-close" type="button" aria-label="اقفل">✕</button></div>'+
     '<div class="mg-body">' +
     /* ① الرقم */
-    '<div class="mg-hero"><div class="mg-hero-n ' + B.state + '">' + B.gauge + '</div>' +
+    '<div class="mg-hero"><div class="mg-hero-n ' + ssEsc(B.state) + '">' + B.gauge + '</div>' +
     '<div class="mg-hero-t"><div class="mg-hero-v ' + B.state + '">' + stName + '</div>' +
     '<div class="mg-hero-s">' + stSub + '</div>' +
     '<div class="mg-hero-d">' + esc(stWhy) + '</div></div></div>' +
@@ -5426,7 +5441,7 @@ function renderBullBear(dash, ticker) {
   <div class="bbs-row">
   <div class="bbs-gauge ${state}">${gauge}</div>
   <div class="bbs-info">
-  <div class="bbs-v ${state}">${label}</div>
+  <div class="bbs-v ${state}">${ssEsc(label)}</div>
   <div class="bbs-s">${sub} — مؤشر السوق العام</div>
   <div class="bbs-scalebar"><div class="bbs-marker" style="left:${markerPos}%"></div></div>
   <div class="bbs-hint">اضغط لتفسير الرقم والمقاييس</div>

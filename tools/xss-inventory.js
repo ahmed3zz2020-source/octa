@@ -110,6 +110,100 @@ const FIXED = [
   { file: 'assets/js/octa-pages.js', fn: 'renderStockPage', what: 'صفحة السهم: الاسم + القطاع + التفسير + الإفصاحات' }
 ];
 
+/* ══════════════════════════════════════════════════════════════════════
+   🛡️ الجولة ١٩ — تصنيف المواضع غير المُرمَّزة (مصدر البيانات + قابلية الاستغلال)
+   ⛔ المراجع المستقل طلب: «تصنيف الـ١٤٩ موضعًا حسب مصدر البيانات وقابلية الاستغلال»
+   ⛔ واللي يكشف إن الحقل بيانات API/مستخدم ولا نص ثابت ولا رقم.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ⛔ أسماء المتغيّرات اللي مصدرها **مدخل مستخدم** (نص اللي المستخدم كتبه) */
+const USER_INPUT_NAMES = [
+  'search', 'query', 'q', 'typed', 'input', 'term', 'keyword', 'filter_text',
+  'search_text', 'searchTerm', 'searchQ', 'userInput', 'typedText'
+];
+
+/* ⛔ أسماء المتغيّرات اللي مصدرها **رقمي/عددي** (مش نص) */
+const NUMERIC_NAMES = [
+  'price', 'qty', 'quantity', 'volume', 'vol', 'value', 'pct', 'pctchg', 'change',
+  'score', 'final', 'total', 'sum', 'avg', 'cap', 'mcap', 'high', 'low', 'open',
+  'close', 'last', 'bid', 'ask', 'eps', 'pe', 'roe', 'roi', 'yield', 'div',
+  'sh', 'shares', 'n', 'num', 'count', 'len', 'size', 'rate', 'ratio', 'minutes'
+];
+
+function isUserInputName(name) {
+  const n = String(name).toLowerCase();
+  return USER_INPUT_NAMES.some((u) => n === u.toLowerCase() || n.indexOf(u.toLowerCase() + '_') === 0
+    || n.indexOf(u.toLowerCase()) > -1 && n.length <= u.length + 8);
+}
+
+/**
+ * 📌 سياق الإدراج: بنراجع النص **قبل** المتغيّر جوّه التعبير.
+ * @returns {{ctx:string, detail:string}}
+ */
+function classifyContext(expr, off) {
+  const before = expr.slice(Math.max(0, off - 60), off);
+  const after = expr.slice(off, off + 80);
+  /* ⛔ مقارنة (مثال: `a.status === 'upcoming'`) ⇒ القيمة **مش بتتدخّل** في الـHTML */
+  if (/^\s*(?:[\w$]+(?:\.[\w$]+|\[[^\]]*\])?\s*)*(===|==|!==|!=)/.test(after))
+    return { ctx: 'مقارنة', detail: 'قيمة مقارنة — مش حقن' };
+  /* ⛔ حدث داخل (onclick=... etc.) — الأخطر
+     ⛔ لازم نعرف إن الـattribute لسه مفتوح عند موضع المتغيّر:
+        آخر `on*=` قبل المتغيّر + مافيش علامة إغلاق بعده. */
+  const onIdx = before.toLowerCase().lastIndexOf('on');
+  if (onIdx > -1 && /on[a-z]+\s*=/.test(before.slice(onIdx))) {
+    const tail = before.slice(onIdx);
+    const m = tail.match(/on[a-z]+\s*=\s*(["'])/);
+    if (m) {
+      const afterOpen = tail.slice(tail.indexOf(m[1]) + 1);
+      const closes = afterOpen.indexOf(m[1]);
+      if (closes === -1) return { ctx: 'حدث داخل', detail: 'inline event handler' };
+    } else if (!/["']\s*[,)]/.test(tail.slice(tail.indexOf('=') + 1))) {
+      return { ctx: 'حدث داخل', detail: 'inline event handler' };
+    }
+  }
+  /* ⛔ رابط (href/src/action) — javascript: ممكن */
+  if (/\b(href|src|action|formaction|data|poster)\s*=\s*["']?[^"']*$/i.test(before))
+    return { ctx: 'رابط/مصدر', detail: 'URL context (javascript: ممكن)' };
+  /* ⛔ ستايل (style=...) — CSS injection */
+  if (/\bstyle\s*=\s*["']?[^"']*$/i.test(before)) return { ctx: 'ستايل', detail: 'style attribute' };
+  /* ⛔ قيمة خاصية عامة */
+  if (/=\s*["'][^"']*$/i.test(before) || /=\s*[^"'\s>]*$/.test(before))
+    return { ctx: 'خاصية', detail: 'HTML attribute' };
+  /* ⛔ نص عادي */
+  return { ctx: 'نص', detail: 'HTML text node' };
+}
+
+/* 🛡️ ملاحظات يدوية على مواضع **إنذار كاذب** (سبب كل واحدة موثّق) */
+const MANUAL_NOTES = {
+  'assets/js/octa-pages.js:3247': '⚠️ إنذار كاذب: النص ده **مش إدراج HTML** — بناء رابط RSS، والـURL كامل بيتشفّر بـencodeURIComponent قبل الطلب ⇒ مافيش حقن.',
+  'assets/js/octa-pages.js:4752': '⚠️ إنذار كاذب: `tradingViewUrl` بيتحقّق بـoctaSafeUrl قبل الإدراج (نفس الأصل بس) ⇒ مافيش javascript: .',
+  'assets/js/octa-core.js:2528': '⚠️ إنذار كاذب: الرابط بيعدّي بـoctaSafeUrl (نفس الأصل بس) ⇒ مافيش javascript: .',
+  'assets/js/octa-core.js:3425': '✅ مُعالَج: القيمة بقت Number(...) (تحويل رقمي) ⇒ مافيش نص من الـAPI.',
+  'assets/js/octa-pages.js:5437': '⚠️ إنذار كاذب: القيمة **مقارنة** (`state===\'bull\' ? \'bull\' : ...`) ⇒ اللي بيتحقن literals معروفة مش بيانات ⇒ مافيش حقن.',
+};
+
+/**
+ * 📌 مصدر البيانات: api / مستخدم / رقم / ثابت / غير معروف
+ */
+function classifySource(name, api) {
+  if (api) return { src: 'API', srcNote: 'قيمة من رد الـAPI' };
+  if (isUserInputName(name)) return { src: 'مستخدم', srcNote: 'مدخل مستخدم' };
+  if (NUMERIC_NAMES.indexOf(String(name).toLowerCase()) > -1) return { src: 'رقم', srcNote: 'قيمة رقمية' };
+  return { src: 'غير محدد', srcNote: 'مصدر غير مؤكد (محتاج مراجعة)' };
+}
+
+/**
+ * 📌 قابلية الاستغلال: عالية / متوسطة / منخفضة
+ */
+function exploitability(source, ctx) {
+  if ((source === 'API' || source === 'مستخدم') &&
+      (ctx === 'حدث داخل' || ctx === 'رابط/مصدر' || ctx === 'خاصية' || ctx === 'ستايل'))
+    return 'عالية';
+  if (source === 'API' || source === 'مستخدم') return 'متوسطة';
+  if (source === 'رقم') return 'منخفضة';
+  return 'منخفضة (مصدر غير مؤكد)';
+}
+
 /* ──────────────────────────────────────────────────────────────────────
    استخراج المتغيّرات المُدرجة (من قوالب `${}` أو دمج `+`)
    ────────────────────────────────────────────────────────────────────── */
@@ -220,11 +314,29 @@ function scanFile(file) {
         escaper: esc || '',
         api: api || '',
         kind: v.kind,
-        line: fLine
+        line: fLine,
+        off: v.off
       });
     }
-    const risky = fields.filter((f) => !f.escaped);
+    const risky = fields.filter((f) => !f.escaped)
+      /* ⛔ دوال الترميز نفسها (مثل `naEsc` في `arr.map(naEsc)`) مش حقن */
+      .filter((f) => ESCAPERS.indexOf(f.name) === -1);
     const apiRisky = risky.filter((f) => f.api);
+    /* 🛡️ الجولة ١٩ — تصنيف كل موضع غير مُرمَّز (مصدر + سياق + قابلية) */
+    for (const f of risky) {
+      const c = classifyContext(expr, f.off >= 0 ? f.off : 0);
+      const s = classifySource(f.name, f.api);
+      f.ctx = c.ctx;
+      f.ctxDetail = c.detail;
+      f.source = s.src;
+      f.sourceNote = s.srcNote;
+      f.exploit = exploitability(s.src, c.ctx);
+      /* ⛔ مقارنة ⇒ مافيش حقن (الأسوأ انذار كاذب) */
+      if (c.ctx === 'مقارنة') f.exploit = 'منخفضة (مقارنة — مش حقن)';
+      /* 🛡️ ملاحظة يدوية موثّقة */
+      const note = MANUAL_NOTES[relFile + ':' + f.line];
+      if (note) { f.manualNote = note; f.exploit = 'منخفضة (ملاحظة يدوية — راجع السبب)'; }
+    }
     const fixed = FIXED.find((x) => x.file === relFile && x.fn === fnName);
     rows.push({
       file: relFile,
@@ -347,6 +459,99 @@ function main() {
     console.log('📝 كُتب: ' + path.relative(ROOT, outPath));
     console.log('   المواضع: ' + all.length + ' · غير مُرمَّز: ' + anyRisky.length +
       ' · غير مُرمَّز+API: ' + apiRows.length);
+    return;
+  }
+
+  /* 🛡️ الجولة ١٩ — إخراج JSON (للإصلاح الآلي المقطوع) */
+  if (process.argv.indexOf('--json') > -1) {
+    const outPath = path.join(ROOT, process.argv[process.argv.indexOf('--json') + 1]);
+    const flat = [];
+    for (const r of all) {
+      for (const f of r.risky) {
+        flat.push({
+          file: r.file, line: f.line, name: f.name, source: f.source,
+          ctx: f.ctx, exploit: f.exploit, off: f.off,
+          expr: r.expr.slice(0, 300),
+        });
+      }
+    }
+    fs.writeFileSync(outPath, JSON.stringify(flat, null, 1), 'utf8');
+    console.log('📝 كُتب: ' + path.relative(ROOT, outPath) + ' · ' + flat.length + ' حقل');
+    return;
+  }
+
+  /* 🛡️ الجولة ١٩ — تصنيف كامل (مصدر البيانات + سياق + قابلية الاستغلال) */
+  if (process.argv.indexOf('--triage') > -1) {
+    const outPath = path.join(ROOT, process.argv[process.argv.indexOf('--triage') + 1]);
+    const flat = [];
+    for (const r of all) {
+      for (const f of r.risky) {
+        flat.push({ r, f });
+      }
+    }
+    const bySource = {}, byCtx = {}, byExploit = {};
+    for (const x of flat) {
+      bySource[x.f.source] = (bySource[x.f.source] || 0) + 1;
+      byCtx[x.f.ctx] = (byCtx[x.f.ctx] || 0) + 1;
+      byExploit[x.f.exploit] = (byExploit[x.f.exploit] || 0) + 1;
+    }
+    const ORDER = { 'عالية': 0, 'متوسطة': 1, 'منخفضة': 2 };
+    flat.sort((a, b) => (ORDER[a.f.exploit] - ORDER[b.f.exploit]) ||
+      (a.r.file < b.r.file ? -1 : a.r.file > b.r.file ? 1 : a.r.line - b.r.line));
+    const md = [];
+    md.push('# تصنيف مواضع إدراج HTML غير المُرمَّزة — الجولة ١٩ (SEC-024)');
+    md.push('');
+    md.push('> مولَّد بـ `node tools/xss-inventory.js --triage docs/XSS-TRIAGE-R19.md` — أداة قراءة بس (مافيش تعديل على الكود).');
+    md.push('> ⛔ التصنيف **تقريبي** (نمطي): «مصدر غير مؤكد» = محتاج مراجعة يدوية — مش معناه ثغنة.');
+    md.push('');
+    md.push('## الأرقام');
+    md.push('');
+    md.push('- إجمالي مواضع إدراج HTML: **' + all.length + '**');
+    md.push('- مواضع فيها إدراج غير مُرمَّز (موضع/سطر): **' + anyRisky.length + '**');
+    md.push('- عدد الحقول غير المُرمَّزة جوهها: **' + flat.length + '**');
+    md.push('');
+    md.push('### حسب مصدر البيانات');
+    md.push('');
+    md.push('| المصدر | العدد |');
+    md.push('|---|---|');
+    for (const k of Object.keys(bySource).sort((x, y) => bySource[y] - bySource[x]))
+      md.push('| ' + k + ' | ' + bySource[k] + ' |');
+    md.push('');
+    md.push('### حسب سياق الإدراج');
+    md.push('');
+    md.push('| السياق | العدد |');
+    md.push('|---|---|');
+    for (const k of Object.keys(byCtx).sort((x, y) => byCtx[y] - byCtx[x]))
+      md.push('| ' + k + ' | ' + byCtx[k] + ' |');
+    md.push('');
+    md.push('### حسب قابلية الاستغلال');
+    md.push('');
+    md.push('| القابلية | العدد |');
+    md.push('|---|---|');
+    for (const k of Object.keys(byExploit).sort((x, y) => ORDER[x] - ORDER[y]))
+      md.push('| ' + k + ' | ' + byExploit[k] + ' |');
+    md.push('');
+    md.push('## الجدول الكامل (كل موضع غير مُرمَّز)');
+    md.push('');
+    md.push('| # | الملف:السطر | الدالة | الحقل | المصدر | السياق | القابلية |');
+    md.push('|---|---|---|---|---|---|---|');
+    let i = 0;
+    for (const x of flat) {
+      i++;
+      md.push('| ' + i + ' | `' + x.r.file + ':' + x.f.line + '` | `' + (x.r.fn || '—') + '` | `' +
+        x.f.name + '` | ' + x.f.source + ' | ' + x.f.ctx + ' | ' + x.f.exploit + ' |');
+    }
+    md.push('');
+    md.push('## قاعدة التصنيف');
+    md.push('');
+    md.push('- **المصدر**: `API` = اسم حقل من رد الـAPI · `مستخدم` = اسم متغيّر مشتق من مدخل المستخدم · `رقم` = قيمة رقمية · `غير محدد` = محتاج مراجعة يدوية.');
+    md.push('- **السياق**: `حدث داخل` = جوّه `onclick=` (الأخطر) · `رابط/مصدر` = `href/src` (ممكن `javascript:`) · `خاصية` = جوّه قيمة خاصية · `ستايل` = جوّه `style` · `نص` = نص عادي.');
+    md.push('- **القابلية**: عالية = (API أو مستخدم) في سياق إدراج (حدث/رابط/خاصية/ستايل) · متوسطة = (API أو مستخدم) كنص عادي · منخفضة = رقم أو ثابت.');
+    md.push('');
+    fs.writeFileSync(outPath, md.join('\n') + '\n', 'utf8');
+    console.log('📝 كُتب: ' + path.relative(ROOT, outPath));
+    console.log('   غير مُرمَّز: ' + flat.length + ' · عالية: ' + (byExploit['عالية'] || 0) +
+      ' · متوسطة: ' + (byExploit['متوسطة'] || 0));
     return;
   }
 

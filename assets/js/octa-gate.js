@@ -2179,7 +2179,7 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  head(title, 1);
  boxEl().className = 'gt-box';
  formEl().innerHTML =
- '<p class="gt-txt">' + hint + '</p>' +
+ '<p class="gt-txt">' + esc(hint) + '</p>' +
  padHtml(0) +
  '<button class="gt-back" id="gtBackC" type="button">رجوع</button>';
  var b = document.getElementById('gtBackC');
