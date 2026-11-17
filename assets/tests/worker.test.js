@@ -25,7 +25,7 @@ const SRC = fs.readFileSync(path.join(ROOT, 'worker.js'), 'utf8');
 /* ═══════════════════════════════════════════════════════════
    🛠بيئة التشغيل — بنعمل بيئة Worker وهمية
    ═══════════════════════════════════════════════════════════ */
-function makeWorker() {
+function makeWorker(fetchImpl) {
   /* بنصدّر الـdefault عن طريق eval — عشان الـworker موديل ESM
      و مفيش package type: module في المشروع.
      ⛔ بنحوّل `export default` لـ `module.exports` عشان new Function
@@ -49,8 +49,21 @@ function makeWorker() {
   const fn = new Function('module', 'exports', 'Request', 'Response',
     'Headers', 'URL', 'fetch', 'setTimeout', halanSrc + '\n' + body);
   fn(mod, mod.exports, Request, Response, Headers, URL,
-    globalThis.fetch, globalThis.setTimeout);
+    fetchImpl || defaultFetch, globalThis.setTimeout);
   return mod.exports;
+}
+
+/* 🐞🛡️ SEC-001 (الجولة ١٨) — موك افتراضي **آمن**
+   📌 البوابة بقت تستدعي صاحب الصلاحية (/api/auth/me) قبل الخدمة
+      ⇒ لازم كل اختبار يكون عنده موك (مافيش اتصال بالإنتاج أبداً).
+   📌 `defaultFetch` بيقبل أي جلسة ⇒ صفحة التطبيق بتتخدم (زي قبل كده). */
+function defaultFetch(target) {
+  const u = String(target);
+  const body = u.indexOf('/api/auth/me') > -1
+    ? '{"ok":true,"user":{"id":"u1"}}' : '{"ok":true}';
+  return Promise.resolve(new Response(body, {
+    status: 200, headers: { 'Content-Type': 'application/json' },
+  }));
 }
 
 /* طلب وهمية */
@@ -169,16 +182,18 @@ test('الـassets (js/css) بتتنفع من غير جلسة', async () => {
    ═══════════════════════════════════════════════════════════ */
 test('الـproxy بيبعت Authorization والكوكي وجسم الطلب', async () => {
   /* ⛔ الـmock لازم يتبعت *قبل* عمل الـworker — عشان الـworker
-     ياخد دالة fetch وقت الإنشاء. */
-  let seen = null;
-  globalThis.fetch = async (target, init) => {
-    seen = { target, init };
+     ياخد دالة fetch وقت الإنشاء.
+     🐞🛡️ SEC-001: البوابة بتسأل صاحب الصلاحية الأول ⇒ بنسجّل
+        كل النداءات ونختار نداء البيانات (مش نداء التحقق). */
+  const seenCalls = [];
+  const fetchImpl = async (target, init) => {
+    seenCalls.push({ target: String(target), init });
     return new Response('{"ok":true}', {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
   };
-  const w = makeWorker();
+  const w = makeWorker(fetchImpl);
   const env = { ASSETS: makeAssets(FILES) };
   const r = await w.fetch(req('https://octashares.com/api/chat', {
     method: 'POST',
@@ -190,7 +205,8 @@ test('الـproxy بيبعت Authorization والكوكي وجسم الطلب', 
     body: '{"q":"hi"}',
   }), env);
   assert.equal(r.status, 200);
-  assert.ok(seen.target.includes('/api/chat'), seen.target);
+  const seen = seenCalls.find((c) => c.target.includes('/api/chat'));
+  assert.ok(seen, 'مافيش نداء للبيانات: ' + JSON.stringify(seenCalls.map((c) => c.target)));
   assert.equal(seen.init.headers.get('Authorization'), 'Bearer TOK');
   assert.equal(seen.init.headers.get('Cookie'), 'octa_token=COOKIE');
   assert.equal(seen.init.headers.get('Content-Type'), 'application/json');
@@ -200,14 +216,14 @@ test('الـproxy بيبعت Authorization والكوكي وجسم الطلب', 
 });
 
 test('Set-Cookie بيرجع للصفحة (كوكي الجلسة)', async () => {
-  globalThis.fetch = async () => new Response('{"ok":true}', {
+  const fetchImpl = async () => new Response('{"ok":true}', {
     status: 200,
     headers: {
       'Content-Type': 'application/json',
       'Set-Cookie': 'octa_token=abc; HttpOnly; Secure; SameSite=Lax; Path=/',
     },
   });
-  const w = makeWorker();
+  const w = makeWorker(fetchImpl);
   const env = { ASSETS: makeAssets(FILES) };
   const r = await w.fetch(req('https://octashares.com/api/auth/pin/login', {
     method: 'POST', body: '{"pin":"1234"}',
@@ -219,23 +235,23 @@ test('Set-Cookie بيرجع للصفحة (كوكي الجلسة)', async () => {
 });
 
 test('الـproxy بيرجّع حالة الـAPI زي ما هي', async () => {
-  globalThis.fetch = async () => new Response('{"why":"unauthorized"}', {
+  const fetchImpl = async () => new Response('{"why":"unauthorized"}', {
     status: 401, headers: { 'Content-Type': 'application/json' },
   });
-  const w = makeWorker();
+  const w = makeWorker(fetchImpl);
   const env = { ASSETS: makeAssets(FILES) };
   const r = await w.fetch(req('https://octashares.com/api/prices'), env);
   assert.equal(r.status, 401);
 });
 
 test('الـquery string بيوصل للـAPI زي ما هو', async () => {
-  let seen = null;
-  globalThis.fetch = async (target) => {
-    seen = target;
+  const seenCalls = [];
+  const fetchImpl = async (target) => {
+    seenCalls.push(String(target));
     return new Response('{}', { status: 200,
       headers: { 'Content-Type': 'application/json' } });
   };
-  const w = makeWorker();
+  const w = makeWorker(fetchImpl);
   const env = { ASSETS: makeAssets(FILES) };
   /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ — ⛔ البوابة بقت تحمي مسارات /api ⬇️
      📌 ⇒ طلب من غير جلسة بيرجّع 401 قبل ما يوصل الـAPI ⬇️
@@ -243,7 +259,8 @@ test('الـquery string بيوصل للـAPI زي ما هو', async () => {
   await w.fetch(req('https://octashares.com/api/markets?market=egypt', {
     headers: { 'Cookie': 'octa_token=abc.def' },
   }), env);
-  assert.ok(seen && seen.includes('market=egypt'), seen);
+  const seen = seenCalls.find((u) => u.indexOf('/api/markets') > -1);
+  assert.ok(seen && seen.includes('market=egypt'), seenCalls.join(','));
 });
 
 /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · المراجعة الأمنية) — ⛔ توثيق ⬇️
@@ -252,8 +269,8 @@ test('الـquery string بيوصل للـAPI زي ما هو', async () => {
    📌 ⬇️ ⇒ ده **سلوك مقصود** (١٤ نوفمبر ٢٠٢٦) ⬇️ */
 test('⛔ /api من غير جلسة ⇒ 401 (البوابة على مستوى الـworker)', async () => {
   let called = 0;
-  globalThis.fetch = async () => { called++; return new Response('{}', { status: 200 }); };
-  const w = makeWorker();
+  const fetchImpl = async () => { called++; return new Response('{}', { status: 200 }); };
+  const w = makeWorker(fetchImpl);
   const env = { ASSETS: makeAssets(FILES) };
   const r = await w.fetch(req('https://octashares.com/api/prices'), env);
   assert.equal(r.status, 401);
@@ -312,19 +329,27 @@ test('⛔ سيرفر بطيء (٧ ثواني) ⇒ الـworker يرجّع ٢٠٠
   /* ⛔ ده هو سيناريو الـcold start بالظبط: السيرفر شغال بس بطيء.
      ⛔ الكود القديم (مهلة ٦ ثواني) كان بيقطع ويحوّل ل٥٠٢. */
   let calls = 0;
-  globalThis.fetch = (target, init) => new Promise((resolve, reject) => {
-    calls++;
-    const t = setTimeout(() => resolve(new Response('{"ok":true}', {
-      status: 200, headers: { 'Content-Type': 'application/json' },
-    })), 7000);
-    if (init && init.signal) {
-      init.signal.addEventListener('abort', () => {
-        clearTimeout(t);
-        reject(new Error('The operation was aborted'));
-      });
+  const fetchImpl = (target, init) => {
+    const u = String(target);
+    if (u.indexOf('/api/auth/me') > -1) {
+      return Promise.resolve(new Response('{"ok":true}', {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      }));
     }
-  });
-  const w = makeWorker();
+    return new Promise((resolve, reject) => {
+      calls++;
+      const t = setTimeout(() => resolve(new Response('{"ok":true}', {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      })), 7000);
+      if (init && init.signal) {
+        init.signal.addEventListener('abort', () => {
+          clearTimeout(t);
+          reject(new Error('The operation was aborted'));
+        });
+      }
+    });
+  };
+  const w = makeWorker(fetchImpl);
   const env = { ASSETS: makeAssets(FILES) };
   const t0 = Date.now();
   const r = await w.fetch(req('https://octashares.com/api/prices', {
@@ -338,12 +363,18 @@ test('⛔ سيرفر بطيء (٧ ثواني) ⇒ الـworker يرجّع ٢٠٠
 });
 
 test('السيرفر واقع فعلاً ⇒ ٥٠٢ بعد ٣ محاولات (مش indefinite)', async () => {
+  /* 🐞🛡️ SEC-001: التحقق من الجلسة بيفشل ⇒ الـworker **مش** بيمنح
+     وصول من تلقاء نفسه — الطلب بينزل عادي والباك هو اللي بيرفض.
+     ⛔ عدّ المحاولات = نداءات **البيانات** بس (مش نداء التحقق). */
   let calls = 0;
-  globalThis.fetch = async () => {
+  const fetchImpl = async (target) => {
+    if (String(target).indexOf('/api/auth/me') > -1) {
+      throw new Error('connection refused');
+    }
     calls++;
     throw new Error('connection refused');
   };
-  const w = makeWorker();
+  const w = makeWorker(fetchImpl);
   const env = { ASSETS: makeAssets(FILES) };
   const r = await w.fetch(req('https://octashares.com/api/prices', {
     headers: { 'Cookie': 'octa_token=abc.def' },
@@ -355,8 +386,14 @@ test('السيرفر واقع فعلاً ⇒ ٥٠٢ بعد ٣ محاولات (م
 });
 
 test('السيرفر بيرجّع ٥٠٠ مرتين وبعدين ٢٠٠ ⇒ الـworker بيرجّع ٢٠٠', async () => {
+  /* 🐞🛡️ SEC-001: الأخطاء دي على مسار **البيانات** (مش التحقق). */
   let calls = 0;
-  globalThis.fetch = async () => {
+  const fetchImpl = async (target) => {
+    if (String(target).indexOf('/api/auth/me') > -1) {
+      return new Response('{"ok":true}', {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    }
     calls++;
     if (calls < 3) return new Response('{"error":"boom"}', {
       status: 500, headers: { 'Content-Type': 'application/json' },
@@ -365,7 +402,7 @@ test('السيرفر بيرجّع ٥٠٠ مرتين وبعدين ٢٠٠ ⇒ ال
       status: 200, headers: { 'Content-Type': 'application/json' },
     });
   };
-  const w = makeWorker();
+  const w = makeWorker(fetchImpl);
   const env = { ASSETS: makeAssets(FILES) };
   const r = await w.fetch(req('https://octashares.com/api/prices', {
     headers: { 'Cookie': 'octa_token=abc.def' },

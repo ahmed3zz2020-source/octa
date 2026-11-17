@@ -660,12 +660,25 @@ function buildHeaders(request, env) {
   return h;
 }
 /* ══════════════════════════════════════════════════════════════
-   🍪 فيه جلسة ولا لأ؟
+   🍪🔐🍪 فيه جلسة صالحة ولا لأ؟ (الجولة ١٨ · SEC-001 · P1)
    ───────────────────────────────────────────────────────────
-   ⛌ بنفحص **وجود** الكوكي بس — مش صحته.
-   ⛌ الـworker مش بيقدر يفكّ التوقيع (السر عند الباك).
-   ⛌ ⇒ لو الكوكي forged ⇒ الـworker هيقدّم التطبيق… والباك
-   ⛌   هيرفض كل طلب بيانات (401). يعني: مفيش تسريب.
+   ⛔⛔⛔ العيب القديم (المُبلَّغ عنه في المراجعة) ⬇️
+   ⛌ `hasSession()` كانت بتعتبر «كوكي octa_token غير فارغ» = **جلسة
+   ⛌ صالحة** ⇒ أي كوكي عشوائي كان يعدّي البوابة — وبتخدم
+   ⛌ مسارات الـAPI من غير ما يتحقق حد من التوقيع أو الصلاحية.
+   📌 الحقيقة (مُثبتة بالكود — update_prices.py):
+   ⛌ · التوكن = `payload.HMAC-SHA256(سر)` والسر (`OCTAD_TOKEN_SECRET`)
+   ⛌   موجود عند **الباك** بس ⇒ الـworker **مش** بيقدر يفكّ التوقيع.
+   ⛌ · صاحب الصلاحية = الباك ⇒ البوابة تطلبه **الحكم** قبل الخدمة.
+   ✅ الحل (هنا):
+   ⛔ ① البوابة ما تعتمدش على «وجود» الكوكي — ولا على وحده.
+   ⛔ ② التحقق **قبل** الخدمة (قبل أي معالج/أي بيانات).
+   ⛔ ③ fail-closed على **الحكم**:
+      ⛌  · «مرفوض» (كوكي مزيّف/منتهي) ⇒ 401 قبل الخدمة + مسح الكوكي.
+      ⛌  · «مقدرناش نتحقق» (الباك واقع) ⇒ صفحة التطبيق بتتقفل (الصفحة
+      ⛌    العامة بدلها)؛ ومسارات الـAPI بتنزل عادي والباك **هو** اللي
+      ⛌    بيرفض (٥٠٢) ⇒ مفيش بيانات بتتخدم من غير جلسة متأكَّد منها.
+      ⛌    (الـworker نفسه ما بيقدّمش بيانات مستخدم من غير الباك.)
    ═══════════════════════════════════════════════════════════ */
 /* ══════════════════════════════════════════════════════════════
   🔐 ١٤ نوفمبر ٢٠٢٦ — المسارات العامة (اللي بتقبل زائر من غير جلسة)
@@ -687,20 +700,132 @@ function isPublicApi(path) {
   return false;
 }
 
-function hasSession(request) {
+/* 🛑 بنجيب قيمة كوكي الجلسة (مش بس «موجود» ولا «فاضي») */
+function sessionCookie(request) {
   try {
     const c = request.headers.get('Cookie') || '';
-    if (!c) return false;
+    if (!c) return '';
     const parts = c.split(';');
     for (let i = 0; i < parts.length; i++) {
       const p = parts[i].trim();
       if (p.indexOf(SESSION_COOKIE + '=') === 0) {
-        const v = p.slice(SESSION_COOKIE.length + 1);
-        if (v) return true;
+        const v = p.slice(SESSION_COOKIE.length + 1).trim();
+        if (v) return v;
       }
     }
   } catch (e) { }
-  return false;
+  return '';
+}
+
+/* 🛑 نفس منطق الباك (_bearer) بالظبط ⬇️
+   📌 الـBearer هو الأساس · الكوكي fallback للقراءة بس
+   📌 (استثناء واحد: POST /api/auth/logout — عشان «تنظيف الموقع»)
+   ⛔ لازم يتطابق مع update_prices.py ⇒ نفس النتيجة للمستخدم بالظبط
+   ⛌   (مفيش رفض ظالم لمستخدم شرعي، ومفيش قبول لكوكي مزيّف). */
+function sessionCredential(request, pathname) {
+  try {
+    const a = request.headers.get('Authorization') || '';
+    if (a.toLowerCase().indexOf('bearer ') === 0) {
+      const t = a.slice(7).trim();
+      if (t) return { token: t, via: 'header' };
+    }
+  } catch (e) { }
+  const m = String(request.method || 'GET').toUpperCase();
+  const p = String(pathname || '');
+  const cookieOk = (m === 'GET' || m === 'HEAD' || m === 'OPTIONS')
+    || (m === 'POST' && p === '/api/auth/logout');
+  if (cookieOk) {
+    const ck = sessionCookie(request);
+    if (ck) return { token: ck, via: 'cookie' };
+  }
+  return null;
+}
+
+/* 🛑 هاش قصير للتوكن (مفتاح الكاش جوه الـisolate)
+   ⛔ مافيش التوكن الخام في الذاكرة ولا في المفتاح. */
+function sessionHash(tok) {
+  try {
+    const s = String(tok || '');
+    let a = 5381, b = 52711;
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charCodeAt(i);
+      a = ((a << 5) + a + c) >>> 0;   /* djb2 */
+      b = (((b << 5) + b) ^ c) >>> 0; /* sdbm-xor */
+    }
+    return a.toString(16) + '-' + b.toString(16) + '-' + s.length;
+  } catch (e) { return 'x'; }
+}
+
+/* ⏱ مدد الأحكام المخزّنة داخل الـisolate (بالمللي) */
+const SESSION_OK_TTL_MS = 300000;   /* ٥ دقايق — جلسة متأكَّد منها */
+const SESSION_NO_TTL_MS = 30000;    /* ٣٠ ثانية — جلسة مرفوضة */
+/* ⛔ الأحكام تُخزَّن بالهاش (مش بالتوكن) · والحد الأقصى ٥٠٠ مفتاح */
+const SESSION_VERDICTS = {};
+let SESSION_VERDICT_KEYS = [];
+
+/* 🛑 الحكم من صاحب الصلاحية (الباك — هو اللي عنده سر التوقيع)
+   📌 بنطلب /api/auth/me بنفس بيانات الاعتماد ⇒ نفس الفيصل في الباك.
+   ⛔ أي حالة مش «صالح» ⇒ مرفوض (fail-closed). */
+async function askSessionAuthority(cred, env) {
+  const target = API || API_DIRECT_FIRST;
+  if (!target) return { ok: false, state: 'unknown', why: 'no_api' };
+  try {
+    const h = new Headers();
+    h.set('Accept', 'application/json');
+    if (cred.via === 'header') h.set('Authorization', 'Bearer ' + cred.token);
+    else h.set('Cookie', SESSION_COOKIE + '=' + cred.token);
+    const ps = env && env.OCTA_PROXY_SECRET;
+    if (ps) h.set('X-OCTA-Proxy', ps);
+    const r = await fetch(target + '/api/auth/me', {
+      method: 'GET',
+      headers: h,
+      signal: AbortSignal.timeout(PROXY_TIMEOUT_FIRST_MS)
+    });
+    if (r.status === 200) return { ok: true, state: 'valid', via: cred.via };
+    if (r.status === 401 || r.status === 403) {
+      return { ok: false, state: 'invalid', via: cred.via, why: 'http_' + r.status };
+    }
+    return { ok: false, state: 'unknown', via: cred.via, why: 'http_' + r.status };
+  } catch (e) {
+    return { ok: false, state: 'unknown', via: cred.via, why: 'unreachable' };
+  }
+}
+
+/* 🛑 التحقق من الجلسة — قبل الخدمة
+   📌 anon   = مافيش بيانات اعتماد أصلاً (زائر مجهول)
+   📌 valid  = الباك أكّد إن الجلسة صالحة
+   📌 invalid= الباك رفض الجلسة (كوكي مزيّف / منتهي / ملغى)
+   📌 unknown= ماقدرناش نتحقق (الباك واقع) ⇒ fail-closed */
+async function verifySession(request, env, pathname) {
+  const cred = sessionCredential(request, pathname);
+  if (!cred) return { ok: false, state: 'anon', via: 'none' };
+  const key = sessionHash(cred.token);
+  const now = Date.now();
+  const cached = SESSION_VERDICTS[key];
+  if (cached && now < cached.until) return cached.verdict;
+  const v = await askSessionAuthority(cred, env);
+  const ttl = v.ok ? SESSION_OK_TTL_MS
+    : (v.state === 'invalid' ? SESSION_NO_TTL_MS : 0);
+  if (ttl > 0) {
+    SESSION_VERDICTS[key] = { until: now + ttl, verdict: v };
+    SESSION_VERDICT_KEYS.push(key);
+    while (SESSION_VERDICT_KEYS.length > 500) {
+      const old = SESSION_VERDICT_KEYS.shift();
+      try { delete SESSION_VERDICTS[old]; } catch (e) { }
+    }
+  }
+  return v;
+}
+
+/* 🛑 حكم واحد لكل طلب (مش تكرار) — الـWeakMap بيتمسح لوحده */
+const SESSION_BY_REQUEST = new WeakMap();
+async function sessionVerdict(request, env, pathname) {
+  let p = SESSION_BY_REQUEST.get(request);
+  if (!p) {
+    p = verifySession(request, env, pathname);
+    SESSION_BY_REQUEST.set(request, p);
+  }
+  return p;
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -1223,21 +1348,43 @@ async function handle(request, env, ctx) {
         }
       });
     }
+    /* 🐞🛡️ SEC-001 (الجولة ١٨ · P1) — بوابة الـAPI: حكم **حقيقي**
+       ───────────────────────────────────────────────────────────
+       📌 كان: «كوكي غير فارغ» = جلسة ⇒ أي كوكي عشوائي يعدّي ⛔
+       📌 دلوقتي: الحكم من صاحب الصلاحية (الباك — عنده سر التوقيع)
+          ⛔ قبل الخدمة (قبل أي معالج) · ⛔ fail-closed على الحكم.
+       📌 «مفيش جلسة» و«جلسة مرفوضة» ⇒ 401 (زي ما قبل كده).
+       📌 «مقدرناش نتحقق» (الباك واقع) ⇒ الطلب بينزل عادي والباك
+          نفسه هو اللي بيرفض ⇒ **ما فيش بيانات بتتسرب** (مفيش
+          بيانات مستخدم بتتخدم من الـworker أصلاً). */
     if (url.pathname.startsWith('/api/') && request.method !== 'OPTIONS'
-      && !isPublicApi(url.pathname) && !hasSession(request)) {
-      return new Response(JSON.stringify({
-        ok: false,
-        error: 'تسجيل الدخول مطلوب',
-        hint: 'سجّل دخول أو اعمل حساب من البوابة، وبعدها افتح تاني',
-        code: 'auth_required'
-      }), {
-        status: 401,
-        headers: {
+      && !isPublicApi(url.pathname)) {
+      const sess = await sessionVerdict(request, env, url.pathname);
+      if (sess.state === 'anon' || sess.state === 'invalid') {
+        const ah = {
           'Content-Type': 'application/json; charset=utf-8',
           'Cache-Control': 'no-store',
           'X-OCTA-Auth': 'required'
+        };
+        /* ⛔ كوكي مرفوض ⇒ نمسحه من المتصفح (يوقف الإرسال) */
+        if (sess.state === 'invalid' && sess.via === 'cookie') {
+          ah['Set-Cookie'] = SESSION_COOKIE + '=; Path=/; Max-Age=0; SameSite=None; Secure';
         }
-      });
+        return new Response(JSON.stringify({
+          ok: false,
+          error: 'تسجيل الدخول مطلوب',
+          hint: 'سجّل دخول أو اعمل حساب من البوابة، وبعدها افتح تاني',
+          code: 'auth_required'
+        }), {
+          status: 401,
+          headers: ah
+        });
+      }
+      if (sess.state === 'unknown') {
+        try {
+          console.warn('[gate] التحقق من الجلسة مش متاح — الباك هو اللي هيحكم');
+        } catch (e) { }
+      }
     }
 
     if (url.pathname === '/api/tvscan' && env && env.OCTA_TV_PROXY === 'on') {
@@ -2220,7 +2367,7 @@ async function handle(request, env, ctx) {
        ⛌ صفحة البوابة نفسها متاحة دايماً على /gate.html. */
     const GATE_ON = !(env && env.OCTA_GATE === 'off');
     const isGatePage = GATE_ON && GATE_PAGES.indexOf(url.pathname) !== -1;
-    if (isGatePage && !hasSession(request)) {
+    if (isGatePage && !(await sessionVerdict(request, env, url.pathname)).ok) {
       /* ════════════════════════════════════════════════════════════
       🌍 ٩ نوفمبر ٢٠٢٦ — ⭐ الواجهة العامة = فلتر السوق
       ────────────────────────────────────────────────────────────────
@@ -2266,7 +2413,7 @@ async function handle(request, env, ctx) {
     📌 ⛌ ⛌ ⇒ والمستخدم المسجّل بياخد 404 على '/' ⇒ الموقع مش بيفتح!
     📌 ✅ الحل: نعمل fetch لـ'/index.html' مباشرة.
     */
-    if (url.pathname === '/' && hasSession(request)) {
+    if (url.pathname === '/' && (await sessionVerdict(request, env, url.pathname)).ok) {
       try {
         const idxUrl = new URL('/index.html', url);
         const idx = await env.ASSETS.fetch(new Request(idxUrl.toString(), request));
@@ -2343,7 +2490,8 @@ async function handle(request, env, ctx) {
     /* ⭐ 'watchlist' مش في السكربت ⇒ مسار ميت ⇒ شِلنّاه (مفيش صفحة watchlist). */
     if (SPA_ROUTES.indexOf(url.pathname) !== -1) {
       /* 🌍 الزائر المجهول على /markets ⇒ صفحة الفلتر العامة (مش التطبيق) */
-      if (!hasSession(request) && (url.pathname === '/markets' || url.pathname === '/stocks')) {
+      if (!(await sessionVerdict(request, env, url.pathname)).ok
+        && (url.pathname === '/markets' || url.pathname === '/stocks')) {
         try {
           const pubUrl = new URL('/market.html', url);
           const pub = await env.ASSETS.fetch(new Request(pubUrl.toString(), request));

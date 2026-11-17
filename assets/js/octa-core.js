@@ -1911,12 +1911,14 @@ function renderAiError(code, msg) {
   const barsEl = document.getElementById('engineBars');
   const dec = document.getElementById('engineDecision');
   if (barsEl) {
+  /* 🐞🛡️ SEC-024 (الجولة ١٨ · P1) — ⛔ رسالة الخطأ جاية من الـAPI ⬇️
+     📌 قبل: `${String(msg)}` خام + `${code}` جوّه onclick ⛔ */
   barsEl.innerHTML = `
   <div style="text-align:center;padding:20px 16px;background:rgba(255,82,82,0.06);border:1px solid var(--red);border-radius:12px;">
   <div style="font-size:1.6rem;">⚠️</div>
   <div style="color:var(--red2);font-weight:800;margin-top:8px;">تعذر تحميل تحليل AI</div>
-  <div style="color:var(--muted);font-size:0.76rem;margin-top:6px;direction:ltr;">${String(msg).slice(0, 80)}</div>
-  <button onclick="AI_LOADING=false; fetchAiAnalysis('${code}')" style="margin-top:12px;background:rgba(212,175,55,0.2);color:var(--gold);padding:8px 18px;border-radius:100px;border:1px solid var(--gold);font-weight:700;font-size:0.82rem;cursor:pointer;">🔄 جرّب تاني</button>
+  <div style="color:var(--muted);font-size:0.76rem;margin-top:6px;direction:ltr;">${octaEsc(String(msg).slice(0, 80))}</div>
+  <button onclick="AI_LOADING=false; fetchAiAnalysis('${octaEsc(code)}')" style="margin-top:12px;background:rgba(212,175,55,0.2);color:var(--gold);padding:8px 18px;border-radius:100px;border:1px solid var(--gold);font-weight:700;font-size:0.82rem;cursor:pointer;">🔄 جرّب تاني</button>
   </div>`;
   }
   if (dec) dec.innerHTML = `<div style="text-align:center;color:var(--muted);font-size:0.8rem;padding:10px;">⏳ محرك OCTA بيحلل — استنى — استنى أو اضغط Retry</div>`;
@@ -3076,28 +3078,33 @@ function searchStock(query) {
   `;
   
   setTimeout(() => {
+  /* 🐞🛡️ SEC-024 (الجولة ١٨ · P1) — ⛔ reflected XSS ⬇️
+     📌 `displayName` = اسم السهم من الداتا **أو** نص البحث بتاع المستخدم
+        (لما مفيش تطابق ⇒ q.toUpperCase() بيرجع خام) ⛔
+     📌 قبل: `${displayName}` خام ⇒ أي HTML من شريط البحث بيتنفّذ.
+     📌 دلوقتي: octaEsc() على كل قيمة. */
   result.innerHTML = `
   <div class="search-result-card">
   <div class="result-header">
-  <h3 class="result-title">${displayName}</h3>
-  <p class="result-subtitle">${stock ? stock.sector : 'غير محدد'} • ${tvSymbol}</p>
+  <h3 class="result-title">${octaEsc(displayName)}</h3>
+  <p class="result-subtitle">${octaEsc(stock ? stock.sector : 'غير محدد')} • ${octaEsc(tvSymbol)}</p>
   </div>
   <div class="result-section">
   <h4 class="result-section-title">💰 السعر والمعلومات</h4>
   <div class="tradingview-widget-container" style="min-height: 200px;">
-  <div id="sr-symbol-info-${tvSymbol}"></div>
+  <div id="sr-symbol-info-${octaEsc(tvSymbol)}"></div>
   </div>
   </div>
   <div class="result-section">
   <h4 class="result-section-title">🧠 التحليل الفني</h4>
   <div class="tradingview-widget-container" style="min-height: 480px;">
-  <div id="sr-tech-analysis-${tvSymbol}"></div>
+  <div id="sr-tech-analysis-${octaEsc(tvSymbol)}"></div>
   </div>
   </div>
   <div class="result-section">
   <h4 class="result-section-title">📊 الرسم البياني التفاعلي</h4>
   <div class="tradingview-widget-container" style="min-height: 600px;">
-  <div id="sr-advanced-chart-${tvSymbol}"></div>
+  <div id="sr-advanced-chart-${octaEsc(tvSymbol)}"></div>
   </div>
   </div>
   </div>
