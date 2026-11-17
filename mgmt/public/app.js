@@ -77,10 +77,18 @@
   function pullRemote(path) {
     return fetch(API + encodeURIComponent(path), { cache: 'no-store', credentials: 'same-origin' })
       .then(function (r) {
-        if (r.status === 401) { showLogin(); throw new Error('انتهت الجلسة'); }
+        /* ⛔ رفض صريح ⇒ الجلسة اتقفلت فعلاً ⇒ تنظيف + صفحة دخول */
+        if (r.status === 401) { clearSensitive(); showLogin(); throw new Error('انتهت الجلسة'); }
         if (r.status === 204) return null;   /* ⛔ 204 = المسار لسه مش مفعّل */
+        /* ⛔ 429/403/503 ⇒ خطأ مؤقّت أو صلاحية ⇒ ⛔ مافيش logout
+           (الجلسة سليمة — غيرها بتعيد المحاولة) */
         if (!r.ok) throw new Error(path + ' → HTTP ' + r.status);
         return r.json();
+      })
+      /* ⛔ رد مش JSON (استجابة غير صالحة) ⇒ خطأ واضح — ⛔ مافيش logout */
+      .catch(function (e) {
+        if (e && e.name === 'SyntaxError') throw new Error(path + ' → رد غير صالح');
+        throw e;
       });
   }
 
@@ -384,18 +392,29 @@
       }
     });
 
-    /* فحص الجلسة */
-    fetch('/api/session', { credentials: 'same-origin' })
-      .then(function (r) {
-        var ok = r.ok;
-        if (window.Panel) window.Panel.setData({ session: { ok: ok } });
-        /* ⛔ R18-A07 — ⛔ رفض الجلسة (401) ⇒ ⛔ ممنوع عرض أي بيانات
-           إدارة (محلية أو أوفلاين) ⇒ تنظيف كامل + صفحة الدخول. */
-        if (!ok) { maybeOffline(); return; }
-        boot2();
-      })
-      /* ⛔ انقطاع الشبكة ⛔ ممنوع يعرض بيانات مخزّنة (حسّاسة) */
-      .catch(function () { maybeOffline(); });
+    /* ⛔ فحص الجلسة — ⛔ الجولة ١٩ (المرحلة ٢): ⛔ **انقطاع الشبكة ⛔ ممنوع
+       يمسح جلسة المستخدم** (خطأ شبكة مش رفض جلسة).
+       ⛔ الفرق بين الحالتين:
+         · رفض صريح (401) ⇒ تنظيف + صفحة دخول (R18-A07)
+         · فشل شبكة ⇒ رسالة + إعادة محاولة + ⛔ الجلسة زي ما هي. */
+    var sessionCheck = function () {
+      fetch('/api/session', { credentials: 'same-origin' })
+        .then(function (r) {
+          var ok = r.ok;
+          if (window.Panel) window.Panel.setData({ session: { ok: ok } });
+          /* ⛔ R18-A07 — ⛔ رفض الجلسة (401) ⇒ ⛔ ممنوع عرض أي بيانات
+             إدارة (محلية أو أوفلاين) ⇒ تنظيف كامل + صفحة الدخول. */
+          if (!ok) { maybeOffline(); return; }
+          boot2();
+        })
+        /* ⛔ انقطاع الشبكة ⛔ مافيش logout ولا مسح بيانات */
+        .catch(function () {
+          setStatus('مفيش اتصال بالسيرفر — بنحاول تاني', 'err');
+          toast('⚠️ مفيش اتصال — الجلسة زي ما هي', 'err');
+          setTimeout(sessionCheck, 5000);
+        });
+    };
+    sessionCheck();
 
     registerSW();
 
