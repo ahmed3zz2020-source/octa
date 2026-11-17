@@ -11,8 +11,8 @@
    ⛔ ٣) التثبيت ما بيفشلش لو بعض الملفات محمية (بالجلسة) ⇒ كل ملف لوحده.
    ══════════════════════════════════════════════════════════════════════ */
 
-const VERSION = 'octa-mgmt-v2.2.0';
-/* ⛔ ملاحظة: '/' و '/index.html' مش في الكاش وقت التثبيت (محميين بجلسة،
+const VERSION = 'octa-mgmt-v2.3.0';
+/* ⛔ ملاحظة: '/' و '/index.html' **مش** في الكاش وقت التثبيت (محميين بجلسة،
    والتثبيت من غير جلسة كان بيفشل) — بس بيتخزّنوا بعد أول تحميل ناجح. */
 const SHELL = [
   '/app.js',
@@ -24,8 +24,14 @@ const SHELL = [
   '/icons/icon-maskable-512.png',
   '/icons/favicon.png'
 ];
-/* ⛔ بيتخزّن بعد نجاح الطلب: الصفحة + الأصول (عشان وضع الأوفلاين يشتغل) */
-const CACHEABLE = SHELL.concat(['/', '/index.html']);
+/* 🛡️ الجولة ١٩ (R18-A03) — ⛔ القشرة المحمية (index.html) **ما بتتخزّنش**:
+   ⛔ قبل كده: CACHEABLE كان فيه '/' و '/index.html' ⇒ المتصفح خزّن نسخة
+      من لوحة الإدارة ⇒ أي حد يفتح الجهاز (أو أي زائر) كان يشوفها
+      من الكاش — والـfallback كان بيرجّعها حتى بعد رفض الجلسة.
+   ⛔ دلوقتي: بس ملفات التطبيق الثابتة (JS/CSS/أيقونات) هي اللي بتتخزّن. */
+const CACHEABLE = SHELL.slice();
+/* ⛔ مسارات محمية ⇒ ممنوعة في الكاش (وده بنمسحها من الكاش القديم) */
+const NEVER_CACHE = ['/', '/index.html', '/login.html'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
@@ -40,6 +46,16 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      /* 🛡️ R18-A03 — تنظيف الكاش التاريخي: نشيل أي نسخة مخزّنة
+         من القشرة المحمية (من نسخ سابقة) */
+      .then(() => caches.open(VERSION))
+      .then((c) => c.keys())
+      .then((keys) => Promise.all(keys.map((r) => {
+        try {
+          const p = new URL(r.url).pathname;
+          return NEVER_CACHE.includes(p) ? c.delete(r) : null;
+        } catch (e) { return null; }
+      })))
       .then(() => self.clients.claim())
   );
 });
@@ -75,7 +91,9 @@ self.addEventListener('fetch', (e) => {
   /* ⛔ أي أصل تاني (Railway مثلاً) — من غير تدخل */
   if (!sameOrigin) return;
 
-  /* ⛔ ملفات التطبيق: الشبكة الأول، فالـcache */
+  /* ⛔ ملفات التطبيق: الشبكة الأول، فالـcache
+     ⛔ R18-A03: ⛔ مافيش fallback على نسخة القشرة المخزّنة (قشرة محمية)
+        ⇒ الفشل => ردّ صريح (فشل مغلق) بدل عرض لوحة قديمة. */
   e.respondWith(
     fetch(req)
       .then((res) => {
@@ -87,6 +105,9 @@ self.addEventListener('fetch', (e) => {
         }
         return res;
       })
-      .catch(() => caches.match(req).then((hit) => hit || caches.match('/index.html')))
+      .catch(() => caches.match(req).then((hit) => hit || new Response(
+        'مفيش اتصال — افتح اللوحة من جديد بعد ما الشبكة ترجع',
+        { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } }
+      )))
   );
 });

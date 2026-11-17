@@ -51,16 +51,26 @@
     return 'منذ ' + Math.floor(s / 86400) + ' يوم';
   }
 
-  /* ══ لقطة محلية (تشتغل أوفلاين) ══ */
+  /* ══ ⛔ الجولة ١٩ (R18-A07) — البيانات الحسّاسة ⛔ ══
+     ⛔ قبل كده: اللوحة كانت بتخزّن **نسخة كاملة** من بيانات الإدارة
+        (إيميلات + متابعات + أسعار) في localStorage، وبتعرضها لو الجلسة
+        اترفضت أو النت ققط ⇒ أي حد يفتح الجهاز كان بيشوف بيانات إدارة.
+     ⛔ دلوقتي: ⛔ مافيش تخزين محلي للبيانات الحسّاسة إطلاقًا،
+        ⛔ ورفض الجلسة (401) ⇒ تنظيف + رجوع لصفحة الدخول (مافيش عرض). */
+  function clearSensitive() {
+    try { localStorage.removeItem(LS_SNAP); } catch (e) { }
+    try { localStorage.removeItem('octa_mgmt_audit'); } catch (e) { }
+    try { window.D = null; } catch (e) { }
+    state.offline = false;
+  }
   function saveSnap() {
-    try { localStorage.setItem(LS_SNAP, JSON.stringify({ ts: Date.now(), data: window.D })); } catch (e) { }
+    /* ⛔ مافيش حفظ — واللقطة القديمة (لو موجودة) بتتشال */
+    try { localStorage.removeItem(LS_SNAP); } catch (e) { }
   }
   function loadSnap() {
-    try {
-      var raw = localStorage.getItem(LS_SNAP);
-      if (!raw) return null;
-      return JSON.parse(raw);
-    } catch (e) { return null; }
+    /* ⛔ مافيش لقطة محلية — اللوحة دايماً من السيرفر */
+    try { localStorage.removeItem(LS_SNAP); } catch (e) { }
+    return null;
   }
 
   /* ══ الشبكة ══ */
@@ -328,17 +338,16 @@
   }
 
   /* ══ الإقلاع ══ */
-  /* ⛔ أوفلاين: لو فيه لقطة محفوظة ⇒ اعرضها بدل ما تطلب دخول */
+  /* ⛔ الجولة ١٩ (R18-A07) — ⛔ رفض الجلسة ⇒ ⛔ ممنوع عرض أي بيانات
+     إدارة مخزّنة (ولا حتى أوفلاين) ⇒ تنظيف + صفحة الدخول.
+     ⛔ الدالة **مستقلة تماماً** (من غير أي اعتماد على متغيّر خارجي)
+        عشان تُختبر لوحدها. */
   function maybeOffline() {
-    var snap = loadSnap();
-    if (snap && snap.data) {
-      state.offline = true;
-      boot2(true);
-      toast('📴 أوفلاين — بتعرض آخر نسخة محفوظة على جهازك', 'warn', 6000);
-      setStatus('أوفلاين — آخر نسخة محفوظة', '');
-    } else {
-      showLogin('اكتب كلمة المرور');
-    }
+    try { localStorage.removeItem(LS_SNAP); } catch (e) { }
+    try { localStorage.removeItem('octa_mgmt_audit'); } catch (e) { }
+    try { window.D = null; } catch (e) { }
+    try { state.offline = false; } catch (e) { }
+    showLogin('اكتب كلمة المرور');
   }
 
   function boot2(offlineMode) {
@@ -346,19 +355,16 @@
     state.ready = true;
     document.body.classList.add('ready');
     var snap = loadSnap();
-    if (snap && snap.data) {
-      window.D = snap.data;
-      if (typeof window.renderAll === 'function') window.renderAll();
-      state.lastSync = snap.ts || 0;
-      if (!offlineMode) toast('📦 لقطة محفوظة (' + fmtAgo(state.lastSync) + ') — جاري التحديث', 'warn', 5000);
-    }
+    /* ⛔ R18-A07 — ⛔ مافيش عرض لأي لقطة محلية (البيانات دايماً من السيرفر):
+       ⛔ البيانات الحسّاسة (إيميلات/متابعات) ما تتخزّنش على الجهاز
+          ولا تُعرض بعد رفض الجلسة. */
+    try { clearSensitive(); } catch (e) { }
     if (!offlineMode) {
-      pull(true).then(function () { if (snap) toast('✅ اتحدّثت من السيرفر', 'ok'); });
+      pull(true);
     }
     startTimer();
     paintLive();
   }
-
   function boot() {
     /* التفضيلات */
     try {
@@ -383,8 +389,12 @@
       .then(function (r) {
         var ok = r.ok;
         if (window.Panel) window.Panel.setData({ session: { ok: ok } });
-        return ok ? boot2() : maybeOffline();
+        /* ⛔ R18-A07 — ⛔ رفض الجلسة (401) ⇒ ⛔ ممنوع عرض أي بيانات
+           إدارة (محلية أو أوفلاين) ⇒ تنظيف كامل + صفحة الدخول. */
+        if (!ok) { maybeOffline(); return; }
+        boot2();
       })
+      /* ⛔ انقطاع الشبكة ⛔ ممنوع يعرض بيانات مخزّنة (حسّاسة) */
       .catch(function () { maybeOffline(); });
 
     registerSW();

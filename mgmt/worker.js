@@ -32,7 +32,31 @@ const ORIGIN = "https://octa-prices-production-4ccb.up.railway.app";
 /* ⭐ كاش التفضيلات (في الذاكرة) — ٣٠ دقيقة */
 let PREFS_CACHE = null;
 const COOKIE = "octa_mgmt_sess";
-const SESSION_TTL = 60 * 60 * 24 * 30; // ٣٠ يوم
+/* 🛡️ الجولة ١٩ (R18-A01) — عمر الجلسة **محدّد** (كان ٣٠ يوم ⛔ نافذة تعرّض طويلة) */
+const SESSION_TTL = 8 * 60 * 60; // ٨ ساعات
+/* ⛔ التدوير: لو الج-session على وشك الانتهاء ⇒ يُصدرنا جلسة جديدة (النسخة المنسوخة ما بتتجدّدش) */
+const RENEW_BEFORE = 2 * 60 * 60; // ساعتين
+/* 🛡️ الجولة ١٩ (R18-A01) — إبطال **من جهة السيرفر**:
+   ⛔ قبل كده: الخروج كان بيمسح الكوكي في المتصفح بس ⇒ أي نسخة منسوخة
+      كانت سليمة ٣٠ يوم! ⇒ دلوقتي الخادم نفسه بيبطل الجلسة فورًا. */
+const REVOKED = new Map(); // raw ← وقت انتهاء الإبطال
+
+function revokeSession(raw) {
+  if (!raw) return;
+  REVOKED.set(raw, Date.now() + SESSION_TTL * 1000);
+  /* ⛔ تنظيف دوري (ما يكبرش الكاش) */
+  if (REVOKED.size > 2000) {
+    const now = Date.now();
+    for (const [k, t] of REVOKED) if (t < now) REVOKED.delete(k);
+  }
+}
+
+function isRevoked(raw) {
+  const t = REVOKED.get(raw);
+  if (!t) return false;
+  if (t < Date.now()) { REVOKED.delete(raw); return false; }
+  return true;
+}
 
 /* 🛡️ الجولة ١٨ — الأخطاء: رسالة عامة للمستخدم + تفصيل في لوج الـWorker فقط */
 const ERR_UPSTREAM = "تعذّر الوصول للسيرفر — جرّب تاني بعد شوية";
@@ -91,7 +115,15 @@ function parseCookies(req) {
   const out = {};
   (req.headers.get("Cookie") || "").split(";").forEach((p) => {
     const i = p.indexOf("=");
-    if (i > 0) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim());
+    if (i <= 0) return;
+    const k = p.slice(0, i).trim();
+    const v = p.slice(i + 1).trim();
+    if (!k) return;
+    /* 🛡️ الجولة ١٩ (R18-A04) — كوكي بترميز غير صالح (مثل %ZZ) كان
+       بيسبب استثناء غير معالج ⇒ 500. دلوقتي: نتجاهل الكوكي الغلط
+       ⇒ المتصفح بياخد 401 مضبوط (مش خطأ سيرفر). */
+    try { out[k] = decodeURIComponent(v); }
+    catch (e) { /* ⛔ كوكي تالف ⇒ نتجاهله */ }
   });
   return out;
 }
@@ -115,6 +147,8 @@ async function validSession(req, secret) {
   if (!secret) return false;
   const raw = parseCookies(req)[COOKIE];
   if (!raw) return false;
+  /* 🛡️ الجولة ١٩ (R18-A01) — جلسة مُبطلة من جهة السيرفر ⇒ مرفوضة */
+  if (isRevoked(raw)) return false;
   const dot = raw.lastIndexOf(".");
   if (dot < 1) return false;
   const exp = raw.slice(0, dot);
@@ -122,6 +156,41 @@ async function validSession(req, secret) {
   if (Number(exp) < Date.now()) return false;
   const expect = await sign(exp, secret);
   return timingSafeEqual(sig, expect);
+}
+
+/* 🛡️ الجولة ١٩ (R18-A01) — التدوير: جلسة جديدة قبل الانتهاء بساعتين.
+   ⛔ النسخة المنسوخة ما بتتجدّدش (المتصفح بس بياخد الكوكي الجديد). */
+async function sessionRenewHeader(req, secret) {
+  if (!secret) return {};
+  const raw = parseCookies(req)[COOKIE];
+  if (!raw || isRevoked(raw)) return {};
+  const dot = raw.lastIndexOf(".");
+  if (dot < 1) return {};
+  const exp = Number(raw.slice(0, dot));
+  if (!exp || !isFinite(exp)) return {};
+  if (exp - Date.now() > RENEW_BEFORE * 1000) return {};
+  const sess = await makeSession(secret);
+  return {
+    "Set-Cookie": `${COOKIE}=${encodeURIComponent(sess)}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL}`,
+  };
+}
+
+/* 🛡️ الجولة ١٩ (R18-A02) — الأصول المحمية ⇒ **no-store/private**.
+   ⛔ قبل كده: ردّ الـASSETS كان بيعدّي كما هو ⇒ «Cache-Control: public» ⇒
+      متصفّح/وسيط مشترك ممكن يخزّن لوحة الإدارة في كاش مشترك. */
+function protectedResponse(res) {
+  try {
+    const h = new Headers(res.headers);
+    h.set("Cache-Control", "no-store, private");
+    h.set("Pragma", "no-cache");
+    h.set("Vary", "Cookie");
+    return new Response(res.body, {
+      status: res.status, statusText: res.statusText, headers: h,
+    });
+  } catch (e) {
+    /* ⛔ لو مش قادرين نلفّ ⇒ نرجّع 401 بدل ما نسيب رد بلا كاش-كونترول */
+    return json({ ok: false, error: ERR_AUTH }, 401);
+  }
 }
 
 /* ── محدّد محاولات الدخول (حماية من التخمين) ── */
@@ -294,6 +363,10 @@ export default {
 
       /* ── خروج ── */
       if (path === "/api/logout" && request.method === "POST") {
+        /* 🛡️ الجولة ١٩ (R18-A01) — إبطال من جهة السيرفر:
+           ⛔ قبل كده كان بينظّف الكوكي في المتصفح بس ⇒ أي نسخة منسوخة
+              كانت بتفضل صالحة. دلوقتي: السيرفر نفسه بيبطلها فورًا. */
+        revokeSession(parseCookies(request)[COOKIE]);
         return json({ ok: true }, 200, {
           "Set-Cookie": `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`,
         });
@@ -326,7 +399,9 @@ export default {
         try {
           const items = await fetchPrefs(env);
           const cached = !!(PREFS_CACHE && Date.now() - PREFS_CACHE.ts < 1800000);
-          return json({ ok: true, cached: cached ? 1 : 0, users: items }, 200);
+          /* ⛔ R18-A01: تدوير الجلسة أثناء الاستخدام (الكوكي الجديد للمتصفح بس) */
+          const renew = await sessionRenewHeader(request, env.SESSION_SECRET);
+          return json({ ok: true, cached: cached ? 1 : 0, users: items }, 200, renew);
         } catch (e) {
           /* ⛔ الجولة ١٨: ⛔ ما بنردّش بتفاصيل الداخلية */
           console.error("[octa-mgmt] prefs failed", { err: String(e && e.message || e) });
@@ -391,9 +466,14 @@ export default {
         }
         try {
           const up = await proxyToRailway(target, env.OCTA_ADMIN_TOKEN, method, bodyText);
-          /* ⛔ المسار لسه مش موجود على السيرفر ⇒ 204 (مش خطأ — ميزة مستقبلية) */
+          /* ⛔ المسار لسه مش موجود على السيرفر ⇒ 204 (مش خطأ — ميزة مستقبلية)
+             ⛔ R18-A05: الـ204 لازم يكون **من غير body** — الـconstructor بيرمي
+                استثناء لو فيه نص ⇒ الرد كان بيرجع 502 بدل حالة "غير موجود". */
           if (up.status === 404 || up.status === 405) {
-            return new Response("", { status: 204, headers: { "X-OCTA-Missing": "1" } });
+            return new Response(null, {
+              status: 204,
+              headers: { "X-OCTA-Missing": "1", "Cache-Control": "no-store" },
+            });
           }
           return up;
         } catch (e) {
@@ -421,11 +501,13 @@ export default {
 
     /* ⛔ لازم يبقى index.html للروابط الداخلية (SPA) */
     const res = await env.ASSETS.fetch(request);
+    /* 🛡️ الجولة ١٩ (R18-A02) — كل أصل محمي ⇒ no-store/private
+       (⛔ الرد كان بيعدّي «Cache-Control: public» ⇒ كاش مشترك ممكن). */
     if (res.status === 404 && request.method === "GET" &&
         !url.pathname.includes(".") && !url.pathname.startsWith("/api/")) {
       const shell = await env.ASSETS.fetch(new Request(new URL("/index.html", url), request));
-      if (shell && shell.status < 400) return shell;
+      if (shell && shell.status < 400) return protectedResponse(shell);
     }
-    return res;
+    return protectedResponse(res);
   },
 };

@@ -3416,11 +3416,13 @@ function calculateOctopusScore(symbol) {
 function renderEngineBars(scores, finalScore, extra) {
   const barsEl = document.getElementById('engineBars');
   if (!barsEl) return;
+  /* 🛡️ الجولة ١٩ (R18-A06 / SEC-024) — ⛔ كل نص من الـAPI يتهرب قبل الـHTML:
+     ⛔ label و source جايين من رد الـAPI ⇒ HTML خام كان بيسمح بحقن وسم. */
   barsEl.innerHTML = scores.map(s => `
   <div class="engine-bar">
-  <div class="lbl">${s.label} <span style="color:var(--muted);font-size:0.7rem;">(${s.source || 'AI'})</span></div>
+  <div class="lbl">${octaEsc(s.label)} <span style="color:var(--muted);font-size:0.7rem;">(${octaEsc(s.source || 'AI')})</span></div>
   <div class="bar">
-  <div class="fill" style="background:linear-gradient(90deg, ${s.value >= 80 ? '#16c79a, #4dabf7' : s.value >= 60 ? '#4dabf7, #f4d03f' : '#d4af37, #f97316'}); width:0%; --target:${s.value}%;">${s.value}</div>
+  <div class="fill" style="background:linear-gradient(90deg, ${s.value >= 80 ? '#16c79a, #4dabf7' : s.value >= 60 ? '#4dabf7, #f4d03f' : '#d4af37, #f97316'}); width:0%; --target:${Number(s.value) || 0}%;">${Number(s.value) || 0}</div>
   </div>
   </div>
   `).join('');
@@ -3473,21 +3475,21 @@ function renderEngineBars(scores, finalScore, extra) {
   <div style="background:linear-gradient(135deg, rgba(212,175,55,0.14), rgba(13,33,55,0.6)); border:1px solid var(--gold); border-radius:14px; padding:18px; margin-bottom:14px;">
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
   <span style="color:var(--gold);font-size:0.8rem;font-weight:800;">🐙 قرار OCTA</span>
-  <span style="color:var(--muted);font-size:0.7rem;">ثقة ${d.confidence || 0}%</span>
+  <span style="color:var(--muted);font-size:0.7rem;">ثقة ${Number(d.confidence) || 0}%</span>
   </div>
-  <div class="verdict" style="color:${decMeta.cls};">${decMeta.icon} ${d.decision}</div>
-  <div style="color:var(--muted);font-size:0.82rem;margin-top:4px;">المخاطرة: ${d.risk_level || 'غير محدد'}${extra.price ? ` • السعر: ${Number(extra.price).toFixed(2)} EGP` : ''}</div>
+  <div class="verdict" style="color:${decMeta.cls};">${decMeta.icon} ${octaEsc(d.decision)}</div>
+  <div style="color:var(--muted);font-size:0.82rem;margin-top:4px;">المخاطرة: ${octaEsc(d.risk_level || 'غير محدد')}${extra.price ? ` • السعر: ${Number(extra.price).toFixed(2)} EGP` : ''}</div>
   </div>
 
   ${d.target ? `
   <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:14px;">
   <div class="calc-result" style="padding:10px;">
   <div class="lbl">🎯 الهدف</div>
-  <div class="num" style="font-size:1.1rem;color:var(--sec);">${d.target}</div>
+  <div class="num" style="font-size:1.1rem;color:var(--sec);">${octaEsc(d.target)}</div>
   </div>
   <div class="calc-result" style="padding:10px;">
   <div class="lbl">⛔ ستوب</div>
-  <div class="num" style="font-size:1.1rem;color:var(--red2);">${d.stop_loss}</div>
+  <div class="num" style="font-size:1.1rem;color:var(--red2);">${octaEsc(d.stop_loss)}</div>
   </div>
   <div class="calc-result" style="padding:10px;">
   <div class="lbl">📊 التوافق</div>
