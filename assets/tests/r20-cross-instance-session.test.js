@@ -148,7 +148,12 @@ test('R20-F04: /api/health reports whether revocation is shared (booleans only)'
   assert.equal(res.status, 200);
   const b = await res.json();
   assert.equal(b.revoke_shared, true, 'مع KV ⇒ الإedal مشترك');
+  // ⭐ الجولة ٢١: زاد `revoke_strong` ⭐ (هل الإطلاع اتساق قوي ⭐)
+  // ⭐ النية (booleans بس ⭐ مافيش أي اسم متغيّر ⭐) محفوظة ⭐
   assert.deepEqual(Object.keys(b).sort(),
-    ['has_admin', 'has_password', 'ok', 'revoke_shared'],
+    ['has_admin', 'has_password', 'ok', 'revoke_shared', 'revoke_strong'],
     '⛔ health لازم يبقى booleans بس — مافيش أي اسم متغيّر');
+  for (const [k, v] of Object.entries(b)) {
+    assert.equal(typeof v, 'boolean', '⛔ الحقل ' + k + ' لازم boolean ⭐');
+  }
 });

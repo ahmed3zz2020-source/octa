@@ -67,6 +67,46 @@ async function revokeKey(env, raw) {
   }
 }
 
+/* ⭐⭐ الجولة ٢١ (R21) — **مسار الاتساق القوي** ⭐ (Durable Object ⭐)
+   📌 المشكلة: ⛔ KV **اتساقه متأخر** (حتى ~٦٠ ثانية ⭐) ⇒ ⛔ في
+     نافذة التأخير: نسخة تانية ممكن تقبل جلسة اتبطلت ⭐ (مُثبت بالاختبار ⭐).
+   📌 ليه مش بنحلّها بـKV: ⛔ القراءة القديمة **مش able** تفرّق بين
+     «مش مبطلة» و«الإبطال لسه ما وصلش» ⭐ ⇒ ⛔ الحل لازم يكون
+     **مصدر واحد strongly-consistent** ⭐.
+   ✅ الحل: ⭐ Durable Object ⭐ (-strongly consistent ⭐) ⭐
+     ⭐ ⛔ **مش مفعّل افتراضياً** ⭐ (محتاج namespace جديد ⭐ ⇒ إذن المالك ⭐)
+     ⭐ لما الـbinding `REVOKE_DO` موجود ⇒ pathname أنا الـDO ⭐
+     ⭐ ولما مافيش ⇒ fallback للـKV (مع توثيق النافذة ⭐).
+   ⛔ مافيش مورد اتعمل ⭐ (مافيش نشر ⭐). */
+async function doRevoke(env, raw) {
+  if (!env.REVOKE_DO || !raw) return false;
+  try {
+    const name = await revokeKey(env, raw);
+    if (!name) return false;
+    const id = env.REVOKE_DO.idFromName(name);
+    const stub = env.REVOKE_DO.get(id);
+    await stub.fetch("https://revoke.internal/revoke", { method: "POST" });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function doIsRevoked(env, raw) {
+  if (!env.REVOKE_DO || !raw) return false;
+  try {
+    const name = await revokeKey(env, raw);
+    if (!name) return null;
+    const id = env.REVOKE_DO.idFromName(name);
+    const stub = env.REVOKE_DO.get(id);
+    const res = await stub.fetch("https://revoke.internal/check");
+    const body = await res.json();
+    return !!body.revoked;
+  } catch (e) {
+    return null;  // ⛔ fail-closed ⭐
+  }
+}
+
 async function kvRevoke(env, raw) {
   if (!env.REVOKE_KV || !raw) return false;
   const k = await revokeKey(env, raw);
@@ -81,14 +121,21 @@ async function kvRevoke(env, raw) {
   }
 }
 
+/* ⛔⛔ الجولة ٢١ (R21) — **fail-closed** ⭐
+   📌 قبل كده: لو الـKV واقف ⇒ `catch` بيرجّع false ⇒ ⛔ الجلسة
+      بتُقبل كأنها سليمة ⭐ ⇒ ⛔ انقطاع الخدمة = انفتاح أمني ⭐.
+   ✅ الحل: ⛔ خطأ الـKV ⇒ **لا نقدر نثبت الإبطال** ⇒ ⛔ نرفض ⭐
+      (fail-closed ⭐ — المبدأ: «مافيش دليل ⇒ مافيش ثقة» ⭐).
+   ⭐ الرمز: `true` = الإبطال **مثبت** ⭐ · `false` = **ما فيش دليل** ⭐
+      ⇒ ⭐ `null` = ⛔ تعذّر التحقق ⭐ ⇒ ⛔ نرفض ⭐. */
 async function kvIsRevoked(env, raw) {
   if (!env.REVOKE_KV || !raw) return false;
   const k = await revokeKey(env, raw);
-  if (!k) return false;
+  if (!k) return null;                     // ⛔ مافيش مفاتيح ⭐ ⇒ ما نقدرش نتحقق ⭐
   try {
     return !!(await env.REVOKE_KV.get(k));
   } catch (e) {
-    return false;
+    return null;                           // ⛔ خطأ ⇒ fail-closed ⭐
   }
 }
 
@@ -202,8 +249,22 @@ async function validSession(req, secret, env) {
   if (isRevoked(raw)) return false;
   /* 🛡️ الجولة ٢٠ (R20) — الإبطال عبر النسخ ⬇️
      ⛔ الذاكرة لوحدها ما بتغطّيش نسخة تانية من الـWorker ⭐
-     ⭐ ⇒ نفحص المخزن المشترك (KV) كمان ⬇️ */
-  if (env && await kvIsRevoked(env, raw)) return false;
+     ⭐ ⇒ نفحص المخزن المشترك (KV) كمان ⬇️
+     ⛔⛔ الجولة ٢١ (R21) — ⛔ **fail-closed** ⭐: لو تعذّر الفحص ⭐
+        (KV واقف · خطأ · timeout ⭐) ⇒ ⛔ نرفض الجلسة ⭐ (مش نقبلها ⭐) */
+  if (env && env.REVOKE_DO) {
+    const _drev = await doIsRevoked(env, raw);
+    if (_drev === null) return false;      // ⛔ ما فيش دليل ⇒ نرفض ⭐
+    if (_drev === true) return false;      // ⛔ إبطال مثبت ⭐
+    /* ⭐⛔ الـDO قال «مش مبطلة» ⭐ ⇒ ده **حكم نهائي** ⭐
+       ⛔ (قوي الاتساق ⭐ ⇒ مافيش نافذة تأخير ⭐) ⭐ */
+    return true;
+  }
+  if (env && env.REVOKE_KV) {
+    const _rev = await kvIsRevoked(env, raw);
+    if (_rev === null) return false;       // ⛔ ما فيش دليل ⇒ نرفض ⭐
+    if (_rev === true) return false;       // ⛔ إبطال مثبت ⭐
+  }
   const dot = raw.lastIndexOf(".");
   if (dot < 1) return false;
   const exp = raw.slice(0, dot);
@@ -424,7 +485,10 @@ export default {
         const _raw = parseCookies(request)[COOKIE];
         revokeSession(_raw);
         /* 🛡️ الجولة ٢٠ (R20) — نفس الإبطال في المخزن المشترك ⬇️
-           ⭐ ⇒ نسخة تانية من الـWorker بترفض نفس الجلسة ⭐ */
+           ⭐ ⇒ نسخة تانية من الـWorker بترفض نفس الجلسة ⭐
+           🛡️ الجولة ٢١ (R21) — ⭐ DO (اتساق قوي ⭐) أولاً ⭐
+           ⭐ وبعده KV (fallback ⭐ — نافذته موثّقة ⭐) ⭐ */
+        await doRevoke(env, _raw);
         await kvRevoke(env, _raw);
         return json({ ok: true }, 200, {
           "Set-Cookie": `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`,
@@ -447,7 +511,8 @@ export default {
           /* 🛡️ الجولة ٢٠ (R20) — ⛔ booleans بس (مافيش أي اسم متغيّر) ⬇️
              ⭐ `revoke_shared` = الإبطال بيشتغل عبر أكتر من نسخة ⭐
              ⛔ `false` ⇒ الإبطال في الذاكرة بس ⇒ نسخة واحدة ⭐ */
-          revoke_shared: !!env.REVOKE_KV,
+          revoke_shared: !!(env.REVOKE_DO || env.REVOKE_KV),
+          revoke_strong: !!env.REVOKE_DO,
         });
       }
 
