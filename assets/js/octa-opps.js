@@ -19,6 +19,9 @@
   var SRC_PRICE_TIME = 'وقت السعر';
   var SRC_LAST_PRICE = 'آخر سعر متاح';
   var SRC_STALE_PRICE = 'سعر قديم';
+  /* ⛔⛔⛔ مراجعة الجولة ١٧ (R17-P1) — حالة «unknown» = مافيش دليل حداثة
+     (مش قديم، ومش حيّ) ⇒ وسم صريح بدل ما نخفيه. */
+  var SRC_UNKNOWN_STATE = 'حالة البيانات غير معروفة';
   var SRC_LAST_KNOWN_AT = 'آخر سعر معروف';
   /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٦) — عمر السعر */
   var SRC_PRICE_AGE = 'عمر السعر';
@@ -161,6 +164,10 @@
           + esc(SRC_LAST_KNOWN_AT) + ': '
           + esc(fmtDateAr(it.source_as_of)) + '</span>';
       }
+    } else if (it.data_state === 'unknown') {
+      /* ⛔⛔⛔ مراجعة الجولة ١٧ (R17-P1) — مافيش دليل حداثة ⇒ وسم صريح
+         (متخفيوش عن المستخدم ولا نقوله «سعر قديم» وهو مش قديم). */
+      h += badge('stale', SRC_UNKNOWN_STATE);
     }
     h += badge('risk', it.risk_level_ar || '');
     h += badge('horizon', it.hold_days ? ('المدى: ' + it.hold_days) : '');
