@@ -18,7 +18,7 @@ const ROOT = process.env.OCTA_FE_ROOT || path.resolve(__dirname, '..', '..');
 function loadWorker() {
   const src = fs.readFileSync(path.join(ROOT, 'mgmt/worker.js'), 'utf8');
   return new Function('Response', 'Request', 'URL', 'crypto',
-    src.replace('export default', 'return'))(Response, Request, URL, crypto);
+    src.replace(/^export\s*\{[^}]*\};?$/gm, '').replace('export default', 'return'))(Response, Request, URL, crypto);
 }
 
 /* ⭐ KV كامل ⭐ */

@@ -19,7 +19,7 @@ function loadWorker() {
   const src = fs.readFileSync(path.join(ROOT, 'mgmt/worker.js'), 'utf8');
   // ⛔ نحمّل الـworker كدالة (نفس طريقة المراجع المستقل) ⇒ نتحكم في Response/Request/crypto
   return new Function('Response', 'Request', 'URL', 'crypto',
-    src.replace('export default', 'return'))(Response, Request, URL, crypto);
+    src.replace(/^export\s*\{[^}]*\};?$/gm, '').replace('export default', 'return'))(Response, Request, URL, crypto);
 }
 
 function makeEnv(worker) {

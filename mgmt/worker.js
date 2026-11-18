@@ -67,17 +67,23 @@ async function revokeKey(env, raw) {
   }
 }
 
-/* ⭐⭐ الجولة ٢١ (R21) — **مسار الاتساق القوي** ⭐ (Durable Object ⭐)
-   📌 المشكلة: ⛔ KV **اتساقه متأخر** (حتى ~٦٠ ثانية ⭐) ⇒ ⛔ في
+/* ⭐⭐⭐ الجولة ٢٢ (R22) — **مسار الاتساق القوي** ⭐⭐⭐ (Durable Object ⭐)
+   📌 المشكلة: ⛔ الـKV **اتساقه متأخر** (حتى ~٦٠ ثانية ⭐) ⇒ ⛔ في
      نافذة التأخير: نسخة تانية ممكن تقبل جلسة اتبطلت ⭐ (مُثبت بالاختبار ⭐).
    📌 ليه مش بنحلّها بـKV: ⛔ القراءة القديمة **مش able** تفرّق بين
      «مش مبطلة» و«الإبطال لسه ما وصلش» ⭐ ⇒ ⛔ الحل لازم يكون
      **مصدر واحد strongly-consistent** ⭐.
-   ✅ الحل: ⭐ Durable Object ⭐ (-strongly consistent ⭐) ⭐
-     ⭐ ⛔ **مش مفعّل افتراضياً** ⭐ (محتاج namespace جديد ⭐ ⇒ إذن المالك ⭐)
-     ⭐ لما الـbinding `REVOKE_DO` موجود ⇒ pathname أنا الـDO ⭐
-     ⭐ ولما مافيش ⇒ fallback للـKV (مع توثيق النافذة ⭐).
-   ⛔ مافيش مورد اتعمل ⭐ (مافيش نشر ⭐). */
+   ✅ الحل: ⭐ Durable Object ⭐ (قراءة بعد كتابة ⇒ مافيش نافذة ⭐)
+     ⭐ الـbinding اسمه `REVOKE_DO` ⭐ ⇒ لما يكون موجود هو **المرجع** ⭐
+     ⭐ ولما مافيش ⇒ fallback للـKV (مع توثيق النافذة ⭐)
+     ⭐ والـKV بيفضل **شاهد احتياطي** ⭐ ⇒ يقدر يرفض بس ما بيقدرش يقبل ⭐.
+   ⛔ مافيش مورد اتعمل ⭐ (مافيش نشر ⭐) — التفعيل بنشر المالك ⭐. */
+
+/* ⭐ كتابة الإبطال في الـDO ⭐
+   📌 **قراءة تأكيد** (read-after-write ⭐): بعد الكتابة بنقرأ تاني ⭐
+     ⇒ لو الـDO مش ردي ⇒ مافيش دليل ⇒ نعتبر الكتابة **فاشلة** ⭐
+     ⇒ الشاهد في الـKV بيمنع القبول الصامت ⭐.
+   ⛔ أي خطأ ⇒ `false` ⭐ (مافيش استثناء بيخرج من هنا ⭐). */
 async function doRevoke(env, raw) {
   if (!env.REVOKE_DO || !raw) return false;
   try {
@@ -85,25 +91,115 @@ async function doRevoke(env, raw) {
     if (!name) return false;
     const id = env.REVOKE_DO.idFromName(name);
     const stub = env.REVOKE_DO.get(id);
-    await stub.fetch("https://revoke.internal/revoke", { method: "POST" });
-    return true;
+    const res = await stub.fetch("https://revoke.internal/revoke", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ revoked: true }),
+    });
+    if (!res || !res.ok) return false;         // ⛔ الكتابة فشلت ⭐
+    const confirmed = await doIsRevoked(env, raw);
+    return confirmed === true;                // ⭐ تأكيد بالقراءة ⭐
   } catch (e) {
-    return false;
+    return false;                             // ⛔ مافيش دليل ⭐
   }
 }
 
+/* ⭐ فحص الإبطال في الـDO ⭐
+   📌 `true` = الإبطال **مثبت** ⭐ · `false` = **مفيش إبطال** ⭐
+      · `null` = ⛔ **تعذّر التحقق** ⭐ ⇒ ⛔ fail-closed ⭐ (الجلسة تُرفض ⭐).
+   ⛔ الرد المش المفهوم (مش JSON ⭐ / مافيش `revoked` ⭐ / خطأ ⭐ / 5xx ⭐)
+      ⇒ `null` ⭐ — **مش** `false` ⭐ (عشان ما نقبلش جلسة من غير دليل ⭐). */
 async function doIsRevoked(env, raw) {
-  if (!env.REVOKE_DO || !raw) return false;
+  if (!env.REVOKE_DO || !raw) return null;
   try {
     const name = await revokeKey(env, raw);
     if (!name) return null;
     const id = env.REVOKE_DO.idFromName(name);
     const stub = env.REVOKE_DO.get(id);
     const res = await stub.fetch("https://revoke.internal/check");
-    const body = await res.json();
-    return !!body.revoked;
+    if (!res || !res.ok) return null;         // ⛔ fail-closed ⭐
+    let body = null;
+    try { body = await res.json(); } catch (e) { return null; }
+    if (!body || typeof body !== "object" || typeof body.revoked !== "boolean") {
+      return null;                            // ⛔ رد مش مفهوم ⇒ fail-closed ⭐
+    }
+    return body.revoked;
   } catch (e) {
-    return null;  // ⛔ fail-closed ⭐
+    return null;                              // ⛔ fail-closed ⭐
+  }
+}
+
+/* ⭐⭐⭐ الجولة ٢٢ (R22) — صنف الـDurable Object ⭐⭐⭐
+   📌 **instance واحد لكل جلسة** ⭐ (الاسم = `rev:` + هاش موقّع ⭐)
+     ⇒ كل طلبات نفس الجلسة بتترتّب ⭐ ⇒ ⛔ مافيش سباق ⭐
+     ⇒ ⛔ مافيش نافذة انتشار ⭐ (قراءة بعد كتابة ⇒ **قوي** ⭐).
+   📌 التخزين: `state.storage` ⭐ (SQLite-backed ⭐) ⇒ الشاهدة بتفضل
+     موجودة حتى لو الـinstance اتقفل ⭐ · ⭐ وكاش في الذاكرة للسرعة ⭐.
+   ⛔ **مافيش `import`** ⭐ ⇒ نفس أسلوب تحميل اختبارات المشروع ⭐
+     (الأسلوب الكلاسيكي `constructor(state, env)` مدعوم ⭐).
+   ⛔ مافيش مورد اتعمل ⭐ (مافيش نشر ⭐) — التفعيل بنشر المالك ⭐. */
+const DO_REVOKE_KEY = "revoked";
+
+class RevokeDO {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env || {};
+    /* ⭐ كاش الذاكرة ⭐ — `null` = مجهول ⭐ (لسه ما اتقراش ⭐) */
+    this._revoked = null;
+  }
+
+  async fetch(request) {
+    let path = "";
+    let method = "GET";
+    try {
+      path = new URL(request.url).pathname;
+      method = (request.method || "GET").toUpperCase();
+    } catch (e) {
+      return json({ ok: false, error: "bad-request" }, 400);
+    }
+
+    /* ⭐ تسجيل الإبطال ⭐ (كتابة متزامنة ⭐) */
+    if (method === "POST" && path === "/revoke") {
+      try {
+        await this.state.storage.put(DO_REVOKE_KEY, true);
+        this._revoked = true;
+        return json({ ok: true, revoked: true });
+      } catch (e) {
+        return json({ ok: false, error: "storage-write-failed" }, 500);
+      }
+    }
+
+    /* ⭐ الفحص ⭐ — الرد **دايمًا** JSON ⭐ */
+    if (method === "GET" && path === "/check") {
+      try {
+        const revoked = await this._readRevoked();
+        return json({ revoked: !!revoked });
+      } catch (e) {
+        return json({ revoked: false, error: "storage-read-failed" }, 500);
+      }
+    }
+
+    /* ⭐ المسح ⭐ (تنظيف ⭐ — اختياري ⭐) */
+    if (method === "POST" && path === "/clear") {
+      try {
+        await this.state.storage.delete(DO_REVOKE_KEY);
+        this._revoked = false;
+        return json({ ok: true, revoked: false });
+      } catch (e) {
+        return json({ ok: false, error: "storage-delete-failed" }, 500);
+      }
+    }
+
+    return json({ ok: false, error: "not-found" }, 404);
+  }
+
+  /* ⭐ قراءة الشاهدة ⭐ — الكاش الأول ⭐ ثم `state.storage` ⭐ */
+  async _readRevoked() {
+    if (this._revoked !== null) return this._revoked;
+    const v = await this.state.storage.get(DO_REVOKE_KEY);
+    const revoked = v === true || v === 1 || v === "1" || v === "true";
+    this._revoked = revoked;
+    return revoked;
   }
 }
 
@@ -251,16 +347,28 @@ async function validSession(req, secret, env) {
      ⛔ الذاكرة لوحدها ما بتغطّيش نسخة تانية من الـWorker ⭐
      ⭐ ⇒ نفحص المخزن المشترك (KV) كمان ⬇️
      ⛔⛔ الجولة ٢١ (R21) — ⛔ **fail-closed** ⭐: لو تعذّر الفحص ⭐
-        (KV واقف · خطأ · timeout ⭐) ⇒ ⛔ نرفض الجلسة ⭐ (مش نقبلها ⭐) */
+        (KV واقف · خطأ · timeout ⭐) ⇒ ⛔ نرفض الجلسة ⭐ (مش نقبلها ⭐)
+     ⭐⭐ الجولة ٢٢ (R22) — ⭐ المصدر القوي = الـDurable Object ⭐
+        (قراءة بعد كتابة ⭐ ⇒ مافيش نافذة ⭐) ⭐ والـKV شاهد احتياطي ⭐ */
   if (env && env.REVOKE_DO) {
+    /* 🛡️ الجولة ٢٢ (R22) — المصدر القوي (الـDO) ⭐
+       ⛔ خطأ / رد مش مفهوم ⇒ `null` ⇒ ⛔ **fail-closed** ⭐ (مش 200 أبدًا ⭐) */
     const _drev = await doIsRevoked(env, raw);
     if (_drev === null) return false;      // ⛔ ما فيش دليل ⇒ نرفض ⭐
     if (_drev === true) return false;      // ⛔ إبطال مثبت ⭐
-    /* ⭐⛔ الـDO قال «مش مبطلة» ⭐ ⇒ ده **حكم نهائي** ⭐
-       ⛔ (قوي الاتساق ⭐ ⇒ مافيش نافذة تأخير ⭐) ⭐ */
-    return true;
-  }
-  if (env && env.REVOKE_KV) {
+    /* ⭐⭐ شاهد الـKV ⭐⭐ — **شاهد احتياطي** ⭐:
+       ⭐ لو كتابة الـDO فشلت ⇒ الشاهد في الـKV بيمنع **القبول الصامت** ⭐
+       ⭐ بيقدر **يرفض** ⭐ بس **ما بيقدرش يقبل** ⭐
+       ⛔/error ⇒ ⛔ نرفض ⭐ (مافيش دليل ⇒ مافيش ثقة ⭐) */
+    if (env.REVOKE_KV) {
+      const _wit = await kvIsRevoked(env, raw);
+      if (_wit === null) return false;     // ⛔ ما فيش دليل ⇒ نرفض ⭐
+      if (_wit === true) return false;     // ⛔ شاهد الإبطال ⭐
+    }
+    /* ⭐⛔ ملاحظة مهمة ⭐: الحكم هنا **مش** نهائي ⭐ ⇒
+       ⛔ التحقق من التوقيع + تاريخ الانتهاء بيحصل بعده ⭐
+       (مانع انتحال أي كوكي ⭐). */
+  } else if (env && env.REVOKE_KV) {
     const _rev = await kvIsRevoked(env, raw);
     if (_rev === null) return false;       // ⛔ ما فيش دليل ⇒ نرفض ⭐
     if (_rev === true) return false;       // ⛔ إبطال مثبت ⭐
@@ -639,3 +747,5 @@ export default {
     return protectedResponse(res);
   },
 };
+
+export { RevokeDO };

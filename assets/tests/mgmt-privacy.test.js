@@ -33,7 +33,7 @@ const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 function loadWorker() {
   const src = fs.readFileSync(path.join(MGMT, 'worker.js'), 'utf8');
   return new Function('Response', 'Request', 'URL', 'crypto',
-    src.replace('export default', 'return'))(Response, Request, URL, crypto);
+    src.replace(/^export\s*\{[^}]*\};?$/gm, '').replace('export default', 'return'))(Response, Request, URL, crypto);
 }
 
 function makeEnv() {
