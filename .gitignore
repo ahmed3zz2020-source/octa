@@ -50,3 +50,6 @@ mgmt/.wrangler/
 # 🛡️ الجولة ٢٠ — مخرجات مولّدة (مش بتتكود)
 r20_xss.json
 r20_xss_triage.json
+
+# 🛡️ الجولة ٢٢ — ملف الـCI الجديد في الواجهة منفصل ⭐ (بانتظار توكن scope workflow ⭐)
+.github/workflows/
