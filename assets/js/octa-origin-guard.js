@@ -288,7 +288,7 @@
     if (typeof window === 'undefined' || typeof window.fetch !== 'function') {
       return Promise.resolve({ code: 'unknown' });
     }
-    var f = window.OCTA_RAW_FETCH || window.fetch;
+    var f = window.OCTA_ORIGIN_FETCH || window.OCTA_RAW_FETCH || window.fetch;
     var url = 'https://cloudflare-dns.com/dns-query?name=' + encodeURIComponent(h) + '&type=A';
     var opt = { cache: 'no-store', headers: { 'Accept': 'application/dns-json' } };
     try {
@@ -327,7 +327,7 @@
     if (typeof window === 'undefined' || typeof window.fetch !== 'function') {
       return Promise.resolve({ ok: false, status: 0, error: 'no-fetch' });
     }
-    var f = window.OCTA_RAW_FETCH || window.fetch;
+    var f = window.OCTA_ORIGIN_FETCH || window.OCTA_RAW_FETCH || window.fetch;
     var opt = { method: 'GET', cache: 'no-store', credentials: 'same-origin' };
     try {
       if (typeof AbortController !== 'undefined') {
@@ -601,7 +601,10 @@
     var w = win || (typeof window !== 'undefined' ? window : null);
     var p = path || configPathOf(w);
     if (!w || typeof w.fetch !== 'function') return Promise.resolve(null);
-    var f = w.OCTA_RAW_FETCH || w.fetch;
+    /* 📌 الـfetch الخام *الأصلي* (مافيش حارس عليه) — لازم كده:
+       ⛔ لو استخدمنا OCTA_RAW_FETCH (المحاط بالحارس) ⇒ طلب العقدة
+       هيتنتظر الحارس ⇒ والحارس منتظر العقدة ⇒ تعطّل (deadlock). */
+    var f = w.OCTA_ORIGIN_FETCH || w.OCTA_RAW_FETCH || w.fetch;
     return f.call(w, p, {
       cache: 'no-store',
       credentials: 'same-origin',

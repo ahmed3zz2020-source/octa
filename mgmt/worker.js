@@ -94,6 +94,58 @@ function revokeTtlSeconds(raw, nowMs) {
   return Math.max(60, base + REVOKE_TTL_MARGIN_S);
 }
 
+/* ============================================================
+   🛡️🛡️ الجولة ٢٥ (R25 · R24-I11) — التحقق من الكوكي **قبل** أي نداء للتخزين ⭐
+   📌 المطلوب من المالك ⭐:
+      «التحقق من التوقيع والانتهاء قبل استدعاء التخزين» ⭐
+      «منع الكوكي المزوّر من استهلاك موارد Durable Object أو KV» ⭐.
+   📌 العيب المقاس ⭐: مسار `/api/logout` كان بينادي الـDO والـKV بـ**أي** كوكي ⭐
+      ⇒ ⛔ كوكي مزوّر = instance جديد في الـDO + كتابة في الـKV ⭐
+      ⇒ ⛔ استنزاف + نمو غير محدود ⭐.
+   ✅ دلوقتي ⭐: التوقيع + الانتهاء **قبل** أي نداء ⭐
+      ⇒ ⛔ الكوكي المزوّر/المشوّه **ما بيوصلش** التخزين أصلاً ⭐.
+   ⭐ مربوط بالاختبار: assets/tests/r25-logout-hardening.test.js ⭐ */
+function cookieShape(raw) {
+  if (!raw) return { ok: false, reason: "missing" };
+  const dot = raw.lastIndexOf(".");
+  if (dot < 1) return { ok: false, reason: "shape" };
+  const exp = raw.slice(0, dot);
+  const sig = raw.slice(dot + 1);
+  if (!/^\d+$/.test(exp)) return { ok: false, reason: "shape" };
+  const expMs = Number(exp);
+  if (!isFinite(expMs) || expMs <= 0) return { ok: false, reason: "shape" };
+  return { ok: true, exp: exp, sig: sig, expMs: expMs };
+}
+
+/* ⭐ تحقق كامل ⭐: الشكل ⭐ ثم التوقيع ⭐ ثم الانتهاء ⭐ */
+async function verifyCookie(raw, secret) {
+  const shape = cookieShape(raw);
+  if (!shape.ok) return shape;
+  if (!secret) return { ok: false, reason: "no-secret" };
+  let expect = "";
+  try {
+    expect = await sign(shape.exp, secret);
+  } catch (e) {
+    return { ok: false, reason: "sign-failed" };
+  }
+  if (!timingSafeEqual(shape.sig, expect)) return { ok: false, reason: "signature" };
+  shape.expired = shape.expMs < Date.now();
+  return shape;
+}
+
+/* 🛡️🛡️ الجولة ٢٥ (R25 · R24-I10) — تحديد بيئة الإنتاج ⭐
+   📌 المطلوب ⭐: «تنفيذ fail-closed في بيئة الإنتاج عند غياب مصدر الإبطال المطلوب» ⭐
+   📌 القرار ⭐: ⛔ **بدون تصريح ⇒ نعتبرها إنتاج** ⭐ (fail-closed ⭐)
+      ⭐ والبيئة غير الإنتاج لازم تصرّح صريح ⭐ (`APP_ENV=preview` ⭐).
+   📌 الحماية من footgun ⭐: ملف إعدادات الإنتاج نفسه فيه تصريح ⭐
+      + ⭐ اختبار حارس يقرأ الإعدادات ⭐ (r25-prod-config-guard.test.js ⭐). */
+function isProductionEnv(env) {
+  const flag = String((env && (env.APP_ENV || env.OCTA_ENV)) || "").trim().toLowerCase();
+  if (flag === "production" || flag === "prod") return true;
+  if (flag) return false;
+  return true;
+}
+
 async function revokeKey(env, raw) {
   if (!raw) return null;
   try {
@@ -685,38 +737,99 @@ export default {
 
       /* ── خروج ── */
       if (path === "/api/logout" && request.method === "POST") {
-        /* 🛡️ الجولة ١٩ (R18-A01) — إبطال من جهة السيرفر:
-           ⛔ قبل كده كان بينظّف الكوكي في المتصفح بس ⇒ أي نسخة منسوخة
-              كانت بتفضل صالحة. دلوقتي: السيرفر نفسه بيبطلها فورًا. */
-        const _raw = parseCookies(request)[COOKIE];
-        revokeSession(_raw);
-        /* 🛡️ الجولة ٢٠ (R20) — نفس الإبطال في المخزن المشترك ⬇️
-           ⭐ ⇒ نسخة تانية من الـWorker بترفض نفس الجلسة ⭐
-           🛡️ الجولة ٢١ (R21) — ⭐ DO (اتساق قوي ⭐) أولاً ⭐
-           ⭐ وبعده KV (fallback ⭐ — نافذته موثّقة ⭐) ⭐ */
-        const _do = await doRevoke(env, _raw);
-        const _kv = await kvRevoke(env, _raw);
         const _clear = {
           "Set-Cookie": `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`,
         };
-        /* 🛡️🛡️ الجولة ٢٤ (R24 · R22-I04) — ⛔ ممنوع **نجاح وهمي** ⭐
-           📌 قبل: نتيجتَي الـDO والـKV كانوا **مُهملين** ⭐ ⇒ ⛔ الرد كان
-              `{ok:true}` **دايماً** ⭐ ⇒ ⛔ فشل الكتابة = إبطال مش مثبت ⭐
-              بس العميل بيقول «تمام اتسجّل الخروج» ⭐ ⭐.
-           ✅ دلوقتي: ⛔ لو فيه مخزن مشترك ⭐ وما اثبتناوش ⭐ ⇒ ⛔ ٥٠٣ ⭐
-              و ⛔ `ok:false` ⭐ (والكوكي بيتمسح ⭐ + الإبطال في الذاكرة شغّال ⭐). */
-        const _shared = !!(env.REVOKE_DO || env.REVOKE_KV);
-        if (_raw && _shared && !(_do || _kv)) {
-          /* ⛔ لوج واضح ⭐ (من غير أي سر ⭐) ⭐ — عشان المشرف يشوف ⭐ */
-          console.error("[octa-mgmt] logout: revocation not proven",
-            { do: _do, kv: _kv, shared: _shared });
+        const _raw = parseCookies(request)[COOKIE];
+        /* 🛡️🛡️ R25 (R24-I11) — التحقق **قبل** أي نداء للتخزين ⭐
+           ⛔ كوكي مزوّر/مشوّه ⇒ ⛔ صفر نداءات ⭐ (لا استنزاف ⭐ ولا نمو ⭐). */
+        const _check = await verifyCookie(_raw, env.SESSION_SECRET);
+        if (_raw && !_check.ok) {
+          console.error("[octa-mgmt] logout: cookie rejected before storage",
+            { reason: _check.reason });
+          return json({
+            ok: false,
+            error: "جلسة غير صالحة",
+            revoked_shared: false,
+          }, 401, _clear);
+        }
+        /* ⭐ جلسة منتهية ⭐ ⇒ ⛔ مفيش حاجة تتبطل ⭐ ⇒ ⛔ صفر نداءات ⭐
+           ⭐ (والخروج صح ⭐ ⇒ الجلسة كانت ميتة أصلاً ⭐). */
+        if (_raw && _check.expired) {
+          revokeSession(_raw);
+          return json({ ok: true, revoked_shared: false, revocation: "not-needed" }, 200, _clear);
+        }
+        /* ⛔ مافيش كوكي ⭐ ⇒ ⛔ مفيش جلسة تتبطل ⭐ ⇒ نجاح بصفر نداءات ⭐ */
+        if (!_raw) {
+          return json({ ok: true, revoked_shared: false, revocation: "not-needed" }, 200, _clear);
+        }
+        /* ⛔ الذاكرة المحلية ⭐ (نفس النسخة ⭐) */
+        revokeSession(_raw);
+        const _hasDo = !!env.REVOKE_DO;
+        const _hasKv = !!env.REVOKE_KV;
+        const _prod = isProductionEnv(env);
+        /* 🛡️🛡️ R25 (R24-I10) — غياب المخزن المشترك ⭐
+           📌 الذاكرة المحلية **مش** حماية كافية عبر نسخ الـWorker ⭐
+              (النسخة التانية مش هتشوف الإبطال ⭐ ⇒ كوكي منسوخ يفضل شغال ⭐).
+           ⛔ في الإنتاج ⇒ ⛔ fail-closed ⭐ (مافيش مصدر ⇒ مافيش إعلان نجاح ⭐). */
+        if (!_hasDo && !_hasKv) {
+          if (_prod) {
+            console.error("[octa-mgmt] logout: no shared revocation source (production)");
+            return json({
+              ok: false,
+              error: "مصدر الإبطال غير متاح — الخرج اتقفل",
+              revoked_shared: false,
+            }, 503, _clear);
+          }
+          /* ⛔ بيئة غير إنتاج ⭐ ⇒ الذاكرة بس ⭐ (وموثّق ⭐) */
+          return json({
+            ok: true, revoked_shared: false, scope: "single-instance",
+            revocation: "memory-only",
+          }, 200, _clear);
+        }
+        /* 🛡️🛡️ R25 (R24-I09) — **المصدر المتسق هو المرجع** ⭐
+           📌 العيب المقاس ⭐: فشل الـDO + نجاح الـKV ⇒ الرد كان `{ok:true}` ⭐
+              ⇒ ⛔ **نجاح وهمي** ⭐ (الإبطال الفوري مش مثبت ⭐).
+           ✅ دلوقتي ⭐: لو الـDO مربوط ⇒ لازم **هو** يأكّد (قراءة بعد كتابة ⭐)
+              ⇒ ⛔ نجاح الـKV وحده **مش** دليل ⭐ ⇒ ٥٠٣ ⭐. */
+        const _do = _hasDo ? await doRevoke(env, _raw) : false;
+        const _kv = _hasKv ? await kvRevoke(env, _raw) : false;
+        if (_hasDo && !_do) {
+          console.error("[octa-mgmt] logout: authoritative source did not confirm",
+            { do: _do, kv: _kv });
           return json({
             ok: false,
             error: "تعذّر إبطال الجلسة على كل النسخ — جرّب تاني",
             revoked_shared: false,
           }, 503, _clear);
         }
-        return json({ ok: true }, 200, _clear);
+        if (!_hasDo && !_kv) {
+          /* ⛔ الـKV متاح بس الكتابة فشلت ⭐ ⇒ ⛔ مافيش دليل ⭐ ⇒ ٥٠٣ ⭐ */
+          console.error("[octa-mgmt] logout: KV witness write failed");
+          return json({
+            ok: false,
+            error: "تعذّر إبطال الجلسة على كل النسخ — جرّب تاني",
+            revoked_shared: false,
+          }, 503, _clear);
+        }
+        /* ⭐ الـKV وحده ⭐ ⇒ ⛔ **مش إبطال فوري** ⭐ ⇒ بنقول كده بصراحة ⭐
+           ⭐ (بنتأكد بالقراءة ⭐ ⇒ confirmed ⭐ / eventual ⭐). */
+        if (!_hasDo) {
+          const _seen = (await kvIsRevoked(env, _raw)) === true;
+          return json({
+            ok: true,
+            revoked_shared: true,
+            revocation: _seen ? "confirmed" : "eventual",
+            immediate: _seen,
+          }, 200, _clear);
+        }
+        /* ⭐ الـDO أكّد ⭐ ⇒ إبطال فوري ⭐ */
+        return json({
+          ok: true,
+          revoked_shared: true,
+          revocation: "strong",
+          immediate: true,
+        }, 200, _clear);
       }
 
       /* ── حالة الجلسة ── */

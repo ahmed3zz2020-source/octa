@@ -27,6 +27,9 @@ function makeEnv(worker) {
     APP_PASSWORD: 'synthetic-password',
     SESSION_SECRET: 'synthetic-secret',
     OCTA_ADMIN_TOKEN: 'synthetic-token',
+    /* 🛡️ R25 (R24-I10) ⭐: الاختبار بيغطي الإبطال **في الذاكرة** ⭐
+       ⭐ ⇒ تصريح إن البيئة **مش إنتاج** ⭐ (الإنتاج ⛔ fail-closed ⭐). */
+    APP_ENV: 'preview',
     ASSETS: {
       fetch: async () => new Response('synthetic protected shell', {
         headers: { 'Cache-Control': 'public, max-age=3600' },
@@ -57,6 +60,16 @@ test('R18-A01: جلسة الأدمن المنسوخة تُبطَل عند تسج
   assert.equal((await worker.fetch(req('/api/session', { headers }), env)).status, 200);
   assert.equal((await worker.fetch(req('/api/logout', { method: 'POST', headers }), env)).status, 200);
   assert.equal((await worker.fetch(req('/api/session', { headers }), env)).status, 401);
+
+  /* 🛡️ R25 (R24-I10) ⭐ — ⭐ case **جديد** ⭐: في الإنتاج ⭐ ⇒ ⛔ ٥٠٣ ⭐ */
+  const workerProd = loadWorker();
+  const envProd = Object.assign(makeEnv(workerProd), { APP_ENV: 'production' });
+  const cookieProd = await login(workerProd, envProd);
+  const outProd = await workerProd.fetch(req('/api/logout', {
+    method: 'POST', headers: { Cookie: cookieProd },
+  }), envProd);
+  assert.equal(outProd.status, 503,
+    '⛔⛔⛔ الإنتاج بدون مصدر مشترك ⇒ ⛔ لازم ٥٠٣ ⭐');
 });
 
 // ── R18-A02: الأصول المحمية ما تن caches confirma ──────────────────────

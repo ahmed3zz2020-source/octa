@@ -298,7 +298,12 @@ test('R22-DO-06: the KV safety net still refuses the session when the DO write f
   const env = makeEnv(kv, doNs);
   const cookie = await login(worker, env);
 
-  assert.equal(await logout(worker, env, cookie), 200);
+  /* 🛡️🛡️ R25 (R24-I09) ⭐ — عقد الجولة ٢٥ ⭐:
+     ⭐ «المصدر المتسق (الـDO) هو المرجع الأساسي» ⭐
+     ⭐ ⇒ فشل كتابة الـDO ⛔ **مش نجاح** ⭐ (٥٠٣ ⭐)
+     ⭐ ⭐ والـKV بيفضل **شاهد** ⭐ ⇒ بيسجّل ⭐ وبيمنع القبول الصامت ⭐. */
+  assert.equal(await logout(worker, env, cookie), 503,
+    '⛔⛔⛔ فشل كتابة الـDO ⇒ ⛔ الخرج ما ينفعش يعلن نجاح ⭐');
   assert.ok([...kv.store.keys()].length > 0,
     '⛔ فشل كتابة الـDO ⇒ لازم الشاهد يتكتب في الـKV ⭐');
 

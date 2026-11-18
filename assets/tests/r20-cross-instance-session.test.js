@@ -38,6 +38,9 @@ function makeEnv(worker, kv) {
     APP_PASSWORD: 'synthetic-password',
     SESSION_SECRET: 'synthetic-secret',
     OCTA_ADMIN_TOKEN: 'synthetic-token',
+    /* 🛡️ R25 (R24-I10) ⭐: الاختبار بيغطي **fallback الذاكرة** ⭐
+       ⭐ ⇒ تصريح إن البيئة **مش إنتاج** ⭐ (في الإنتاج ⛔ fail-closed ⭐). */
+    APP_ENV: 'preview',
     REVOKE_KV: kv || null,
     ASSETS: {
       fetch: async () => new Response('synthetic protected shell', {
@@ -139,6 +142,17 @@ test('R20-F03: without KV the worker still works (single instance fallback)', as
     headers: { Cookie: cookie },
   }), env);
   assert.equal(after.status, 401, 'الإبطال في الذاكرة لازم يشتغل');
+
+  /* 🛡️ R25 (R24-I10) ⭐ — ⭐ case **جديد** ⭐: نفس الحالة في الإنتاج ⭐
+     ⭐ ⇒ ⛔ fail-closed ⭐ (٥٠٣ ⭐) ⭐. */
+  const workerProd = loadWorker();
+  const envProd = Object.assign(makeEnv(workerProd, null), { APP_ENV: 'production' });
+  const cookieProd = await login(workerProd, envProd);
+  const outProd = await workerProd.fetch(req('/api/logout', {
+    method: 'POST', headers: { Cookie: cookieProd },
+  }), envProd);
+  assert.equal(outProd.status, 503,
+    '⛔⛔⛔ الإنتاج بدون KV ⇒ ⛔ الخرج ما ينفعش يعلن نجاح ⭐');
 });
 
 test('R20-F04: /api/health reports whether revocation is shared (booleans only)', async () => {

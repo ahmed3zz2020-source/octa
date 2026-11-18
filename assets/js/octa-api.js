@@ -52,6 +52,10 @@
      ولا الطابور) ⇒ البوابة تفتح في ~٠٫٣ ثانية.
      📌 ⚠️ الطلب لازم يكون GET عادي والترويسات بتتحط بنفسها. */
   try { window.OCTA_RAW_FETCH = ORIG_FETCH; } catch (e) { }
+  /* 🛡️ R23 — الـfetch الخام *الأصلي* (مفيش حارس عليه)
+     📌 الحارس نفسه بيحتاجه (تحميل العقدة + فحص الصحة) ⇒ لازم يكون
+     📌 متاح قبل ما الحارس يلتفّ على OCTA_RAW_FETCH. */
+  try { window.OCTA_ORIGIN_FETCH = ORIG_FETCH; } catch (e) { }
 
   /* ════════════════════════════════════════════════════════════════
    🛡️ الجولة ٢٣ (R23) — حارس الوجهة (fail-closed)
@@ -222,6 +226,36 @@
   }
 
   try { window.OCTA_ORIGIN_GUARD_LOAD = _guardLoad(); } catch (e) { }
+
+  /* ════════════════════════════════════════════════════════════════
+   🛡️ R23 — الـfetch الخام كمان يعدّي من الحارس (مافيش طريق محيط)
+   ────────────────────────────────────────────────────────────────
+   📌 البوابة بتستخدم الـfetch الخام عشان تتجاوز الخانق
+   (استجابة /api/auth/me لازم تيجي بسرعة).
+   ⛔ قبل الإصلاح: ده كان **مسار محيط** — الطلب بيعدّي من غير حكم!
+   📌 بعد الإصلاح: الـfetch الخام محاط بالحارس زي أي نداء تاني.
+   📌 الحارس نفسه بيستخدم `OCTA_ORIGIN_FETCH` (الخام الأصلي) عشان
+   تحميل العقدة وفحص الصحة ميتقفلوش بنفس الحكم.
+   ════════════════════════════════════════════════════════════════ */
+  try {
+   const _RAW = ORIG_FETCH;
+   window.OCTA_RAW_FETCH = function (url, opts) {
+    const s = String(url || '');
+    const g = _guardInstance();
+    if (g && typeof g.check === 'function') {
+     const v = g.check(s);
+     if (v && v.ok === false) return _guardBlock(v);
+     return _RAW.apply(window, arguments);
+    }
+    return _guardReady().then(function (gg) {
+     if (gg && typeof gg.check === 'function') {
+      const v = gg.check(s);
+      if (v && v.ok === false) return _guardBlock(v);
+     }
+     return _RAW.apply(window, arguments);
+    });
+   };
+  } catch (e) { }
 
   let active = -1;  /* رقم السيرفر اللي شغال */
   let fails = {};   /* عدّاد فشل لكل سيرفر */

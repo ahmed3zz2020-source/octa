@@ -41,6 +41,10 @@ function makeEnv() {
     APP_PASSWORD: 'synthetic-password',
     SESSION_SECRET: 'synthetic-secret',
     OCTA_ADMIN_TOKEN: 'synthetic-token',
+    /* 🛡️ R25 (R24-I10) ⭐: الاختبار ده بيغطي سلوك **الذاكرة الواحدة** ⭐
+       ⭐ ⇒ لازم تصريح إن البيئة **مش إنتاج** ⭐
+       ⭐ (في الإنتاج ⛔ fail-closed ⭐ — انظر R25-I10-01 ⭐). */
+    APP_ENV: 'preview',
     ASSETS: {
       fetch: async (req) => {
         const p = new URL(req.url).pathname;
@@ -122,4 +126,16 @@ test('AZ35: نسخة الكوكي بعد الخروج ⇒ 401 (إبطال من �
   assert.equal((await worker.fetch(req('/api/session', { headers }), env)).status, 200);
   assert.equal((await worker.fetch(req('/api/logout', { method: 'POST', headers }), env)).status, 200);
   assert.equal((await worker.fetch(req('/api/session', { headers }), env)).status, 401);
+
+  /* 🛡️🛡️ R25 (R24-I10) ⭐ — ⭐ case **جديد** ⭐ (مفيش assertion اتضعّف ⭐):
+     ⭐ في الإنتاج ⭐ + مافيش مصدر إبطال مشترك ⭐ ⇒ ⛔ **fail-closed** ⭐
+     ⭐ (الذاكرة المحلية مش حماية كافية عبر نسخ الـWorker ⭐). */
+  const workerProd = loadWorker();
+  const envProd = Object.assign(makeEnv(), { APP_ENV: 'production' });
+  const cookieProd = await login(workerProd, envProd);
+  const outProd = await workerProd.fetch(req('/api/logout', {
+    method: 'POST', headers: { Cookie: cookieProd },
+  }), envProd);
+  assert.equal(outProd.status, 503,
+    '⛔⛔⛔ الإنتاج بدون مصدر إبطال مشترك ⇒ ⛔ لازم ٥٠٣ (fail-closed ⭐) ⭐');
 });

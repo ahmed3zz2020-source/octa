@@ -307,7 +307,12 @@ test('R23-DO-INT-02: a DO failure fails closed — the session is REFUSED, never
     const envB = makeEnv(makeKvReplica(backend, { lagMs: 60000 }), doNs);
 
     const cookie = await login(workerA, envA);
-    assert.equal(await logout(workerA, envA, cookie), 200);
+    /* 🛡️🛡️ R25 (R24-I09) ⭐ — العقد الجديد ⭐:
+       ⭐ «المصدر المتسق (الـDO) هو المرجع الأساسي» ⭐
+       ⭐ ⇒ فشل الـDO ⛔ **مش نجاح** ⭐ (٥٠٣ ⭐) — حتى لو الـKV اشتغل ⭐
+       ⭐ (الـKV **شاهد** ⭐ مش مرجع ⭐). */
+    assert.equal(await logout(workerA, envA, cookie), 503,
+      '⛔⛔⛔ الـDO فاشل ⇒ ⛔ الخرج ما ينفعش يعلن نجاح ⭐');
 
     const st = await sessionStatus(workerB, envB, cookie);
     assert.notEqual(st, 200,
