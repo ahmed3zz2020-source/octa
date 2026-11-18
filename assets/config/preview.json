@@ -1,0 +1,47 @@
+{
+  "contract": "octa-origin/v1",
+  "version": 1,
+  "updated": "2026-11-18",
+  "summary": "عقد وجهة الـAPI — بيقفل بين المعاينة والانتاج. المعاينة لازم سيرفر منفصل (داتا وبتخزين منفصلين) وممنوع تلمس الإنتاج ابداً.",
+  "production": {
+    "apiBaseUrl": "https://octa-prices-production-4ccb.up.railway.app",
+    "healthPath": "/api/health",
+    "hosts": [
+      "octashares.com",
+      "www.octashares.com",
+      "octa-prices-production-4ccb.up.railway.app"
+    ]
+  },
+  "preview": {
+    "apiBaseUrl": "",
+    "healthPath": "/api/health",
+    "mustBeSeparateFromProduction": true,
+    "mustHaveOwnDatabase": true,
+    "mustHaveOwnStorage": true,
+    "hosts": [],
+    "status": "unconfigured",
+    "ownerStep": "ضيف عنوان سيرفر المعاينة الدائم في preview.apiBaseUrl هنا، وضبط نفس العنوان في سر OCTA_API_URL (و OCTA_API_DIRECT) بتاع عامل المعاينة، وبعدين شغل: python3 /workspace/tools/r23_origin_preflight.py <العنوان>"
+  },
+  "forbidden": {
+    "hosts": [
+      "octashares.com",
+      "www.octashares.com",
+      "octa-prices-production-4ccb.up.railway.app"
+    ],
+    "hostSuffixes": [
+      ".trycloudflare.com",
+      ".ngrok.io",
+      ".ngrok-free.app",
+      ".loca.lt",
+      ".serveo.net",
+      ".localhost.run",
+      ".bore.pub"
+    ],
+    "why": "انفاق مؤقتة — بتتموت وبتسيب خطأ 530 (Cloudflare 1016). ما ينفعش تبقى وجهة دائمة."
+  },
+  "notes": [
+    "الواجهة بتقرأ العقدة دي (assets/js/octa-origin-guard.js) وبتقفل أي نداء API لو وجهة مضبوطة، أو الوجهة بتشير للإنتاج، أو الوجهة نفق مؤقت، أو الوجهة غلاب عن العقدة.",
+    "الإنتاج بيفضل شغال زي ما هو: نفس الأصل (الـworker) هو اللي بيتكلم مع الباك، والعقدة دي بتتأكد بس ان الإنتاج ما بيوصلش لوجهة المعاينة.",
+    "الفحص الحي (قبل ما تضبط السر): python3 /workspace/tools/r23_origin_preflight.py <العنوان> — قراءة بس."
+  ]
+}

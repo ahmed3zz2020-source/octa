@@ -53,18 +53,197 @@
      📌 ⚠️ الطلب لازم يكون GET عادي والترويسات بتتحط بنفسها. */
   try { window.OCTA_RAW_FETCH = ORIG_FETCH; } catch (e) { }
 
+  /* ════════════════════════════════════════════════════════════════
+   🛡️ الجولة ٢٣ (R23) — حارس الوجهة (fail-closed)
+   ────────────────────────────────────────────────────────────────
+   📌 المشكلة (مقاس): المعاينة كانت بتروّح على نفق ميت ⇒ 530/1016
+      ⇒ الواجهة فاكرة إن «الباسورد غلط» ⇒ المستخدم بيتّهم بإيمه.
+   📌 ⛔ القاعدة: المعاينة ⇒ ممنوع تلمس الإنتاج. ومفيش رجوع صامت.
+   📌 الحارس بيتحمّل من هنا (مش من index.html) ⇒ صفحة واحدة تتغير.
+   📌 ⛔ الإنتاج: مافيش blockade — نفس الأصل (الـworker) زي ما هو.
+   ════════════════════════════════════════════════════════════════ */
+  const OCTA_GUARD_SRC = '/assets/js/octa-origin-guard.js';
+
+  /* 📌 مضيفات الإنتاج — لازم تبقى مطابقة لـ octa-origin-guard.js
+     (فيه اختبار بيقارن الاتنين ⇒ مفيش انحراف بصمت). */
+  const OCTA_PROD_HOSTS = [
+    'octashares.com',
+    'www.octashares.com',
+    'octa-prices-production-4ccb.up.railway.app'
+  ];
+
+  function _octaHostOf(u) {
+    try {
+      const s = String(u || '');
+      if (!s) return '';
+      if (s.charAt(0) === '/') return '';
+      const m = s.match(/^https?:\/\/([^\/:?#]+)/i);
+      return m ? String(m[1]).toLowerCase() : '';
+    } catch (e) { return ''; }
+  }
+
+  function _octaIsProdHost(h) {
+    const x = String(h || '').toLowerCase();
+    if (!x) return false;
+    for (let i = 0; i < OCTA_PROD_HOSTS.length; i++) {
+      const p = OCTA_PROD_HOSTS[i];
+      if (x === p) return true;
+      if (x.length > p.length && x.slice(-(p.length + 1)) === '.' + p) return true;
+    }
+    return false;
+  }
+
+  /* 📦 المعاينة = أي حاجة مش على دومين الإنتاج */
+  function _octaPreviewMode() {
+    try {
+      const h = String((location && location.hostname) || '').toLowerCase();
+      if (!h) return true;          /* ⛔ مفيش دومين ⇒ نقفل */
+      return !_octaIsProdHost(h);
+    } catch (e) { return true; }
+  }
+
+  /* 📌 لواحق الأنفاق المؤقتة (لازم تطابق الـguard) */
+  const OCTA_TUNNEL_SUFFIXES = ['.trycloudflare.com', '.ngrok.io',
+    '.ngrok-free.app', '.loca.lt', '.serveo.net', '.localhost.run', '.bore.pub'];
+
+  function _octaIsTunnelHost(h) {
+    const x = String(h || '').toLowerCase();
+    if (!x) return false;
+    for (let i = 0; i < OCTA_TUNNEL_SUFFIXES.length; i++) {
+      const s = OCTA_TUNNEL_SUFFIXES[i];
+      if (x.length > s.length && x.slice(-s.length) === s) return true;
+    }
+    return false;
+  }
+
+  /* 📌 «شبه المعاينة» — ممنوع في الإنتاج (حماية قبل ما الحارس يجهز) */
+  function _octaIsPreviewLike(h) {
+    const x = String(h || '').toLowerCase();
+    if (!x) return false;
+    if (x.indexOf('preview') > -1) return true;
+    return _octaIsTunnelHost(x);
+  }
+
+  /* 📌 الحارس (لو محمّل) */
+  function _guardInstance() {
+    try { return window.OCTA_ORIGIN_GUARD || null; } catch (e) { return null; }
+  }
+
+  /* 📌 حكم **المضيف** (سريع · متزامن) — شبكة الأمان
+     ⛔ المعاينة ⇒ ممنوعة من الإنتاج والأنفاق.
+     ⛔ الإنتاج  ⇒ ممنوع من المعاينة والأنفاق. */
+  function _guardHostVerdict(url) {
+    try {
+      const host = _octaHostOf(url);
+      if (!host) return null;
+      if (_octaPreviewMode()) {
+        if (_octaIsProdHost(host) || _octaIsTunnelHost(host)) {
+          return {
+            ok: false, code: 'production_origin_in_preview',
+            message: 'المعاينة ممنوعة من الإنتاج ومن الأنفاق المؤقتة'
+          };
+        }
+      } else if (_octaIsPreviewLike(host)) {
+        return {
+          ok: false, code: 'preview_origin_in_production',
+          message: 'الإنتاج ممنوع من وجهة المعاينة ومن الأنفاق المؤقتة'
+        };
+      }
+    } catch (e) { }
+    try {
+      const g = _guardInstance();
+      if (g && typeof g.checkHost === 'function') {
+        const v = g.checkHost(url);
+        if (v && v.ok === false) return v;
+      }
+    } catch (e) { }
+    return null;
+  }
+
+  /* 📌 حكم الوجهة (للفشل التلقائي) — حكم المضيف + حكم العقدة */
+  function _guardAllow(url) {
+    const hv = _guardHostVerdict(url);
+    if (hv && hv.ok === false) return hv;
+    try {
+      const g = _guardInstance();
+      if (g && typeof g.allowOrigin === 'function') return g.allowOrigin(url);
+    } catch (e) { }
+    return null;
+  }
+
+  /* 🛡️ R23 — ⛔ جلسة اتباطلت (401 والتوكن كان مبعوت) ⇒ حالة انتهاء صريحة
+     📌 ⛔ زائر مجهول (مافيش توكن مبعوت) ⇒ ما نعملش حاجة. */
+  function _octaSessionExpired(url, opt) {
+    try {
+      let had = false;
+      try {
+        const h = opt && opt.headers;
+        if (h && typeof h.get === 'function') had = !!h.get('Authorization');
+      } catch (e) { had = false; }
+      if (!had) return;
+      if (typeof window.OCTAAuthFail === 'function') window.OCTAAuthFail(_pathOf(url));
+    } catch (e) { }
+  }
+
+  function _guardBlock(v) {
+    /* ⛔ نمنع الطلب ونرجّع خطأ واضح (مش 530 ولا «حصل خطأ») */
+    const msg = (v && v.message) ? String(v.message) : 'الطلب اتمنع';
+    const code = (v && v.code) ? String(v.code) : 'origin_blocked';
+    try {
+      const g = _guardInstance();
+      if (g && typeof g.showBanner === 'function') g.showBanner(v);
+    } catch (e) { }
+    const err = new Error(msg);
+    try { err.octaGuard = { code: code, message: msg }; } catch (e) { }
+    return Promise.reject(err);
+  }
+
+  /* 📦 تحميل سكربت الحارس (مرة واحدة) */
+  function _guardLoad() {
+    if (window.OCTA_ORIGIN_GUARD_LOAD) return window.OCTA_ORIGIN_GUARD_LOAD;
+    const p = new Promise(function (resolve) {
+      try {
+        const s = document.createElement('script');
+        s.src = OCTA_GUARD_SRC;
+        s.async = false;
+        s.onload = function () { resolve(window.OCTA_ORIGIN_GUARD_READY || null); };
+        s.onerror = function () { resolve(null); };
+        (document.head || document.documentElement).appendChild(s);
+      } catch (e) { resolve(null); }
+    });
+    window.OCTA_ORIGIN_GUARD_LOAD = p;
+    return p;
+  }
+
+  /* 📦 الحارس جاهز؟ (بيستنى التهيئة — مش بس تحميل الملف) */
+  function _guardReady() {
+    if (window.OCTA_ORIGIN_GUARD_READY) return window.OCTA_ORIGIN_GUARD_READY;
+    return _guardLoad();
+  }
+
+  try { window.OCTA_ORIGIN_GUARD_LOAD = _guardLoad(); } catch (e) { }
+
   let active = -1;  /* رقم السيرفر اللي شغال */
   let fails = {};   /* عدّاد فشل لكل سيرفر */
 
   function base() {
   if (active < 0) {
   for (let i = 0; i < SERVERS.length; i++) {
-  if (SERVERS[i].on) { active = i; break; }
+  if (!SERVERS[i].on) continue;
+  /* 🛡️ R23 — ⛔ ما نختارش مضيف إنتاج في وضع المعاينة */
+  const v = _guardAllow(SERVERS[i].url);
+  if (v && v.ok === false) {
+  try { console.warn('[OCTA] السيرفر اتمنع:', SERVERS[i].name, '-', v.code); } catch (x) { }
+  continue;
+  }
+  active = i; break;
   }
   }
   /* ⛔ مافيش سيرفرات ⇒ مافيش عنوان ⇒ مافيش اتصال بالإنتاج */
   if (!SERVERS.length) return '';
-  return SERVERS[active >= 0 ? active : 0].url;
+  /* 🛡️ R23 — ⛔ كل السيرفرات اتمنعت ⇒ مافيش عنوان (fail closed) */
+  if (active < 0) return '';
+  return SERVERS[active].url;
   }
 
   window.OCTADev = window.OCTADev || {};
@@ -80,12 +259,21 @@
   /* 🔄 بدّل السيرفر النشط */
   window.OCTAServer = {
   list: SERVERS,
-  current: () => (SERVERS.length ? SERVERS[active >= 0 ? active : 0] : { name: 'none', url: '' }),
+  current: () => (SERVERS.length && active >= 0
+  ? SERVERS[active]
+  : { name: 'none', url: '' }),
   /* لو السيرفر فشل n times → جرّب اللي بعده */
   failover: function () {
   fails[active] = (fails[active] || 0) + 1;
   for (let i = 0; i < SERVERS.length; i++) {
-  if (!SERVERS[i].on || i === active) continue;
+  if (!SERVERS[i].on) continue;
+  if (active >= 0 && i === active) continue;
+  /* 🛡️ R23 — ⛔ ممنوع نرجع للإنتاج من المعاينة (ولا نفق مؤقت) */
+  const v = _guardAllow(SERVERS[i].url);
+  if (v && v.ok === false) {
+  try { console.warn('[OCTA] التحويل اتمنع —', SERVERS[i].name, '-', v.code); } catch (x) { }
+  continue;
+  }
   active = i;
   window.OCTA_API = SERVERS[i].url;
   window.OCTA_DIRECT = SERVERS[i].url;
@@ -234,6 +422,10 @@
   if (!_isOurs(s)) return s;
   const i = s.indexOf('/api/');
   if (i === -1) return s;
+  /* 🛡️ R23 — ⛔ ممنوع نرجع للإنتاج (ولا نفق) من المعاينة
+     📌 ده كان المسار اللي بيربط الإنتاج بالمعاينة من غير ما حد ياخد باله. */
+  const v = _guardAllow(window.OCTA_DIRECT);
+  if (v && v.ok === false) return s;
   return window.OCTA_DIRECT + s.slice(i);
   }
 
@@ -311,7 +503,8 @@
 
   /* 🩺 شغّل على السيرفر التاني لو الرئيسي واقع */
   const ORIG = ORIG_FETCH;
-  window.fetch = function (url, opts) {
+  /* 🛡️ R23 — التنفيذ الأصلي (الحارس ملفّف بره) */
+  const _apiFetch = function (url, opts) {
   const s = String(url || '');
   /* ⛌ URL خارجي (مش نداء بتاعنا) → يفضل زي ما هو */
   if (!_isOurs(s)) return ORIG.apply(this, arguments);
@@ -448,6 +641,11 @@
   if (r.status === 401 && !_isOpen(_pathOf(s))) {
   try { console.warn('[OCTA] ' + _pathOf(s) + ' محمي — توكن ناقص'); }
   catch (e) { }
+  /* 🛡️ R23 (الجولة ٢٣) — ⛔ جلسة **باطلة** ⇒ حالة انتهاء صريحة
+  📌 التOKEن كان مبعوت (يعني المستخدم داخل) والسيرفر رجّع 401
+  📌 ⇒ الجلسة انتهت (أو اتباطلت) ⇒ لازم المستخدم يعرف السبب
+  📌 ⛔ زائر مجهول (مافيش توكن) ⇒ مافيش جلسة تنتهي ⇒ ما نعملش حاجة. */
+  _octaSessionExpired(s, opt);
   }
   return r;
   })
@@ -458,6 +656,40 @@
   window.OCTAServer.failover();
   try { console.warn('[OCTA]_primary failed — trying direct API'); } catch (x) { }
   return ORIG.call(window, nu, _withToken(nu, opts));
+  });
+  };
+
+  /* ════════════════════════════════════════════════════════════════
+   🛡️ R23 — الحارس ملفّف حوالين الـfetch
+   ────────────────────────────────────────────────────────────────
+   📌 أي نداء /api/ لازم يعدّي من الحارس **قبل** ما يطلع على الشبكة.
+   📌 ⛔ لو الحارس رفض ⇒ بنرجّع خطأ واضح (مفيش 530 ولا صمت).
+   📌 ⛔ لو الحارس لسه بيحمّل ⇒ بنستناه (مرة واحدة) — مافيش طلب
+      يعدّي قبل ما الحكم يخلص.
+   ════════════════════════════════════════════════════════════════ */
+  window.fetch = function (url, opts) {
+  const s = String(url || '');
+  /* 🛡️ R23 — ⛔ ممنوع أي نداء لمضيف إنتاج في وضع المعاينة (فوراً) */
+  const hv = _guardHostVerdict(s);
+  if (hv && hv.ok === false) return _guardBlock(hv);
+  if (!_isOurs(s)) return _apiFetch.apply(this, arguments);
+  if (s.indexOf('/api/') === -1) return _apiFetch.apply(this, arguments);
+  const g = _guardInstance();
+  if (g && typeof g.check === 'function') {
+  let v = null;
+  try { v = g.check(s); } catch (e) { v = null; }
+  if (v && v.ok === false) return _guardBlock(v);
+  return _apiFetch.apply(this, arguments);
+  }
+  /* ⛔ الحارس لسه بيحمّل ⇒ نستناه قبل أي نداء */
+  return _guardReady().then(function (gg) {
+  if (gg && typeof gg.check === 'function') {
+  const v = gg.check(s);
+  if (v && v.ok === false) return _guardBlock(v);
+  }
+  return _apiFetch.call(window, s, opts);
+  }, function () {
+  return _apiFetch.call(window, s, opts);
   });
   };
 

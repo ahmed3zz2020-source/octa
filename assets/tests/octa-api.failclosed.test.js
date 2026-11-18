@@ -49,7 +49,14 @@ function loadApi(opts) {
   const sandbox = {
     window: win,
     console: console,
-    location: { origin: 'https://octa-preview.example.test' },
+    /* 📌 الجولة ٢٣ (R23) — الـhostname مهم دلوقتي:
+       ⛔ المعاينة (أي دومين غير الإنتاج) ⇒ ممنوعة من الإنتاج
+       ⇒ من غير fail-closed ⇒ مافيش اتصال مباشر بالإنتاج.
+       📌 فمحاكاة الإنتاج لازم يكون الـhostname بتاع الإنتاج. */
+    location: {
+      origin: o.origin || 'https://octa-preview.example.test',
+      hostname: o.hostname || 'octa-preview.example.test'
+    },
     localStorage: { getItem: () => null, setItem: () => { }, removeItem: () => { } },
     Headers: globalThis.Headers,
     AbortController: globalThis.AbortController,
@@ -93,9 +100,23 @@ test('P0-01 · وضع الإغلاق الآمن + قائمة محقونة ⇒ ا
 });
 
 test('P0-01 · من غير علامة الإغلاق (الإنتاج) ⇒ السلوك القديم ما يتغيّرش', () => {
-  const { win } = loadApi({});
+  /* 📌 الجولة ٢٣ (R23) — محاكاة الإنتاج لازم بدومين الإنتاج
+     ⛔ (من غير ده: أي دومين تاني = معاينة ⇒ ممنوعة من الإنتاج). */
+  const { win } = loadApi({
+    hostname: 'octashares.com',
+    origin: 'https://octashares.com'
+  });
   assert.strictEqual(win.OCTA_DIRECT, PROD, 'الإنتاج لازم يفضل على الاتصال المباشر');
   assert.strictEqual(win.OCTAServer.current().name, 'railway');
+});
+
+test('P0-01 · ⛔ الجولة ٢٣ (R23) · من غير علامة الإغلاق (معاينة) ⇒ مافيش ارتجاع للإنتاج', () => {
+  /* 📌 العيب اللي التكليف سمّاه: «مفيش رجوع صامت للإنتاج».
+     ⛔ المعاينة (دومين غير الإنتاج) + من غير fail-closed
+     ⇒ القائمة الافتراضية (إنتاج) تُمنع ⇒ مافيش عنوان مباشر. */
+  const { win } = loadApi({ hostname: 'octa-preview.example.test' });
+  assert.strictEqual(win.OCTA_DIRECT, '', 'المعاينة اترجعت للإنتاج');
+  assert.notStrictEqual(win.OCTAServer.current().url, PROD, 'السيرفر الحالي للإنتاج');
 });
 
 test('P0-01 · فشل الطلب في وضع الإغلاق الآمن ⇒ إعادة المحاولة ما تروحش للإنتاج', async () => {

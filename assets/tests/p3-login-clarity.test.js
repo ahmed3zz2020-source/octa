@@ -31,9 +31,25 @@ const AUTH = fs.readFileSync(path.join(ROOT, 'assets', 'js', 'octa-auth.js'), 'u
 const MSG_MAINT = 'مؤقتًا غير متاحة';
 const MSG_CHECK = 'افحص حالة الخدمة';
 
+/* ⛔ يستخرج قاموس كائن من المصدر (مطابقة الأقواس) ⬇️ */
+function extractObj(src, marker) {
+  const i = src.indexOf(marker);
+  assert.ok(i > -1, 'مألقاش: ' + marker);
+  const start = src.indexOf('{', i + marker.length - 1);
+  let depth = 0;
+  for (let k = start; k < src.length; k++) {
+    const c = src[k];
+    if (c === '{') depth++;
+    else if (c === '}') {
+      depth--;
+      if (depth === 0) return src.slice(start, k + 1);
+    }
+  }
+  throw new Error('القوس مش مقفول: ' + marker);
+}
+
 /* ⛔ يستخرج جسم دالة من المصدر (مطابقة الأقواس) ⬇️ */
-function extractBody(src, anchor, fnMarker) {
-  const i = src.indexOf(anchor);
+function extractBody(src, anchor, fnMarker) {  const i = src.indexOf(anchor);
   assert.ok(i > -1, 'مألقاش الموضع: ' + anchor);
   const fi = src.indexOf(fnMarker, i);
   assert.ok(fi > -1, 'مألقاش الدالة: ' + fnMarker);
@@ -89,12 +105,19 @@ function runGateLogin(o) {
   const body = extractBody(GATE, "post('/api/auth/pin/login'", 'function (o)');
   const isApiDownSrc = extractFn(GATE, 'isApiDown');
   const isApiDown = new Function('return (' + isApiDownSrc + ')')();
+  /* 🛡️ الجولة ٢٣ (R23) — دالة خطأ الوجهة (نفس قاموس البوابة) */
+  const FAULTS = new Function('return (' + extractObj(GATE, 'var ORIGIN_FAULTS = {') + ')')();
+  const originFault = new Function('ORIGIN_FAULTS',
+    'return (' + extractFn(GATE, 'originFault') + ')')(FAULTS);
+  const originMsg = new Function('ORIGIN_FAULTS',
+    'return (' + extractFn(GATE, 'originMsg') + ')')(FAULTS);
   const calls = { said: [], strikePush: 0, strikeReset: 0, recordTriedPin: 0, badPin: 0, locked: 0, askCode: 0 };
   const state = { tries: 0 };
   const fn = new Function(
     'o', 'p', 'state', 'isApiDown', 'API_DOWN_MSG', 'API_DOWN_HINT',
     'strikeReset', 'say', 'paintPad', 'locked', 'askCode', 'needCode',
     'recordTriedPin', 'strikePush', 'badPin', 'winLeft', 'STRIKE_LIMIT',
+    'originFault', 'originMsg',
     body);
   fn(o, '1234', state, isApiDown, 'الخدمة مؤقتًا غير متاحة — جرّب بعد قليل', MSG_CHECK,
     function () { calls.strikeReset++; },
@@ -107,7 +130,8 @@ function runGateLogin(o) {
     function () { calls.strikePush++; return 1; },
     function () { calls.badPin++; },
     function () { return 5; },
-    5);
+    5,
+    originFault, originMsg);
   return { calls: calls, state: state };
 }
 

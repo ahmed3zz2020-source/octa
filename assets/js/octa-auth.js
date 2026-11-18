@@ -309,8 +309,17 @@
   go.disabled = false;
   go.textContent = isLogin ? 'دخول' : 'أنشئ حسابي';
   }
-  }).catch(function () {
-  msg('❌ الاتصال فشل — حاول تاني', false);
+  }).catch(function (e) {
+  /* 🛡️ R23 (الجولة ٢٣) — ⛔ الحارس رفض الطلب ⇒ سبب **محدّد**
+  📌 (وجهة مقفولة · نفق · DNS · مش رادّة) — مش «الاتصال فشل». */
+  var gm = '';
+  try {
+   var gc = (e && e.octaGuard && e.octaGuard.code) ? String(e.octaGuard.code) : '';
+   if (gc && window.OCTAOriginGuard && typeof window.OCTAOriginGuard.messageFor === 'function') {
+    gm = window.OCTAOriginGuard.messageFor(gc);
+   }
+  } catch (x) { gm = ''; }
+  msg('❌ ' + (gm || 'الاتصال فشل — حاول تاني'), false);
   go.disabled = false;
   go.textContent = isLogin ? 'دخول' : 'أنشئ حسابي';
   });

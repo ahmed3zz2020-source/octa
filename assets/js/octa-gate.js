@@ -121,7 +121,12 @@
    ⛌ ⛌ النتيجة: المستخدم بيكتب ٤ أرقام ولا حاجة بتحصل.
    ⛌ ⛌ الحل: نرجّع حالة pseudo عشان الـcaller يشوف ويفرز اللوحة. */
  }).catch(function (e) {
- return { s: 0, d: {}, err: String((e && e.message) || e || 'network') };
+ /* 🛡️ R23 (الجولة ٢٣) — ⛔ الحارس رفض الطلب (وجهة مقفولة/ميتة)
+   📌 بنحمل السبب في why ⇒ الواجهة بتقول السبب **المحدّد**
+   📌 بدل «الشبكة ضعيفة» أو (أخطر) «الباسورد غلط». */
+ var gc = '';
+ try { gc = (e && e.octaGuard && e.octaGuard.code) ? String(e.octaGuard.code) : ''; } catch (x) { gc = ''; }
+ return { s: 0, d: {}, err: String((e && e.message) || e || 'network'), why: gc };
  });
  }
 
@@ -149,6 +154,13 @@
  try { d = JSON.parse(txt); } catch (e) { d = null; }
  return { s: r.status, d: d || {} };
  }, function () { return { s: r.status, d: {} }; });
+ /* 🛡️ R23 (الجولة ٢٣) — ⛔ catch للشبكة + سبب الحارس
+ 📌 قبل: مافيش catch ⇒ أي فشل في الشبكة كان بيخلّي الطلب واقف
+ 📌 للأبد (المستخدم بيفضل «بيحاول» من غير نهاية). */
+ }).catch(function (e) {
+ var gc = '';
+ try { gc = (e && e.octaGuard && e.octaGuard.code) ? String(e.octaGuard.code) : ''; } catch (x) { gc = ''; }
+ return { s: 0, d: {}, err: String((e && e.message) || e || 'network'), why: gc };
  });
  }
 
@@ -359,6 +371,35 @@
  function isApiDown(d) {
   return !!(d && d.why === 'api_unreachable');
  }
+
+ /* ════════════════════════════════════════════════════════════════
+ 🛡️ الجولة ٢٣ (R23) — خطأ **الوجهة** (مش خطأ المستخدم) ⬇️
+ ────────────────────────────────────────────────────────────────
+ 📌 الحالات: المعاينة مقفولة · وجهة ناقصة · نفق مؤقت · DNS ·
+    وجهة مش رادّة · تعارض مع ملف الإعداد.
+ ⛔ دي **محدّدة** — والمستخدم لازم يعرف إن المشكلة في البنية
+    مش في حسابه (ومفروض مافيش خصم من عدّاد المحاولات).
+ 📌 نفس قواميس الأكواد في octa-origin-guard.js (MESSAGES).
+ ════════════════════════════════════════════════════════════════ */
+ var ORIGIN_FAULTS = {
+ origin_missing: 'وجهة الخدمة للمعاينة مش مضبوطة — المعاينة مقفولة',
+ config_missing: 'ملف إعداد المعاينة ناقص — المعاينة مقفولة',
+ origin_mismatch: 'وجهة الخدمة مختلفة عن ملف الإعداد — المعاينة مقفولة',
+ production_origin_in_preview: 'المعاينة كانت هتروح على الإنتاج — اتمنعت',
+ preview_origin_in_production: 'الإنتاج كان هيروح على المعاينة — اتمنعت',
+ tunnel_origin: 'وجهة الخدمة نفق مؤقت — لازم سيرفر دائم',
+ origin_dns_error: 'وجهة الخدمة مش موجودة (DNS) — النفق انتهى',
+ origin_unreachable: 'وجهة الخدمة مش رادّة — الخدمة مش شغّالة',
+ origin_blocked: 'الطلب اتمنع عشان وجهة الخدمة'
+ };
+ /* 📌 بيرجّع كود خطأ الوجهة (ولو فاضي) */
+ function originFault(o) {
+  if (!o) return '';
+  var w = String((o.d && o.d.why) || o.why || '');
+  if (w && ORIGIN_FAULTS[w]) return w;
+  return '';
+ }
+ function originMsg(w) { return ORIGIN_FAULTS[w] || API_DOWN_MSG; }
 
  /* ok = true (أخضر) · false (أحمر) · 'hi' (عادي) */
  function say(t, ok) {
@@ -928,6 +969,13 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  ⛔ باقي الرسائل (email_taken · pin_taken · غيرها) زي ما هي. */
  if (isApiDown(d)) {
  say('⚠️ ' + API_DOWN_MSG + ' — ' + API_DOWN_HINT, false);
+ shake();
+ return;
+ }
+ /* 🛡️ R23 (الجولة ٢٣) — ⛔ خطأ **الوجهة** ⇒ رسالة محدّدة */
+ var _of = originFault(o);
+ if (_of) {
+ say('⛔ ' + originMsg(_of), false);
  shake();
  return;
  }
@@ -1570,7 +1618,14 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  /* ⛔ شبكة (s===0) — مش خطأ باسورد. مافيش خصم من العدّاد. */
  if (o.s === 0) {
  state.tries = 0; strikeReset();
+ /* 🛡️ R23 (الجولة ٢٣) — ⛔ خطأ **الوجهة** ⇒ رسالة محدّدة
+ 📌 (وجهة مقفولة · نفق · DNS · مش رادّة) — مش «شبكة ضعيفة». */
+ var _of = originFault(o);
+ if (_of) {
+ say('⛔ ' + originMsg(_of), false);
+ } else {
  say('⚠️ الشبكة ضعيفة — جاوب تاني', false);
+ }
  paintPad(false);
  return;
  }
