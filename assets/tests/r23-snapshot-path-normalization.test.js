@@ -133,7 +133,7 @@ test('R23-03: ⭐⭐ برهان سالب ⭐⭐ — الدالة القديمة 
       const p = String(pathname || '').toLowerCase();
       return OLD_PATHS.indexOf(p) !== -1;
     };
-    /* ⭐ لازم ن至少 الصيغ اللي بتتجاوز ⭐ (وإلا الاختبار مالهوش معنى ⭐) */
+    /* ⭐ لازم نجيب الصيغ اللي بتتجاوز ⭐ (وإلا الاختبار مالهوش معنى ⭐) */
     const bypassed = LEAK_VARIANTS.filter(p => !oldIsSnapshotPath(p));
     assert.ok(bypassed.length >= 5,
       `الدالة القديمة كانت بتتجاوز ${bypassed.length} صيغة بس ⭐ — لازم 5+ ⭐`);
