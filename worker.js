@@ -621,8 +621,41 @@ const SNAPSHOT_PATHS = [
   '/data/alpha_snapshot.json'
 ];
 
+/* 🛡️ الجولة ٢٣ (R23) — تطبيع المسار قبل المقارنة ⭐
+   📌 العيب المقاس حيًّا (١٨ نوفمبر ٢٠٢٦ ⭐):
+      https://octashares.com/data/opp_snapshot.json      ⇒ 200 (1,460,164 B ⭐)
+      https://octashares.com/data/./opp_snapshot.json     ⇒ 200 (1,460,164 B ⭐)
+      https://octashares.com/data/%6fpp_snapshot.json    ⇒ 307 ⇒ 200 ⭐
+   📌 ⛔ السبب: المقارنة كانت **تامة** على `pathname.toLowerCase()` ⭐
+      ⇒ `./` و`//` والمُرمَّز كلها بتتجاوز الحارس ⭐ ⭐
+   ✅ الحل: تطبيع كامل ⭐ (decode ⭐ + resolve `./` و`..` ⭐ + collapse `//` ⭐
+      + قصّ الشرطة الأخيرة ⭐ + lower ⭐) ⭐ والمقارنة على **المسار المُطبَّع** ⭐
+      ⭐ ⇒ كل الصيغ المقاسة بتتسد ⭐.
+   ⛔ الأوزان والمنهجيات ما اتغيّرتش ⭐ — ده حارس وصول ⭐.
+*/
+function normalizeAssetPath(pathname) {
+  let p = String(pathname == null ? '' : pathname);
+  /* ①-decoding (مرة واحدة ⭐) — `%6f` ⇒ `o` ⭐
+     ⛔ لازم نرمي الـdecode لو فشل ⭐ (مش نبلع المسار الخام ⭐) */
+  try { p = decodeURIComponent(p); } catch (e) { /* مسار مش مطبوع ⇒ نكمل ⭐ */ }
+  /* ②-تطبيع الـbackslash ⭐ */
+  p = p.replace(/\\/g, '/');
+  /* ③-حلّ المقاطع النسبية `.` و`..` ⭐ + ضغط `//` ⭐ */
+  const parts = [];
+  for (const seg of p.split('/')) {
+    if (seg === '' || seg === '.') continue;          /* ⭐ `//` و`.` ⭐ */
+    if (seg === '..') { parts.pop(); continue; }        /* ⭐ `..` ⭐ */
+    parts.push(seg);
+  }
+  p = '/' + parts.join('/');
+  /* ④-قصّ الشرطة الأخيرة ⭐ */
+  if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
+  /* ⑤-حروف صغيرة ⭐ */
+  return p.toLowerCase();
+}
+
 function isSnapshotPath(pathname) {
-  const p = String(pathname || '').toLowerCase();
+  const p = normalizeAssetPath(pathname);
   return SNAPSHOT_PATHS.indexOf(p) !== -1;
 }
 
