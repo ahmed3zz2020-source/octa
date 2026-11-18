@@ -1,0 +1,281 @@
+name: OCTA Interface CI — الجولة ٢٣ (بوابات حقيقية)
+
+# OCTA-CI-GATES-V1 profile=frontend
+#
+# 📌 ليه الملف ده على فرع `ci/octa-ci-r23-fe`؟
+#    ⇒ remote main في مستودع الواجهة **مش فيه** أي ملف
+#      تحت `.github/workflows/` ⇒ أي ملف CI جديد =Push بيحتاج
+#      scope اسمه `workflow` في التوكن.
+#    ⇒ فرع الـci هو المكان الصح للـCI الحقيقي، ويننشر بتوكن
+#      عنده scope `workflow`.
+#
+# ⛔ قواعد الـCI (كلها متحقَّقة آلياً بـ tools/test_ci_gates.py):
+#   ① `npm ci` = **بوابة صارمة**: لو فشل الـjob فشل وكل خطوة بعده
+#      اتخطّت (مفيش continue-on-error · مفيش `|| true` · مفيش
+#      `|| npm install` كبديل).
+#   ② **كل** ملف اختبار موجود في المستودع بيشتغل (مفيش استبعاد
+#      صامت · مفيش `--test-name-pattern` · مفيش حذف ملفات اختبار) —
+#      وأي ملف محتاج متصفح/سيرفر حيّ/الباك الشقيق ليه **بوابة
+#      بديلة إلزامية** بتشتغل جواه نفس الـjob.
+#   ③ الفشل في أي اختبار ⇒ الـjob بيفشل.
+#   ④ حُرّاس المستودع (نظافة النص · جرد XSS · نسخة الإنتاج · حارس
+#      الـCI) = بوابات بتفشل الـpipeline.
+#   ⑤ مفيش أسرار · مفيش نشر · مفيش دفع · مفيش موارد مدفوعة.
+
+on:
+  push:
+    branches:
+      - main
+      - 'ci/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  # ══════════════════════════════════════════════════════════════
+  # ① البوابة الأولى: تثبيت الاعتماديات (صارم)
+  # ══════════════════════════════════════════════════════════════
+  dependency-install:
+    name: "📦 ١) تثبيت الاعتماديات — بوابة صارمة"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "📥 تحميل الكود"
+        uses: actions/checkout@v4
+
+      - name: "🟢 تجهيز Node"
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: "📦 npm ci (فشل التثبيت ⇒ فشل الـjob)"
+        run: |
+          set -euo pipefail
+          echo "📦 تثبيت الاعتماديات من package-lock.json…"
+          npm ci --no-audit --no-fund
+          echo "✅ التثبيت خلص بنجاح"
+
+      - name: "🔬 تحقّق إن التثبيت تمّ فعلاً (npm ls)"
+        run: |
+          set -euo pipefail
+          npm ls --depth=0
+          node --version
+          npm --version
+
+      - name: "🛡️ حارس الـCI (لازم ملف الـCI نفسه نضيف)"
+        run: python3 tools/test_ci_gates.py .github/workflows/ci.yml
+
+  # ══════════════════════════════════════════════════════════════
+  # ② كل اختبارات الواجهة (كل ملف موجود — بلا استبعاد صامت)
+  # ══════════════════════════════════════════════════════════════
+  frontend-suite:
+    name: "🖥️ ٢) اختبارات الواجهة — كل الملفات (بوابة صارمة)"
+    needs: dependency-install
+    runs-on: ubuntu-latest
+    steps:
+      - name: "📥 تحميل الكود"
+        uses: actions/checkout@v4
+
+      - name: "🟢 تجهيز Node"
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: "📦 npm ci (بوابة صارمة)"
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+
+      - name: "🖥️ تشغيل كل اختبارات الواجهة (تشغيل كل ملف · عدّاد لكل ملف)"
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          import sys
+
+          def bail(code):
+              sys.stdout.flush()
+              sys.stderr.flush()
+              os._exit(code)
+
+          ROOT = os.getcwd()
+
+          # ─────────────────────────────────────────────────────
+          #  ① اكتشاف **كل** ملفات الاختبار في المستودع
+          #     (من git ls-files ⇒ الملفات المتتبَّعة بس)
+          # ─────────────────────────────────────────────────────
+          NAME_RE = re.compile(r"^(test[_-].*|.*\.(test|spec)\.[cm]?js)$")
+          tracked = subprocess.run(["git", "ls-files"], capture_output=True,
+                                   text=True, encoding="utf-8",
+                                   errors="replace", timeout=120).stdout.split()
+          # ⛔ أدوات الـCI نفسها (مش اختبارات) ⇒ بتتشال من الكشف
+          NOT_TESTS = {"tools/test_ci_gates.py"}
+          found = sorted(f for f in tracked
+                         if f.endswith((".js", ".mjs", ".cjs", ".py"))
+                         and NAME_RE.match(os.path.basename(f))
+                         and f not in NOT_TESTS)
+
+          # ─────────────────────────────────────────────────────
+          #  ⓪ الملفات اللي **مش** قادرة تشتغل في الـCI:
+          #     كل واحد فيهم لازم يكون ليه **بوابة بديلة إلزامية**
+          #     بتشتغل في نفس الـjob (ومش بتتخطّى).
+          # ─────────────────────────────────────────────────────
+          GATE_FILE = "tools/test_ci_alt_gates.mjs"
+          GATED = {
+              "mgmt/test_live.py": ("G4", "لوحة الإدارة حيّاً + متصفح + كلمة مرور"),
+              "mgmt/tests/test_panel_e2e.py": ("G5", "متصفح حقيقي على اللوحة"),
+              "test-screener-merge.mjs": ("G3", "بيانات حيّة من الإنتاج"),
+              "test_gold_savings_ui.py": ("G6", "متصفح حقيقي"),
+              "tools/test-data-routing.js": ("G15", "مستودع الباك الشقيق"),
+              "tools/test-halan-news.js": ("G14", "مستودع الباك الشقيق"),
+              "tools/test-index-ui.js": ("G1", "متصفح + معاينة حيّة"),
+              "tools/test-news-axis-page.py": ("G7", "متصفح حقيقي"),
+              "tools/test-news-axis-paths.py": ("G8", "متصفح حقيقي"),
+              "tools/test-news-axis-visual.py": ("G9", "متصفح + معاينة حيّة"),
+              "tools/test-usd-ui.js": ("G2", "متصفح + معاينة حيّة"),
+              "tools/test_gauge.py": ("G10", "متصفح حقيقي"),
+              "tools/test_intel_modal.py": ("G11", "متصفح + معاينة حيّة"),
+              "tools/test_preview_isolation.py": ("G12", "متصفح + معاينة حيّة"),
+              "tools/test_webapk_update.py": ("G13", "متصفح + سيرفر محلي"),
+          }
+
+          print("📂 عدد ملفات الاختبار المكتشفة في المستودع: %d" % len(found))
+          for f in found:
+              print("   · %s" % f)
+          print("")
+
+          # ⓪ البوابة البديلة لازم موجودة
+          if not os.path.isfile(os.path.join(ROOT, GATE_FILE)):
+              print("⛔ البوابة البديلة الإلزامية %s مش موجودة!" % GATE_FILE)
+              bail(1)
+
+          # ⓪⓪ التصنيف لازم يبقى متزامن مع المستودع:
+          #      · كل ملف في قائمة «المعزولة» لازم يكون موجود فعلاً
+          #      · أي ملف تاني (الجديد) بيتشغّل **افتراضياً** ⇒
+          #        مفيش طريقة تستبعد ملف من غير ما يبان في اللوق
+          stale = [f for f in GATED if f not in found]
+          if stale:
+              print("⛔ تصنيف «الملفات المعزولة» قديم — ملفات مش موجودة:")
+              for f in stale:
+                  print("   · %s" % f)
+              bail(1)
+          print("ℹ️  ملفات معزولة (لها بوابة بديلة إلزامية): %d" % len(GATED))
+          print("ℹ️  ملفات بتشتغل مباشرة: %d" % (len(found) - len(GATED)))
+
+          def run_node(path):
+              return subprocess.run(["node", "--test", path], cwd=ROOT,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE,
+                                    encoding="utf-8", errors="replace",
+                                    timeout=1800)
+
+          def counts(out):
+              p = re.search(r"^# pass (\d+)", out, re.M)
+              f = re.search(r"^# fail (\d+)", out, re.M)
+              s = re.search(r"^# skipped (\d+)", out, re.M)
+              return (int(p.group(1)) if p else None,
+                      int(f.group(1)) if f else None,
+                      int(s.group(1)) if s else None)
+
+          passed = failed = 0
+          total_pass = total_fail = total_skip = 0
+          failures = []
+          isolated = []
+          for f in found:
+              if f in GATED:
+                  sec, why = GATED[f]
+                  print("⚠️  معزول (مش بيتنفّذ هنا): %s" % f)
+                  print("    ↳ السبب: %s" % why)
+                  print("    ↳ البوابة البديلة الإلزامية: %s (%s)"
+                        % (GATE_FILE, sec))
+                  isolated.append(f)
+                  continue
+              try:
+                  r = run_node(f)
+                  rc, out, err = r.returncode, r.stdout or "", r.stderr or ""
+              except subprocess.TimeoutExpired:
+                  rc, out, err = 124, "", "⏱️ تجاوز الوقت (30 دقيقة)"
+              p, fl, sk = counts(out)
+              if p:
+                  total_pass += p
+              if fl:
+                  total_fail += fl
+              if sk:
+                  total_skip += sk
+              print("%-52s %-4s rc=%-3s pass=%-4s fail=%-3s skipped=%-3s"
+                    % (f, "PASS" if rc == 0 else "FAIL", rc,
+                       p if p is not None else "-",
+                       fl if fl is not None else "-",
+                       sk if sk is not None else "-"))
+              if rc == 0:
+                  passed += 1
+              else:
+                  failed += 1
+                  failures.append((f, rc, out[-4000:], err[-2000:]))
+
+          print("")
+          print("=" * 74)
+          print("📊 اختبارات الواجهة: %d ملف · %d نجح · %d فشل · %d معزول"
+                % (len(found), passed, failed, len(isolated)))
+          print("   حالات: %d نجحت · %d فشلت · %d متخطّاة"
+                % (total_pass, total_fail, total_skip))
+          print("=" * 74)
+          if failures:
+              for f, rc, out, err in failures:
+                  print("")
+                  print("⛔ فشل: %s (rc=%s)" % (f, rc))
+                  print(out)
+                  print("--stderr--")
+                  print(err)
+              bail(1)
+          print("✅ كل اختبارات الواجهة عدّت")
+          bail(0)
+          PY
+
+  # ══════════════════════════════════════════════════════════════
+  # ③ حُرّاس المستودع (نظافة النص · XSS · نسخة الإنتاج · حارس الـCI)
+  # ══════════════════════════════════════════════════════════════
+  hygiene-guards:
+    name: "🧹 ٣) حُرّاس المستودع — نظافة النص + XSS + نسخة الإنتاج + حارس الـCI"
+    needs: frontend-suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: "📥 تحميل الكود"
+        uses: actions/checkout@v4
+
+      - name: "🟢 تجهيز Node"
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: "📦 npm ci (بوابة صارمة)"
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+
+      - name: "🔤 حارس نظافة النص (حروف تالفة / أسماء أدوات)"
+        run: node tools/check-text-hygiene.js
+
+      - name: "🛡️ جرد XSS + التصنيف"
+        run: node tools/xss-inventory.js --triage ci-xss-triage.md
+
+      - name: "🏗️ حارس البناء (نسخة الإنتاج)"
+        run: npm run build
+
+      - name: "📦 حارس نسخة الإنتاج (check-dist)"
+        run: node tools/check-dist.js
+
+      - name: "🔎 التأكد إن مافيش اختبارات في نسخة الإنتاج"
+        run: |
+          set -euo pipefail
+          if [ -d dist/assets/tests ]; then
+            echo "⛔ ملفات اختبارات داخل dist — البناء مرفوض"
+            exit 1
+          fi
+          echo "✅ مافيش اختبارات في نسخة الإنتاج"
+
+      - name: "🛡️ حارس بوّابات الـCI (tools/test_ci_gates.py)"
+        run: python3 tools/test_ci_gates.py .github/workflows/ci.yml
