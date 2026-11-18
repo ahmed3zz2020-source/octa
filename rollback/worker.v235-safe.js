@@ -1,0 +1,2837 @@
+/* ═══════════════════════════════════════════════════════════
+   🐙 OCTA — Worker entrypoint
+   ───────────────────────────────────────────────────────────
+   Proxy /api/* → octa-prices-production-4ccb.up.railway.app
+   (يحايل CORS + cross-origin-resource-policy في الباك).
+   باقي الطلبات → static assets في dist/.
+
+   ⚠️ ليش فيه إعادة محاولة؟
+   الاتصال من الـWorker للـRailway بيتقطّع أحياناً (TLS reset من
+   الطرف التاني) — والطلب كان بيرجع 503 للمستخدم من غير سبب.
+   فبنحاول ٣ مرات بتباعد قصير قبل ما نرجّع خطأ.
+
+   ═══════════════════════════════════════════════════════════
+   🚪 البوابة — ٢١ أكتوبر ٢٠٢٦
+   ───────────────────────────────────────────────────────────
+   ⛔⛔⛔ المشكلة: الـWorker كان بيقدّم التطبيق **كله** (١٫٨ ميجا)
+   لأي زائر — حتى لو مش مسجّل. والبيانات كانت بتنزل من غير توكن.
+
+   ⛌ الحل: الـWorker بيفحص **كوكي الجلسة**:
+     · كوكي present  → التطبيق (زي ما كان)
+     · مفيش كوكي    → صفحة بوابة صغيرة (gate.html) بدل التطبيق
+
+   ⛌ ليه كوكي وليه مش localStorage؟
+     الـWorker مش بيقدر يقرا localStorage — ده المتصفح بس.
+     فالجلسة لازم تكون كوكي على دومين الموقع. الـكوكي HttpOnly
+     (يعني السكربتات ماتقراهوش) + SameSite=Lax + Secure.
+
+   ⛌⛔ مهم — البوابة **مش** بديل عن حماية الباك:
+     الباك نفسه بقى يقفل كل مسار بيانات ورا توكن
+     (api_gate في update_prices.py). البوابة دي طبقة أولى
+     (بتوفّر ١٫٨ ميجا للزائر المجهول) — والباك هو الطبقة
+     اللي بتمنع تنزيل الداتا فعلياً.
+   ═══════════════════════════════════════════════════════════ */
+
+/* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ — دفعة الأمان ٠٢ — ⛔ وجهة الـAPI من البيئة ⬇️
+   📌 ⬇️ قبل: الرابط **مكتوب** ⬇️ ⬇️ ⇒ المعاينة والإنتاج بيخدموا ⬇️
+   📌 ⬇️ نفس الباك دايماً ⬇️ ⬇️ ⇒ مستحيل نختبر الإصلاحات ⬇️ ⬇️
+   📌 ⬇️ على بيئة معزولة ⬇️ ⬇️
+   ✅ الحل: `env.OCTA_API_URL` ⬇️
+   ⛔ ⬇️ الإنتاج: مش متظبطلوش ⇒ الرابط الافتراضي (الإنتاج) ⬇️ ⬇️
+   ⛔ ⬇️ ⇒ ما فيش أي تغيير على سلوك الإنتاج ⬇️ ⬇️
+   ⛔ ⬇️ المعاينة: `OCTA_API_URL` = الباك التجريبي ⬇️ ⬇️ */
+const API_DEFAULT = 'https://octa-prices-production-4ccb.up.railway.app';
+
+/* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ سياسة CSP (Report-Only) ⬇️
+   📌 ⬇️ نفس قواعد الـmeta في index.html ⬇️ ⬇️
+   📌 ⬇️ + 'unsafe-inline' مؤقتاً (لأن فيه onclick جوه الـHTML) ⬇️ ⬇️
+   📌 ⬇️ ⇒ لما نخلص نقل الـonclick ⇒ نشيلها ⇒ نحوّل لـenforce ⬇️ ⬇️
+   📌 📌 الخطة: doc/CSP-PLAN.md ⬇️ */
+function cspPolicy() {
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ — ⛔ الـCSP يتبع الوجهة ⬇️
+     📌 ⬇️ ⇒ المعاينة: connect-src = الـstaging (مش الإنتاج) ⬇️ ⬇️ */
+  let p = CSP_REPORT_ONLY;
+  if (API_DIRECT_FIRST) {
+    p = p.split('https://octa-prices-production-4ccb.up.railway.app').join(API_DIRECT_FIRST);
+  }
+  return p;
+}
+
+const CSP_REPORT_ONLY = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'self'",
+  "frame-src 'self' https://*.tradingview.com https://*.tradingview-widget.com https://s.tradingview.com https://www.tradingview.com",
+  "form-action 'self'",
+  "img-src 'self' data: blob: https://*.tradingview.com https://*.tradingview-widget.com https://s.tradingview.com",
+  "font-src 'self' data:",
+  "style-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline' https://s3.tradingview.com",
+  "connect-src 'self' https://octa-prices-production-4ccb.up.railway.app https://scanner.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://www.tradingview-widget.com https://news.google.com https://api.rss2json.com https://foudalens.com https://api.cors.lol",
+  "worker-src 'self' blob:",
+].join('; ');
+/* ⛔ بيتحدّد في أول كل طلب (handle/scheduled) ⬇️ */
+let API = API_DEFAULT;
+
+/* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ — ⛔ قائمة الاتصال الاحتياطي ⬇️
+   📌 ⬇️ الواجهة عندها fallback مباشر للـRailway ⬇️ ⬇️
+   📌 ⬇️ (لو الـWorker وقع) ⬇️ ⬇️
+   📌 ⬇️ ⇒ لو الإنتاج مرتبط بحتمية ⬇️ ⬇️
+   📌 ⬇️ ⇒ المعاينة كانت هتلمس الإنتاج أثناء الاختبار ⬇️ ⬇️
+   ✅ الحل: الـworker يحقن القائمة في الصفحة ⬇️
+   ⛔ ⬇️ الإنتاج: من غير حقن ⇒ القائمة الافتراضية (الإنتاج) ⬇️ ⬇️ */
+function apiDirectList(env) {
+  const raw = env && env.OCTA_API_DIRECT ? String(env.OCTA_API_DIRECT) : '';
+  if (!raw) return '';
+  const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+  if (!parts.length) return '';
+  try {
+    const arr = parts.map((u, i) => ({ name: i === 0 ? 'staging' : 'alt' + i, url: u, on: true }));
+    return JSON.stringify(arr).replace(/</g, '\\u003c');
+  } catch (e) { return ''; }
+}
+
+function injectApiDirect(html, env) {
+  const list = apiDirectList(env);
+  if (!list) return html;
+  try {
+    const tag = '<script>window.OCTA_DIRECT_LIST=' + list + ';</script>';
+    if (String(html).indexOf('</head>') !== -1) {
+      return String(html).replace('</head>', tag + '</head>');
+    }
+    return tag + html;
+  } catch (e) { return html; }
+}
+
+const TRIES = 3;
+
+/* ⭐ محرك محور الأخبار (هالان) — نسخة مطابقة 1:1 من news_engine في الباك.
+   📌 الاختبار: tools/test-halan-news.js ⇒ 182/182 مطابقة. */
+import { newsEngine, mergeEvents, eventsByCode, parseHalaText } from './halan-news.js';
+
+/* ══════════════════════════════════════════════════════════════
+   ⭐ جسر سكانر TradingView — للفلتر (Smart Money)
+   ──────────────────────────────────────────────────────────────
+   ⛔⛔ ليه؟
+      الباك (Railway) ممكن يبقى واقع ساعات ⇒ الفلتر يبقى فاضي
+      والصفحة كلها بتتقفل behind صفحة الصيانة. الجسر ده بيجيب
+      داتا السوق من TradingView مباشرة من الـedge (من غير توكن
+      و من غير CORS — لأن الطلب بيطلع من السيرفر مش من المتصفح).
+
+   ⛌ مقفول على الإنتاج افتراضياً: شغّال بس لو
+      env.OCTA_TV_PROXY === 'on' (اللي متحطّ في المعاينة بس).
+      ⇒ الإنتاج ما يتأثرش خالص.
+
+   📌 الداتا دي من TradingView نفسه — متاحة للكل. مش سر.
+   📌 الكاش على الـedge ٥ دقايق (احترام المصدر + سرعة).
+   ══════════════════════════════════════════════════════════════ */
+const TV_SCAN = 'https://scanner.tradingview.com/egypt/scan';
+
+/* الأعمدة اللي بنجيبها — نفس اللي الباك بيجيبها */
+const TV_COLS = [
+  'close', 'change', 'volume',
+  'Perf.W', 'Perf.1M', 'Perf.3M', 'Perf.6M', 'Perf.Y', 'Perf.YTD',
+  'Volatility.D', 'relative_volume_10d_calc', 'average_volume_30d_calc',
+  'market_cap_basic', 'beta_1_year', 'Recommend.All',
+  'RSI', 'MACD.macd', 'MACD.signal',
+  'EMA20', 'EMA50', 'EMA200', 'SMA50', 'SMA200',
+  'ATR', 'ADX', 'ADX+DI', 'ADX-DI', 'Stoch.K', 'Stoch.D',
+  'price_earnings_ttm', 'price_book_fq', 'return_on_equity',
+  'earnings_per_share_diluted_ttm', 'total_revenue'
+];
+
+/* ══════════════════════════════════════════════════════════════
+   ⭐⭐⭐ خريطة رموز TradingView → Yahoo Finance
+   ──────────────────────────────────────────────────────────────
+   📌 ٢٥ أكتوبر ٢٠٢٦ — جسر الأسعار (أذهب · دولار ·.normalize
+   ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+   ⛌ ⛌ ⛌ ⛌ ⛌ tradingview-widget.com بيقاوم على داتاسنتر (403 bot)
+   ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ Yahoo chart API هو المصدر البديل
+   ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+   📌 Yahoo symbol: GC=F (ذهب) · EGP=X (دولار) · ^EGX30 (مؤشر مصر)
+   ⛌ ⛌ ⛌ ⛌ ⛌ CL=F (نفط WTI) · BZ=F (برنت)
+   ══════════════════════════════════════════════════════════════ */
+const TV_TO_YAHOO = {
+  'OANDA:XAUUSD': 'GC=F',
+  'OANDA:XAGUSD': 'SI=F',
+  'EGP=X': 'EGP=X',
+  'EGX:EGX30': '^EGX30',
+  'EGX:EGX20': '^EGX20',
+  'EGX:EGX100': '^EGX100',
+  'TVC:USOIL': 'CL=F',
+  'TVC:UKOIL': 'BZ=F',
+  'NYMEX:CL1!': 'CL=F',
+  'TVC:GOLD': 'GC=F',
+  'TVC:UKOIL.C': 'BZ=F',
+  'CAPITALCOM:GOLD': 'GC=F',
+  'PEPPERSTONE:GOLD': 'GC=F',
+  'OANDA:WTICOUSD': 'CL=F',
+  'OANDA:BCOUSD': 'BZ=F',
+  'FOREXCOM:XAUUSD': 'GC=F',
+  'TVC:DXY': 'DX-Y.NYB',
+  'INDEX:EGX30': '^EGX30',
+  'EGX:EGX30P': '^EGX30'
+};
+
+function tvToYahoo(sym) {
+  const s = String(sym || '').trim();
+  if (!s) return null;
+  if (TV_TO_YAHOO[s]) return TV_TO_YAHOO[s];
+  const up = s.toUpperCase();
+  if (TV_TO_YAHOO[up]) return TV_TO_YAHOO[up];
+  /* سهم مصري عادي (COMI.CA) → Yahoo ticker */
+  if (/^[A-Z0-9]+\.CA$/i.test(s)) return s.toUpperCase();
+  /* أي symbol تاني بـ : → نجرب الجزء التاني */
+  const parts = s.split(':');
+  if (parts.length === 2) {
+    const p2 = parts[1].toUpperCase();
+    if (/^[A-Z0-9]+\.CA$/i.test(p2)) return p2;
+  }
+  return null;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ⭐⭐⭐ محلّل RSS بسيط (regex) — شكل rss2json
+   ──────────────────────────────────────────────────────────────
+   📌 بنرجّع {status, items:[{title,link,pubDate,description,categories}]}
+   ⛌ ⛌ ⛌ ⛌ ⛌ بالظبط زي rss2json ⇒ الـJS مش محتاج يتغير.
+   ══════════════════════════════════════════════════════════════ */
+function xmlUnescape(s) {
+  return String(s || '')
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'")
+    .replace(/&apos;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&');
+}
+function xmlTag(xml, tag, block) {
+  const re = new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)</' + tag + '>', 'i');
+  const m = block.match(re);
+  return m ? xmlUnescape(m[1]).trim() : '';
+}
+function parseRssItems(xml) {
+  const out = [];
+  const s = String(xml || '');
+  const blocks = s.match(/<item[\s>][\s\S]*?<\/item>/gi) || s.match(/<entry[\s>][\s\S]*?<\/entry>/gi) || [];
+  for (let i = 0; i < blocks.length && out.length < 30; i++) {
+    const b = blocks[i];
+    let link = xmlTag(b, 'link');
+    if (!link) {
+      const m = b.match(/<link[^>]*href=["']([^"']+)["']/i);
+      if (m) link = xmlUnescape(m[1]);
+    }
+    const title = xmlTag(b, 'title');
+    if (!title) continue;
+    out.push({
+      title: title,
+      link: link,
+      pubDate: xmlTag(b, 'pubDate') || xmlTag(b, 'published') || xmlTag(b, 'updated') || '',
+      description: xmlTag(b, 'description') || xmlTag(b, 'summary') || '',
+      categories: []
+    });
+  }
+  return out;
+}
+
+/* ⛔ خريطة العمود → اسم الحقل اللي محرك OCTA بيفهمه */
+const TV_MAP = {
+  'close': 'price', 'change': 'change', 'volume': 'volume',
+  'Perf.W': 'perf1w', 'Perf.1M': 'perf1m', 'Perf.3M': 'perf3m',
+  'Perf.6M': 'perf6m', 'Perf.Y': 'perf1y', 'Perf.YTD': 'perfYtd',
+  'Volatility.D': 'volD', 'relative_volume_10d_calc': 'relvol',
+  'average_volume_30d_calc': 'av30', 'market_cap_basic': 'mkt_cap',
+  'beta_1_year': 'beta', 'Recommend.All': 'tvRating',
+  'RSI': 'rsi', 'MACD.macd': 'macd', 'MACD.signal': 'macdSig',
+  'EMA20': 'ema20', 'EMA50': 'ema50', 'EMA200': 'ema200',
+  'SMA50': 'ma50', 'SMA200': 'ma200',
+  'ATR': 'atr', 'ADX': 'adx', 'ADX+DI': 'diPlus', 'ADX-DI': 'diMinus',
+  'Stoch.K': 'stochK', 'Stoch.D': 'stochD',
+  'price_earnings_ttm': 'pe', 'price_book_fq': 'pb',
+  'return_on_equity': 'roe',
+  'earnings_per_share_diluted_ttm': 'eps', 'total_revenue': 'revenue'
+};
+
+function tvRowsFromScan(data, cols) {
+  const use = cols || TV_COLS;
+  const out = [];
+  const rows = (data && data.data) || [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const d = r.d || [];
+    const code = String(r.s || '').split(':').pop();
+    if (!code) continue;
+    const o = { code: code };
+    for (let c = 0; c < use.length; c++) {
+      const f = TV_MAP[use[c]];
+      const v = d[c];
+      if (f && v !== null && v !== undefined && isFinite(v)) o[f] = v;
+    }
+    if (o.price) out.push(o);
+  }
+  return out;
+}
+
+
+
+/* ══════════════════════════════════════════════════════════════════
+   ⭐⭐ تصحيح نسبة التغيّر اليومية في /api/quotes (١٤ نوفمبر ٢٠٢٦)
+   ──────────────────────────────────────────────────────────────────
+   📌 المشكلة: المصدر بيرجّع `change` مقارنةً بمرجع قديم لو السهم
+      عدّل سعره (توزيع/تقسيم) ⇒ مثال بنك قناة السويس: +٥٣.٢٠٪
+      والرقم الصح +٢.١٤٪ (مطابق للإغلاق الرسمي).
+      ⛔ حد البورصة المصرية اليومي ±٢٠٪ ⇒ +٥٣٪ مستحيل أصلاً.
+   📌 الحل: نجيب `change_from_open` من نفس المصدر (مطابق للإغلاق
+      الحقيقي) ⇒ ولو الفرق أكبر من ٣ نقاط نصحّح.
+   📌 ⛔ Fail-safe: أي خطأ ⇒ نرجّع الرد زي ما هو (مش بنكسر).
+   ══════════════════════════════════════════════════════════════════ */
+const TV_FIX_COLS = ['close', 'change', 'change_from_open'];
+
+async function tvChangeMap() {
+  const cache = caches && caches.default;
+  const key = 'https://octa.internal/v2/tvchg/egypt';
+  const cacheKey = new Request(key, { method: 'GET' });
+  try {
+    if (cache) {
+      const hit = await cache.match(cacheKey);
+      if (hit) {
+        const j = await hit.json();
+        if (j && j.map) return j.map;
+      }
+    }
+  } catch (e) { }
+  try {
+    const body = {
+      filter: [
+        { left: 'exchange', operation: 'in_range', right: ['EGX'] },
+        { left: 'type', operation: 'equal', right: 'stock' }
+      ],
+      options: { lang: 'en' },
+      columns: TV_FIX_COLS,
+      range: [0, 400],
+      sort: { sortBy: 'market_cap_basic', sortOrder: 'desc' }
+    };
+    const up = await fetch(TV_SCAN, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    if (!up.ok) return null;
+    const j = await up.json();
+    const rows = (j && j.data) || [];
+    const map = {};
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i], d = r.d || [];
+      const code = String(r.s || '').split(':').pop();
+      if (!code) continue;
+      const ch = d[1], fo = d[2];
+      if (ch == null || fo == null) continue;
+      if (!isFinite(ch) || !isFinite(fo)) continue;
+      if (Math.abs(ch - fo) <= 3) continue;   /* السهم الطبيعي ⇒ نسيبه */
+      map[code] = { change: fo, raw: ch };      /* المرجع القديم ⇒ الصحّح */
+    }
+    if (cache && Object.keys(map).length) {
+      try {
+        const res = new Response(JSON.stringify({ map: map }), {
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=600' }
+        });
+        await cache.put(cacheKey, res);
+      } catch (e) { }
+    }
+    return map;
+  } catch (e) { return null; }
+}
+
+async function fixQuotesChange(bodyText) {
+  try {
+    const j = JSON.parse(bodyText);
+    const mk = j && j.markets && j.markets.egypt;
+    if (!mk) return bodyText;
+    const map = await tvChangeMap();
+    if (!map || !Object.keys(map).length) return bodyText;
+    let fixed = 0;
+    for (const code in mk) {
+      const fx = map[code];
+      if (!fx) continue;
+      const q = mk[code];
+      if (!q || q.change == null) continue;
+      q.change = fx.change;
+      if (fx.raw != null) q.change_raw = fx.raw;
+      q.change_fixed = true;
+      fixed++;
+    }
+    if (!fixed) return bodyText;
+    return JSON.stringify(j);
+  } catch (e) { return bodyText; }
+}
+
+/* ⛔ اسم كوكي الجلسة — لازم يبقى نفس اسم الباك (octa_token) */
+const SESSION_COOKIE = 'octa_token';
+
+/* 🚪 صفحات التطبيق — دي اللي بتتقفل بدون جلسة
+   ⛌ الـassets (js/css/images) بتتنفع عادي — صفحة البوابة
+      محتاجاها. */
+const GATE_PAGES = ['/', '/index.html', '/chart', '/chart.html'];
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* ⛔⛔ ٢٧ أكتوبر ٢٠٢٦ — مهلة البروبكاي (كانت ٨ ثواني × ٣ = ٢٤ ثانية!)
+   📌 الغرض: لو الـRailway بطيء/ واقع، الطلب يرجع بسرعة والواجهة
+   📌   تعيد المحاولة بنفسها ⇒ المستخدم بيشوف «بنحاول تاني» بدل صفحة ميتة. */
+const PROXY_TIMEOUT_MS = 6000;
+/* ⛔⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐⭐⭐ المحاولة الأولى: ٦ ⇒ ١٥ ثانية
+   📌 السبب (مُقيس، مش متخمين): زمن رد الـAPI وهو بارد = **٦٫٣٤ ثانية**
+   📌   ومهلة الـworker كانت **٦٫٠٠ ثانية** بالظبط ⇒ أي أول طلب بعد
+   📌   أي فترة خمول بيتقطع ⇒ ٥٠٢ ⇒ الرسالتين الحمرا في وش المستخدم
+   📌   («السيرفر بينزل») + الأدوات المحمية فاضية.
+   📌   ⛔ دي كانت الفجوة: السيرفر **شغال** بس الردّ بيوصل متأخر عن المهلة.
+   ✅ الحل: المحاولة الأولى تاخد ١٥ ثانية (تغطي cold start ١٢-١٥ ثانية)
+   ✅   ⇒ الرد بيوصل ٢٠٠ بدل ما يتحوّل لخطأ. المحاولات اللي بعدها ٦ ثواني
+   ✅   (السيرفر لو واقع فعلاً ⇒ نرجّع بسرعة بدل ما نطوّل). */
+const PROXY_TIMEOUT_FIRST_MS = 15000;
+/* ⛔ ٢٩ أكتوبر ٢٠٢٦ — ٣ محاولات بدل ٢.
+   📌 السبب: أول طلب بعد فترة سكون ⇒ الـAPI بيعمل cold start
+   📌   (≈١٢ ثانية) ⇒ المحاولة الأولى بتـtimeout ⇒ 502 والمستخدم
+   📌   واقف قدام شاشة تحميل.
+   ✅ الحل: ٣ محاولات × ٦ ثواني ⇒ المحاولة التانية بتلاقي السيرفر
+   ✅   دافي وبترد في ثانية ⇒ البيانات بتوصل بدل ما تفشل. */
+const PROXY_TRIES = 3;
+
+/* ═══════════════════════════════════════════════════════════════
+   🩺 الجولة ١٨ (P3) — مهلة فحص الجاهزية ⬇️
+   📌 الفحص لازم يردّ **سريع** (المالك بيفتح الرابط وبيتنى) ⇒ ٣ ثواني
+   📌   (مش ١٥ زي الطلبات العادية — دي مش بيانات، دي تشخيص).
+   ═══════════════════════════════════════════════════════════════ */
+const PREFLIGHT_TIMEOUT_MS = 3000;
+
+/* 🔁 جلب من الـAPI مع إعادة محاولة — الخطأ البسيط بيتراجع لوحده */
+/* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · المراجعة الأمنية) — ⛔ رد واضح ⬇️
+   📌 ⬇️ بدل ما نرجع للإنتاج ⇒ نرجع 503 برسالة صريحة ⬇️ ⬇️
+   📌 ⬇️ (المستخدم بيفهم إن البيئة مش جاهزة — مش إن الموقع واقع) ⬇️ ⬇️ */
+function apiUnavailable() {
+  return new Response(JSON.stringify({
+    ok: false,
+    error: 'بيئة المعاينة مش جاهزة — مفيش خادم مربوط (Fail-Closed)',
+    why: 'api_not_configured',
+    hint: 'المطلوب ضبط OCTA_API_URL و OCTA_API_DIRECT للمعاينة'
+  }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   🩺 الجولة ١٨ (P3) — ⛔ خطأ واحد واضح بدل 530 ⬇️
+   ───────────────────────────────────────────────────────────────
+   📌 العيب المقاس (تشخيص حيّ · ١٧ نوفمبر ٢٠٢٦ · ٠٣:٤٧ UTC):
+      المعاينة كانت بترجّع **530** (Cloudflare 1016 «Origin DNS error»)
+      على **كل** مسارات الـAPI ⇒ المتصفح شاف صفحة إنجليزية
+      («error code: 1016») بدل رسالة واضحة.
+      ⛌⇐ وبما إن رد الـedge مش JSON ⇒ الواجهة فسّرته «باسورد غلط»
+      ⇒ المستخدم اتّهم بإيمه والسبب الحقيقي (البنية) مستخبي.
+
+   ⛔ القاعدة: أي فشل في جلب الـAPI ⇒ رد واحد ثابت:
+      503 + {ok:false, error:'الخدمة مؤقتًا غير متاحة', why:'api_unreachable'}
+   ⛔ ممنوع: عنوان الـAPI الداخلي · أي مفتاح · رسالة الاستثناء
+      (في الرد أو في اللوج) — كل ده بيسيلّم البنية للمهاجم.
+   ═══════════════════════════════════════════════════════════════ */
+function apiUnreachable() {
+  return new Response(JSON.stringify({
+    ok: false,
+    error: 'الخدمة مؤقتًا غير متاحة',
+    why: 'api_unreachable'
+  }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
+  });
+}
+
+/* ⛔ لو رد الـedge نفسه قال «الوجهة مش موجودة» (530/1016 · 502 · 504)
+   ⇒ نفس الرسالة الصريحة (مش 530 ولا HTML). */
+function isOriginUnreachable(status) {
+  return status === 530 || status === 502 || status === 504;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   🔇 الجولة ١٨ (P3) — ⛔ لوج بلا عنوان ⬇️
+   ───────────────────────────────────────────────────────────────
+   📌 رسالة الاستثناء بتقدر تحوي عنوان الوجهة الداخلية
+      (مثل «Fetch API cannot resolve host: …trycloudflare.com»)
+      ⇒ بتسريب عنوان الـAPI في لوج الـworker (وعبر الـdashboard).
+   ⛔ الحل: نسجّل **مفتاح** ثابت (timeout / dns / error) بدل العنوان.
+   ═══════════════════════════════════════════════════════════════ */
+function apiLogKey(err) {
+  const m = String((err && err.message) || err || '');
+  if (/timeout|timed out|abort/i.test(m)) return 'timeout';
+  if (/resolve|host|dns|ENOTFOUND|EAI_AGAIN/i.test(m)) return 'dns';
+  return 'error';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   🩺 الجولة ١٨ (P3) — تقرير الجاهزية (read-only)
+   ───────────────────────────────────────────────────────────────
+   📌 بيرجّع ٤ حقول بس: ok · api · mail · checked_at
+   ⛔ ما بيقراش بيانات مستخدمين · ما بيطلعش أسرار · ما بيعملش كتابة.
+   ⛔ الطلب المرسل: GET /api/health بس — بدون كوكي المستخدم
+      (مالوش لازمة · وبيقلّل تسريب الجلسة) وبسر الـedge لو موجود.
+   📌 mail من حقل mail_configured في رد الـhealth:
+      ⛔ boolean/سلسلة بسيطة بس ⇒ «on»/«off»/«unknown»
+      ⛔ أي قيمة تانية ⇒ «unknown» (مافيش تخمين · مافيش تسريب).
+   ═══════════════════════════════════════════════════════════════ */
+async function preflightReport(env) {
+  const out = {
+    ok: true,
+    api: 'down',
+    mail: 'unknown',
+    checked_at: new Date().toISOString(),
+  };
+  /* ⛔ مافيش وجهة ⇒ down (من غير أي طلب خارجي) */
+  if (!API) return out;
+  let res = null;
+  try {
+    const h = new Headers();
+    h.set('Accept', 'application/json');
+    h.set('Accept-Encoding', 'identity');
+    h.set('User-Agent', 'octa-preflight/1.0');
+    /* ⛔ سر الـedge (لو موجود) — عشان الـstaging يردّ 200 بدل 403.
+       ⛌ والسر ده مش بيتكتبش في أي رد ولا لوج. */
+    if (env && env.OCTA_PROXY_SECRET) h.set('X-OCTA-Proxy', String(env.OCTA_PROXY_SECRET));
+    const init = { method: 'GET', headers: h };
+    /* ⛔ مهلة قصيرة (٣ ثواني) ⇒ timeout واضح ⇒ down (مش تعليق) */
+    if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
+      init.signal = AbortSignal.timeout(PREFLIGHT_TIMEOUT_MS);
+    }
+    res = await fetch(API + '/api/health', init);
+  } catch (e) {
+    /* ⛔⛔⛔ ممنوع عنوان الـAPI الداخلي في اللوج ⬇️ (مفتاح بس) */
+    console.warn('[preflight] api_unreachable (' + apiLogKey(e) + ')');
+    return out;
+  }
+  const st = res && res.status;
+  /* ⛔ 401/403 ⇒ الخادم شغّال بس محمي ⇒ up + unknown */
+  if (st === 401 || st === 403) {
+    out.api = 'up';
+    out.mail = 'unknown';
+    return out;
+  }
+  /* ⛔ أي حالة تانية غير 2xx ⇒ الباك مش شغّال (timeout/server error) */
+  if (!(st >= 200 && st < 300)) return out;
+  out.api = 'up';
+  try {
+    const txt = await res.text();
+    const j = JSON.parse(txt);
+    const mc = j ? j.mail_configured : undefined;
+    if (mc === true || mc === 'true' || mc === 'on' || mc === 1) out.mail = 'on';
+    else if (mc === false || mc === 'false' || mc === 'off' || mc === 0) out.mail = 'off';
+    else out.mail = 'unknown';
+  } catch (e) {
+    out.mail = 'unknown';
+  }
+  return out;
+}
+
+async function fetchApi(target, init) {
+  let lastErr = null;
+  for (let i = 0; i < PROXY_TRIES; i++) {
+    try {
+      /* ⛔⛔ ٢٢ أكتوبر ٢٠٢٦ — مهلة ٨ ثواني لكل محاولة.
+      ⛌ الباك (Railway) واقع ⇒ الطلب كان بيقعد دقيقة لحد ما
+      ⛌   يرد 502 ⇒ المستخدم واقف قدام شاشة تحميل.
+      ⛌ دلوقتي بنقطعه بسرعة ونرجّع 502 — الواجهة بتعرف تتعامل. */
+      const o = Object.assign({}, init || {});
+      if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
+        /* ⛔⛔ ٢٧ أكتوبر ٢٠٢٦ — ٨ ثواني × ٣ محاولات = ٢٤ ثانية!
+           📌 الطلب كان بيقعد نص دقيقة والواجهة كانت بتقطع بعد ٨ ثواني
+           ⇒ المستخدم بيشوف «السيرفر بطيء» وصفحة فاضية.
+           📌 ✅ الحل: ٦ ثواني × محاولتين = ~١٢ ثانية كحد أقصى.
+           📌 (المسارات الكبيرة زي /api/gold/history بترد في أقل من ثانيتين
+           📌  من السيرفر — فالمهلة دي أمان مش حدّ للصفحات الكبيرة). */
+        /* ⛔⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐ أول محاولة: ١٥ ثانية (تغطي cold start)
+           📌 القياس: ردّ الـAPI وهو بارد = ٦٫٣٤ ثانية ⇒ بمهلة ٦ ثواني
+           📌   كانت بيرجع ٥٠٢ دايماً ⇒ رسالتين حمرا + بيانات فاضية.
+           📌 بعد ١٥ ثانية: المحاولة الأولى بترد ٢٠٠ وده كل حاجة.
+           📌 (لو السيرفر واقع فعلاً ⇒ المحاولتين بعدهم ٦ ثواني
+           📌  ⇒ الخطأ يرجع بسرعة زي ما كان.) */
+        o.signal = AbortSignal.timeout(i === 0 ? PROXY_TIMEOUT_FIRST_MS : PROXY_TIMEOUT_MS);
+      }
+      const r = await fetch(target, o);
+      if (r.status >= 500 && i < PROXY_TRIES - 1) {
+        lastErr = new Error('upstream ' + r.status);
+        await sleep(180 * (i + 1));
+        continue;
+      }
+      return r;
+    } catch (e) {
+      lastErr = e;
+      if (i < PROXY_TRIES - 1) await sleep(180 * (i + 1));
+    }
+  }
+  throw lastErr || new Error('api-proxy-failed');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🔐 هيدرات الطلب اللي بتتبعت للـAPI
+   ───────────────────────────────────────────────────────────
+   ⛔⛔ ٢١ أكتوبر ٢٠٢٦ — الـworker كان بيبعت Accept بس
+   ⛌ وبيرمي Authorization و Cookie و جسم الطلب!
+   ⛌ النتيجة: أي مسار محمي كان بيرجّع 401 دايماً لما يمر
+   ⛌ من الـworker.
+   ═══════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+  📸 لقطة محرّك الفرص — للمعاينة بس (مش الإنتاج)
+  ────────────────────────────────────────────────────────────────
+  📌 ليش؟ محرّك الفرص (OPP-001) لسه ما اتنشرش على الباك
+     ⇒ /api/opp/* بيرجّع 405 ⇒ الفلتر رقم ٨ كان هيبقى ميت
+     على المعاينة (وكان بيعرض فرص حقيقية قبل كده).
+  ⛔⛔ القاعدة: الأولوية دايماً للباك الحيّ. اللقطة fallback بس،
+     وبتتشال من الإنتاج بالكامل (OCTA_OPP_SNAPSHOT مش مفعّل هناك).
+  ⛔ والملف نفسه (data/opp_snapshot.json) مش بيننسخ في بناء الإنتاج.
+*/
+let _oppSnap = null;
+let _oppSnapAt = 0;
+const OPP_SNAP_TTL = 10 * 60 * 1000;
+
+/* ⛔⛔⛔ 16 نوفمبر 2026 — سياسة القطعة:
+   · الافتراض: `OCTA_SNAPSHOT_FALLBACK=off` (الدفتري)
+     ⇒ لو الباك حي فشل ⇒ رد صريح (503) — مابترجعش لقطة قديمة.
+   · الإعطاء: `on` ⇒ السلوك الحالي (رجوع إلى القطة).
+   ⛔ التعديل في الفرع يحتاج المالك — تعديل الإنتاج يحتاج صراحة الرفع.
+   ⛔ المعاينة: مافيش تغيير — لا يقاعد تطبيق. */
+function snapshotFallbackAllowed(env) {
+  if (!env) return false;
+  return env.OCTA_SNAPSHOT_FALLBACK === 'on';
+}
+
+/* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٤) — منع تحميل اللقطات مباشرة.
+   📌 المسألة: تعطيل الـfallback داخل الـWorker **مش كفاية** —
+      لازم الملف نفسه ما ينفعش يتنزّل من الموقع ولا من الكاش.
+   📌 القياس (١٦ نوفمبر ٢٠٢٦): https://octashares.com/data/opp_snapshot.json
+      ⇒ HTTP 200 · ١,٤٦٠,١٦٤ بايت (وصف المحرّك + ١٧٧ سطر أسهم).
+   ⛔ الحل (طبقتان):
+      ① البناء الإنتاجي مش بينسخ الملفات دي أصلاً (tools/copy-data.js).
+      ② بلوك هنا ⇒ حتى لو الإصدار القديم اترجّع (فيه الملف)،
+         الطلب بيرجّع 404 — لأن الـWorker بيشتغل الأول (run_worker_first).
+*/
+const SNAPSHOT_PATHS = [
+  '/data/opp_snapshot.json',
+  '/data/alpha_snapshot.json'
+];
+
+/* 🛡️ الجولة ٢٣ (R23) — تطبيع المسار قبل المقارنة ⭐
+   📌 العيب المقاس حيًّا (١٨ نوفمبر ٢٠٢٦ ⭐):
+      https://octashares.com/data/opp_snapshot.json      ⇒ 200 (1,460,164 B ⭐)
+      https://octashares.com/data/./opp_snapshot.json     ⇒ 200 (1,460,164 B ⭐)
+      https://octashares.com/data/%6fpp_snapshot.json    ⇒ 307 ⇒ 200 ⭐
+   📌 ⛔ السبب: المقارنة كانت **تامة** على `pathname.toLowerCase()` ⭐
+      ⇒ `./` و`//` والمُرمَّز كلها بتتجاوز الحارس ⭐ ⭐
+   ✅ الحل: تطبيع كامل ⭐ (decode ⭐ + resolve `./` و`..` ⭐ + collapse `//` ⭐
+      + قصّ الشرطة الأخيرة ⭐ + lower ⭐) ⭐ والمقارنة على **المسار المُطبَّع** ⭐
+      ⭐ ⇒ كل الصيغ المقاسة بتتسد ⭐.
+   ⛔ الأوزان والمنهجيات ما اتغيّرتش ⭐ — ده حارس وصول ⭐.
+*/
+function normalizeAssetPath(pathname) {
+  let p = String(pathname == null ? '' : pathname);
+  /* ①-decoding (مرة واحدة ⭐) — `%6f` ⇒ `o` ⭐
+     ⛔ لازم نرمي الـdecode لو فشل ⭐ (مش نبلع المسار الخام ⭐) */
+  try { p = decodeURIComponent(p); } catch (e) { /* مسار مش مطبوع ⇒ نكمل ⭐ */ }
+  /* ②-تطبيع الـbackslash ⭐ */
+  p = p.replace(/\\/g, '/');
+  /* ③-حلّ المقاطع النسبية `.` و`..` ⭐ + ضغط `//` ⭐ */
+  const parts = [];
+  for (const seg of p.split('/')) {
+    if (seg === '' || seg === '.') continue;          /* ⭐ `//` و`.` ⭐ */
+    if (seg === '..') { parts.pop(); continue; }        /* ⭐ `..` ⭐ */
+    parts.push(seg);
+  }
+  p = '/' + parts.join('/');
+  /* ④-قصّ الشرطة الأخيرة ⭐ */
+  if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
+  /* ⑤-حروف صغيرة ⭐ */
+  return p.toLowerCase();
+}
+
+function isSnapshotPath(pathname) {
+  const p = normalizeAssetPath(pathname);
+  return SNAPSHOT_PATHS.indexOf(p) !== -1;
+}
+
+async function oppSnapshot(url, request, env) {
+  if (!_oppSnap || (Date.now() - _oppSnapAt) > OPP_SNAP_TTL) {
+    try {
+      const r = await env.ASSETS.fetch(new Request(
+        new URL('/data/opp_snapshot.json', url.origin).toString()));
+      if (r && r.status < 400) {
+        _oppSnap = await r.json();
+        _oppSnapAt = Date.now();
+      }
+    } catch (e) { }
+  }
+  if (!_oppSnap) {
+    return new Response(JSON.stringify({ ok: false, error: 'snapshot-missing' }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } });
+  }
+  const snap = _oppSnap;
+  const path = url.pathname;
+  const note = { snapshot: true, generated_at: snap.generated_at,
+                 model_version: snap.model_version, note_ar: snap.note_ar };
+  let body = null;
+  if (path === '/api/opp/strategies') {
+    body = { ok: true, strategies: snap.strategies, model_version: snap.model_version, ...note };
+  } else {
+    const m = path.match(/^\/api\/opp\/(list|detail|explain)\/([^/]+)(?:\/([^/]+))?/);
+    if (m) {
+      const kind = m[1], key = m[2], code = m[3];
+      const lst = (snap.lists || {})[key];
+      if (!lst) {
+        body = { ok: false, error: 'unknown-strategy', ...note };
+      } else if (kind === 'list') {
+        body = { ok: true, strategy: key, summary: lst.summary, items: lst.items, ...note };
+      } else {
+        const it = (lst.items || []).find(x => String(x.code) === String(code));
+        if (!it) {
+          body = { ok: false, error: 'not-found', ...note };
+        } else if (kind === 'detail') {
+          body = { ok: true, strategy: key, code: code, item: it, explain: it.criteria || [], ...note };
+        } else {
+          body = { ok: true, strategy: key, code: code,
+                   criteria: it.criteria || [], missing: it.missing || [], ...note };
+        }
+      }
+    }
+  }
+  if (!body) {
+    return new Response(JSON.stringify({ ok: false, error: 'no-snapshot-route' }),
+      { status: 404, headers: { 'Content-Type': 'application/json' } });
+  }
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+  🐙 لقطة OCTA Alpha — المحفظة الذكية (OPP-002) — للمعاينة بس
+  ────────────────────────────────────────────────────────────────
+  📌 نفس منطق محرّك الفرص: الباك الحيّ الأول، واللقطة fallback.
+  ⛔ في الإنتاج OCTA_ALPHA_SNAPSHOT مش مفعّل ⇒ صفر تسرّب.
+*/
+let _alphaSnap = null;
+let _alphaSnapAt = 0;
+const ALPHA_SNAP_TTL = 10 * 60 * 1000;
+
+async function alphaSnapshot(url, request, env) {
+  if (!_alphaSnap || (Date.now() - _alphaSnapAt) > ALPHA_SNAP_TTL) {
+    try {
+      const r = await env.ASSETS.fetch(new Request(
+        new URL('/data/alpha_snapshot.json', url.origin).toString()));
+      if (r && r.status < 400) {
+        _alphaSnap = await r.json();
+        _alphaSnapAt = Date.now();
+      }
+    } catch (e) { }
+  }
+  if (!_alphaSnap) {
+    return new Response(JSON.stringify({ ok: false, error: 'snapshot-missing' }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } });
+  }
+  const snap = _alphaSnap;
+  const path = url.pathname;
+  const note = { snapshot: true, generated_at: snap.generated_at,
+                 model_version: snap.model_version, note_ar: snap.note_ar };
+  let body = null;
+  if (path === '/api/alpha/portfolio') {
+    body = { ok: true, portfolio: snap, ...note };
+  } else if (path === '/api/alpha/performance') {
+    /* ⭐ مفيش تاريخ تقييمات حقيقي غير نقطة التأسيس ⇒ فترات ناقصة.
+       ⛔ بنصرّح بدل ما نخترع أرقام. */
+    const vals = (snap.ledger && snap.ledger.valuations) || [];
+    const periods = {};
+    ['30d', '90d', '183d', '365d'].forEach(function (k) {
+      periods[k] = { ok: false, note_ar: 'البيانات الفعلية غير كافية لهذه المدة.' };
+    });
+    periods.since_inception = { ok: vals.length >= 2,
+      note_ar: vals.length >= 2 ? null : 'محتاج تاريخ تقييمات أكتر من نقطة واحدة.' };
+    body = { ok: true,
+      performance: { periods: periods, has_data: vals.length >= 2,
+        last_update: snap.generated_at, notes_ar: ['التاريخ الفعلي لسلسلة التقييمات لسه قصير — الأرقام الفعلية هتبان مع الوقت.'] },
+      ...note };
+  } else if (path === '/api/alpha/decisions') {
+    body = { ok: true, decisions: snap.decisions || [], ...note };
+  } else if (path === '/api/alpha/alerts') {
+    body = { ok: true, alerts: [], enabled: false, ...note };
+  } else if (path === '/api/alpha/lab') {
+    body = { ok: true, lab: { champion: snap.model_version, challengers: [], errors: {}, closed: false }, ...note };
+  }
+  if (!body) {
+    return new Response(JSON.stringify({ ok: false, error: 'no-snapshot-route' }),
+      { status: 404, headers: { 'Content-Type': 'application/json' } });
+  }
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+  });
+}
+
+function buildHeaders(request, env) {
+  const h = new Headers();
+  h.set('Accept', 'application/json');
+  /* ⛔ التوكن —Authorization (الباك بيقراه) */
+  const auth = request.headers.get('Authorization');
+  if (auth) h.set('Authorization', auth);
+  /* ⛔ الكوكي — عشان الباك يقرأ الجلسة من الكوكي كمان */
+  const ck = request.headers.get('Cookie');
+  if (ck) h.set('Cookie', ck);
+  /* ⛔ نوع المحتوى — لازم يوصل زي ما هو */
+  const ct = request.headers.get('Content-Type');
+  if (ct) h.set('Content-Type', ct);
+  /* ⛌⛔⛔ identity — عشان مفيش gzip من الـAPI
+     ⛌ (الـruntime بيضغط الردود لوحده قبل ما تطلع للعميل) */
+  h.set('Accept-Encoding', 'identity');
+  /* ⛌ الـIP — الباك بيقراه للrate limit */
+  const cf = request.headers.get('CF-Connecting-IP');
+  if (cf) h.set('X-Forwarded-For', cf);
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ — دفعة الأمان ٠١ — ⛔ سر الـEdge ⬇️
+     ⛔ ⬇️ الباك على Railway **مكشوف مباشرة** ⬇️ ⬇️
+     ⛔ ⬇️ ⇒ أي حد يقدر يتخطّى الـworker ويصطاد الـAPI ⬇️ ⬇️
+     ⛔ ⬇️ ⇒ ويقدر يكسر عدّادات المحاولات بالترويسات ⬇️ ⬇️
+     ✅ الحل: سر مشترك بين الـworker والباك ⬇️
+     ⛔ ⬇️ (Cloudflare **secret** + Railway variable — مش في الريبو) ⬇️ ⬇️
+     ⛔ ⬇️ + IP العميل الموثّق ⬇️ ⬇️
+     📌 لو الـsecret مش متظبطلوش ⬇️ ⇒ مافيش ترويسة ⬇️ (زي ما كان) ⬇️ */
+  const ps = env && env.OCTA_PROXY_SECRET;
+  if (ps) {
+    h.set('X-OCTA-Proxy', ps);
+    if (cf) h.set('X-OCTA-Client-IP', cf);
+  }
+  return h;
+}
+/* ══════════════════════════════════════════════════════════════
+   🍪🔐🍪 فيه جلسة صالحة ولا لأ؟ (الجولة ١٨ · SEC-001 · P1)
+   ───────────────────────────────────────────────────────────
+   ⛔⛔⛔ العيب القديم (المُبلَّغ عنه في المراجعة) ⬇️
+   ⛌ `hasSession()` كانت بتعتبر «كوكي octa_token غير فارغ» = **جلسة
+   ⛌ صالحة** ⇒ أي كوكي عشوائي كان يعدّي البوابة — وبتخدم
+   ⛌ مسارات الـAPI من غير ما يتحقق حد من التوقيع أو الصلاحية.
+   📌 الحقيقة (مُثبتة بالكود — update_prices.py):
+   ⛌ · التوكن = `payload.HMAC-SHA256(سر)` والسر (`OCTAD_TOKEN_SECRET`)
+   ⛌   موجود عند **الباك** بس ⇒ الـworker **مش** بيقدر يفكّ التوقيع.
+   ⛌ · صاحب الصلاحية = الباك ⇒ البوابة تطلبه **الحكم** قبل الخدمة.
+   ✅ الحل (هنا):
+   ⛔ ① البوابة ما تعتمدش على «وجود» الكوكي — ولا على وحده.
+   ⛔ ② التحقق **قبل** الخدمة (قبل أي معالج/أي بيانات).
+   ⛔ ③ fail-closed على **الحكم**:
+      ⛌  · «مرفوض» (كوكي مزيّف/منتهي) ⇒ 401 قبل الخدمة + مسح الكوكي.
+      ⛌  · «مقدرناش نتحقق» (الباك واقع) ⇒ صفحة التطبيق بتتقفل (الصفحة
+      ⛌    العامة بدلها)؛ ومسارات الـAPI بتنزل عادي والباك **هو** اللي
+      ⛌    بيرفض (٥٠٢) ⇒ مفيش بيانات بتتخدم من غير جلسة متأكَّد منها.
+      ⛌    (الـworker نفسه ما بيقدّمش بيانات مستخدم من غير الباك.)
+   ═══════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+  🔐 ١٤ نوفمبر ٢٠٢٦ — المسارات العامة (اللي بتقبل زائر من غير جلسة)
+  ──────────────────────────────────────────────────────────────
+  ⭐ غير المسارات دي ⇒ 401 «تسجيل الدخول مطلوب».
+  📌 صفحة السوق العامة (market.html) بتطلب /api/quotes بس — فهي
+     شغالة زي ما هي. وكل التحليل والقرار بقى محمي.
+  ══════════════════════════════════════════════════════════════ */
+function isPublicApi(path) {
+  if (!path) return false;
+  /* ⛔ OPTIONS (preflight) — مافيش كوكي ⇒ لازم يعدّي */
+  if (path === '/api/health') return true;
+  /* 🩺 الجولة ١٨ (P3) — فحص الجاهزية (تشخيص) — مفتاح بلا تسجيل دخول.
+     ⛔ مافيش بيانات مستخدمين · مافيش أسرار · مافيش كتابة. */
+  if (path === '/api/preflight') return true;
+  if (path === '/api/track') return true;          /* التتبّع لازم يفضل مفتوح */
+  if (path.indexOf('/api/auth/') === 0) return true; /* التوثيق (تسجيل/دخول/كود) */
+  if (path === '/api/quotes') return true;          /* صفحة السوق العامة */
+  if (path.indexOf('/api/logos') === 0) return true;
+  if (path.indexOf('/api/tvlogo/') === 0) return true;
+  if (path.indexOf('/api/tvlogo') === 0) return true;
+  return false;
+}
+
+/* 🛑 بنجيب قيمة كوكي الجلسة (مش بس «موجود» ولا «فاضي») */
+function sessionCookie(request) {
+  try {
+    const c = request.headers.get('Cookie') || '';
+    if (!c) return '';
+    const parts = c.split(';');
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i].trim();
+      if (p.indexOf(SESSION_COOKIE + '=') === 0) {
+        const v = p.slice(SESSION_COOKIE.length + 1).trim();
+        if (v) return v;
+      }
+    }
+  } catch (e) { }
+  return '';
+}
+
+/* 🛑 نفس منطق الباك (_bearer) بالظبط ⬇️
+   📌 الـBearer هو الأساس · الكوكي fallback للقراءة بس
+   📌 (استثناء واحد: POST /api/auth/logout — عشان «تنظيف الموقع»)
+   ⛔ لازم يتطابق مع update_prices.py ⇒ نفس النتيجة للمستخدم بالظبط
+   ⛌   (مفيش رفض ظالم لمستخدم شرعي، ومفيش قبول لكوكي مزيّف). */
+function sessionCredential(request, pathname) {
+  try {
+    const a = request.headers.get('Authorization') || '';
+    if (a.toLowerCase().indexOf('bearer ') === 0) {
+      const t = a.slice(7).trim();
+      if (t) return { token: t, via: 'header' };
+    }
+  } catch (e) { }
+  const m = String(request.method || 'GET').toUpperCase();
+  const p = String(pathname || '');
+  const cookieOk = (m === 'GET' || m === 'HEAD' || m === 'OPTIONS')
+    || (m === 'POST' && p === '/api/auth/logout');
+  if (cookieOk) {
+    const ck = sessionCookie(request);
+    if (ck) return { token: ck, via: 'cookie' };
+  }
+  return null;
+}
+
+/* 🛑 هاش قصير للتوكن (مفتاح الكاش جوه الـisolate)
+   ⛔ مافيش التوكن الخام في الذاكرة ولا في المفتاح. */
+function sessionHash(tok) {
+  try {
+    const s = String(tok || '');
+    let a = 5381, b = 52711;
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charCodeAt(i);
+      a = ((a << 5) + a + c) >>> 0;   /* djb2 */
+      b = (((b << 5) + b) ^ c) >>> 0; /* sdbm-xor */
+    }
+    return a.toString(16) + '-' + b.toString(16) + '-' + s.length;
+  } catch (e) { return 'x'; }
+}
+
+/* ⏱ مدد الأحكام المخزّنة داخل الـisolate (بالمللي) */
+const SESSION_OK_TTL_MS = 300000;   /* ٥ دقايق — جلسة متأكَّد منها */
+const SESSION_NO_TTL_MS = 30000;    /* ٣٠ ثانية — جلسة مرفوضة */
+/* ⛔ الأحكام تُخزَّن بالهاش (مش بالتوكن) · والحد الأقصى ٥٠٠ مفتاح */
+const SESSION_VERDICTS = {};
+let SESSION_VERDICT_KEYS = [];
+
+/* 🛑 الحكم من صاحب الصلاحية (الباك — هو اللي عنده سر التوقيع)
+   📌 بنطلب /api/auth/me بنفس بيانات الاعتماد ⇒ نفس الفيصل في الباك.
+   ⛔ أي حالة مش «صالح» ⇒ مرفوض (fail-closed). */
+async function askSessionAuthority(cred, env) {
+  const target = API || API_DIRECT_FIRST;
+  if (!target) return { ok: false, state: 'unknown', why: 'no_api' };
+  try {
+    const h = new Headers();
+    h.set('Accept', 'application/json');
+    if (cred.via === 'header') h.set('Authorization', 'Bearer ' + cred.token);
+    else h.set('Cookie', SESSION_COOKIE + '=' + cred.token);
+    const ps = env && env.OCTA_PROXY_SECRET;
+    if (ps) h.set('X-OCTA-Proxy', ps);
+    const r = await fetch(target + '/api/auth/me', {
+      method: 'GET',
+      headers: h,
+      signal: AbortSignal.timeout(PROXY_TIMEOUT_FIRST_MS)
+    });
+    if (r.status === 200) return { ok: true, state: 'valid', via: cred.via };
+    if (r.status === 401 || r.status === 403) {
+      return { ok: false, state: 'invalid', via: cred.via, why: 'http_' + r.status };
+    }
+    return { ok: false, state: 'unknown', via: cred.via, why: 'http_' + r.status };
+  } catch (e) {
+    return { ok: false, state: 'unknown', via: cred.via, why: 'unreachable' };
+  }
+}
+
+/* 🛑 التحقق من الجلسة — قبل الخدمة
+   📌 anon   = مافيش بيانات اعتماد أصلاً (زائر مجهول)
+   📌 valid  = الباك أكّد إن الجلسة صالحة
+   📌 invalid= الباك رفض الجلسة (كوكي مزيّف / منتهي / ملغى)
+   📌 unknown= ماقدرناش نتحقق (الباك واقع) ⇒ fail-closed */
+async function verifySession(request, env, pathname) {
+  const cred = sessionCredential(request, pathname);
+  if (!cred) return { ok: false, state: 'anon', via: 'none' };
+  const key = sessionHash(cred.token);
+  const now = Date.now();
+  const cached = SESSION_VERDICTS[key];
+  if (cached && now < cached.until) return cached.verdict;
+  const v = await askSessionAuthority(cred, env);
+  const ttl = v.ok ? SESSION_OK_TTL_MS
+    : (v.state === 'invalid' ? SESSION_NO_TTL_MS : 0);
+  if (ttl > 0) {
+    SESSION_VERDICTS[key] = { until: now + ttl, verdict: v };
+    SESSION_VERDICT_KEYS.push(key);
+    while (SESSION_VERDICT_KEYS.length > 500) {
+      const old = SESSION_VERDICT_KEYS.shift();
+      try { delete SESSION_VERDICTS[old]; } catch (e) { }
+    }
+  }
+  return v;
+}
+
+/* 🛑 حكم واحد لكل طلب (مش تكرار) — الـWeakMap بيتمسح لوحده */
+const SESSION_BY_REQUEST = new WeakMap();
+async function sessionVerdict(request, env, pathname) {
+  let p = SESSION_BY_REQUEST.get(request);
+  if (!p) {
+    p = verifySession(request, env, pathname);
+    SESSION_BY_REQUEST.set(request, p);
+  }
+  return p;
+}
+
+/* ════════════════════════════════════════════════════════════════
+ 🌍 روابط المشاركة (Open Graph) — بتتظبط حسب الدومين
+ ────────────────────────────────────────────────────────────────
+ 📌 ٩ نوفمبر ٢٠٢٦ — نفس ملفات HTML بتتخدم على المعاينة
+    (octa-preview.ahmed3zz2020.workers.dev) وعلى الإنتاج
+    (octashares.com).
+ 📌 ⛔ رابط og:image المطلق الثابت ⇒ كارت المشاركة على
+    المعاينة بيبان مكسور (لما حد يبعت رابط المعاينة).
+ 📌 ✅ الحل: نستبدل نطاق الإنتاج بنطاق الطلب الحالي ⇒
+    كل دومين بيبعت صورته الصح (و الإنتاج بيفضل زي ما هو).
+ ════════════════════════════════════════════════════════════════ */
+/* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ قائمة الاتصال ⬇️
+   📌 ⬇️ بتتحقّق في كل صفحة HTML ⬇️ ⬇️ */
+let API_DIRECT_LIST = '';
+/* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · المراجعة الأمنية) — ⛔ fail-closed ⬇️
+   📌 ⬇️ المعاينة **لازم** تفشل بدل ما ترجع للإنتاج ⬇️ ⬇️
+   📌 ⬇️ ⛔ لو `OCTA_API_URL` ناقص ⬇️ ⬇️
+   📌 ⬇️ ⛔ ⇒ الباقي يستجيب للإنتاج ⬇️ ⬇️ ⬇️
+   📌 ⬇️ ⛔ ⇒ أي اختبار معزول بيلوث الإنتاج ⬇️ ⬇️ ⬇️
+   📌 ⬇️ ✅ الحل: `OCTA_FAIL_CLOSED=on` في **المعاينة بس** ⬇️ ⬇️
+   📌 ⬇️ ⛔ الإنتاج: من غير المتغيّر ⇒ سلوكه زي ما هو ⬇️ ⬇️ */
+let API_FAIL_CLOSED = false;
+/* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ أول عنوان مباشر ⬇️
+   📌 ⬇️ بنستخدموه في تبديل رابط الإنتاج داخل HTML ⬇️ ⬇️
+   📌 ⬇️ (CSP connect-src + وضع التشخيص) ⬇️ ⬇️
+   📌 ⬇️ ⇒ المعاينة ما بتبقاش قادرة تلمس الإنتاج ⬇️ ⬇️ */
+let API_DIRECT_FIRST = '';
+
+function withSiteOrigin(html, origin) {
+  try {
+    let out = html;
+    if (origin) {
+      out = String(out)
+      .replace(/https:\/\/octashares\.com\/assets\//g, origin + '/assets/')
+      .replace(/https:\/\/octashares\.com\//g, origin + '/');
+    }
+    /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ حقن ⬇️
+       📌 ⬇️ المعاينة: القائمة = الباك التجريبي ⬇️ ⬇️
+       📌 ⬇️ ⇒ لو الـWorker وقع، الواجهة ما يلمسش الإنتاج ⬇️ ⬇️
+       📌 ⬇️ الإنتاج: من غير حقن ⇒ القائمة الافتراضية (الإنتاج) ⬇️ ⬇️ */
+    if (API_DIRECT_LIST) {
+      const tag = '<script>window.OCTA_DIRECT_LIST=' + API_DIRECT_LIST + ';</script>';
+      out = String(out).indexOf('</head>') !== -1
+      ? String(out).replace('</head>', tag + '</head>')
+      : (tag + String(out));
+    }
+    /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · المراجعة الأمنية) — ⛔⛔⛔ ⬇️
+       📌 ⬇️ ⛔ المعاينة من غير خادم ⬇️ ⬇️ ⬇️
+       📌 ⬇️ ⛔ ⇒ القائمة الفاضية + منع رابط الإنتاج ⬇️ ⬇️ ⬇️
+       📌 ⬇️ ⛔ ⇒ الواجهة ما تروحش للاحتياطي الإنتاج ⬇️ ⬇️ ⬇️
+       📌 ⬇️ ⛔ ⇒ (octa-api.js) كان بيرجع للإنتاج لو القائمة فاضية ⬇️ ⬇️ ⬇️ */
+    if (API_FAIL_CLOSED) {
+      const fc = '<script>window.OCTA_FAIL_CLOSED=1;</script>';
+      out = String(out).indexOf('</head>') !== -1
+      ? String(out).replace('</head>', fc + '</head>')
+      : (fc + String(out));
+    }
+    /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔⛔⛔ العزل ⬇️
+       📌 ⬇️ ⬇️ الـHTML فيه رابط الإنتاج في مكانين ⬇️ ⬇️ ⬇️
+       📌 ⬇️ ⬇️ ① `<meta name="octa-csp-report" ... connect-src 'self' https://octa-prices-production-...` ⬇️ ⬇️ ⬇️
+       📌 ⬇️ ⬇️    (يعني المتصفح **يمنع** أي طلب للتجريبي) ⬇️ ⬇️ ⬇️
+       📌 ⬇️ ⬇️ ② وضع التشخيص (diag) في index.html ⇒ fallback للإنتاج ⬇️ ⬇️ ⬇️
+       📌 ⬇️ ⬇️ ⇒ المعاينة كانت هتلمس الإنتاج ⬇️ ⬇️ ⬇️
+       ✅ الحل: نستبدل رابط الإنتاج بعنوان التجريبي ⬇️ ⬇️
+       ⛔ الإنتاج: من غير حقن ⇒ مافيش استبدال ⇒ زي ما هو ⬇️ ⬇️ */
+    if (API_DIRECT_FIRST) {
+      out = String(out).replace(
+        /https:\/\/octa-prices-production-4ccb\.up\.railway\.app/g,
+        API_DIRECT_FIRST
+      );
+    } else if (API_FAIL_CLOSED) {
+      /* ⛔⛔⛔ مافيش عنوان ⇒ نستبدل رابط الإنتاج بـ**مضيف ميّت** ⬇️
+         📌 ⇒ المتصفح بيتصل بمضيف مش موجود ⇒ fail-closed ⬇️
+         📌 ⇒ مشProduction أبداً ⬇️ */
+      out = String(out).replace(
+        /https:\/\/octa-prices-production-4ccb\.up\.railway\.app/g,
+        'https://blocked.invalid'
+      );
+    }
+    return out;
+  } catch (e) { return html; }
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+ 🔄 ⭐ ٢٥ أكتوبر ٢٠٢٦ — fetch من الـAssets بدون كاش
+ ────────────────────────────────────────────────────────────────
+ 📌 السبب: Cloudflare Assets بيعمل cache للـHTML/JS (cf-cache-status: HIT)
+ 📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+ 📌 ⛌ ⛌ ⇒ المستخدم بيفتح نسخة قديمة (bootstrap مفقود · إصلاحات مفقودة)
+ 📌 ✅ الحل: header `Cache-Control: no-cache` في الطلب ⇒ الـedge يعمل bypass
+ ════════════════════════════════════════════════════════════════ */
+async function assetsFresh(env, request, opts) {
+  const r = new Request(request.url, request);
+  const _url = new URL(request.url);
+  const h = new Headers(r.headers);
+  /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — الأصول الثابتة (JS/CSS/الخطوط) بتتخزّن
+     📌 السبب: كل رابط أصل عليه ختم نسخة (?v=YYYYMMDDHHmm) ⇒ النسخة
+     📌   الجديدة = رابط جديد ⇒ الكاش الآمن صحيح.
+     📌 ❌ قبل كده: no-store على كل حاجة ⇒ **٣ ميجا بتتحمّل كل زيارة**
+     📌   ⇒ على الموبايل = ١٥-٤٠ ثانية انتظار ⛔ (ده سبب «٣٥ ثانية»).
+     📌 ✅ الحل: نطلب من الـedge النسخة المخزّنة (مش no-cache).
+     📌   (الـHTML لسه no-store — هو اللي فيه الختم الجديد.) */
+  const _static = opts && opts.static === true;
+  if (!_static) {
+    h.set('Cache-Control', 'no-cache');
+    h.set('Pragma', 'no-cache');
+  }
+  /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ bypass كامل للـedge cache
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⛌ ⛌.cf.cacheEverything=false + cacheTtl=0 ⇒ المتصفح/الـedge
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ✅ + نضيف cache-bust في الـURL (عشان نضمن التفرّد)
+  📌 ✅ + Cache-Control: no-cache في الـresponse (عشان المتصفح مبيكاشش)
+  */
+  /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ الـAssets بتخدم النسخة المعبّأة صح.
+  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+  📌 ⛌ ⛌ (الـcf-cache-status: HIT ده كاش داخلي للـAssets — طبيعي،
+  📌 ⛌ ⛌ ⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+  📌 ⛌ ⛌ ⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+  📌 ⛌ ⛌ ⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+  📌 ⛌ ⛌ ⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+  📌 ⛌ ⛌ ⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+  📌 ⛌ ⛌ ⛌⇒ والـbust بالـquery بيدّي 404 (الـAssets مش بتقبله)).
+  📌 ✅ الحل: bust بسيط بالـtimestamp — ونتعامل مع 404 بالfallback.
+  */
+  /* ⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ '/' مش asset ⇒ 404. نحوّله index.html
+  📌 (والـgate.html بيتخدم من المسار التاني في الـworker — شوف فوق) */
+  let bust = _url.pathname;
+  if (bust === '/' || bust === '') bust = '/index.html';
+  /* ⛔⛔⛔ ٢٩ أكتوبر ٢٠٢٦ — ⛔⛔⛔ شيل الـquery من مسار الـasset!
+  📌 السبب: `/?clean=1` ⇒ bust = '/index.html?clean=1' ⇒ الـAssets
+  📌   بترجّع 404 فاضي ⇒ المتصفح بيشوف صفحة بيضا (نص لا شيء).
+  📌 ✅ الحل: المسار من غير query — والـworker بيحط no-store على
+  📌   كل الردود ⇒ الكاش مش مشكلة أصلاً. */
+  /* bust = bust + (_url.search || ''); */
+  try {
+  /* ════════════════════════════════════════════════════════════════
+  ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ عنوان مطلق (مش نسبي) — إصلاح 404 فاضي
+  ────────────────────────────────────────────────────────────────
+  📌 السبب: `new Request('/index.html')` في رَن-times الـWorker
+  📌 ⛌⛌⛔ بيرمي استثناء (عنوان نسبي من غير base) ⇒ الـcatch
+  📌 ⛌⛌⛔ بيرجّع الطلب الأصلي ⇒ '/' بيرجّع 404 فاضي (0 بايت)
+  📌 ⛌⛌⛔ ⇒ المعاينة (البوابة مقفولة هناك) مش بتفتح خالص!
+  📌 ✅ الحل: نحَلّ المسار مقابل عنوان الطلب قبل الـfetch.
+  📌 (الإنتاج ما تأثّرش: '/' بيروح لصفحة البوابة قبل النقطة دي)
+  ════════════════════════════════════════════════════════════════ */
+  const bustUrl = new URL(bust, request.url);
+  return await env.ASSETS.fetch(new Request(bustUrl.toString(), { method: 'GET', headers: h }));
+  } catch (e) {
+  return env.ASSETS.fetch(new Request(r, { headers: h }));
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+🧹 سكربت التطهير — ٣٠ أكتوبر ٢٠٢٦ (يخدمه الـworker لكل النسخ)
+──────────────────────────────────────────────────────────────
+📌 المشكلة الحقيقية: المتصفح عند المستخدم فيه index.html **قديم**
+📌   في الكاش ⇒ وهو بيسجّل الـservice worker القديم ⇒(old SW)
+📌   بيرجع تاني ⇒ الشاشة البيضاء + «تنزيل الملف» ترجع كل مرة.
+📌 ✅ الحل: الـworker يخدم أي طلب لـ octa-sw.js (بأي ?v=) بالـkiller
+📌   ⇒ النسخة القديمة من الـHTML كمان بتعمل التنظيف ⇒ المعضلة اتقفلت.
+══════════════════════════════════════════════════════════════ */
+const OCTA_KILLER_JS = [
+  '/* ⛔ killer — أي Service Worker على الموقع بيتشال + الكاش بيتمسح */',
+  '(function(){try{',
+  'if(!("serviceWorker" in navigator))return;',
+  'function kill(){',
+  'navigator.serviceWorker.getRegistrations().then(function(rs){',
+  'if(!rs||!rs.length)return;',
+  'rs.forEach(function(r){try{r.unregister();}catch(e){}});',
+  'try{if(window.caches&&window.caches.keys)window.caches.keys().then(function(ks){',
+  'ks.forEach(function(k){try{window.caches.delete(k);}catch(e){}});});}catch(e){}',
+  '}).catch(function(){});',
+  '}',
+  'if(document.readyState==="complete")kill();',
+  'else window.addEventListener("load",kill);',
+  '}catch(e){}})();'
+].join('\n');
+
+/* ⭐⭐⭐ ٩ نوفمبر ٢٠٢٦ — «مفتاح إطفاء» Service Worker (نسخة الـSW)
+   📌 ⛔ مفيش fetch handler إطلاقاً ⇒ كل الطلبات بتعدّي للشبكة عادي.
+   📌 الهدف: يبقى هو آخر Service Worker مسجّل ⇒ القديم (٢٩ أكتوبر)
+      يبقى مش قادر يعترض أي تنقّل ⇒ الشاشة البيضاء تروح.
+   📌 ومن ثمّ يلغي نفسه + يمسح الكاش ⇒ رجوع كامل لوضع المتصفح العادي.
+   📌 `skipWaiting` + `clients.claim` ⇒ يسري فوراً من أول تنقّل بعده. */
+const OCTA_SW_KILLER_JS = [
+  '/* ⛔ OCTA — مفتاح الإطفاء (٩ نوفمبر ٢٠٢٦) */',
+  "self.addEventListener('install', function (e) { self.skipWaiting(); e.waitUntil(Promise.resolve()); });",
+  "self.addEventListener('activate', function (e) {",
+  '  e.waitUntil(',
+  '    caches.keys()',
+  '      .then(function (ks) { ks.forEach(function (k) { try { caches.delete(k); } catch (err) {} }); })',
+  '      .then(function () { return self.clients.claim(); })',
+  '      .then(function () { return self.registration.unregister(); })',
+  '      .catch(function () {})',
+  '  );',
+  '});',
+  "self.addEventListener('fetch', function (e) { /* ⛔ لا تدخّل — خلّي الشبكة */ });"
+].join('\n');
+
+  /* ══════════════════════════════════════════════════════════════
+   🛡️ ⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ هيدرات الأمان على كل رد
+   ────────────────────────────────────────────────────────────────
+   📌 المشكلة: مافيش ولا هيدر أمان واحد كان بيتقدّم من Cloudflare.
+   📌 ⛔⛔⛔ ⇒ ولا X-Content-Type-Options (نوع المحتوى بيتخمن)
+   📌 ⛔⛔⛔ ⇒ ولا X-Frame-Options (الصفحة تتحط في iframe)
+   📌 ⛔⛔⛔ ⇒ ولا Referrer-Policy (الـReferer بيسرّب روابط)
+   📌 ⛔⛔⛔ ⇒ ولا Permissions-Policy (الكاميرا/المايك/GPS)
+   📌 ⛔⛔⛔ ⇒ ولا HSTS.
+   📌 📌 السبب إن `_headers` مالوش تأثير مع `run_worker_first: true`
+   📌 📌 ⛌⛌⛌ (الـworker بيرد الأول ⇒ هو اللي بيمسك الرد).
+   📌 ✅ الحل: غلاف واحد على كل رد — مفيش استثناء ممكن ينسى.
+   ══════════════════════════════════════════════════════════════ */
+export default {
+  async fetch(request, env, ctx) {
+    let res;
+    try {
+      res = await handle(request, env, ctx);
+    } catch (e) {
+      res = new Response(JSON.stringify({ ok: false, error: 'worker-failed' }), {
+        status: 500, headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    try {
+      const h = new Headers(res.headers);
+      h.set('X-Content-Type-Options', 'nosniff');
+      h.set('X-Frame-Options', 'DENY');
+      h.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+      h.set('Permissions-Policy',
+        'geolocation=(), microphone=(), camera=(), payment=(), usb=(), ' +
+        'magnetometer=(), accelerometer=(), gyroscope=()');
+      h.set('Strict-Transport-Security',
+        'max-age=31536000; includeSubDomains; preload');
+      h.set('Cross-Origin-Opener-Policy', 'same-origin');
+      h.set('Cross-Origin-Resource-Policy', 'same-origin');
+      /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · مراجعة الأمان) — ⛔ CSP ⬇️
+         📌 ⬇️ ⛔ كان: مافيش CSP **إلا** meta في index.html ⬇️ ⬇️ ⬇️
+         📌 ⬇️ ⛔ ⇒ (meta مش بيلغي أي حاجة · المتصفح بيبلّغ بس) ⬇️ ⬇️ ⬇️
+         📌 ⬇️ ⛔ ⛔ وفيه ~٧٠ onclick جوه الـHTML ⬇️ ⬇️ ⬇️
+         📌 ⬇️ ⛔ ⛔ ⇒ تفعيل enforce دلوقتي هيكسر أزرار ⬇️ ⬇️ ⬇️
+         ✅ الحل (آمن): **Report-Only** ⬇️ ⬇️ ⬇️
+         📌 ⬇️ ⇒ المتصفح بيسجّل المخالفات من غير ما يكسر حاجة ⬇️ ⬇️
+         📌 ⬇️ ⇒ الخطة: نقل الـonclick لـaddEventListener ⬇️ ⬇️
+         📌 ⬇️ ⬇️ (doc/CSP-PLAN.md) ⇒ بعدين نتحوّل لـenforce ⬇️ ⬇️ */
+      try {
+        h.set('Content-Security-Policy-Report-Only', cspPolicy());
+        h.set('Report-To', '{"group":"csp"}');
+      } catch (e) { }
+      /* ⛌⛌⛌ CORP على ردود الـAPI: الباك بيرد
+         ⛌⛌⛌ cross-origin-resource-policy: same-site والـworker
+         ⛌⛌⛌ بيربط الأصول ⇒ ما نكسرش الـfetch من workers.dev. */
+      try {
+        const p = new URL(request.url).pathname;
+        if (p.indexOf('/api/') === 0
+          && h.get('Content-Type')
+          && h.get('Content-Type').indexOf('application/json') === 0) {
+          h.set('Cross-Origin-Resource-Policy', 'same-site');
+        }
+      } catch (e) { }
+      /* 🧹 رابط التنظيف (?clean=1) — ٢٩ أكتوبر ٢٠٢٦
+         📌 كاشف شامل: كوكيز + كاش + localStorage + service workers.
+         📌 ⛔ كروم بيتجاهل الهيدر في الأجزاء الفرعية ⇒ لازم navigation.
+         📌 بنحطه على أي رد HTML (بوابة · رئيسية · SPA). */
+      try {
+        const cu = new URL(request.url);
+        if (cu.searchParams.get('clean') === '1') {
+          const ct = h.get('Content-Type') || '';
+          /* ⭐⭐⭐ ٩ نوفمبر ٢٠٢٦ — رجّعنا هيدر التنظيف!
+             📌 السبب: الكتلة كانت **ميتة** (بيحسب `ct` وبيرميه) من
+                ٣٠ أكتوبر ⇒ رابط النجاة `/?clean=1` ما بيعملش حاجة.
+             📌 الأثر: الـService Worker القديم (٢٩ أكتوبر) بيفضل ماسك
+                النطاق ⇒ شاشة بيضا للأبد في التطبيق المثبّت.
+             ✅ الحل: Clear-Site-Data بيمسح الكاش + localStorage +
+                الـService Workers + الكوكيز ⇒ رجوع كامل لنظافة.
+             ⛔ كروم بيتجاهل الهيدر في الأجزاء الفرعية ⇒ لازم navigation
+                (ولذلك الرابط لازم يتفتح في تبويب جديد). */
+          if (ct.indexOf('text/html') === 0) {
+            /* ⛔ بنمسح «cache» + «storage» بس — **مش** «cookies»!
+               📌 الكوكي ده جلسة الدخول ⇒ لو مسحناه المستخدم اتطلّع
+                  من حسابه بعد أي تنظيف. الكاش والـlocalStorage كفاية. */
+            h.set('Clear-Site-Data', '"cache", "storage"');
+          }
+        }
+      } catch (e) { }
+      /* ⭐ وضع الاختبار البطيء (?slowtest=1) ⇒ كوكي مؤقّت
+         ⇒ طلبات /api/auth/me بعدها تتأخر ١٢ ثانية (محاكاة cold start).
+         ⛔ المعاينة بس (OCTA_SLOWTEST=1) — الإنتاج مفعّلوش. */
+      try {
+        const _su = new URL(request.url);
+        if (_su.searchParams.get('slowtest') === '1'
+          && (h.get('Content-Type') || '').indexOf('text/html') === 0) {
+          h.append('Set-Cookie', 'octa_slowtest=1; Path=/; Max-Age=600; SameSite=Lax');
+        }
+      } catch (e) { }
+      return new Response(res.body, { status: res.status, headers: h });
+    } catch (e) {
+      return res;
+    }
+  },
+  /* ══════════════════════════════════════════════════════════════
+   ⭐⭐ إيقاظ السيرفر — scheduled trigger كل ٥ دقايق (٥ نوفمبر ٢٠٢٦)
+   ────────────────────────────────────────────────────────────────
+   📌 المشكلة (مُقيسة على الإنتاج):
+   📌   Railway بينام بعد فترة سكون ⇒ أول طلب بيعمل cold start
+   📌   (≈١٢ ثانية) ⇒ البوابة (octa-gate.js) كانت بتقطع بعد ٨ ثواني
+   📌   ⇒ المستخدم بيشوف «⚠️ السيرفر بطيء — بنحاول تاني» على أول زيارة.
+   📌   وكل الـkeepalive اتشال (١ و ٢ نوفمبر) ⇒ مفيش حاجة بتصحيّيه.
+   📌
+   📌 ✅ الحل: ping خفيف على /api/health كل ٥ دقايق ⇒ السيرفر ما بينامش.
+   📌   ⭐ التكلفة = ٠ كريدت (مش LLM) — كود على Cloudflare.
+   📌   ⭐ read-only: بيقرا /api/health بس (لا يكتب ولا يعدّل).
+   📌   ⭐ بيفوق الـisolate بتاع الـWorker كمان (بيمنع cold start ليه هو).
+   📌
+   📌 التفعيل: في wrangler.jsonc (معاينة) وwrangler-prod.jsonc (إنتاج):
+   📌   "triggers": { "crons": [cron كل ٥ دقايق] }
+   */
+  async scheduled(event, env, ctx) {
+    /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ وجهة الـAPI ⬇️ */
+    API_FAIL_CLOSED = !!(env && env.OCTA_FAIL_CLOSED === 'on');
+    API = (env && env.OCTA_API_URL) ? String(env.OCTA_API_URL)
+         : (API_FAIL_CLOSED ? '' : API_DEFAULT);
+    if (!API) {
+      console.log('[keepalive]', new Date().toISOString(), 'fail-closed: no API url');
+      return;
+    }
+    const target = API + '/api/health';
+    let status = 'unknown';
+    try {
+      /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ سر الـedge ⬇️
+         📌 ⬇️ الباك (staging) بيطلب السر ⬇️ ⬇️
+         📌 ⬇️ ⇒ من غيره الـkeepalive بيرجّع 403 ⬇️ ⬇️ */
+      const _kh = { 'User-Agent': 'octa-keepalive/1.0' };
+      if (env && env.OCTA_PROXY_SECRET) _kh['X-OCTA-Proxy'] = env.OCTA_PROXY_SECRET;
+      const r = await fetch(target, {
+        headers: _kh
+      });
+      status = 'http ' + r.status;
+      console.log('[keepalive]', new Date().toISOString(), status);
+    } catch (e) {
+      /* ⛔⛔⛔ الجولة ١٨ (P3) — ⛔ ممنوع عنوان الوجهة في اللوج ⬇️
+         📌 كان: 'err ' + e.message ⇒ ممكن يفضح العنوان الداخلي. */
+      status = 'err ' + apiLogKey(e);
+      console.log('[keepalive]', new Date().toISOString(), status);
+    }
+    /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐ marker قابل للقياس
+    📌 ليه؟ كرون Cloudflare **مقيس إنه مش بيشتغل** على العامل ده
+    📌   (السيرفر نام ⇒ ردّ ٦٫٣٤ ثانية). ⛔ من غير marker مش
+    📌   هنعرف هو اشتغل ولا لأ.
+    📌 ✅ الحل: نكتب آخر تشغيل في الـKV ⇒ نقراه من برّه (API/console).
+    📌   (في معرّفBiglobal نقدر نقراه بـcurl على /api/halan/status) */
+    try {
+      if (env && env.HALAN_KV) {
+        await env.HALAN_KV.put('octa_keepalive_last', JSON.stringify({
+          at: Date.now(), iso: new Date().toISOString(), status: status
+        }));
+      }
+    } catch (e) { }
+
+    /* ⭐ هالان — كرون تجديد الكاش Lives في عامل منفصل (halan-feed)
+       ⇐ عشان ما يحجبش طلبات الموقع (isolate واحد = طلبات بتقف).
+       ⇐ هنا الكرون بيعمل ping بس (سريع) ⇐ والـKASH بيتملّى من العامل التاني. */
+  }
+};
+
+async function handle(request, env, ctx) {
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ وجهة الـAPI ⬇️ */
+  API_FAIL_CLOSED = !!(env && env.OCTA_FAIL_CLOSED === 'on');
+  API = (env && env.OCTA_API_URL) ? String(env.OCTA_API_URL)
+       : (API_FAIL_CLOSED ? '' : API_DEFAULT);
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ قائمة الاتصال ⬇️ */
+  API_DIRECT_LIST = apiDirectList(env);
+  /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢) — ⛔ أول عنوان ⬇️ */
+  try {
+    const _raw = env && env.OCTA_API_DIRECT ? String(env.OCTA_API_DIRECT) : '';
+    const _first = _raw.split(',').map(s => s.trim()).filter(Boolean)[0] || '';
+    API_DIRECT_FIRST = _first.replace(/\/$/, '');
+  } catch (e) { API_DIRECT_FIRST = ''; }
+  const url = new URL(request.url);
+
+  /* 🧹 التطهير: أي نسخة من سكربت التنظيف (بأي ?v=) ⇒ دايمًا الـkiller.
+     📌 السبب: كاش المتصفح فيه index.html قديم بيسجّل الـSW القديم
+     📌   ⇒ لوخدنا الـkiller من السيرفر، النسخة القديمة كمان بتتطهّر. */
+  if (url.pathname === '/assets/js/octa-sw.js') {
+    return new Response(OCTA_KILLER_JS, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+      }
+    });
+  }
+
+  /* ⭐⭐⭐ ٩ نوفمبر ٢٠٢٦ — ⭐ `/sw.js` = «مفتاح الإطفاء» متاح دائماً
+     📌 المشكلة: في الإنتاج `/sw.js` كان **404** ⇒ أي Service Worker
+        قديم (٢٩ أكتوبر) مش بيقدر يتحدّث ولا يتشال ⇒ التطبيق المثبّت
+        بيفضل شات أبيض للأبد.
+     ✅ الحل: السيرفر يخدم نفس الـkiller دايماً (ما فيه fetch handler
+        ⇒ كل طلب يعدّي للشبكة) + no-store عشان المتصفح ياخد الجديد.
+     📌 ولأن الـkiller بيلغي نفسه، ده مش بيضيف أي Service Worker
+        جديد — بيقتل القديم بس. */
+  if (url.pathname === '/sw.js') {
+    return new Response(OCTA_SW_KILLER_JS, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Service-Worker-Allowed': '/'
+      }
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+  🧹 ٢٩ أكتوبر ٢٠٢٦ — رابط التنظيف: /?clean=1
+  ────────────────────────────────────────────────────────────────
+  📌 المشكلة: كروم (في المتصفح نفسه) بقى بيفتح شاشة بيضا بعد ما
+  📌   المستخدم يعمل «تثبيت» ⇒ كروم سجّل service worker خاص بالتطبيق
+  📌   (WebAPK) وبيحبسك على نسخة قديمة/فاضية من الصفحة.
+  📌   ⇒ المتصفح التاني شغّال (سجل الـSW منفصل) — وده اللي فاضلنا
+  📌   عليه في العزل.
+  📌 ✅ الحل: رابط التنظيف بيرجّع الصفحة مع هيدر
+  📌   Clear-Site-Data: "*" ⇒ كروم يمسح كل حاجة للموقع:
+  📌   الكوكيز · الكاش · localStorage · ⛔ و(service worker) كلهم.
+  📌   ⇒ الـSW القديم بيتمسح وبعدها الـSW الجديد (network-first)
+  📌   بيسجّل نفسه من أول تحميل.
+  ⛔ لازم يكون navigation (فتح صفحة) — كروم بيتجاهل الهيدر في
+  ⛔   الأجزاء الفرعية (صور/سكربتات).
+  ══════════════════════════════════════════════════════════════ */
+  const DO_CLEAN = url.searchParams.get('clean') === '1';
+
+    /* ══════════════════════════════════════════════════════════════
+    🛡️ ⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ منع بيانات الإدارة من الوصول العام
+    ────────────────────────────────────────────────────────────────
+    📌 المشكلة (ثغرة حرجة): مجلد `admin/` كان **منشور بالكامل**
+    📌 ⛔⛔⛔ على الإنتاج. و `admin/users.json` فيه:
+    📌 ⛔⛔⛔   · إيميلات مستخدمين حقيقية (gmail + octashares)
+    📌 ⛔⛔⛔   · أسماء حقيقية
+    📌 ⛔⛔⛔   · uid لكل مستخدم
+    📌 ⛔⛔⛔ ⇒ https://octashares.com/admin/users.json → HTTP 200
+    📌 ⛔⛔⛔ ⇒ أي حد على الإنترنت يقدر ينزّل قاعدة بيانات المستخدمين.
+    📌 ✅ الحل (٤ طبقات):
+    📌   ① الملف اتشال من git + من البناء (tools/check-dist.js).
+    📌   ② الـworker بيرجّع 404 لكل **ملف بيانات** في /admin/.
+    📌   ③ الـ_assets نفسها مالهاش الأصل (الملف مش موجود) ⇒ 404 طبيعي.
+    📌   ④ الـ_headers بتعمل no-store على /admin/*.
+    📌 ⛌⛌⛌ ⭐ قرار المشرف: **صفحات الـHTML تفضل متاحة** (لوحة
+    📌 ⛌⛌⛌ الإدارة لازم تفتح) — بس **ملفات البيانات JSON ممنوعة**.
+    📌 ⛌⛌⛌ ⇒ نشيل /admin من القائمة السوداء، ونمنع JSON بس.
+    ══════════════════════════════════════════════════════════════ */
+    if (url.pathname === '/admin' || url.pathname.indexOf('/admin/') === 0) {
+      /* ⛔⛔⛔ ملفات البيانات — ممنوعة تماماً (دي اللي فيها PII) */
+      const ADMIN_DATA = /\.(json|csv|tsv)$/i;
+      if (ADMIN_DATA.test(url.pathname)) {
+        return new Response(JSON.stringify({
+          ok: false, error: 'المسار ده مش متاح'
+        }), {
+          status: 404,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+          }
+        });
+      }
+      /* ⛌⛌⛌ صفحات الـHTML — تفضل متاحة (اللوحة لازم تفتح) */
+      /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ '/admin' ⇒ '/admin/index.html'
+      📌 السبب: الأصول بتشتغل بـhtml_handling="none" ⇒ مفيش "/admin"
+      📌 ⛌⛌⛔ ⇒ 404 فاضي ⇒ لوحة الإدارة مش بتفتح (كانت ٢٠٠ قبل).
+      📌 ✅ الحل: نوجّه '/admin' لـ'/admin/index.html' قبل الـfetch. */
+      const adminTarget = (url.pathname === '/admin')
+        ? new URL('/admin/index.html', url).toString()
+        : url.toString();
+      const h2 = new Headers();
+      h2.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      h2.set('X-Robots-Tag', 'noindex, nofollow');
+      h2.set('Content-Type', 'text/html; charset=utf-8');
+      return env.ASSETS.fetch(new Request(adminTarget, request)).then(
+        (r) => {
+          try {
+            const hh = new Headers(r.headers);
+            hh.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+            hh.set('X-Robots-Tag', 'noindex, nofollow');
+            return new Response(r.body, { status: r.status, headers: hh });
+          } catch (e) { return r; }
+        }
+      );
+    }
+
+    /* 1.5) ⭐ جسر سكانر TradingView — الفلتر يشتغل من غير الباك
+       ⛌ مقفول على الإنتاج: شغّال بس لو OCTA_TV_PROXY === 'on'
+          (اللي في إعدادات المعاينة بس).
+       📌 stale-while-revalidate: أول طلب بعد انتهاء الكاش بيرجّع
+          النسخة القديمة فوراً ويحدّث في الخلفية — عشان المستخدم
+          ما يستناش ٢٠ ثانية كل مرة. */
+    /* ══════════════════════════════════════════════════════════════
+    ⛔⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐⭐ بوابة الـAPI (في أول الـWorker!)
+    ──────────────────────────────────────────────────────────────
+    📌 لازم تكون **قبل** كل معالجات الـAPI الخاصة (dividends · news
+    📌 · obdepth · tvscan · halan …) ⇒ هي كانت بتلتفّ على البوابة.
+    📌 المتاح بلا جلسة: health · track · auth/* · quotes · logos · tvlogo/*
+    ══════════════════════════════════════════════════════════════ */
+    /* ⛔⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐ مسار التسجيل القديم اتقفل.
+       📌 السبب: /api/auth/register كان لسه شغال والإيميل فيه اختياري
+       ⛔ ⇒ حد يعمل حساب من غير إيميل و uid = هاش الكود بس ⇒
+       ⛔    منعرفش مين هو خالص. البوابة الجديدة (OTP) بتطلب إيميل.
+       ⛔ ده كان مفتوح ⇒ حد يعمل حسابات بلا هوية وبيلعب بلا حدود. */
+    if (url.pathname === '/api/auth/register') {
+      return new Response(JSON.stringify({
+        ok: false,
+        error: 'طريقة التسجيل القديمة اتقفلت — استخدم شاشة التسجيل الجديدة',
+        hint: 'لازم إيميل + كود تحقق',
+        code: 'legacy_register_disabled'
+      }), {
+        status: 410,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store'
+        }
+      });
+    }
+    /* 🐞🛡️ SEC-001 (الجولة ١٨ · P1) — بوابة الـAPI: حكم **حقيقي**
+       ───────────────────────────────────────────────────────────
+       📌 كان: «كوكي غير فارغ» = جلسة ⇒ أي كوكي عشوائي يعدّي ⛔
+       📌 دلوقتي: الحكم من صاحب الصلاحية (الباك — عنده سر التوقيع)
+          ⛔ قبل الخدمة (قبل أي معالج) · ⛔ fail-closed على الحكم.
+       📌 «مفيش جلسة» و«جلسة مرفوضة» ⇒ 401 (زي ما قبل كده).
+       📌 «مقدرناش نتحقق» (الباك واقع) ⇒ الطلب بينزل عادي والباك
+          نفسه هو اللي بيرفض ⇒ **ما فيش بيانات بتتسرب** (مفيش
+          بيانات مستخدم بتتخدم من الـworker أصلاً). */
+    if (url.pathname.startsWith('/api/') && request.method !== 'OPTIONS'
+      && !isPublicApi(url.pathname)) {
+      const sess = await sessionVerdict(request, env, url.pathname);
+      if (sess.state === 'anon' || sess.state === 'invalid') {
+        const ah = {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store',
+          'X-OCTA-Auth': 'required'
+        };
+        /* ⛔ كوكي مرفوض ⇒ نمسحه من المتصفح (يوقف الإرسال) */
+        if (sess.state === 'invalid' && sess.via === 'cookie') {
+          ah['Set-Cookie'] = SESSION_COOKIE + '=; Path=/; Max-Age=0; SameSite=None; Secure';
+        }
+        return new Response(JSON.stringify({
+          ok: false,
+          error: 'تسجيل الدخول مطلوب',
+          hint: 'سجّل دخول أو اعمل حساب من البوابة، وبعدها افتح تاني',
+          code: 'auth_required'
+        }), {
+          status: 401,
+          headers: ah
+        });
+      }
+      if (sess.state === 'unknown') {
+        try {
+          console.warn('[gate] التحقق من الجلسة مش متاح — الباك هو اللي هيحكم');
+        } catch (e) { }
+      }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       🩺 الجولة ١٨ (P3) — فحص الجاهزية — /api/preflight
+       ────────────────────────────────────────────────────────────────
+       📌 الغرض: نقطة تشخيص واحدة بتقول الحقيقة في ثانية:
+          «الـAPI شغّال؟ · والإيميل مضبوط؟»
+       ⛔ قراءة بس: مافيش كتابة · مافيش بيانات مستخدمين · مافيش أسرار.
+       ⛔ الرد: ٤ حقول بالظبط (api · mail · ok · checked_at)
+          ⛔ ممنوع: عنوان الـAPI الداخلي · اسم المضيف · أي مفتاح.
+       ⛔ متاح بلا تسجيل دخول (تشخيص) — عبر isPublicApi.
+       ⛔ ملاحظة: الرد بيتحسب جوّه الـworker نفسه (مش من الباك)
+          ⇒ لو الـAPI واقع ⇒ الفحص لسه بيردّ (api:down) وده المطلوب.
+       ════════════════════════════════════════════════════════════════ */
+    if (url.pathname === '/api/preflight') {
+      const rep = await preflightReport(env);
+      return new Response(JSON.stringify(rep), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store'
+        }
+      });
+    }
+
+    if (url.pathname === '/api/tvscan' && env && env.OCTA_TV_PROXY === 'on') {
+      const c = url.searchParams.get('c') || 'egx';
+      const limit = Math.max(1, Math.min(400, Number(url.searchParams.get('limit') || 400)));
+      const cols = url.searchParams.get('cols') === 'min'
+        ? ['close', 'change', 'volume', 'RSI', 'MACD.macd', 'MACD.signal', 'SMA50', 'SMA200']
+        : TV_COLS;
+      /* 📌 v2 في المفتاح — عشان الكاش القديم (بصيغة تانية) ما يتخدمش
+         بعد أي تعديل على شكل البيانات. */
+      const key = 'https://octa.internal/v2/tvscan/' + c + '/' + limit + '/' + cols.length;
+      const cacheKey = new Request(key, { method: 'GET' });
+      const cache = caches && caches.default;
+
+      const doFetch = async () => {
+        const body = {
+          symbols: { query: { types: [] }, tickers: [] },
+          filter: [
+            { left: 'exchange', operation: 'in_range', right: ['EGX'] },
+            { left: 'type', operation: 'equal', right: 'stock' }
+          ],
+          options: { lang: 'en' },
+          columns: cols,
+          range: [0, limit],
+          sort: { sortBy: 'market_cap_basic', sortOrder: 'desc' }
+        };
+        const up = await fetch(TV_SCAN, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        if (!up.ok) throw new Error('tv-' + up.status);
+        const j = await up.json();
+        const rows = tvRowsFromScan(j, cols);
+        const res = new Response(JSON.stringify({ ok: true, n: rows.length, ts: Date.now(), rows: rows }), {
+          headers: {
+            'Content-Type': 'application/json',
+            /* ⛔ TTL طويل (يوم) — التحديث بيتم في الخلفية مش عند الطلب */
+            /* ⚠️ TTL كان يوم كامل ⇒ لو فشل التحديث في الخلفية، المستخدم
+               ياخد بيانات من يوم كامل وهي معروضة «حيّة». ⇒ ١٠ دقايق. */
+            'Cache-Control': 'public, max-age=600',
+            'Access-Control-Allow-Origin': '*',
+            'x-octa-ts': String(Date.now())
+          }
+        });
+        if (cache) { try { await cache.put(cacheKey, res.clone()); } catch (e) { } }
+        return res;
+      };
+
+      if (cache) {
+        const hit = await cache.match(cacheKey);
+        if (hit) {
+          const ts = Number(hit.headers.get('x-octa-ts') || 0);
+          const age = Date.now() - ts;
+          const h = new Headers(hit.headers);
+          h.set('x-octa-cache', age < 300000 ? 'fresh' : 'stale');
+          h.set('x-octa-age', String(age));
+          if (age < 300000) return new Response(hit.body, { headers: h });   /* لسه طازة */
+          if (ctx && ctx.waitUntil) {               /* قديمة → نحدّث في الخلفية */
+            try { ctx.waitUntil(doFetch().catch(() => { })); } catch (e) { }
+          }
+          return new Response(hit.body, { headers: h });                    /* نرجّع القديمة فوراً */
+        }
+      }
+      try {
+        return await doFetch();
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: 'tv-failed', msg: String(e && e.message || e) }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
+    /* 1.6) ⭐ شموع السوق — للمؤشرات الذكية (جيميني · القفل · MCDX)
+       ⛌ نفس بوابة المعاينة (OCTA_TV_PROXY) — الإنتاج مقفول.
+       📌 المصدر: startamarkets (نفس مصدر الباك) — شموع يومية حقيقية. */
+    if (url.pathname === '/api/tvcandles' && env && env.OCTA_TV_PROXY === 'on') {
+      /* ⛔⛔⛔⛔⛔⛔⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+       📌 ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ التنضيف كان **بيمسح** `.CA`!
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ الكود القديم كان:
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌   .replace(/[^A-Z0-9]/g, '')
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ "COMI.CA" بقى "COMICA" ❌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ وبعدين startamarkets ملقاش الرمز ⇒ [] ⇒ 502
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ والبديل "COMI" (من غير CA) كان **بيشتغل**!
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ✅ الحل: نحتفظ بالرمز زي ما هو (حروف + أرقام + نقطة)،
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ونشيل `.CA` قبل طلب startamarkets. */
+      const rawCode = (url.searchParams.get('code') || '').toUpperCase().replace(/[^A-Z0-9.]/g, '');
+      const code = rawCode.replace(/\.CA$/, '');
+      const n = Math.max(60, Math.min(400, Number(url.searchParams.get('n') || 320)));
+      if (!code) {
+        return new Response(JSON.stringify({ ok: false, error: 'bad code' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } });
+      }
+      const ck = new Request('https://octa.internal/v2/tvcandles/' + code + '/' + n, { method: 'GET' });
+      const cache = caches && caches.default;
+      if (cache) {
+        const hit = await cache.match(ck);
+        if (hit) return hit;
+      }
+      try {
+        /* 📌 startamarkets.com عايز الرمز **من غير** `.CA` (شِّلناها فوق) */
+        const saCode = code;
+         const up = await fetch('https://startamarkets.com/api/v1/egx/history/' + saCode, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+            'Accept': 'application/json,text/plain,*/*',
+            'Origin': 'https://startamarkets.com',
+            'Referer': 'https://startamarkets.com/egx'
+          }
+        });
+        if (!up.ok) throw new Error('sa-' + up.status);
+        const raw = await up.json();
+        /* ⛔ الحد الأدنى ٢٥ (مش ٢٠) — نفس حدّ المحرك. بالحد القديم
+           ⛌   IRAX (٢٠ شمعة) كان يعدّي من الـworker ويرجّع null بعدين
+           ⛌   ⇒ كارت فاضي من غير سبب. */
+        if (!Array.isArray(raw) || raw.length < 25) throw new Error('no data');
+        const out = [];
+        for (let i = Math.max(0, raw.length - n); i < raw.length; i++) {
+          const c = raw[i];
+          try {
+            /* ⚠️ الإغلاق **المعدّل** (adj_close) لما يتوفّر — التوزيعات
+               والتجزئة بتخلي الإغلاق الخام غلط. (لو مفيش adj_close ⇒ خام) */
+            const close = (c.adj_close != null && isFinite(Number(c.adj_close)))
+              ? Number(c.adj_close) : Number(c.close);
+            out.push({
+              t: c.date, o: +Number(c.open).toFixed(4), h: +Number(c.high).toFixed(4),
+              l: +Number(c.low).toFixed(4), c: +close.toFixed(4), v: Math.round(c.volume || 0)
+            });
+          } catch (e) { }
+        }
+        /* ⛔⛔ حارس البيانات القديمة (حرجة): مثال TOUR آخر شمعة ٢٠١٧-٠٤-٠٢
+           ⇒ الكارت بيحسب مستويات على بيانات ٩ سنين والسعر الظاهر ١٠.٠٠.
+           ⇒ هنا بنرتّب ونعلّم العمر، والواجهة بتعرض سبب واضح. */
+        const lastDate = out.length ? String(out[out.length - 1].t) : '';
+        const lastMs = lastDate ? Date.parse(lastDate) : NaN;
+        const ageDays = isFinite(lastMs) ? Math.floor((Date.now() - lastMs) / 86400000) : null;
+        const res = new Response(JSON.stringify({
+          ok: true, code: code, count: out.length, candles: out,
+          ageDays: ageDays, stale: !!(ageDays != null && ageDays > 10)
+        }), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=600',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+        if (cache) { try { await cache.put(ck, res.clone()); } catch (e) { } }
+        return res;
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: 'candles-failed', msg: String(e && e.message || e) }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
+    /* 1.65) ⭐⭐⭐ /api/bench — مقارنة المصداقية (٢٥ أكتوبر ٢٠٢٦)
+       ──────────────────────────────────────────────────────────
+       📌 المشكلة اللي اتحلّت: مقارنة «أفضل ٢٠ عندنا» بالمؤشر كانت
+       📌 متبنية على حقول جاهزة (Perf.*) من TradingView. وفي حالة
+       📌 **المؤشر** المرجع بتاعها مزحزح (شهر ⇒ مرجع 3 شهور ورا)،
+       📌 وكمان الصفوف الناقصة (0.00%) كانت بتدخل كعوائد حقيقية.
+       📌 ⇒ متوسطغلط في الاتجاهين.
+
+       ✅ الحل: نقارن الطرفبن على **نفس الإغلاقات** و**نفس تواريخ
+       📌 المرجع** بالظبط. الواجهة بتحسب تواريخ المرجع من سلسلة
+       📌 المؤشر الرسمية، وبتطلب هنا إغلاق كل سهم عند نفس التاريخ.
+
+       📌 المدخل:  ?codes=LUTS,PHTV,…&d1=2026-09-24&d2=2026-04-23&d3=2025-10-23
+       📌 المخرج:  {ok, rows:[{code, now, m1:{date,close}, m6:{..}, y1:{..}}]}
+       📌 ملاحظة: لو السهم مافتrawlش في تاريخ المرجع ⇒ بناخد آخر
+       📌   إغلاق **قبله** (مش صفر!) ⇒ وده الرقم الحقيقي.
+
+       📌 الكاش: نفس مفتاح شموع الأسهم ⇒ الجسور بيشارك الكاش. */
+    if (url.pathname === '/api/bench' && env && (env.OCTA_TV_PROXY === 'on' || env.OCTA_BENCH === 'on')) {
+      const codes = (url.searchParams.get('codes') || '')
+        .toUpperCase().split(',').map(s => s.trim().replace(/[^A-Z0-9]/g, ''))
+        .filter(Boolean).slice(0, 30);
+      const dates = ['d1', 'd2', 'd3'].map(k => (url.searchParams.get(k) || '').trim());
+      if (!codes.length) {
+        return new Response(JSON.stringify({ ok: false, error: 'no codes' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } });
+      }
+      const cache = caches && caches.default;
+      const N = 400;
+      try {
+        const rows = await Promise.all(codes.map(async (code) => {
+          const ck = new Request('https://octa.internal/v2/tvcandles/' + code + '/' + N, { method: 'GET' });
+          let candles = null;
+          if (cache) {
+            const hit = await cache.match(ck);
+            if (hit) { try { const j = await hit.json(); candles = j.candles || null; } catch (e) { } }
+          }
+          if (!candles) {
+            const up = await fetch('https://startamarkets.com/api/v1/egx/history/' + code, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+                'Accept': 'application/json,text/plain,*/*',
+                'Origin': 'https://startamarkets.com',
+                'Referer': 'https://startamarkets.com/egx'
+              }
+            });
+            if (!up.ok) throw new Error('sa-' + up.status);
+            const raw = await up.json();
+            if (!Array.isArray(raw) || raw.length < 25) throw new Error('no data');
+            candles = [];
+            for (let i = Math.max(0, raw.length - N); i < raw.length; i++) {
+              const c = raw[i];
+              try {
+                const close = (c.adj_close != null && isFinite(Number(c.adj_close)))
+                  ? Number(c.adj_close) : Number(c.close);
+                candles.push({ t: c.date, c: +close.toFixed(4) });
+              } catch (e) { }
+            }
+            if (cache) {
+              try {
+                const fake = new Response(JSON.stringify({ ok: true, code: code, candles: candles }), {
+                  headers: { 'Content-Type': 'application/json' }
+                });
+                await cache.put(ck, fake);
+              } catch (e) { }
+            }
+          }
+          /* آخر إغلاق ≤ كل تاريخ مرجعي */
+          const at = (iso) => {
+            if (!iso) return null;
+            let pick = null;
+            for (const c of candles) {
+              if (String(c.t) <= iso && (!pick || String(c.t) > String(pick.t))) pick = c;
+            }
+            return pick ? { date: String(pick.t), close: pick.c } : null;
+          };
+          const last = candles.length ? candles[candles.length - 1] : null;
+          return {
+            code: code,
+            now: last ? { date: String(last.t), close: last.c } : null,
+            m1: at(dates[0]), m6: at(dates[1]), y1: at(dates[2])
+          };
+        }));
+        return new Response(JSON.stringify({ ok: true, rows: rows, dates: dates }),
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'public, max-age=1800',
+              'Access-Control-Allow-Origin': '*'
+            }
+          });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: 'bench-failed', msg: String(e && e.message || e) }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
+    /* 1.7) ⭐⭐⭐ جسور CORS لأطراف تالتة — ٢٥ أكتوبر ٢٠٢٦
+       ──────────────────────────────────────────────────────────
+       📌 المشكلة: المتصفح كان بيطلب:
+         · https://www.tradingview-widget.com/api/v1/quote?symbol=…
+         · https://api.rss2json.com/v1/api.json?rss_url=…
+       ⛌ مباشرة من الـJS ⇒ الـserverين مش بيقبلوا CORS من
+       ⛌ دوميننا ⇒ المتصفح بيمنع الرد ⇒ "blocked by CORS".
+       ⛌ (وكمان الـocta-api.js كان بيعيد توجيههم للـRailway ⇒ 405)
+
+       ✅ الحل: نجيبهم من الـedge (نفس-origin) ⇒ مفيش CORS خالص.
+       ⛌ الكاش على الـedge: ٦٠ ثانية للأسعار · ٣٠٠ ثانية للأخبار.
+
+       📌 ملاحظة مهمة: المسارات دي **مش** من الباك — هي جسر
+       ⛌   للـedge بس. ولوWorker واقع، الـJS بيرجع لطلب-party
+       ⛌   مباشر (وهو هيفشل CORS برضه ⇒ الأرقام تفضل «---»).
+       ⛌   ⇒ مفيش ضرر أمني: البيانات دي عامة ومفتوحة أصلاً. */
+    if (url.pathname === '/api/tvquote') {
+      const sym = (url.searchParams.get('symbol') || '').trim();
+      if (!sym) {
+        return new Response(JSON.stringify({ ok: false, error: 'no symbol' }),
+          { status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+      const ck = new Request('https://octa.internal/v2/tvquote/' + encodeURIComponent(sym), { method: 'GET' });
+      const cache = caches && caches.default;
+      if (cache) {
+        const hit = await cache.match(ck);
+        if (hit) return hit;
+      }
+      try {
+        /* ⛔⛔⛔⛔⛔⛔⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+         📌 ٢٥ أكتوبر ٢٠٢٦ — tradingview-widget.com **مش** بيقبل
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ الطلب من داتاسنتر (403 Cloudflare bot
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ protection) ⇒ جسر الـworker مش هينفع.
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ✅ البديل: **Yahoo Finance chart API** — شغّال ٢٠٠ من الـedge
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ⛌ ⛌ ⛌ ⛌ ⛌ (بي conversion map من TradingView symbol لـ Yahoo).
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         📌 وبنرجّع **بنفس الشكل** اللي الـJS متوقعه
+         ⛌ ⛌ ⛌ ⛌ ⛌ (data.v.lp / data.v.ch) ⇒ مفيش تعديل في الـJS. */
+        const ySym = tvToYahoo(sym);
+        if (!ySym) throw new Error('unmapped symbol: ' + sym);
+        const up = await fetch(
+          'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(ySym) + '?range=5d&interval=1d',
+          { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120', 'Accept': 'application/json' } }
+        );
+        if (!up.ok) throw new Error('yahoo ' + up.status);
+        const raw = await up.json();
+        const meta = raw && raw.chart && raw.chart.result && raw.chart.result[0] && raw.chart.result[0].meta;
+        if (!meta) throw new Error('no meta');
+        const price = Number(meta.regularMarketPrice);
+        const prev = Number(meta.chartPreviousClose != null ? meta.chartPreviousClose : meta.previousClose);
+        if (!isFinite(price) || price <= 0) throw new Error('bad price');
+        const chg = isFinite(prev) && prev > 0 ? ((price - prev) / prev) * 100 : 0;
+        const body = {
+          ok: true, source: 'yahoo', symbol: sym, yahoo: ySym,
+          v: { lp: price, ch: +chg.toFixed(4), chp: +chg.toFixed(4), volume: meta.regularMarketVolume || 0 }
+        };
+        const res = new Response(JSON.stringify(body), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=60',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+        if (cache) { try { await cache.put(ck, res.clone()); } catch (e) { } }
+        return res;
+      } catch (e) {
+        /* ⛔⛔⛔⛔⛔⛔⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+         📌 Yahoo مش عنده مؤشرات EGX (EGX30 · EGX20 · EGX100) ⇒ 404.
+         ✅ Fallback: **سكانر TradingView** (شغّال ٢٠٠ من الـedge) — جسر
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         📌 بيبعت ticker صريح للـscanner (EGX:EGX30) وبيرجّع السعر. */
+        try {
+          const tv = await fetch('https://scanner.tradingview.com/global/scan', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              symbols: { tickers: [sym] },
+              columns: ['close', 'change', 'volume', 'name']
+            })
+          });
+          if (tv.ok) {
+            const t = await tv.json();
+            const d = t && t.data && t.data[0];
+            if (d && d.d && d.d.length >= 2 && isFinite(Number(d.d[0]))) {
+              const p2 = Number(d.d[0]);
+              const c2 = Number(d.d[1]);
+              const body2 = {
+                ok: true, source: 'tradingview', symbol: sym,
+                v: { lp: p2, ch: c2, chp: c2, volume: d.d[2] || 0 }
+              };
+              const res2 = new Response(JSON.stringify(body2), {
+                status: 200,
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Cache-Control': 'public, max-age=60',
+                  'Access-Control-Allow-Origin': '*'
+                }
+              });
+              if (cache) { try { await cache.put(ck, res2.clone()); } catch (e2) { } }
+              return res2;
+            }
+          }
+        } catch (e2) { }
+        return new Response(JSON.stringify({ ok: false, error: 'tvquote-failed', msg: String(e && e.message || e) }),
+          { status: 502, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       ⭐⭐⭐ محور الأخبار — كل الأسهم (endpoint مفتوح للاختبار)
+       ────────────────────────────────────────────────────────────────
+       📌 بيرجّع لكل سهم: درجة المحور · عدد الأحداث · الأهمية · المصدر
+       📌 المصدر = foudalens (الباك) + هالان (المroker MCP) — مدمجين
+       ════════════════════════════════════════════════════════════════ */
+    if (url.pathname === '/api/halan/axis') {
+      try {
+        const ek = await env.HALAN_KV.get('halan_events_v1', 'json');
+        const halanByCode = eventsByCode(ek);
+        const codes = Object.keys(halanByCode).sort();
+        const out = [];
+        for (const code of codes) {
+          const he = halanByCode[code];
+          const news = newsEngine(he);
+          /* ⭐ عنوان + نص الخبر — النص الخام كان بيتعرض زي ما هو
+             («العنوان : اسم الشركة ...») ⇒ المستخدم مش شايف الخبر. */
+          const txt = parseHalaText(news.headline);
+          out.push({
+            code: code,
+            axis: news.score,
+            events: news.events_count,
+            materiality: news.materiality,
+            headline: news.headline,
+            title: txt.title,
+            body: txt.body,
+            has_news: news.has_news,
+            source: 'halan',
+          });
+        }
+        return new Response(JSON.stringify({
+          ok: true,
+          count: out.length,
+          updatedAt: ek && ek.at ? new Date(ek.at).toISOString() : null,
+          source: 'إعلانات البورصة الرسمية',
+          axes: out,
+        }, null, 1), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=120' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: String(e && e.message || e) }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
+    if (url.pathname === '/api/rss') {
+      const rss = (url.searchParams.get('url') || '').trim();
+      if (!rss) {
+        return new Response(JSON.stringify({ ok: false, error: 'no url' }),
+          { status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+      /* ⛔⛔⛔ حماية SSRF — مينفعش نخلي الـworker يجيب أي URL.
+         ⛌   بنسمح بس بنطاقات RSS معروفة ( Yahoo · Google News ). */
+      let allowed = false;
+      try {
+        const h = new URL(rss).hostname;
+        allowed = /(^|\.)(yahoo\.com|finance\.yahoo\.com|feeds\.finance\.yahoo\.com|news\.google\.com|google\.com)$/i.test(h);
+      } catch (e) { }
+      if (!allowed) {
+        return new Response(JSON.stringify({ ok: false, error: 'rss host not allowed' }),
+          { status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+      const ck = new Request('https://octa.internal/v2/rss/' + encodeURIComponent(rss), { method: 'GET' });
+      const cache = caches && caches.default;
+      if (cache) {
+        const hit = await cache.match(ck);
+        if (hit) return hit;
+      }
+      try {
+        /* ⛔⛔⛔⛔⛔⛔⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+         📌 ٢٥ أكتوبر ٢٠٢٦ — rss2json.com **مش** بيقبل الطلب من
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ داتاسنتر (403 Cloudflare bot protection)
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ جسر الـworker مش هينفع كده.
+         ✅ البديل: نجيب الـRSS **مباشرة** (news.google.com بيقبل ٢٠٠
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ من الـedge) ونحلّله **هنا** بـregex
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ ونرجّع **بنفس الشكل** اللي
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ rss2json كان بيرجّعه
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ({status, items:[{title,link,pubDate,description}]})
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ مفيش أي تعديل في الـJS. */
+        const up = await fetch(rss, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+            'Accept': 'application/rss+xml,application/xml,text/xml,*/*'
+          }
+        });
+        if (!up.ok) throw new Error('feed ' + up.status);
+        const xml = await up.text();
+        const items = parseRssItems(xml);
+        if (!items.length) throw new Error('feed empty');
+        const body = { status: 'ok', items: items };
+        const res = new Response(JSON.stringify(body), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=300',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+        if (cache) { try { await cache.put(ck, res.clone()); } catch (e) { } }
+        return res;
+      } catch (e) {
+        /* ⛔⛔⛔⛔⛔⛔⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌⛌
+         📌 ٢٥ أكتوبر ٢٠٢٦ — news.google.com بيرجّع **503** للـedge
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ (بيحجب نطاقات Cloudflare) ⇒ يا إما نجرّب
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ مصدر تاني، يا إما نرجّع **فاضي**
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ (degrade) بدل ما نكسر الصفحة.
+         ✅ Fallback: rss2json.com (شغال أحياناً) ⇒ لو هيك ⇒ نرجّع فاضي
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ بأمان (٢٠٠ مش ٥٠٢) — الـJS بيتعامل
+         ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ مع items=[] فاضي بهدوء. */
+        try {
+          const alt = await fetch('https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(rss), {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+              'Accept': 'application/json,text/plain,*/*'
+            }
+          });
+          if (alt.ok) {
+            const txt = await alt.text();
+            const res = new Response(txt, {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'public, max-age=300',
+                'Access-Control-Allow-Origin': '*'
+              }
+            });
+            if (cache) { try { await cache.put(ck, res.clone()); } catch (e2) { } }
+            return res;
+          }
+        } catch (e2) { }
+        /* ⛔ آخر حاجة: فاضي بأمان (٢٠٠) — الـJS مش هيعمل error */
+        return new Response(JSON.stringify({ status: 'error', items: [], ok: false, msg: String(e && e.message || e) }), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=60',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      }
+    }
+
+    /* ⭐ نقطة فحص: افتحها على موبايلك وقولّي النتيجة */
+    if (url.pathname === '/api/halan/status') {
+      const st = await (async () => { try { return await env.HALAN_KV.get('halan_state_v1', 'json'); } catch (e) { return null; } })();
+      const ev = await (async () => { try { return await env.HALAN_KV.get('halan_events_v1', 'json'); } catch (e) { return null; } })();
+      return new Response(JSON.stringify({
+        ok: true, worker: 'octa-preview',
+        tokenCached: !!(st && st.access),
+        tokenAgeMin: st && st.at ? Math.round((Date.now() - st.at) / 60000) : null,
+        events: (ev && ev.events || []).length,
+        isins: ev ? Object.keys(ev.isinOf || {}).length : 0,
+        eventsAgeMin: ev && ev.at ? Math.round((Date.now() - ev.at) / 60000) : null,
+        now: new Date().toISOString(),
+      }, null, 1), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+    }
+    /* 1) proxy للـAPI (نفس origin عشان نتفادى CORP same-site) */
+    /* ══════════ ⭐ هالان (بورصة مصر) — ٩ نوفمبر ٢٠٢٦ ══════════
+       📌 ① /api/obdepth/<code> ⇒ عمق السوق الحقيقي.
+       📌   الباك بيرجّع 503 no_key (محتاج EGX_LIVE_KEY) ⇒ هنا بنجيبه من هالان.
+       📌 ② /api/dividends ⇒ بندمج إعلانات هالان مع المصدر الحالي.
+       📌 ⛔ التوكن في أسرار الـWorker + KV — مش في الكود ولا في المتصفح.
+       📌 ⛔ بيانات بسوق عامة — مفيش أي مسار للمحفظة أو الأوامر. */
+    if (url.pathname.startsWith('/api/obdepth/')) {
+      /* ⭐ عمق السوق من هالان — **قراءة KV بس** (صفر نداءات MCP في مسار الطلب
+         ⇒ صفر حجب للـisolate ⇒ مفيش شاشة بيضا). العامل halan-feed بيملّي الـKV. */
+      try {
+        const code = url.pathname.split('/').pop().toUpperCase();
+        const dk = await env.HALAN_KV.get('halan_depth_v1', 'json');
+        const dd = dk && dk.depth && dk.depth[code];
+        const d = dd ? { bids: dd.bids || [], asks: dd.asks || [], trades: [], last: dd.last,
+                         spread_pct: dd.spread_pct, lastClose: dd.lastClose,
+                         volume: dd.volume, value_today: dd.value_today } : null;
+        if (d) {
+          return new Response(JSON.stringify({ ok: true, cached: false, source: 'halan', data: d }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=120' }
+          });
+        }
+      } catch (e) { }
+      /* ⛔ مفيش بيانات من هالان ⇒ نكمّل عادي للـAPI (المصدر القديم) */
+    }
+    if (url.pathname === '/api/dividends') {
+      try {
+        const upTarget = API + url.pathname + url.search;
+        const up = await fetchApi(upTarget, { method: request.method, headers: buildHeaders(request, env) });
+        const upTxt = await up.text();
+        let merged;
+        try { merged = JSON.parse(upTxt); } catch (e) { merged = { actions: [] }; }
+        try {
+          const ek = await env.HALAN_KV.get('halan_events_v1', 'json');
+          const evs = (ek && ek.events) || [];
+          if (evs.length) {
+            const acts = Array.isArray(merged.actions) ? merged.actions : [];
+            const seen = {};
+            for (const a of acts) {
+              seen[(a.code || '') + '|' + (a.kind || '') + '|' + (a.date || '')] = 1;
+              seen[(a.code || '') + '|' + (a.date || '')] = 1;
+            }
+            let added = 0;
+            for (const e of evs) {
+              const k1 = e.code + '|' + e.kind + '|' + e.date;
+              const k2 = e.code + '|' + e.date;
+              if (seen[k1] || seen[k2]) continue;
+              seen[k1] = 1; seen[k2] = 1;
+              acts.push({
+                code: e.code, id: e.code + '|' + e.kind + '|' + (e.date || ''),
+                kind: e.kind, kindAr: e.kindAr, mode: e.mode,
+                date: e.date, distributionDate: e.date, recordDate: e.date,
+                headline: e.headline, value: null, ratio: null, currency: null,
+                yieldPct: null, lastClose: null, nameAr: null, nameEn: null,
+                sector: null, status: e.status, source: 'halan',
+              });
+              added++;
+            }
+            acts.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+            merged.actions = acts;
+            merged.halanEvents = added;
+          }
+        } catch (e) { }
+        const out = new Headers();
+        out.set('Content-Type', 'application/json');
+        out.set('Cache-Control', 'public, max-age=300');
+        const scUp = up.headers.get('Set-Cookie');
+        if (scUp) out.set('Set-Cookie', scUp);
+        return new Response(JSON.stringify(merged), { status: up.status, headers: out });
+      } catch (e) { /* ⛔ fallback: يكمّل عادي للـAPI */ }
+    }
+
+    /* ════════════════════════════════════════════════════════════════
+       ⭐⭐⭐ محور الأخبار الحقيقي (هالان) — ١٠ نوفمبر ٢٠٢٦
+       ────────────────────────────────────────────────────────────────
+       📌 المشكلة: الباك بيرجّع «45» ثابت لكل سهم مفيش عندو أحداث في
+          مصدره (foudalens) ⇒ 220 من 287 سهم محور الأخبار بتاعهم وهمي.
+          ⛔ «45» دي مش رقم مخترع — هي قاعدة الباك نفسها
+             (update_prices.py: news_engine → "مفيش أخبار ⇒ 45").
+          ⛔ والباك مش شايف أحداث هالان أصلاً ⇒ الملف
+             (data/halan_events.json) مش موجود عنده.
+
+       📌 الحل: نحسب محور الأخبار هنا بنفس معادلة الباك **بالحرف**
+          (نسخة مطابقة 1:1 · halan-news.js) ونمدجه مع أحداث هالان.
+          ⭐ الاختبار: tools/test-halan-news.js ⇒ 182/182 مطابقة
+             مع news_engine الحقيقي من كود الباك.
+
+       📌 ليه هنا مش في الباك؟ نشر الباك محتاج صلاحية كتابة على
+          ريبو octa-prices (التوكن الحالي مقيّد على ريبو octa بس)
+          ⇒ الباك هيشوف نفس النتيجة لما الـpatch يتنشر.
+
+       📌 ⛔ مفيش نداء MCP في مسار الطلب (قراءة KV بس) ⇒ صفر تجميد.
+       ════════════════════════════════════════════════════════════════ */
+    if (url.pathname.startsWith('/api/news/') || url.pathname.startsWith('/api/intelligence/')) {
+      const isNews = url.pathname.startsWith('/api/news/');
+      try {
+        const upTarget = API + url.pathname + url.search;
+        const up = await fetchApi(upTarget, { method: request.method, headers: buildHeaders(request, env) });
+        const upTxt = await up.text();
+        let upJson;
+        try { upJson = JSON.parse(upTxt); } catch (e) { upJson = {}; }
+
+        /* ⛔ الباك بيرجّع 401/404 ⇒ نسيب الرد زي ما هو */
+        if (!upJson || upJson.error) {
+          return new Response(upTxt, { status: up.status, headers: up.headers });
+        }
+
+        const code = String(upJson.code || url.pathname.split('/').pop() || '').toUpperCase();
+        const ek = await env.HALAN_KV.get('halan_events_v1', 'json');
+        const halanByCode = eventsByCode(ek);
+        const halanEvents = halanByCode[code] || [];
+
+        /* 📌 أحداث الباك: من الرد نفسه (فودالنس) — نفس الشكل */
+        const backendRaw = (isNews && upJson.news && Array.isArray(upJson.news.events))
+          ? upJson.news.events
+          : ((upJson.news_engine && Array.isArray(upJson.news_engine.events))
+            ? upJson.news_engine.events : []);
+        const backendEvents = backendRaw.map(e => ({
+          kind: e.kind, kindAr: e.kindAr, headline: e.headline,
+          date: e.date, value: (e.value === undefined ? undefined : e.value),
+        }));
+
+        const merged = mergeEvents(backendEvents, halanEvents);
+        const news = newsEngine(merged);
+
+        /* ⭐ التغطية: هل فيه حدث حقيقي؟ (هالان أضاف أحداث جديدة) */
+        const addedHalan = Math.max(0, merged.length - backendEvents.length);
+        if (isNews) {
+          upJson.news = news;
+        } else {
+          /* 📌 /api/intelligence ⇒ news_engine (مش news) */
+          upJson.news_engine = news;
+        }
+        upJson.newsSource = addedHalan > 0 ? 'halan' : 'backend';
+        upJson.halanEvents = addedHalan;
+        /* ⭐ المحاور (axes) — الباك بيرجّعها من اللقطة (45 فيها).
+           ⛔ بنحدّثها بنفس القيمة الجديدة ⇒ الأذرع في الواجهة تعرض الرقم الحقيقي. */
+        if (upJson.axes && typeof upJson.axes === 'object') {
+          upJson.axes.news = news.score;
+        }
+        /* 📌 محور الأخبار متاح كـendpoint مستقل كمان (للاختبار) */
+        if (url.searchParams.get('axis') === '1') {
+          upJson.axis = { code, news: news.score, events: news.events_count,
+                          materiality: news.materiality, source: upJson.newsSource };
+        }
+
+        const out = new Headers();
+        out.set('Content-Type', 'application/json');
+        /* 📌 intelligence محمي (يتطلب جلسة) ⇒ private. news عام ⇒ public.
+           ⛔ خلّيناها private في الحالتين (أأمن، والعميل بيجيبه بجلسة). */
+        out.set('Cache-Control', 'private, max-age=120');
+        const scUp = up.headers.get('Set-Cookie');
+        if (scUp) out.set('Set-Cookie', scUp);
+        return new Response(JSON.stringify(upJson), { status: up.status, headers: out });
+      } catch (e) {
+        console.warn('[HALAN-NEWS] fallback:', String(e && e.message || e));
+        /* ⛔ fallback: نكمّل عادي للـAPI (أفضل من رد غلط) */
+      }
+    }
+
+    if (url.pathname.startsWith('/api/')) {
+      /* ⛔⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐ بوابة الـAPI: التحليل والقرار
+         محميين.session مطلوب.
+         📌 القياس قبل التغيير: /api/explain/COMI و/api/opportunity/COMI
+            و/api/risk/COMI و/api/sentiment/COMI كانوا 200 لغير المسجّلين.
+         📌 المعيار: نفس كوكي البوابة (octa_token) — الباك بيفحصه كمان.
+         ⛔ OPTIONS (preflight) بيعدّي عشان الكوكي مش بيوصل معاه. */
+      /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⛔ «تسجيل الخروج» مش شغال (المستخدم
+         بيدخل تاني فوراً). السبب: كوكي الجلسة HttpOnly ⇒ المتصفح
+         ما يقدرش يمسحه، والزرار كان بيمسح الـlocalStorage بس.
+         ⭐ الحل: مسار GET /api/auth/logout ⇒ الـWorker (١) يبلّغ الباك
+         فيلغي كل التوكنات القديمة (token_epoch) ويمسح الكوكي، (٢) يرجّع
+         المستخدم للبوابة. ⭐ التنقل (navigation) مش fetch — عشان الكوكي
+         يتمسح فعلاً قبل ما الصفحة الجديدة تفتح. */
+      if (url.pathname === '/api/auth/logout'
+        && (request.method === 'GET' || request.method === 'POST')) {
+        /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · المراجعة الأمنية) — ⛔⛔⛔ ⬇️
+           📌 ⬇️ ⛔ كان: الرد يتحرّك فوراً ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ⛔ والإبطال (token_epoch) بيحصل في **الخلفية** ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ⛔ ⇒ المستخدم بيشوف «خرج» والتوكن لسه صالح ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ⛔ ⇒ (حد يقدر يطلب الصفحة بعد ثانية يدخل تاني) ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ✅ الحل: **ننتظر** الباك ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ✅ ونتحقق إن `revoked=true` ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ✅ ونمسح الكوكي **بس** لو الإبطال نجح ⬇️ ⬇️ ⬇️
+           📌 ⬇️ ✅ لو فشل ⇒ 502 + رسالة (مافيش «نجاح» كاذب) ⬇️ ⬇️ ⬇️ */
+        if (!API) return apiUnavailable();
+        let okRevoked = false, why = 'unknown';
+        try {
+          const up = await fetchApi(API + '/api/auth/logout', {
+            method: 'POST', headers: buildHeaders(request, env)
+          });
+          const txt = await up.text();
+          try {
+            const j = JSON.parse(txt);
+            /* ⛔ «already» = مافيش جلسة ⇒ المستخدم فعلاً خارج ⬇️ ⇒ نجاح ⬇️ */
+            const _already = (j && j.already === true);
+            okRevoked = (!!j && (j.revoked === true || _already))
+              && up.status >= 200 && up.status < 300;
+            if (!okRevoked) why = (j && (j.why || j.error)) || ('http_' + up.status);
+          } catch (e) {
+            okRevoked = false; why = 'bad_response';
+          }
+        } catch (e) {
+          okRevoked = false;
+          why = 'backend_unreachable';
+          console.warn('[logout] الباك مش راد (' + apiLogKey(e) + ')');
+        }
+        if (!okRevoked) {
+          /* ⛔⛔⛔ فشل ⇒ مافيش «خرج» كاذب ⬇️
+             📌 ⛔ الكوكي بيفضل ⇒ الجلسة بتفضل ⇒ أأمن ⬇️ */
+          const eh = new Headers();
+          eh.set('Content-Type', 'application/json; charset=utf-8');
+          eh.set('Cache-Control', 'no-store');
+          return new Response(JSON.stringify({
+            ok: false, revoked: false, error: 'فشل إبطال الجلسة — لم يتم الخروج', why: why
+          }), { status: 502, headers: eh });
+        }
+        const h = new Headers();
+        h.set('Set-Cookie', SESSION_COOKIE + '=; Path=/; Max-Age=0; SameSite=None; Secure');
+        h.set('Cache-Control', 'no-store');
+        if (request.method === 'GET') {
+          h.set('Location', '/gate.html');
+          return new Response(null, { status: 302, headers: h });
+        }
+        h.set('Content-Type', 'application/json; charset=utf-8');
+        return new Response(JSON.stringify({ ok: true, revoked: true }),
+          { status: 200, headers: h });
+      }
+      /* ⭐⭐ محرّك الفرص (OPP-001) — الباك الحيّ الأول، واللقطة fallback.
+         ⛔ في الإنتاج الـOCTA_OPP_SNAPSHOT مش مفعّل ⇒ السلوك القديم
+            (proxy بس) — يعني ما فيش أي تغيير على الإنتاج. */
+      if (url.pathname.startsWith('/api/opp/') && env && env.OCTA_OPP_SNAPSHOT === 'on') {
+        try {
+          const live = await fetch(API + url.pathname + url.search,
+            { method: 'GET', headers: buildHeaders(request, env) });
+          if (live && live.status === 200) {
+            const ct = (live.headers.get('content-type') || '');
+            if (ct.indexOf('json') >= 0) {
+              return new Response(live.body, {
+                status: 200,
+                headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+              });
+            }
+          }
+          /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٤) — خطأ المصادقة مش «الباك ميت».
+             📌 العيب المقاس: الباك الحيّ شغّال ويردّ 401 «محتاج تسجيل دخول»
+                ⇒ الـworker كان بيعتبر ده فشل ⇒ بيردّ 503 «الباك الحي شاغل»
+                ⇒ **رسالة كاذبة** (الباك شغّال فعلاً).
+             ⛔ الحل: 401/403 تُمرَّر زي ما هي (هي الحقيقة).
+                503 «الباك غير متاح» بس عند فشل الشبكة/5xx/رد مش JSON. */
+          if (live && (live.status === 401 || live.status === 403)) {
+            return new Response(live.body, {
+              status: live.status,
+              headers: {
+                'Content-Type': live.headers.get('Content-Type') || 'application/json',
+                'Cache-Control': 'no-store'
+              }
+            });
+          }
+        } catch (e) { }
+        /* ⛔⛔⛔ 16 نوفمبر 2026 — مافيش رجوع إلقطة القديمة:
+           ⛔ الباك حي ماشبش (or مرد غير JSON)
+           ⇒ رد صريح 503 + سبب واضح — مابترجعش وصفة المحرّك وبيانات قديمة.
+           ⛔ السلوك القديم يُخلّق ولا يشتغلّل بسبب «on». */
+        if (!snapshotFallbackAllowed(env)) {
+          return new Response(JSON.stringify({
+            ok: false,
+            error: 'live_backend_unavailable',
+            why: 'backend_failed_no_stale_snapshot',
+            source: 'none',
+            note_ar: 'الباك الحي شاغل — مابعرشناش لقطة قديمة.'
+          }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+          });
+        }
+        return await oppSnapshot(url, request, env);
+      }
+      /* ⭐⭐ OCTA Alpha (OPP-002) — نفس المنطق: الباك الحيّ الأول. */
+      if (url.pathname.startsWith('/api/alpha/') && env && env.OCTA_ALPHA_SNAPSHOT === 'on') {
+        try {
+          const live = await fetch(API + url.pathname + url.search,
+            { method: 'GET', headers: buildHeaders(request, env) });
+          if (live && live.status === 200) {
+            const ct = (live.headers.get('content-type') || '');
+            if (ct.indexOf('json') >= 0) {
+              return new Response(live.body, {
+                status: 200,
+                headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+              });
+            }
+          }
+          /* ⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٤) — نفس قاعدة المصادقة (فوق). */
+          if (live && (live.status === 401 || live.status === 403)) {
+            return new Response(live.body, {
+              status: live.status,
+              headers: {
+                'Content-Type': live.headers.get('Content-Type') || 'application/json',
+                'Cache-Control': 'no-store'
+              }
+            });
+          }
+        } catch (e) { }
+        /* ⛔⛔⛔ 16 نوفمبر 2026 — مافيش رجوع إلقطة القديمة
+           (نفس السياسة) — رد صريح 503 بلا لقطة. */
+        if (!snapshotFallbackAllowed(env)) {
+          return new Response(JSON.stringify({
+            ok: false,
+            error: 'live_backend_unavailable',
+            why: 'backend_failed_no_stale_snapshot',
+            source: 'none',
+            note_ar: 'الباك الحي شاغل — مابعرشناش لقطة قديمة.'
+          }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+          });
+        }
+        return await alphaSnapshot(url, request, env);
+      }
+      /* ⛔⛔ الجسور بتاعت المعاينة (tvscan/tvcandles) **ما بتروحلش**
+         ⛌   للـAPI الميت — لو حصل خطأ جواها (أو نشر جديد لسه
+         ⛌   بيتملّد) كانت بيروحوا للباك (Railway) ⇒ 405/503 HTML
+         ⛌   والصفحة بتكسر. ⛌ هنا بنرجّع JSON نضيف. */
+      if ((url.pathname === '/api/tvscan' || url.pathname === '/api/tvcandles') &&
+        !(env && env.OCTA_TV_PROXY === 'on')) {
+        return new Response(JSON.stringify({ ok: false, error: 'bridge-off', msg: 'الجسر مش شغال' }),
+          { status: 503, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+      }
+      /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · المراجعة الأمنية) — ⛔⛔⛔ ⬇️
+         📌 ⬇️ ⛔ مافيش وجهة API ⇒ **ممنوع** نرجع للإنتاج ⬇️ ⬇️ ⬇️
+         📌 ⬇️ ⛔ (المعاينة fail-closed) ⬇️ ⬇️ ⬇️
+         📌 ⬇️ ⛔ نرجع 503 برسالة صريحة ⬇️ ⬇️ ⬇️ */
+      if (!API) return apiUnavailable();
+      const target = API + url.pathname + url.search;
+      const init = {
+        method: request.method,
+        headers: buildHeaders(request, env)
+      };
+      /* ⛔⛔ جسم الطلب — كان بيضيع خالص!
+         ⛌ يعني كل POST (chat · analyze · charts · auth) كان
+         ⛌ بيوصل للباك من غير body. */
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        try {
+          const buf = await request.arrayBuffer();
+          if (buf && buf.byteLength) init.body = buf;
+        } catch (e) { }
+      }
+      try {
+        /* ⭐ ٥ نوفمبر ٢٠٢٦ — وضع الاختبار (تشخيصي · مؤقّت).
+         📌 الهدف: نخلّي السيرفر «يبان» بطيء (زي الـcold start) عشان
+         📌   المالك يشوف بنفسه الفرق بين البوابة القديمة والجديدة.
+         📌 الاستخدام: افتح ?slowtest=1 ⇒ /api/auth/me بيتأخر ١٢ ثانية.
+         📌 ⛔ شغّال في **المعاينة بس** (OCTA_SLOWTEST=1) — الإنتاج مفعّلوش.
+         📌 ⛔ ومفيش أي بيانات بتتغيّر — تأخير في الرد بس. */
+        const slowCookie = /(^|;\s*)octa_slowtest=1(;|$)/.test(
+          request.headers.get('cookie') || '');
+        if (env && env.OCTA_SLOWTEST === '1'
+          && url.pathname === '/api/auth/me'
+          && (url.searchParams.get('slowtest') === '1' || slowCookie)) {
+          await sleep(12000);
+        }
+        const upstream = await fetchApi(target, init);
+        /* ════════════════════════════════════════════════════════════════
+           🩺 الجولة ١٨ (P3) — ⛔ 530 (Cloudflare 1016) ⇐ رد صريح ⬇️
+           ────────────────────────────────────────────────────────────────
+           📌 القياس الحيّ (١٧ نوفمبر ٢٠٢٦): المعاينة كانت بتروّج رد
+              530 (نص إنجليزي «error code: 1016») ⇒ المستخدم مش فاهم
+              حاجة ⇒ والواجهة فسّرته «باسورد غلط».
+           ⛔ الحل: 530/502/504 (الوجهة مش موجودة · البوابة فاشلة)
+              ⇒ نفس الرد الثابت: 503 + why:api_unreachable.
+           ⛔ الردود 5xx العادية من الباك نفسه (زي 503 mail_down)
+              بتعدّي زي ما هي — السبب (*why*) بيقول الحقيقة.
+           ════════════════════════════════════════════════════════════════ */
+        if (isOriginUnreachable(upstream && upstream.status)) {
+          console.warn('[api-proxy] api_unreachable (upstream ' + upstream.status + ')');
+          return apiUnreachable();
+        }
+        let body = await upstream.text();
+        /* ⭐⭐ ١٤ نوفمبر ٢٠٢٦ — تصحيح نسبة اليوم (مرجع قديم بعد تعديل
+           سعر السهم). ⛔ Fail-safe: لو فشل ⇒ الرد زي ما هو. */
+        if (url.pathname === '/api/quotes') {
+          body = await fixQuotesChange(body);
+        }
+        const out = new Headers();
+        out.set('Content-Type', upstream.headers.get('Content-Type') || 'application/json');
+        /* ⛔⛔⛔ Set-Cookie — كان بيضيع!
+           ⛌ ده كوكي الجلسة HttpOnly — من غير ما يوصل للصفحة
+           ⛌ مفيش جلسة أصلاً والبوابة هتفضل قايمة للأبد. */
+        const sc = upstream.headers.get('Set-Cookie');
+        if (sc) {
+          /* ⛔⛔⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐⭐⭐⭐ الـSet-Cookie كان
+           📌 بيتحفظ على دومين Railway (octa-prices-production-4ccb
+           📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ .up.railway.app) — والمتصفح
+           📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+           📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+           📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+           📌 ⇒ ⛔⛔⛌ المتصفح **بيرفضها** (دومين غلط) ⇒ مفيش كوكي
+           📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+           📌 ⇒ ⛔⛔⛌ ⇒ /api/auth/me رجّع 401 ⇒ البوابة بعد كل
+           📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+           📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+           📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+           📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+           📌 ✅ الحل: نشيل الـDomain attribute ⇒ الكوكي يتحفظ على
+           📌 ✅ دومين الموقع (octashares.com) — زي ما المتصفح بيعمل
+           📌 ✅ للـhost-only cookies.
+           📌 ✅ ونضيف SameSite=None + Secure عشان يتبعت دايماً.
+           📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+           📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+           📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ */
+          let sc2 = sc.replace(/;\s*Domain=[^;]*/gi, '');
+          if (!/SameSite/i.test(sc2)) sc2 += '; SameSite=None';
+          if (!/Secure/i.test(sc2)) sc2 += '; Secure';
+          out.set('Set-Cookie', sc2);
+        }
+        /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⛔ «تسجيل الخروج» مش شغال:
+           ⛔ الـSet-Cookie بتاع مسح الكوكي ممكن ما توصلش (أو رد الباك
+           ⛔ مالوش) ⇒ الكوكي بيفضل ⇒ الـWorker بيفتح التطبيق تاني.
+           ⭐ الحل: الـWorker نفسه يمسح الكوكي على مسار الخروج. */
+        if (url.pathname === '/api/auth/logout') {
+          out.set('Set-Cookie', SESSION_COOKIE + '=; Path=/; Max-Age=0; SameSite=None; Secure');
+        }
+        out.set('Cache-Control', 'no-store');
+        /* ⛔⛔⛔ ضغط الردود الكبيرة (gzip) — ٢٣ أكتوبر ٢٠٢٦
+           📌 المشكلة: ردود الـAPI كانت **من غير أي ضغط** (ولا
+             Content-Encoding) ⇒ الرادار ٤٩٢ ك.ب لكل دفعة × ٨
+             دفعات = ~٤ ميجا على موبايل ⇒ «البيانات بتتأخر».
+           📌 الحل: نضغط هنا بـCompressionStream (مضغوط natively
+             ⇒ رخيص جداً في CPU) والمتصفح بيفكّ الضغط لوحده.
+           ⛌ بنضغط بس الردود الكبيرة (فوق ٢٠ ك.ب) — الردود الصغيرة
+             بتاخد CPU من غير فايدة.
+           ⛌ ومفيش Content-Length (الرد بيطلع chunked) — صح. */
+        /* ════════════════════════════════════════════════════════════════
+        ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ إيقاف الضغط المزدوج (gzip×٢) — قاتل!
+        ────────────────────────────────────────────────────────────────
+        📌 المشكلة: الـworker كان بيضغط الردود الكبيرة بـgzip،
+        📌 والـCloudflare edge بيضغط كمان ⇒ gzip×٢.
+        📌 ⇒ المتصفح بيفكّ مرة واحدة ⇒ يفضل gzip خام ⇒ res.json() بيفشل
+        📌 ⇒ OS_DB فاضي ⇒ **كل الأدوات والفلاتر بتقول «جاري التحميل»!**
+        📌 ✅ الحل: مافيش ضغط في الـworker — Cloudflare بيضغط صح لوحده
+        📌 (وكمان بيسرّع التحميل — مفيش CPU ضاغطة على الرادار).
+        ════════════════════════════════════════════════════════════════ */
+        out.delete('Content-Encoding');
+        out.delete('Content-Length');
+        return new Response(body, { status: upstream.status, headers: out });
+      } catch (e) {
+        /* ════════════════════════════════════════════════════════════════
+           🩺 الجولة ١٨ (P3) — ⛔ الاستثناء ⇒ رد واحد واضح ⬇️
+           ────────────────────────────────────────────────────────────────
+           📌 كان: 502 + {error:'api-proxy-failed', message:<نص الاستثناء>}
+              ⛌⇐ **تسريب**: رسالة الاستثناء بتحوي عنوان الوجهة الداخلية
+                 (مثل «cannot resolve host: …trycloudflare.com») ⇒
+                 العنوان بيطلع للمتصفح (وفي اللوج كمان).
+           ⛔ الحل: 503 + why:api_unreachable — بلا عنوان وبلا رسالة خام.
+           ════════════════════════════════════════════════════════════════ */
+        console.warn('[api-proxy] api_unreachable (' + apiLogKey(e) + ')');
+        return apiUnreachable();
+      }
+    }
+
+    /* 2) 🚪 البوابة — صفحة التطبيق من غير جلسة = صفحة البوابة
+       ⛔⛔ مفتاح التحويل: env.OCTA_GATE = 'off' ⇐ البوابة مقفولة.
+       ⛌ دلوقتي (قبل ما الـAPI الجديد يتنشر) البوابة مقفولة في
+       ⛌   المعاينة: لأن الـAPI القديم مش بيرجّع كوكي الجلسة
+       ⛌   (NameError في _json_auth) ⇒ أي حد هيفضل في البوابة
+       ⛌   للأبد. ⇒ المعاينة بتاخد التطبيق زي ما كان، والبوابة
+       ⛌   بتتفتح مع الـAPI الجديد.
+       ⛌ صفحة البوابة نفسها متاحة دايماً على /gate.html. */
+    const GATE_ON = !(env && env.OCTA_GATE === 'off');
+    const isGatePage = GATE_ON && GATE_PAGES.indexOf(url.pathname) !== -1;
+    if (isGatePage && !(await sessionVerdict(request, env, url.pathname)).ok) {
+      /* ════════════════════════════════════════════════════════════
+      🌍 ٩ نوفمبر ٢٠٢٦ — ⭐ الواجهة العامة = فلتر السوق
+      ────────────────────────────────────────────────────────────────
+      📌 قرار المالك: «فلتر السوق هو اللي يظهر للعامة — وأي حاجة
+         تانية تطلب تسجيل دخول».
+      📌 ⛔ قبل كده: الزائر المجهول كان بيشوف صفحة تسجيل دخول
+         (١٤٩ حرف) ⇒ ويطلع من الموقع فوراً.
+      📌 ✅ الحل: نقدّم صفحة market.html (فلتر أسعار حي لكل الأسواق)
+         للزائر المجهول ⇒ وهو نفسه الموقع اللي جوجل هيفهرسه.
+      📌 صفحة الدخول نفسها بتفضل متاحة على /gate.html (منها التسجيل).
+      📌 ⛔ صفحة market.html فيها **بيانات عامة فقط** (أسعار · أسماء ·
+         قطاعات) — مفيش قرار OCTA ولا درجة ولا محفظة.
+      ════════════════════════════════════════════════════════════ */
+      try {
+        const pubUrl = new URL('/market.html', url);
+        const pub = await env.ASSETS.fetch(new Request(pubUrl.toString(), request));
+        if (pub && pub.status < 400) {
+          const h = new Headers(pub.headers);
+          h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+          /* 🌍 روابط المشاركة (OG) ⇒ نطاق الدومين الحالي */
+          const pubHtml = withSiteOrigin(await pub.text(), url.origin);
+          return new Response(pubHtml, { status: 200, headers: h });
+        }
+      } catch (e) { }
+      /* ⛔ احتياطي: لو market.html مش موجودة ⇒ صفحة الدخول زي الأول */
+      try {
+        const gateUrl = new URL('/gate.html', url);
+        const gate = await env.ASSETS.fetch(new Request(gateUrl.toString(), request));
+        if (gate && gate.status < 400) {
+          const h = new Headers(gate.headers);
+          h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+          /* 🌍 روابط المشاركة (OG) ⇒ نطاق الدومين الحالي */
+          const gateHtml = withSiteOrigin(await gate.text(), url.origin);
+          return new Response(gateHtml, { status: 200, headers: h });
+        }
+      } catch (e) { }
+    }
+
+    /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ '/' ⇒ '/index.html' (مباشر)
+    📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+    📌 ⛌ ⛌ السبب: env.ASSETS.fetch('/') بيرجّع 404 (مافيش asset اسمه '/')
+    📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+    📌 ⛌ ⛌ ⇒ والمستخدم المسجّل بياخد 404 على '/' ⇒ الموقع مش بيفتح!
+    📌 ✅ الحل: نعمل fetch لـ'/index.html' مباشرة.
+    */
+    if (url.pathname === '/' && (await sessionVerdict(request, env, url.pathname)).ok) {
+      try {
+        const idxUrl = new URL('/index.html', url);
+        const idx = await env.ASSETS.fetch(new Request(idxUrl.toString(), request));
+        if (idx && idx.status < 400) {
+          const ih = new Headers(idx.headers);
+          ih.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+          ih.set('Pragma', 'no-cache');
+          ih.set('Expires', '0');
+          /* ════════════════════════════════════════════════════════════
+          ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ مسح كاش المتصفح (مرة واحدة)
+          ────────────────────────────────────────────────────────────
+          📌 السبب: المستخدم كان شايف نسخة قديمة من الـJS (كاش
+          📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+          📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+          📌 ⛌ ⛌ رغم إن السيرفر فيه النسخة الجديدة.
+          📌 ✅ الحل: Clear-Site-Data: "cache" — يمسح الكاش بس
+          📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+          📌 ⛌ ⛌ (مش الـcookies — الجلسة تفضل شغالة).
+          📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+          📌 ⚠️ بنحطه بس لو الإصدار مختلف ⇒ مرة واحدة وبعدها يختفي.
+          ════════════════════════════════════════════════════════════ */
+          /* ════════════════════════════════════════════════════════════
+          ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — ⭐ مسح كاش المتصفح (مرة واحدة بس)
+          ────────────────────────────────────────────────────────────
+          📌 المشكلة: المتصفح كاش نسخة قديمة من الـJS رغم إن
+          📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+          📌 ⛌ ⛌ السيرفر فيه النسخة الجديدة (متأكد بالـmd5).
+          📌 ✅ الحل: Clear-Site-Data: "cache" — مسح الكاش بس
+          📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+          📌 ⛌ ⛌ (مش الـcookies — الجلسة تفضل شغالة).
+          📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+          📌 ⚠️ بنحطه مرة واحدة بس — لحد ما كل المستخدمين يحدّثوا.
+          ════════════════════════════════════════════════════════════ */
+          const WANT_CLEAR = '202610250945';
+          if (!request.headers.get('X-OCTA-Cleared-' + WANT_CLEAR)) {
+          }
+          ih.set('ETag', '"' + Date.now() + '"');
+          /* 🌍 روابط المشاركة (OG) ⇒ نطاق الدومين الحالي */
+          const idxHtml = withSiteOrigin(await idx.text(), url.origin);
+          return new Response(idxHtml, { status: 200, headers: ih });
+        }
+      } catch (e) { }
+    }
+
+    /* 3) static assets (الصور/HTML/CSS/JS) */
+    /* ⛔⛔⛔ ٢٤ أكتوبر ٢٠٢٦ — ⭐⭐⭐ الـJS: no-store صريح
+     📌 السبب: Cloudflare Assets كان بيعمل cache للـJS
+     📌 ⛌ ⛌ ⛌ ⛌ (cf-cache-status: HIT) ⇒ المتصفح بيشغّل نسخة
+     📌 ⛌ ⛌ ⛌ ⛌ قديمة من octa-gate.js ⇒ المستخدم بيفضل يشوف
+     📌 ⛌ ⛌ ⛌ ⛌ نفس المشكلة («طلبت ٣ أكواد» + البوابة القديمة).
+     📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+     📌 ✅ الحل: نعمل fetch للـJS ونضيف cache-control صريح.
+     📌 ✅ (نفس الشغل في الـworker — أكتر موثوق من _headers)
+     */
+    /* ⛔⛔⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ الـHTML كمان — no-store صريح
+    📌 السبب: Cloudflare Assets كان بيعمل cache للـindex.html
+    📌 ⛌ ⛌ ⛌ (cf-cache-status: HIT) ⇒ المستخدم بيفتح نسخة قديمة
+    📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+    📌 ⛌ ⛌ ⛌ ⛌ ⇒ التحديثات الجديدة ما بتوصلش (bootstrap مفقود).
+    📌 ✅ الحل: نفس الـJS — fetch + no-store.
+    */
+    /* ⭐⭐⭐ ٢٥ أكتوبر ٢٠٢٦ — روابط مباشرة للصفحات
+    📌 السبب: `/markets` و `/stocks` بيرجعوا 404 (مفيش ملفات HTML منفصلة —
+    📌 كل الصفحات SPA جوه index.html). ⛔ المستخدم طلب يقدر يفتح
+    📌 «لوحة الأسواق» من غير ما يرجع بالزر.
+    ✅ الحل: أي مسار صفحة معروف ⇒ نخدّم index.html (نفس الـSPA).
+    */
+    /* ⭐ كل المسارات دي بتقابل TOOL_PAGES في octa-core.js */
+    const SPA_ROUTES = ['/markets', '/stocks', '/tools', '/engine', '/arms', '/filters',
+      '/newsaxis',
+      '/filter', '/best', '/screener', '/dividends', '/octasearch', '/verdict', '/pick',
+      '/compare', '/radar', '/smartmoney', '/money', '/news', '/academy', '/watchlist',
+      '/search', '/calc', '/bestpick', '/radar-stock'];
+    /* ⭐ 'watchlist' مش في السكربت ⇒ مسار ميت ⇒ شِلنّاه (مفيش صفحة watchlist). */
+    if (SPA_ROUTES.indexOf(url.pathname) !== -1) {
+      /* 🌍 الزائر المجهول على /markets ⇒ صفحة الفلتر العامة (مش التطبيق) */
+      if (!(await sessionVerdict(request, env, url.pathname)).ok
+        && (url.pathname === '/markets' || url.pathname === '/stocks')) {
+        try {
+          const pubUrl = new URL('/market.html', url);
+          const pub = await env.ASSETS.fetch(new Request(pubUrl.toString(), request));
+          if (pub && pub.status < 400) {
+            const ph = new Headers(pub.headers);
+            ph.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+            const pubHtml = withSiteOrigin(await pub.text(), url.origin);
+            return new Response(pubHtml, { status: 200, headers: ph });
+          }
+        } catch (e) { }
+      }
+      const res = await assetsFresh(env, new Request(new URL('/index.html', url), request));
+      const h = new Headers(res.headers);
+      h.delete('Cache-Control'); h.delete('Pragma'); h.delete('Expires');
+      h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      h.set('Pragma', 'no-cache'); h.set('Expires', '0');
+      h.set('ETag', '"' + Date.now() + '"');
+      /* 🌍 روابط المشاركة (OG) ⇒ نطاق الدومين الحالي */
+      const spaHtml = withSiteOrigin(await res.text(), url.origin);
+      return new Response(spaHtml, { status: 200, headers: h });
+    }
+    if (/\.(html?)$/.test(url.pathname) || url.pathname === '/' || url.pathname === '/index.html') {
+      const res = await assetsFresh(env, request);
+      const h = new Headers(res.headers);
+      h.delete('Cache-Control');
+      h.delete('Pragma');
+      h.delete('Expires');
+      h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      h.set('Pragma', 'no-cache');
+      h.set('Expires', '0');
+      h.set('ETag', '"' + Date.now() + '"');
+      /* ⭐ وضع الاختبار البطيء: الصفحة اللي اتفتحت بـ ?slowtest=1 ⇒
+         🍪 كوكي مؤقّت ⇒ طلبات /api/auth/me بعدها تتأخر ١٢ ثانية
+         (محاكاة cold start). ⛔ المعاينة بس — الإنتاج مفعّلوش. */
+      try {
+        if (url.searchParams.get('slowtest') === '1') {
+          h.append('Set-Cookie', 'octa_slowtest=1; Path=/; Max-Age=600; SameSite=Lax');
+        }
+      } catch (e) { }
+      /* ⭐ مسح كاش المتصفح — مرة واحدة (لحد ما كل المستخدمين يحدّثوا) */
+      try {
+      const WANT = '202610250945';
+      } catch (e) { }
+      /* 🌍 روابط المشاركة (OG) ⇒ نطاق الدومين الحالي
+         📌 (٩ نوفمبر ٢٠٢٦ — ⭐ الكود ده كان نايم: المسار ده بيخدم
+         كل صفحات HTML قبل بلوك الـ.html ⇒ روابط المشاركة كانت
+         بتطلع بنطاق الإنتاج على المعاينة.) */
+      const pageHtml = withSiteOrigin(await res.text(), url.origin);
+      return new Response(pageHtml, { status: res.status, headers: h });
+    }
+    if (/\.(js|mjs|css)$/.test(url.pathname)) {
+      const res = await assetsFresh(env, request, { static: true });
+      const h = new Headers(res.headers);
+      /* ⛌⛌⛌ لازم نمسح كل الـcache-control القديم ونحط واحد
+       📌 ⛌ ⛌ ⛌ (لأن الـ_headers بيحط ٣ قواعد متلاصقة)
+       📌 ⛌ ⛌ ⛌ ⛌ ⇒ لازم نعمل delete قبل set
+       📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ */
+       h.delete('Cache-Control');
+       h.delete('Pragma');
+       h.delete('Expires');
+      /* ⭐⭐⭐ ١٤ نوفمبر ٢٠٢٦ — ⭐⭐⭐ تخزين طويل للأصول المختومة
+      📌 كل رابط أصل في صفحات OCTA عليه ?v=YYYYMMDDHHmm ⇒ النسخة
+      📌   الجديدة = رابط جديد ⇒ الكاش الآمن صحيح تماماً.
+      📌 ⇒ الزيارة الثانية onwards: **صفر بايت** من الـJS ⇒ فتح فوري.
+      📌 ⛔ الأمان: لو الرابط **من غير** ختم ⇒ no-store (مش بنخاطر
+      📌   بنسخة قديمة أبداً). */
+      const _stamped = /[?&]v=[0-9]{8,}/.test(url.search || '');
+      if (_stamped) {
+        h.set('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      }
+       h.set('Pragma', 'no-cache');
+       h.set('Expires', '0');
+       h.set('ETag', '"' + Date.now() + '"');
+       return new Response(res.body, { status: res.status, headers: h });
+    }
+
+    /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐⭐⭐ خريطة الصفحات (لازم!)
+       ──────────────────────────────────────────────────────────
+       📌 الأصول بتشتغل بـhtml_handling="none" (عشان الـworker
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⇒ يعني مفيش تحويل تلقائي:
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ / ⇐ index.html   (وإلا 404 فاضي)
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ /chart ⇐ chart.html (وكمان)
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ✅ الحل: نعمل الخريطة هنا — بالظبط زي ما Cloudflare كان
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
+       ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ */
+    const PAGE_MAP = {
+      '/': '/index.html',
+      '/chart': '/chart.html',
+      '/gate': '/gate.html',
+      /* ⛔ '/admin' — ٢٥ أكتوبر ٢٠٢٦: الصفحة نفسها تفضل متاحة
+         ⛌ (قرار المشرف — لوحة الإدارة لازم تفتح)، بس ملفات
+         ⛌ البيانات (JSON/CSV) مرفوضة من فوق (404). */
+      '/admin': '/admin/index.html'
+    };
+    if (PAGE_MAP[url.pathname]) {
+      try {
+        const target = new URL(PAGE_MAP[url.pathname], url);
+        const res = await env.ASSETS.fetch(new Request(target.toString(), request));
+        if (res && res.status < 400) {
+          const h = new Headers(res.headers);
+          h.delete('Cache-Control');
+          h.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+          /* 🌍 روابط المشاركة (OG) ⇒ نطاق الدومين الحالي */
+          const pageHtml = withSiteOrigin(await res.text(), url.origin);
+          return new Response(pageHtml, { status: 200, headers: h });
+        }
+      } catch (e) { }
+    }
+
+    /* ⛔ ملاحظة (٩ نوفمبر ٢٠٢٦): بلوك «أي HTML» اتشال من هنا —
+       المسار الأعلى (سطر ١٣١٠) بيسخدم كل *.html وبيظبط روابط المشاركة
+       ⇒ الكود هنا كان ميّت (لا بيترنّش أبداً). */
+
+    /* ⛔⛔⛔ ١٧ نوفمبر ٢٠٢٦ (الجولة ١٤) — اللقطات ما تنزلش أبداً:
+       ⛔ من غير بلوك هنا ⇒ الملف بينزل مباشرة من الموقع (200).
+       ⛔ run_worker_first=true ⇒ الـWorker بيشتغل الأول ⇒ البلوك فعّال.
+    */
+    if (isSnapshotPath(url.pathname)) {
+      return new Response(JSON.stringify({
+        ok: false, error: 'not-found', why: 'snapshot_assets_blocked'
+      }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+      });
+    }
+
+    return env.ASSETS.fetch(request);
+}

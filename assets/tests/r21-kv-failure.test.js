@@ -124,9 +124,22 @@ test('R21-KV-02: a KV write failure during logout must not 500', async () => {
     method: 'POST', headers: { Cookie: cookie },
   }), env);
   assert.notEqual(res.status, 500, '⛔ فشل كتابة KV ما ينفعش يدي 500 ⭐');
-  assert.equal(res.status, 200, '⛔ الخروج لازم ينجح (الكوكي يتمسح) ⭐');
+  /* 🛡️🛡️ الجولة ٢٤ (R24 · R22-I04) — ⛔ ممنوع **نجاح وهمي** ⭐
+     📌 قبل R24 ⭐: الرد كان `{ok:true}` و ٢٠٠ **دايماً** ⭐
+        ⇒ ⛔ فشل الكتابة = «إبطال مش مثبت» ⭐ بس العميل بيقول «تمام» ⭐.
+     ✅ العقد الجديد ⭐: ٥٠٣ ⭐ + `ok:false` ⭐ (والكوكي بيتمسح ⭐
+        والإبطال في الذاكرة شغّال ⭐ ⇒ R21-KV-03 لسه passes ⭐).
+     ⛔ ملاحظة ⭐: الـassertion هنا **مش أضعف** ⭐ — بقى يربط الحالة
+        بالضبط (٥٠٣ ⭐ بدل «مش ٥٠٠» ⭐) وبيقرّر المقصود ⭐. */
+  assert.equal(res.status, 503,
+    '⛔ فشل كتابة الـKV ⇒ لازم يبقى ٥٠٣ (ممنوع نجاح وهمي ⭐) ⭐');
   const body = await res.json();
-  assert.equal(body.ok, true);
+  assert.equal(body.ok, false,
+    '⛔ الرد لازم يقول إن الإبطال ما اتثبتش ⭐');
+  assert.equal(body.revoked_shared, false,
+    '⛔ لازم يعلن إن الإبطال المشترك ما اتثبتش ⭐');
+  assert.ok(res.headers.get('Set-Cookie'),
+    '⛔ الكوكي لازم يتمسح برضو ⭐');
 });
 
 test('R21-KV-03: with KV down, the in-memory revocation still applies on that instance', async () => {

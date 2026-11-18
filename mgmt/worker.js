@@ -36,6 +36,13 @@ const COOKIE = "octa_mgmt_sess";
 const SESSION_TTL = 8 * 60 * 60; // ٨ ساعات
 /* ⛔ التدوير: لو الج-session على وشك الانتهاء ⇒ يُصدرنا جلسة جديدة (النسخة المنسوخة ما بتتجدّدش) */
 const RENEW_BEFORE = 2 * 60 * 60; // ساعتين
+/* 🛡️ الجولة ٢٤ (R24 · R22-I05) — هامش صلاحية علامة الإبطال ⭐
+   📌 العيب المقاس في الجولة ٢٤ ⭐: `expirationTtl` في الـKV **بالثواني** ⭐
+      ⇒ الكود القديم كان يحسب **بالدقائق** ⭐ ⇒ العلامة كانت بتخلص بعد
+      ~٨ دقايق ⭐ (بدل ٨ ساعات ⭐) ⇒ ⛔ الجلسة المبطلة بترجع صالحة تاني ⭐.
+   ✅ الحل: TTL = العمر المتبقي للجلسة (بالثواني ⭐) + هامش ⭐.
+   ⛔ الحد الأدنى في الـKV = ٦٠ ثانية ⭐ ⇒ مش بننزل تحته ⭐. */
+const REVOKE_TTL_MARGIN_S = 5 * 60; // ٥ دقايق هامش
 /* 🛡️ الجولة ١٩ (R18-A01) — إبطال **من جهة السيرفر**:
    ⛔ قبل كده: الخروج كان بيمسح الكوكي في المتصفح بس ⇒ أي نسخة منسوخة
       كانت سليمة ٣٠ يوم! ⇒ دلوقتي الخادم نفسه بيبطل الجلسة فورًا. */
@@ -57,6 +64,35 @@ const REVOKED = new Map(); // raw ← وقت انتهاء الإبطال
      النسخ بيبقى فعّال خلال دقيقة ⭐ (والعمر ٨ ساعات يقلّل الأثر) ⭐
    ⭐ الحل الأقوى (Do) محتاج مورد جديد ⇒ ⛔ ممنوع بدون موافقة المالك ⭐ */
 const REVOKE_PREFIX = "rev:";
+
+/* 🛡️ الجولة ٢٤ (R24 · R22-I05) — حساب عمر الجلسة المتبقي ⭐
+   📌 شكل الكوكي: `<exp>.<sig>` ⭐ و`exp` = وقت الانتهاء بالمللي ثانية ⭐.
+   ⛔ الرجوع صفر ⭐ = ما فيش جلسة صالحة ⭐ ⇒ نستعمل الحد الأعلى ⭐. */
+function sessionExpiryMs(raw) {
+  if (!raw) return 0;
+  const dot = raw.lastIndexOf(".");
+  if (dot < 1) return 0;
+  const exp = Number(raw.slice(0, dot));
+  if (!isFinite(exp) || exp <= 0) return 0;
+  return exp;
+}
+
+/* ⭐ العمر المتبقي بالثواني ⭐ */
+function sessionRemainingSeconds(raw, nowMs) {
+  const exp = sessionExpiryMs(raw);
+  if (!exp) return 0;
+  const now = (typeof nowMs === "number") ? nowMs : Date.now();
+  return Math.max(0, Math.floor((exp - now) / 1000));
+}
+
+/* ⭐⭐ TTL = العمر المتبقي + هامش ⭐⭐ (بالثواني ⭐ — الـKV بياخد ثواني ⭐)
+   ⛔ الحد الأدنى ٦٠ ثانية ⭐ (حد الـKV ⭐).
+   ⛔ لو الجلسة مش معروفة ⇒ بناخد عمر الجلسة كامل ⭐ (الأأمن ⭐). */
+function revokeTtlSeconds(raw, nowMs) {
+  const remaining = sessionRemainingSeconds(raw, nowMs);
+  const base = remaining > 0 ? remaining : SESSION_TTL;
+  return Math.max(60, base + REVOKE_TTL_MARGIN_S);
+}
 
 async function revokeKey(env, raw) {
   if (!raw) return null;
@@ -94,7 +130,14 @@ async function doRevoke(env, raw) {
     const res = await stub.fetch("https://revoke.internal/revoke", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ revoked: true }),
+      /* 🛡️ R24 (I05): ⭐ بنبعت وقت انتهاء الجلسة ⭐
+         ⇒ الـDO يقدر يحط صلاحية على العلامة ⭐
+         ⇒ العلامة ما تعيشش بعد ما الجلسة تموت ⭐ (تنظيف ⭐)
+         ⛔ والصلاحية ما تبقاش أقصر من عمر الجلسة ⭐. */
+      body: JSON.stringify({
+        revoked: true,
+        expiresAt: sessionExpiryMs(raw) || 0,
+      }),
     });
     if (!res || !res.ok) return false;         // ⛔ الكتابة فشلت ⭐
     const confirmed = await doIsRevoked(env, raw);
@@ -146,6 +189,8 @@ class RevokeDO {
     this.env = env || {};
     /* ⭐ كاش الذاكرة ⭐ — `null` = مجهول ⭐ (لسه ما اتقراش ⭐) */
     this._revoked = null;
+    /* 🛡️ R24 (I05): ⭐ وقت انتهاء العلامة ⭐ (بالمللي ثانية ⭐) */
+    this._expiresAt = 0;
   }
 
   async fetch(request) {
@@ -160,9 +205,25 @@ class RevokeDO {
 
     /* ⭐ تسجيل الإبطال ⭐ (كتابة متزامنة ⭐) */
     if (method === "POST" && path === "/revoke") {
+      let body = {};
+      try { body = await request.json(); } catch (e) { body = {}; }
       try {
-        await this.state.storage.put(DO_REVOKE_KEY, true);
+        /* 🛡️ R24 (I05): ⭐ صلاحية على العلامة ⭐
+           📌 العلامة القديمة كانت بتفضل **للأبد** ⭐ ⇒ تخزين بيزيد ⭐.
+           ✅ دلوقتي: الصلاحية = نهاية الجلسة + هامش ⭐
+              ⇒ ⛔ ما تبقاش أقصر من عمر الجلسة ⭐ (وإلا ⇒ قبول صامت ⭐)
+              ⇒ وبتتحذف لوحدها لما الجلسة تموت ⭐ (تنظيف ⭐). */
+        const nowSec = Math.floor(Date.now() / 1000);
+        const expAt = Number((body && body.expiresAt) || 0);
+        let ttl = SESSION_TTL + REVOKE_TTL_MARGIN_S;
+        if (expAt > 0) {
+          const endSec = Math.floor(expAt / 1000) + REVOKE_TTL_MARGIN_S;
+          ttl = Math.max(60, endSec - nowSec);
+        }
+        const expiration = nowSec + ttl;
+        await this.state.storage.put(DO_REVOKE_KEY, true, { expiration });
         this._revoked = true;
+        this._expiresAt = expiration * 1000;
         return json({ ok: true, revoked: true });
       } catch (e) {
         return json({ ok: false, error: "storage-write-failed" }, 500);
@@ -184,6 +245,7 @@ class RevokeDO {
       try {
         await this.state.storage.delete(DO_REVOKE_KEY);
         this._revoked = false;
+        this._expiresAt = 0;
         return json({ ok: true, revoked: false });
       } catch (e) {
         return json({ ok: false, error: "storage-delete-failed" }, 500);
@@ -195,7 +257,15 @@ class RevokeDO {
 
   /* ⭐ قراءة الشاهدة ⭐ — الكاش الأول ⭐ ثم `state.storage` ⭐ */
   async _readRevoked() {
-    if (this._revoked !== null) return this._revoked;
+    /* 🛡️ R24 (I05): ⭐ الكاش ما يقدرش يتعدّى وقت الانتهاء ⭐ */
+    if (this._revoked !== null) {
+      if (this._expiresAt && Date.now() >= this._expiresAt) {
+        this._revoked = null;
+        this._expiresAt = 0;
+      } else {
+        return this._revoked;
+      }
+    }
     const v = await this.state.storage.get(DO_REVOKE_KEY);
     const revoked = v === true || v === 1 || v === "1" || v === "true";
     this._revoked = revoked;
@@ -207,9 +277,14 @@ async function kvRevoke(env, raw) {
   if (!env.REVOKE_KV || !raw) return false;
   const k = await revokeKey(env, raw);
   if (!k) return false;
+  /* 🛡️ الجولة ٢٤ (R24 · R22-I05) — TTL = العمر المتبقي + هامش ⭐
+     📌 قبل: `Math.floor(SESSION_TTL / 60) + 1` = ٤٨١ ⭐ ⇒ ⛔ بس **ثواني** ⭐
+        ⇒ العلامة كانت بتخلص بعد ~٨ دقايق ⭐ ⇒ ⛔ الجلسة المبطلة بترجع ⭐.
+     ✅ دلوقتي: الثواني المتبقية من عمر الجلسة + ٥ دقايق هامش ⭐. */
+  const ttl = revokeTtlSeconds(raw);
   try {
     await env.REVOKE_KV.put(k, "1", {
-      expirationTtl: Math.max(60, Math.floor(SESSION_TTL / 60) + 1),
+      expirationTtl: ttl,
     });
     return true;
   } catch (e) {
@@ -233,6 +308,37 @@ async function kvIsRevoked(env, raw) {
   } catch (e) {
     return null;                           // ⛔ خطأ ⇒ fail-closed ⭐
   }
+}
+
+/* 🛡️ الجولة ٢٤ (R24 · R22-I05) — حالة الإبطال في **المخزن المشترك** ⭐
+   ⭐ `true`  = الإبطال **مثبت** ⭐ (جلسة متبطل ⭐).
+   ⭐ `false` = **مش مبتطل** ⭐ (ثابت ⭐ ⇒ نقدر نثق ⭐).
+   ⭐ `null`  = ⛔ **مش معروف** ⭐ (المخزن واقف ⭐ أو رجّع رد غلط ⭐)
+     ⇒ ⛔ fail-closed ⭐ (المبدأ: «مافيش دليل ⇒ مافيش ثقة» ⭐).
+   ⛔ مافيش مخزن مربوط ⭐ ⇒ `false` ⭐ (وضع الذاكرة الواحدة ⭐
+      وهو **موثّق** في `/api/health` ⭐ عبر `revoke_shared` ⭐).
+   📌 الترتيب ⭐: الـDO (المصدر القوي ⭐) الأول ⭐ ثم الـKV (شاهد ⭐). */
+async function sharedRevokeState(env, raw) {
+  if (!env || !raw) return false;
+  if (env.REVOKE_DO) {
+    /* ⛔ خطأ / رد مش مفهوم ⇒ `null` ⇒ ⛔ **fail-closed** ⭐ (مش 200 أبدًا ⭐) */
+    const d = await doIsRevoked(env, raw);
+    if (d === null) return null;      // ⛔ ما فيش دليل ⇒ نرفض ⭐
+    if (d === true) return true;      // ⛔ إبطال مثبت ⭐
+    /* ⭐⭐ شاهد الـKV ⭐⭐ — بيقدر **يرفض** ⭐ بس **ما بيقدرش يقبل** ⭐ */
+    if (env.REVOKE_KV) {
+      const k = await kvIsRevoked(env, raw);
+      if (k === null) return null;    // ⛔ الشاهد مش معروف ⇒ نرفض ⭐
+      if (k === true) return true;    // ⛔ شاهد الإبطال ⭐
+    }
+    return false;
+  }
+  if (env.REVOKE_KV) {
+    const k = await kvIsRevoked(env, raw);
+    if (k === null) return null;      // ⛔ ما فيش دليل ⇒ نرفض ⭐
+    return k;
+  }
+  return false;                       // ⛔ مافيش مخزن مشترك ⭐ (ذاكرة ⭐)
 }
 
 function revokeSession(raw) {
@@ -341,53 +447,45 @@ async function validSession(req, secret, env) {
   if (!secret) return false;
   const raw = parseCookies(req)[COOKIE];
   if (!raw) return false;
-  /* 🛡️ الجولة ١٩ (R18-A01) — جلسة مُبطلة من جهة السيرفر ⇒ مرفوضة */
-  if (isRevoked(raw)) return false;
-  /* 🛡️ الجولة ٢٠ (R20) — الإبطال عبر النسخ ⬇️
-     ⛔ الذاكرة لوحدها ما بتغطّيش نسخة تانية من الـWorker ⭐
-     ⭐ ⇒ نفحص المخزن المشترك (KV) كمان ⬇️
-     ⛔⛔ الجولة ٢١ (R21) — ⛔ **fail-closed** ⭐: لو تعذّر الفحص ⭐
-        (KV واقف · خطأ · timeout ⭐) ⇒ ⛔ نرفض الجلسة ⭐ (مش نقبلها ⭐)
-     ⭐⭐ الجولة ٢٢ (R22) — ⭐ المصدر القوي = الـDurable Object ⭐
-        (قراءة بعد كتابة ⭐ ⇒ مافيش نافذة ⭐) ⭐ والـKV شاهد احتياطي ⭐ */
-  if (env && env.REVOKE_DO) {
-    /* 🛡️ الجولة ٢٢ (R22) — المصدر القوي (الـDO) ⭐
-       ⛔ خطأ / رد مش مفهوم ⇒ `null` ⇒ ⛔ **fail-closed** ⭐ (مش 200 أبدًا ⭐) */
-    const _drev = await doIsRevoked(env, raw);
-    if (_drev === null) return false;      // ⛔ ما فيش دليل ⇒ نرفض ⭐
-    if (_drev === true) return false;      // ⛔ إبطال مثبت ⭐
-    /* ⭐⭐ شاهد الـKV ⭐⭐ — **شاهد احتياطي** ⭐:
-       ⭐ لو كتابة الـDO فشلت ⇒ الشاهد في الـKV بيمنع **القبول الصامت** ⭐
-       ⭐ بيقدر **يرفض** ⭐ بس **ما بيقدرش يقبل** ⭐
-       ⛔/error ⇒ ⛔ نرفض ⭐ (مافيش دليل ⇒ مافيش ثقة ⭐) */
-    if (env.REVOKE_KV) {
-      const _wit = await kvIsRevoked(env, raw);
-      if (_wit === null) return false;     // ⛔ ما فيش دليل ⇒ نرفض ⭐
-      if (_wit === true) return false;     // ⛔ شاهد الإبطال ⭐
-    }
-    /* ⭐⛔ ملاحظة مهمة ⭐: الحكم هنا **مش** نهائي ⭐ ⇒
-       ⛔ التحقق من التوقيع + تاريخ الانتهاء بيحصل بعده ⭐
-       (مانع انتحال أي كوكي ⭐). */
-  } else if (env && env.REVOKE_KV) {
-    const _rev = await kvIsRevoked(env, raw);
-    if (_rev === null) return false;       // ⛔ ما فيش دليل ⇒ نرفض ⭐
-    if (_rev === true) return false;       // ⛔ إبطال مثبت ⭐
-  }
+  /* 🛡️🛡️🛡️ الجولة ٢٤ (R24 · R22-I06) — التوقيع + الانتهاء **قبل** أي نداء للتخزين ⭐
+     📌 قبل: الفحص كان بينادي الـDO/الـKV **قبل** ما يتحقق من التوقيع ⭐
+        ⇒ ⛔ أي كوكي مزوّر أو منتهٍ كان بيوصل للمخزن ⭐
+        (استنزاف ⭐ + تسريب ⭐ + نافذة ⭐).
+     ✅ دلوقتي: ⛔ نداء **غير مصرّح به** ما بيوصلش للتخزين **أصلاً** ⭐.
+     📌 ترتيب الخطوات ⭐: ① التوقيع ② الانتهاء ③ الإبطال ④ المخزن المشترك ⭐. */
   const dot = raw.lastIndexOf(".");
   if (dot < 1) return false;
   const exp = raw.slice(0, dot);
   const sig = raw.slice(dot + 1);
-  if (Number(exp) < Date.now()) return false;
+  if (!/^\d+$/.test(exp)) return false;             // ⛔ شكل غير صالح ⭐
+  if (Number(exp) < Date.now()) return false;       // ⛔ جلسة منتهية ⭐
   const expect = await sign(exp, secret);
-  return timingSafeEqual(sig, expect);
+  if (!timingSafeEqual(sig, expect)) return false;  // ⛔ توقيع غلط ⭐
+  /* ⛔ دلوقتي بس ⇒ نتفرج على الإبطال ⭐ */
+  /* 🛡️ الجولة ١٩ (R18-A01) — جلسة مُبطلة من جهة السيرفر ⇒ مرفوضة */
+  if (isRevoked(raw)) return false;
+  /* 🛡️ الجولة ٢٠/٢١/٢٢ — الإبطال عبر النسخ ⭐
+     ⭐ المصدر القوي = الـDurable Object ⭐ (قراءة بعد كتابة ⭐ ⇒ مافيش نافذة ⭐)
+     ⭐ والـKV شاهد احتياطي ⭐
+     ⛔ `null` (مش معروف ⭐) ⇒ ⛔ **fail-closed** ⭐ (مش 200 أبدًا ⭐). */
+  const state = await sharedRevokeState(env, raw);
+  if (state !== false) return false;   // true ⭐ = متبطل ⭐ · null ⭐ = مش معروف ⭐ ⇒ ⛔ نرفض ⭐
+  return true;
 }
 
 /* 🛡️ الجولة ١٩ (R18-A01) — التدوير: جلسة جديدة قبل الانتهاء بساعتين.
    ⛔ النسخة المنسوخة ما بتتجدّدش (المتصفح بس بياخد الكوكي الجديد). */
-async function sessionRenewHeader(req, secret) {
+async function sessionRenewHeader(req, secret, env) {
   if (!secret) return {};
   const raw = parseCookies(req)[COOKIE];
   if (!raw || isRevoked(raw)) return {};
+  /* 🛡️🛡️ الجولة ٢٤ (R24 · R22-I05) — التدوير لازم يسأل المخزن المشترك ⭐
+     📌 قبل: التدوير كان بيعتمد على الذاكرة local بس ⭐ ⇒ ⛔ جلسة اتبطلت
+        على نسخة تانية كانت **بتتجدّد** هنا ⭐ (fail-open ⭐ ⭐).
+     ✅ دلوقتي: ⛔ لو حالة الإبطال **مش معروفة** ⭐ ⇒ ⛔ مفيش تجديد ⭐
+        (fail-closed ⭐) ⭐ و ⛔ لو متبطل ⭐ ⇒ ⛔ مفيش تجديد ⭐. */
+  const state = await sharedRevokeState(env, raw);
+  if (state !== false) return {};   // true ⭐ = متبطل ⭐ · null ⭐ = مش معروف ⭐ ⇒ ⛔ مفيش تجديد ⭐
   const dot = raw.lastIndexOf(".");
   if (dot < 1) return {};
   const exp = Number(raw.slice(0, dot));
@@ -596,11 +694,29 @@ export default {
            ⭐ ⇒ نسخة تانية من الـWorker بترفض نفس الجلسة ⭐
            🛡️ الجولة ٢١ (R21) — ⭐ DO (اتساق قوي ⭐) أولاً ⭐
            ⭐ وبعده KV (fallback ⭐ — نافذته موثّقة ⭐) ⭐ */
-        await doRevoke(env, _raw);
-        await kvRevoke(env, _raw);
-        return json({ ok: true }, 200, {
+        const _do = await doRevoke(env, _raw);
+        const _kv = await kvRevoke(env, _raw);
+        const _clear = {
           "Set-Cookie": `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`,
-        });
+        };
+        /* 🛡️🛡️ الجولة ٢٤ (R24 · R22-I04) — ⛔ ممنوع **نجاح وهمي** ⭐
+           📌 قبل: نتيجتَي الـDO والـKV كانوا **مُهملين** ⭐ ⇒ ⛔ الرد كان
+              `{ok:true}` **دايماً** ⭐ ⇒ ⛔ فشل الكتابة = إبطال مش مثبت ⭐
+              بس العميل بيقول «تمام اتسجّل الخروج» ⭐ ⭐.
+           ✅ دلوقتي: ⛔ لو فيه مخزن مشترك ⭐ وما اثبتناوش ⭐ ⇒ ⛔ ٥٠٣ ⭐
+              و ⛔ `ok:false` ⭐ (والكوكي بيتمسح ⭐ + الإبطال في الذاكرة شغّال ⭐). */
+        const _shared = !!(env.REVOKE_DO || env.REVOKE_KV);
+        if (_raw && _shared && !(_do || _kv)) {
+          /* ⛔ لوج واضح ⭐ (من غير أي سر ⭐) ⭐ — عشان المشرف يشوف ⭐ */
+          console.error("[octa-mgmt] logout: revocation not proven",
+            { do: _do, kv: _kv, shared: _shared });
+          return json({
+            ok: false,
+            error: "تعذّر إبطال الجلسة على كل النسخ — جرّب تاني",
+            revoked_shared: false,
+          }, 503, _clear);
+        }
+        return json({ ok: true }, 200, _clear);
       }
 
       /* ── حالة الجلسة ── */
@@ -636,7 +752,7 @@ export default {
           const items = await fetchPrefs(env);
           const cached = !!(PREFS_CACHE && Date.now() - PREFS_CACHE.ts < 1800000);
           /* ⛔ R18-A01: تدوير الجلسة أثناء الاستخدام (الكوكي الجديد للمتصفح بس) */
-          const renew = await sessionRenewHeader(request, env.SESSION_SECRET);
+          const renew = await sessionRenewHeader(request, env.SESSION_SECRET, env);
           return json({ ok: true, cached: cached ? 1 : 0, users: items }, 200, renew);
         } catch (e) {
           /* ⛔ الجولة ١٨: ⛔ ما بنردّش بتفاصيل الداخلية */
