@@ -109,6 +109,7 @@ const TRIES = 3;
 /* ⭐ محرك محور الأخبار (هالان) — نسخة مطابقة 1:1 من news_engine في الباك.
    📌 الاختبار: tools/test-halan-news.js ⇒ 182/182 مطابقة. */
 import { newsEngine, mergeEvents, eventsByCode, parseHalaText } from './halan-news.js';
+import { handlePreviewApi } from './preview-api.js';
 
 /* ══════════════════════════════════════════════════════════════
    ⭐ جسر سكانر TradingView — للفلتر (Smart Money)
@@ -2272,6 +2273,19 @@ async function handle(request, env, ctx) {
         console.warn('[HALAN-NEWS] fallback:', String(e && e.message || e));
         /* ⛔ fallback: نكمّل عادي للـAPI (أفضل من رد غلط) */
       }
+    }
+
+    /* 🧪 الجولة ٢٦ (R26 · البند ٤) — ⭐ API المعاينة الحقيقي ⭐
+       📌 المعاينة المعزولة بقت عندها API **حقيقي** ⭐: تسجيل ⭐ دخول ⭐
+       جلسات ⭐ أسعار ⭐ محفظة ⭐ تنبيهات ⭐ — كله على تخزين المعاينة
+       الخاص ⭐ وبسر جلسات المعاينة ⭐ ⇒ ⛔ صفر اتصال بالإنتاج ⭐.
+       📌 المسارات اللي الـAPI المحلي مش بيخدمها ⇒ ترجع للفرع اللي
+       تحت (503 صريح) ⭐ ⇒ ⛔ مافيش نجاح وهمي ⭐. */
+    if (url.pathname.startsWith('/api/')) {
+      const previewResp = await handlePreviewApi({
+        request: request, env: env, ctx: ctx, url: url
+      });
+      if (previewResp) return previewResp;
     }
 
     if (url.pathname.startsWith('/api/')) {
