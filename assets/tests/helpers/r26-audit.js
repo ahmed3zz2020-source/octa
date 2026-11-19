@@ -326,22 +326,49 @@ const AUDIT_SRC = String.raw`
   out.smallTargets.count = out.smallTargets.standalone;
 
   /* ── ⑤ تباين الألوان ──────────────────────────────────── */
-  function effectiveBg(el) {
+  /* 📌 الخلفية الحقيقية = تركيب الطبقات (ألوان + تدرّجات) ⭐
+     📌 القاعدة: أقرب تدرّج ⇒ الخلفية الحقيقية هي تدرّجه ⭐
+        (ومرشّحات = كل ألوان التدرّج ⭐) ⇒ الأسوأ هو القياس ⭐. */
+  function bgLayers(el) {
+    const layers = [];
     let node = el;
-    let stack = [];
     while (node && node.nodeType === 1) {
       const st = window.getComputedStyle(node);
-      const c = parseColor(st.backgroundColor);
-      if (c && c.a > 0) {
-        stack.push(c);
-        if (c.a >= 0.95) break;
+      const clip = (st.webkitBackgroundClip || st.backgroundClip || '');
+      const stops = gradientStops(st.backgroundImage);
+      if (stops.length && clip !== 'text') {
+        layers.push({ kind: 'gradient', stops: stops });
+      } else {
+        const c = parseColor(st.backgroundColor);
+        if (c && c.a > 0) layers.push({ kind: 'color', color: c });
       }
       node = node.parentElement;
     }
-    if (!stack.length) stack.push({ r: 255, g: 255, b: 255, a: 1 });
-    let acc = stack[stack.length - 1];
-    for (let i = stack.length - 2; i >= 0; i--) acc = over(stack[i], acc);
-    return acc;
+    return layers.reverse();
+  }
+  function bgCandidates(el) {
+    const layers = bgLayers(el);
+    let gIndex = -1;
+    for (let i = layers.length - 1; i >= 0; i--) {
+      if (layers[i].kind === 'gradient') { gIndex = i; break; }
+    }
+    if (gIndex === -1) {
+      /* 📌 التركيب: من الأبعد للأقرب (الأقرب فوق) ⭐ */
+      let acc = { r: 255, g: 255, b: 255, a: 1 };
+      for (let i = 0; i < layers.length; i++) acc = over(layers[i].color, acc);
+      return [acc];
+    }
+    const above = layers.slice(gIndex + 1);
+    const below = layers.slice(0, gIndex);
+    let under = { r: 255, g: 255, b: 255, a: 1 };
+    for (let i = 0; i < below.length; i++) under = over(below[i].color, under);
+    const outs = [];
+    for (const s of layers[gIndex].stops) {
+      let acc = s.color;
+      for (let i = 0; i < above.length; i++) acc = over(above[i].color, acc);
+      outs.push(over(acc, under));
+    }
+    return outs;
   }
   for (let i = 0; i < all.length; i++) {
     const el = all[i];
@@ -349,33 +376,32 @@ const AUDIT_SRC = String.raw`
     if (txt.length < 2) continue;
     if (!isVisible(el)) continue;
     const st = window.getComputedStyle(el);
-    const bg = effectiveBg(el);
+    const clip = (st.webkitBackgroundClip || st.backgroundClip || '');
     const fs = parseFloat(st.fontSize) || 16;
     const fw = parseInt(st.fontWeight, 10) || 400;
     const large = fs >= 24 || (fs >= 18.66 && fw >= 700);
     const need = large ? 3 : 4.5;
-    let fg = parseColor(st.color);
-    let f = null, r = null;
-    if (fg && fg.a > 0) {
-      f = over(fg, bg);
-      r = ratio(f, bg);
+    const bgList = bgCandidates(el);
+    let fgList = null;
+    const stops = gradientStops(st.backgroundImage);
+    if (clip === 'text' && stops.length) {
+      /* 📌 النص بيتلوّن بتدرّجه (مقصوصة على النص) ⇒ لون النص = التدرّج ⭐ */
+      fgList = stops.map(function (s) { return s.color; });
+      out.contrast.gradient++;
     } else {
-      /* نص شفاف ⇒ غالباً تدرّج مقصوص على النص ⇒ نقيس التدرّج */
-      const stops = gradientStops(st.backgroundImage);
-      if (stops.length) {
-        let worst = null;
-        for (const s of stops) {
-          const c = over(s.color, bg);
-          const rr = ratio(c, bg);
-          if (!worst || rr < worst.ratio) worst = { color: c, ratio: rr };
-        }
-        f = worst.color; r = worst.ratio;
-        out.contrast.gradient++;
-      } else {
-        out.contrast.unmeasured++;
-        continue;
+      const fg = parseColor(st.color);
+      if (!fg || fg.a <= 0) { out.contrast.unmeasured++; continue; }
+      fgList = [fg];
+    }
+    let worst = null;
+    for (const f0 of fgList) {
+      for (const b of bgList) {
+        const fc = over(f0, b);
+        const rr = ratio(fc, b);
+        if (!worst || rr < worst.ratio) worst = { f: fc, b: b, ratio: rr };
       }
     }
+    const f = worst.f, r = worst.ratio, bg = worst.b;
     out.contrast.checked++;
     if (r < need) {
       out.contrast.count++;
