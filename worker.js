@@ -2282,6 +2282,27 @@ async function handle(request, env, ctx) {
           }
         });
       }
+      if (env && env.OCTA_PREVIEW_SELF_API === 'on'
+          && !url.pathname.startsWith('/api/opp/')) {
+        /* ⭐⭐ المعاينة المعزولة — المسارات اللي محتاجة الباك الحيّ ⭐
+           ⭐ (تسجيل الدخول ⭐ الأسعار ⭐ الاشتراكات ⭐) ⇔ متاحة بسرير مخالف ⭐
+           ⇔ ⇔ الرد بصيغة مختلفة ⭐ وفيها خطوة المالك ⭐
+           ⇔ ⇔ ⏴ مافيش رجوع صامت ⭐ ولا نهِ للإنتاج ⭐. */
+        const h = new Headers();
+        h.set('Content-Type', 'application/json; charset=utf-8');
+        h.set('Cache-Control', 'no-store');
+        /* ⭐ الخروج: مينمط الكوكي في المعاينة ⭐ (مافيش خادم على الخادم بالفعل ⭐). */
+        if (url.pathname.indexOf('/api/auth/logout') === 0) {
+          h.set('Set-Cookie', SESSION_COOKIE + '=; Path=/; Max-Age=0; SameSite=None; Secure');
+        }
+        return new Response(JSON.stringify({
+          ok: false,
+          revoked: false,
+          error: 'preview_isolated_backend_required',
+          why: 'المعاينة المعزولة بتخدم لقطة الفرص بس ⭐ — هذا المسارات محتاجة سيرفر ثابت ⭐',
+          owner_step: 'شغّل الباك على سيرفر ثابت ⭐ (Railway service جديدة ⭐ أو جهاز ⭐) ⇔ حطّ عنوانه في preview.apiBaseUrl في assets/config/preview.json ⇔ ثم شغّل: python3 /workspace/tools/r23_origin_preflight.py <العنوان>⭐'
+        }), { status: 503, headers: h });
+      }
       /* ⛔⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐ بوابة الـAPI: التحليل والقرار
          محميين.session مطلوب.
          📌 القياس قبل التغيير: /api/explain/COMI و/api/opportunity/COMI

@@ -129,14 +129,34 @@ test('R25-PV-05 · متغيّر وضع المعاينة موجود في إعدا
     'the production config must NOT enable the isolated mode');
 });
 
-test('R25-PV-06 · ⭐⭐ البرهان السالب ⭐: على الكود قبل التصحيح الفحص مش محلي', () => {
+test('R25-PV-06 · ⭐⭐ البرهان السالب ⭐: شيل الكتبة ⇔ الرد المحلي يختفي', async () => {
+  /* ⭐ برهان mutation مستقل من الكود لعيّر الإصلاح ⭐ */
+  const src = workerSource();
+  const marker = 'OCTA_PREVIEW_SELF_API';
+  assert.ok(src.indexOf(marker) > 0, 'the patched worker must contain the isolated mode');
+  /* ⭐⭐ mutation بتوفيق واحد: بطول الكتبة لصفر ⇒ الفحص يرجع للباك ⇔ لا تطبيق الوجهة المحلية ⭐ */
+  const cut = src.split("OCTA_PREVIEW_SELF_API === 'on'").join("OCTA_PREVIEW_SELF_API === 'off'");
+  const w = loadWorker(cut);
+  let body = '';
+  try {
+    const res = await w.fetch(new Request('https://octa-preview.ahmed3zz2020.workers.dev/api/health'),
+      previewEnv(), { waitUntil() {}, passThroughOnException() {} });
+    body = await res.text();
+  } catch (e) {
+    body = 'threw:' + String(e && e.message);
+  }
+  assert.ok(body.indexOf('"source":"preview-isolated"') === -1,
+    'without the isolated block the health must NOT be the local isolated answer');
+});
+
+test('R25-PV-07 · ⭐⭐ البرهان السالب ⭐: الأساس (الرج قبل المرحلة ⭐) مفيش المود المحلي', () => {
   let before = '';
   try {
-    before = execFileSync('git', ['show', 'HEAD:worker.js'],
+    before = execFileSync('git', ['show', '2f7338df9f63721fd7179d9fa406f82d7c2eb0fa:worker.js'],
       { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   } catch (e) {
-    return; /* ⭐ مفيش تاريخ ⭐ ⇒ مفيش برهان سلبي ⭐ (مش فشل ⭐) */
+    return; /* ⭐ مفيش تاريخ ⭐ (مفيش فشل ⭐) */
   }
   assert.ok(before.indexOf('OCTA_PREVIEW_SELF_API') === -1,
-    'the pre-patch worker must not contain the isolated preview mode');
+    'the pre-R25-phase4 baseline must not contain the isolated preview mode');
 });
