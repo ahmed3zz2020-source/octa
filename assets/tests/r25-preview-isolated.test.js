@@ -1,0 +1,142 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   🛡️🛡️🛡️ الجولة ٢٥ (R25 · المرحلة ٤) — ⭐ **المعاينة المعزولة** ⭐
+   (تنهي مشكلة Cloudflare 1016 ⭐ — من غير نفق مؤقت ⭐ ومن غير أي اتصال بالإنتاج ⭐)
+
+   📌 القصة ⭐: ⛔ المعاينة كانت معتمدة على **نفق مؤقت** ⭐
+      ⇒ ⛔ النفق بيموت ⭐ ⇒ ⛔ Cloudflare 1016 ⭐ ⇒ ⛔ 530 على /api/health ⭐
+      ⇒ ⛔ ما ينفعشش يبقى وجهة دائمة ⭐ (والعقد نفسه بيمنع لواحق الأنفاق ⭐).
+
+   📌 المطلوب ⭐:
+      ① المعاينة تقدّم **فحص صحة من عندها** ⭐ (مش من الباك ⭐).
+      ② ⭐ و ⛔ الإنتاج ما يتغيّرش ⭐ (الفحص يفضل من الـproxy ⭐).
+      ③ ⭐ وجهة المعاينة في العقد = عامل workers.dev **ثابت** ⭐
+         (مش نفق ⭐ ومش الإنتاج ⭐).
+      ④ ⭐ متغيّر وضع المعاينة **مش** موجود في إعدادات الإنتاج ⭐.
+
+   📌 التشغيل: node --test assets/tests/r25-preview-isolated.test.js
+   ═══════════════════════════════════════════════════════════════════════ */
+'use strict';
+
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
+
+const ROOT = process.env.OCTA_FE_ROOT || path.resolve(__dirname, '..', '..');
+
+/* ⭐ تحميل العامل (نفس أسلوب r25-login-path ⭐) */
+function loadWorker(srcText) {
+  /* ⭐ العامل فيه \`import\` واحد (محرك الأخبار) → نشيله وندينا عنه بمحرك اختياري فارغ في الاختيار ماليص للفحص صحيح. */
+  const src = srcText
+    .replace(/^import\s+\{[^}]*\}\s+from\s+'[^']*';?$/gm, '')
+    .replace(/^export\s*\{[^}]*\};?$/gm, '')
+    .replace('export default', 'module.exports =');
+  const mod = { exports: {} };
+  const stub = { newsEngine: {}, mergeEvents: () => [], eventsByCode: () => [], parseHalaText: () => [] };
+  const fn = new Function('module', 'exports', 'Request', 'Response',
+    'Headers', 'URL', 'crypto', 'newsEngine', 'mergeEvents', 'eventsByCode', 'parseHalaText', src);
+  fn(mod, mod.exports, Request, Response, Headers, URL, crypto,
+    stub.newsEngine, stub.mergeEvents, stub.eventsByCode, stub.parseHalaText);
+  return mod.exports;
+}
+
+function workerSource() {
+  return fs.readFileSync(path.join(ROOT, 'worker.js'), 'utf8');
+}
+
+/* ⭐ بيئة بلا أي وصول خارجي ⭐ (لازم أي نداء خارجي يفشل ⭐) */
+function previewEnv() {
+  return {
+    OCTA_PREVIEW_SELF_API: 'on',
+    OCTA_OPP_SNAPSHOT: 'on',
+    OCTA_FAIL_CLOSED: 'on',
+    ASSETS: {
+      fetch: async () => {
+        throw new Error('ASSETS fetch must not be needed for /api/health');
+      },
+    },
+  };
+}
+
+function prodEnv() {
+  return {
+    OCTA_FAIL_CLOSED: 'on',
+    ASSETS: {
+      fetch: async () => {
+        throw new Error('ASSETS fetch must not be needed for /api/health');
+      },
+    },
+  };
+}
+
+test('R25-PV-01 · المعاينة المعزولة: /api/health محلي وبيقول مصدره بصراحة', async () => {
+  const w = loadWorker(workerSource());
+  const res = await w.fetch(new Request('https://octa-preview.ahmed3zz2020.workers.dev/api/health'),
+    previewEnv(), { waitUntil() {}, passThroughOnException() {} });
+  assert.equal(res.status, 200, 'local preview health must be 200');
+  const j = await res.json();
+  assert.equal(j.ok, true);
+  assert.equal(j.source, 'preview-isolated',
+    'the health must declare the isolated source (no pretending the backend is up)');
+  assert.ok(!j.upstream, 'the preview health must not leak an internal upstream address');
+});
+
+test('R25-PV-02 · ⛔ الإنتاج ما يتغيّرش: من غير متغيّر الوضع ⇒ الفحص يفضل من الـproxy', async () => {
+  const w = loadWorker(workerSource());
+  const res = await w.fetch(new Request('https://octa-prices-production-4ccb.up.railway.app/api/health'),
+    prodEnv(), { waitUntil() {}, passThroughOnException() {} });
+  const txt = await res.text();
+  assert.ok(txt.indexOf('"source":"preview-isolated"') === -1,
+    'production must never answer with the isolated preview health');
+});
+
+test('R25-PV-03 · المسارات التانية مش بتتردّ بالفحص المحلي', async () => {
+  const src = workerSource();
+  const w = loadWorker(src);
+  const res = await w.fetch(new Request('https://octa-preview.ahmed3zz2020.workers.dev/api/opp/strategies'),
+    previewEnv(), { waitUntil() {}, passThroughOnException() {} });
+  const txt = await res.text();
+  assert.ok(txt.indexOf('"source":"preview-isolated"') === -1,
+    'only /api/health may use the local isolated answer');
+});
+
+test('R25-PV-04 · ⭐ عقد المعاينة: وجهة ثابتة ⭐ مش نفق ⭐ ومش الإنتاج', () => {
+  const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/config/preview.json'), 'utf8'));
+  const pv = cfg.preview;
+  assert.ok(pv.apiBaseUrl && pv.apiBaseUrl.length > 0, 'the preview origin must be configured');
+  assert.ok(pv.apiBaseUrl.indexOf('workers.dev') > 0,
+    'the preview origin must be a stable workers.dev host');
+  const forbidden = (cfg.forbidden.hosts || []).concat(cfg.forbidden.hostSuffixes || []);
+  const host = pv.apiBaseUrl.replace(/^https?:\/\//, '');
+  forbidden.forEach((f) => {
+    const hit = f.indexOf('*') >= 0
+      ? host.endsWith(f.replace('*', ''))
+      : host === f || host.indexOf(f) === 0;
+    assert.ok(!hit, 'the preview origin must not match the forbidden entry: ' + f);
+  });
+  (cfg.production.hosts || []).forEach((h) => {
+    assert.ok(host !== h, 'the preview origin must differ from the production host: ' + h);
+  });
+});
+
+test('R25-PV-05 · متغيّر وضع المعاينة موجود في إعدادات المعاينة ومش في الإنتاج', () => {
+  const pv = fs.readFileSync(path.join(ROOT, 'wrangler.jsonc'), 'utf8');
+  const prod = fs.readFileSync(path.join(ROOT, 'wrangler-prod.jsonc'), 'utf8');
+  assert.ok(pv.indexOf('"OCTA_PREVIEW_SELF_API"') > 0,
+    'the preview config must enable the isolated mode');
+  assert.ok(prod.indexOf('"OCTA_PREVIEW_SELF_API"') === -1,
+    'the production config must NOT enable the isolated mode');
+});
+
+test('R25-PV-06 · ⭐⭐ البرهان السالب ⭐: على الكود قبل التصحيح الفحص مش محلي', () => {
+  let before = '';
+  try {
+    before = execFileSync('git', ['show', 'HEAD:worker.js'],
+      { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch (e) {
+    return; /* ⭐ مفيش تاريخ ⭐ ⇒ مفيش برهان سلبي ⭐ (مش فشل ⭐) */
+  }
+  assert.ok(before.indexOf('OCTA_PREVIEW_SELF_API') === -1,
+    'the pre-patch worker must not contain the isolated preview mode');
+});

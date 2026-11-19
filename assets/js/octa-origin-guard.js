@@ -241,12 +241,15 @@
       if (!config) return fail(CODES.CONFIG_MISSING);
       /* ⛔ من غير وجهة ⇒ نقفل — مفيش رجوع للإنتاج أبداً */
       if (!origin) return fail(CODES.ORIGIN_MISSING);
-      /* ⛔ تعارض بين العامل والعقدة ⇒ نقفل */
-      if (r.mismatch) return fail(CODES.ORIGIN_MISMATCH);
-      /* ⛔ المعاينة ⇒ ممنوعة من لمس الإنتاج */
+      /* ⛔ المعاينة ⇒ ممنوعة من لمس الإنتاج
+         💨 الجولة ۵ — الفحص الده يتقدّم على فحص التعارض 💨
+         ⇔ ⇔ لسبب أقوى (لمس الإنتاج 💨) هو الذي بيتبعت 💨
+         ⇔ ⇔ الفصل بيفزل مقفول في الحالتين 💨 (مش relaxing 💨) 💨 والسبب الأدق هو الذي بيتبعت 💨. */
       if (isProductionHost(host, config)) return fail(CODES.PRODUCTION_IN_PREVIEW);
       /* ⛔ نفق مؤقت ⇒ ممنوع (بيتموت وبيسيب 530) */
       if (isTunnelHost(host, config)) return fail(CODES.TUNNEL_ORIGIN);
+      /* ⛔ تعارض بين العامل والعقدة ⇒ نقفل */
+      if (r.mismatch) return fail(CODES.ORIGIN_MISMATCH);
       res.ok = true;
       res.code = CODES.OK;
       res.message = MESSAGES.ok;

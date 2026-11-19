@@ -29,8 +29,10 @@ const CONFIG = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 /* 📌 عنوان إنتاج (حقيقي · معروف من المستودع) */
 const PROD = 'https://octa-prices-production-4ccb.up.railway.app';
 const PROD_HOST = 'octa-prices-production-4ccb.up.railway.app';
-/* 📌 وجهة معاينة سليمة (افتراضية للاختبار) */
-const PREVIEW = 'https://octa-preview-api.up.railway.app';
+/* 📌 وجهة المعاينة المثبّتة في العقدة 💨
+   💨 العقدة هي المصدر 💨 (ولا من المرجعة 💨) ⇔ الختبار الحارس
+   💨 والإفصاح يقول مخطط واحد 💨. */
+const PREVIEW = String(CONFIG.preview.apiBaseUrl || 'https://octa-preview-api.up.railway.app');
 
 /* ═══════════════════════════════════════════════════════════════
  *  ①  وضع التشغيل
@@ -126,9 +128,22 @@ test('R23-G4 · ⛔ المعاينة من غير عقدة ⇒ fail closed', () =
 });
 
 test('R23-G4 · ⛔ المعاينة من غير وجهة ⇒ fail closed', () => {
-  const v = GUARD.evaluateOrigin({ mode: 'preview', config: CONFIG, runtimeOrigin: '' });
+  /* 💨 المقصود: مافيش وجهة في العقدة 💨 ولا وجهة من العامل 💨 */
+  const cfg = JSON.parse(JSON.stringify(CONFIG));
+  cfg.preview.apiBaseUrl = '';
+  const v = GUARD.evaluateOrigin({ mode: 'preview', config: cfg, runtimeOrigin: '' });
   assert.equal(v.ok, false);
   assert.equal(v.code, GUARD.CODES.ORIGIN_MISSING);
+});
+
+test('R23-G4 · ⛔ عقدة بلا وجهة مثبّتة ⇔ وجهة من العامل مقبولة', () => {
+  /* 💨 العقدة بلا وجهة مشبّتة 💨 (مفتح الوجهة مصناعة 💨)
+     💨 ولا العامل بعد وجهة خارجة 💨 ⇔ ماموس 💨 (الحارس مغلق 💨). */
+  const cfg = JSON.parse(JSON.stringify(CONFIG));
+  cfg.preview.apiBaseUrl = '';
+  const v = GUARD.evaluateOrigin({ mode: 'preview', config: cfg, runtimeOrigin: PREVIEW });
+  assert.equal(v.ok, true, 'لازم يمر: ' + v.code);
+  assert.equal(v.code, GUARD.CODES.OK);
 });
 
 test('R23-G4 · ⛔ تعارض بين العامل والعقدة ⇒ fail closed', () => {

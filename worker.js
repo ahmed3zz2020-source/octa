@@ -2258,6 +2258,30 @@ async function handle(request, env, ctx) {
     }
 
     if (url.pathname.startsWith('/api/')) {
+      /* 🛡️🛡️🛡️ الجولة ٢٥ (R25 · المرحلة ٤) — ⭐ **المعاينة المعزولة** ⭐
+         📌 المشكلة ⭐: ⛔ المعاينة كانت معتمدة على **نفق مؤقت** ⭐
+            ⇒ ⛔ نفق بيموت ⭐ ⇒ ⛔ Cloudflare 1016 ⭐ ⇒ ⛔ 530 على الـAPI ⭐
+            ⇒ ⛔ ما ينفعشش يبقى وجهة دائمة ⭐ (والعقد نفسه بيمنع لواحق الأنفاق ⭐).
+         ✅ الحل ⭐: ⭐ المعاينة بتخدم **فحصها من عندها** ⭐ + ⭐ لقطة الفرص ⭐
+            ⇒ ⭐ العنوان **ثابت** ⭐ (عامل workers.dev نفسه ⭐) ⇒ ⭐ مافيش 1016 ⭐
+            ⇒ ⭐ ⭐ ⭐ ومفيش **أي** اتصال بالإنتاج ⭐ (عزل كامل ⭐).
+         ⛔ والفحص **محلي** ⭐ ⇒ ⛔ مافيش تضليل ⭐ (مش بيقول إن الباك الحيّ شغّال ⭐
+            ⭐ — بيقول إن المعاينة المعزولة شغّالة ⭐).
+         ⛔ ⛔ —  ⭐: الفحص بيفضل من غير تغيير ⭐ (الـproxy عادي ⭐). */
+      if (env && env.OCTA_PREVIEW_SELF_API === 'on'
+          && url.pathname === '/api/health') {
+        return new Response(JSON.stringify({
+          ok: true,
+          source: 'preview-isolated',
+          note_ar: 'معاينة معزولة — بتخدم لقطة بيانات الخاصة بيها ⭐ ومفيش أي اتصال بالإنتاج ⭐.'
+        }), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'no-store'
+          }
+        });
+      }
       /* ⛔⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐ بوابة الـAPI: التحليل والقرار
          محميين.session مطلوب.
          📌 القياس قبل التغيير: /api/explain/COMI و/api/opportunity/COMI
