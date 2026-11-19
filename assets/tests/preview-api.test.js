@@ -172,8 +172,28 @@ test('③ دخول بالباسورد + جهاز مسجّل ⇒ جلسة ⭐', a
   /* ⛔ جهاز جديد ⇒ لازم كود (زي الإنتاج) ⭐ */
   const newDev = await call(e, '/api/auth/pin/login',
     { method: 'POST', json: { pin: '1111', device: 'device-cccc-0000' } });
-  assert.strictEqual(newDev.status, 403);
-  assert.strictEqual(newDev.body.why, 'device_challenge_required');
+  assert.strictEqual(newDev.status, 401);
+  assert.strictEqual(newDev.body.why, 'bad_pin_or_device');
+
+  /* ⛔⛔⛔ حسابين بنفس الباسورد ⭐ ⇒ لازم الجهاز يميّز ⭐ */
+  const email2 = 'r26.login2@example.com';
+  const device2 = 'device-cccc-0000';
+  const s2 = await call(e, '/api/auth/signup/start',
+    { method: 'POST', json: { name: 'x', email: email2 } });
+  await call(e, '/api/auth/signup/newpin', {
+    method: 'POST',
+    json: { email: email2, code: s2.body.preview_code, pin: '1111', device: device2 }
+  });
+  const right = await call(e, '/api/auth/pin/login',
+    { method: 'POST', json: { pin: '1111', device: device2 } });
+  assert.strictEqual(right.status, 200, 'لازم يدخل الحساب اللي جهازه مطابق ⭐');
+  assert.strictEqual(right.body.user.email, email2);
+
+  /* ⛔ من غير جهاز ⇒ رفض ⭐ */
+  const noDev = await call(e, '/api/auth/pin/login',
+    { method: 'POST', json: { pin: '1111' } });
+  assert.strictEqual(noDev.status, 400);
+  assert.strictEqual(noDev.body.why, 'device_required');
 });
 
 test('③ب من أنا بالجلسة ⭐ — ومن غير جلسة ⇒ 401 ⭐', async () => {

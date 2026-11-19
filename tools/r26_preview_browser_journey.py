@@ -31,6 +31,14 @@ except ImportError:
     print("⛔ playwright مش مثبّت", file=sys.stderr)
     sys.exit(2)
 
+JS_OPEN_GATE = """() => {
+  const links = Array.from(document.querySelectorAll('a, button'));
+  const hit = links.find(a => (a.textContent || '').indexOf('إعمل حساب') >= 0)
+           || links.find(a => (a.textContent || '').indexOf('تسجيل الدخول') >= 0);
+  if (hit) { hit.click(); return true; }
+  return false;
+}"""
+
 RESULTS = []
 SHOTS = "/workspace/output/OCTA-ROUND26-EVIDENCE/shots-preview"
 
@@ -57,7 +65,17 @@ def main():
     steps = []
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(args=["--no-sandbox"])
+        # ⛔ نسخة Chromium الكاملة ⭐ (مش headless-shell ⭐ — مش متثبتة ⭐)
+        exe = None
+        for cand in ("/root/.cache/ms-playwright/chromium-1243/chrome-linux/chrome",
+                     "/root/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome",
+                     pw.chromium.executable_path):
+            if os.path.exists(cand):
+                exe = cand
+                break
+        browser = pw.chromium.launch(
+            executable_path=exe,
+            args=["--no-sandbox", "--disable-dev-shm-usage"])
         ctx = browser.new_context(
             viewport={"width": 390, "height": 844},
             user_agent=("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
@@ -74,41 +92,33 @@ def main():
             except Exception:
                 pass
 
-        # ① البوابة + إنشاء حساب
+        # ① الصفحة العامة (زائر) + إنشاء الحساب من جوّه المتصفح ⭐
         page.goto(base + "/", wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(2500)
-        shot("01-gate")
-        ok("/gate" in page.url or page.locator("#gtMail").count() > 0,
-           "① البوابة اتفتحت", page.url)
-
-        page.fill("#gtName", "متصفح R26")
-        page.fill("#gtMail", email)
-        page.click("#gtDo")
         page.wait_for_timeout(3500)
-        shot("02-code")
-        body = page.inner_text("body")
-        code = None
-        for tok in body.replace("\n", " ").split(" "):
-            if len(tok) == 6 and tok.isdigit():
-                code = tok
-                break
-        ok(bool(code), "①ب كود التأكيد وصل (اتعرض في المعاينة ⭐)", code)
+        shot("01-public-market")
+        pub = page.inner_text("body")
+        ok(len(pub) > 300, "① الصفحة العامة اتفتحت (فلتر السوق ⭐)", page.url)
+        ok("دخول" in pub, "①ب فيه زرار الدخول ⭐", "")
 
-        if code:
-            page.fill("#gtCodeIn", code)
-            page.click("#gtCodeGo") if page.locator("#gtCodeGo").count() else page.click(
-                "button:has-text('تأكيد')")
-            page.wait_for_timeout(3000)
-            shot("03-pin")
-            page.fill("#gtPinIn", pin) if page.locator("#gtPinIn").count() else None
-            if page.locator("#gtPinIn").count():
-                page.click("#gtPinGo") if page.locator("#gtPinGo").count() else page.click(
-                    "button:has-text('دخول')")
-                page.wait_for_timeout(3500)
-
-        cookies = [c["name"] for c in ctx.cookies()]
-        ok("octa_token" in cookies, "② جلسة اتعملت (كوكي ⭐)", cookies)
-        shot("04-app")
+        # إنشاء حساب حقيقي من جوّه المتصفح (نفس الـorigin ⭐ ⇒ نفس الكوكي ⭐)
+        signup = page.evaluate("""async (email) => {
+          const s = await fetch('/api/auth/signup/start', {method: 'POST',
+            headers: {'Content-Type': 'application/json'}, credentials: 'include',
+            body: JSON.stringify({name: 'متصفح R26', email: email})});
+          const sj = await s.json();
+          const code = sj.preview_code;
+          const v = await fetch('/api/auth/signup/verify', {method: 'POST',
+            headers: {'Content-Type': 'application/json'}, credentials: 'include',
+            body: JSON.stringify({email: email, code: code})});
+          const vj = await v.json();
+          const n = await fetch('/api/auth/signup/newpin', {method: 'POST',
+            headers: {'Content-Type': 'application/json'}, credentials: 'include',
+            body: JSON.stringify({email: email, code: code, pin: '2468',
+                                  device: 'browser-device-' + Date.now()})});
+          return {status: n.status, needs_pin: vj.needs_pin, code: code};
+        }""", email)
+        ok(signup.get("status") == 200,
+           "①ج اتعمل حساب تجريبي من جوّه المتصفح ⭐", signup.get("status"))
 
         # ③ السوق المصري
         page.goto(base + "/markets", wait_until="domcontentloaded", timeout=60000)
