@@ -121,6 +121,14 @@
         "--gate",
         "G15"
       ]
+    },
+    "assets/tests/r26-ux-perf.test.js": {
+      "reason": "متصفح حقيقي بمتصفح Playwright + Chromium ⭐ — المتصفح مش مثبّت في عدّاد ال​CI ⭐ ⇒ محتاج تحميل المتصفح ⇒ مش قابل للتكرار ⭐ ⇒ لازم بوابة بديلة ⭐",
+      "gate": "tools/test_ci_alt_gates.py",
+      "gate_args": [
+        "--gate",
+        "G16"
+      ]
     }
   }
 }
