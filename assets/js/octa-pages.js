@@ -2090,7 +2090,7 @@ function vRing(pct,color){
   const R=56,C=2*Math.PI*R,off=C*(1-p/100);
   return '<div class="vring"><svg width="132" height="132">'+
   '<circle cx="66" cy="66" r="'+R+'" fill="none" stroke="var(--vring-track)" stroke-width="11"/>'+
-  '<circle cx="66" cy="66" r="'+R+'" fill="none" stroke="'+color+'" stroke-width="11" '+
+  '<circle cx="66" cy="66" r="'+R+'" fill="none" style="stroke:'+color+'" stroke-width="11" '+
   'stroke-linecap="round" stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" '+
   'style="transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)"/></svg>'+
   '<div class="vval"><b>'+(has ? Math.round(p) : '—')+'</b><span>'+
@@ -2371,18 +2371,18 @@ function initVerdictCard(){
 
 /* ══════════ كارت قرار OCTA — القرار الحي للسوق ككل ══════════ */
 const VC_DEC = {
-  'إشارة إيجابية':  { c:'#16c79a', bg:'rgba(22,199,154,.16)' },
-  'شراء':  { c:'#16c79a', bg:'rgba(22,199,154,.16)' },
-  'إشارة محايدة':  { c:'#4dabf7', bg:'rgba(77,171,247,.16)' },
-  'إشارة سلبية':  { c:'#ff8a80', bg:'rgba(255,82,82,.16)' },
-  'تجنب':  { c:'#ff5252', bg:'rgba(255,82,82,.16)' }
+  'إشارة إيجابية':  { c:'var(--up2)', bg:'rgba(22,199,154,.16)' },
+  'شراء':  { c:'var(--up2)', bg:'rgba(22,199,154,.16)' },
+  'إشارة محايدة':  { c:'var(--sec2)', bg:'rgba(77,171,247,.16)' },
+  'إشارة سلبية':  { c:'var(--dn4)', bg:'rgba(255,82,82,.16)' },
+  'تجنب':  { c:'var(--dn2)', bg:'rgba(255,82,82,.16)' }
 };
 const VC_AXES = [
   ['فني','technical'], ['أساسي','fundamental'], ['سيولة','liquidity'],
   ['أخبار','news'], ['معنويات','sentiment'], ['أمان','safety'],
   ['محفظة','portfolio'], ['النتيجة','final']
 ];
-const vcColor = v => v >= CFG.th.safe ? '#16c79a' : v >= CFG.th.mid ? '#f4d03f' : '#ff8a80';
+const vcColor = v => v >= CFG.th.safe ? 'var(--up2)' : v >= CFG.th.mid ? 'var(--gold2)' : 'var(--dn4)';
 
 function buildOctaVerdictCard(d, results) {
   const dec = (d && d.decisions) || {};
@@ -2402,7 +2402,7 @@ function buildOctaVerdictCard(d, results) {
   const ring =
   '<div class="vc-ring"><svg width="74" height="74" viewBox="0 0 74 74">' +
   '<circle cx="37" cy="37" r="30" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="7"/>' +
-  '<circle cx="37" cy="37" r="30" fill="none" stroke="' + vCol + '" stroke-width="7" ' +
+  '<circle cx="37" cy="37" r="30" fill="none" style="stroke:' + vCol + '" stroke-width="7" ' +
   'stroke-linecap="round" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) + '"/>' +
   '</svg><div class="vc-pct" style="color:' + vCol + '">' + (isFinite(final) ? final.toFixed(0) : '—') + '</div></div>';
 
@@ -2416,7 +2416,7 @@ function buildOctaVerdictCard(d, results) {
   '</div><div class="vc-legend">' +
   '<span>🟢 تجميع <b style="color:#16c79a">' + cnt['إشارة إيجابية'] + '</b></span>' +
   '<span>🔵 احتفظ <b style="color:#4dabf7">' + cnt['إشارة محايدة'] + '</b></span>' +
-  '<span>🔴 بيع <b style="color:#ff8a80">' + cnt['إشارة سلبية'] + '</b></span>' +
+  '<span>🔴 بيع <b style="color:var(--dn4)">' + cnt['إشارة سلبية'] + '</b></span>' +
   '<span>· الإجمالي <b>' + tot + '</b></span>' +
   '</div>';
   }
@@ -2435,7 +2435,7 @@ function buildOctaVerdictCard(d, results) {
 
   // أعلى 5 فرص
   const picks = (results || []).slice(0, 5).map(s => {
-  const m = VC_DEC[s.decision] || { c:'#d4af37', bg:'rgba(212,175,55,.16)' };
+  const m = VC_DEC[s.decision] || { c:'var(--gold)', bg:'rgba(212,175,55,.16)' };
   return '<div class="vc-pick" onclick="analyzeStock(\'' + s.code + '\')">' +
   '<div class="vc-p-code">' + s.code + '</div>' +
   '<div class="vc-p-name">' + (s.name || '') + '</div>' +

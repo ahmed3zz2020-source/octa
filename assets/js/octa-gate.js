@@ -3027,7 +3027,14 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  */
  try { RESOLVED = true; clearTimeout(_grace); } catch (e) { }
  if (inFlow()) { return; }
- logoutLocal();
+ /* ⛔⛔⛔ ٢٦ أكتوبر ٢٠٢٦ (R26 · UX) — ما نمسحش الجلسة إلا لو
+ 📌 السيرفر قال ٤٠١/٤٠٣ صراحةً.
+ 📌 السبب: أي حالة تانية (٤٠٤ · ٤٢٩ · رد غلط) كانت بتعتبر
+ 📌 «التوكن غلط» ⇒ مسح الجلسة من localStorage ⇒ المستخدم
+ 📌 بيترجّع لصفحة الدخول من غير سبب (وده اللي كان بيحصل).
+ 📌 ✅ الحل: ٤٠١/٤٠٣ ⇒ مسح. أي حالة تانية ⇒ نسيب التوكن
+ 📌    ونفتح البوابة بس (المستخدم يقدر يدخل تاني). */
+ if (r && (r.status === 401 || r.status === 403)) logoutLocal();
  mount(); welcome(); open();
  }).catch(function () {
  clearTimeout(to);

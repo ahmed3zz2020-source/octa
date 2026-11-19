@@ -641,7 +641,7 @@ window.addEventListener('error', function (e) {
   <div class="top-bar">
   <div class="top-bar-inner">
   <div class="logo">
-  <img src="assets/octa-logo.png" alt="OCTA">
+  <img src="assets/octa-logo.png" alt="OCTA" width="256" height="256" decoding="async">
   <span class="logo-text">OCTA</span>
   </div>
   </div>
@@ -669,7 +669,7 @@ window.addEventListener('error', function (e) {
   <!-- 👤 كارت الحساب — مكانه جوّه الهيدر (مش طفو فوقيه).
        octa-auth.js بيملا الـslot ده، ولو مش مسجّل دخول بيبقى فاضي. -->
   <div class="au-slot" id="auSlot"></div>
-  <button class="theme-toggle" id="lightBtn" onclick="toggleLight()" title="الوضع النهاري">🌙</button>
+  <button class="theme-toggle" id="lightBtn" onclick="toggleLight()" title="الوضع النهاري" aria-label="تبديل بين الوضع النهاري والداكن">🌙</button>
   <!-- ⛌ الزر القديم بتاع التقرير اتشال —
   /api/audit/redundancy, which now requires a token, so the
   button could only ever produce an error for a user. -->
@@ -710,8 +710,8 @@ window.addEventListener('error', function (e) {
   <div class="tb-row">
   <div class="toolbar" id="toolbar"></div>
   <div class="tb-btns">
-  <button class="tb-btn" onclick="sbToggle()" title="القائمة الجانبية">☰</button>
-  <button class="tb-btn" id="toolCfg" onclick="OCTASettings.open()" title="إعدادات المشروع">⚙️</button>
+  <button class="tb-btn" onclick="sbToggle()" title="القائمة الجانبية" aria-label="فتح القائمة الجانبية">☰</button>
+  <button class="tb-btn" id="toolCfg" onclick="OCTASettings.open()" title="إعدادات المشروع" aria-label="إعدادات المشروع">⚙️</button>
   </div>
   </div>
 
@@ -788,7 +788,7 @@ window.addEventListener('error', function (e) {
   <div class="page" id="page-home">
   <!-- Hero -->
   <div class="hero">
-  <div class="hero-logo"><img src="assets/octa-logo.png" alt="OCTA"></div>
+  <div class="hero-logo"><img src="assets/octa-logo.png" alt="OCTA" width="256" height="256" decoding="async" fetchpriority="high"></div>
   <h1>OCTA</h1>
   <p class="hero-tagline">منصة التوصيات الذكية في البورصة المصرية</p>
   <div class="pillars">
@@ -2319,38 +2319,38 @@ window.addEventListener('error', function (e) {
  📌 ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌ ⛌
  📌 ⚠️ مهم: لو رجعت الـcore قبل البوابة ⇒ المشكلة دي هترجع تاني.
  ════════════════════════════════════════════════════════════════ -->
-<script src="assets/js/octa-api.js?v=202611190052"></script>
-<script src="assets/js/octa-config.js?v=202611190052"></script>
+<script src="assets/js/octa-api.js?v=202611190052" defer></script>
+<script src="assets/js/octa-config.js?v=202611190052" defer></script>
 <!-- ⭐ البوابة هنا — قبل الـcore (عشان استرجاع الجلسة يسبق الطلبات) -->
-<script src="assets/js/octa-gate.js?v=202611190052"></script>
-<script src="assets/js/octa-auth.js?v=202611190052"></script>
-<script src="assets/js/octa-stats.js?v=202611190052"></script>
-<script src="assets/js/octa-core.js?v=202611190052"></script>
-<script src="assets/js/octa-sidebar.js?v=202611190052"></script>
-<script src="assets/js/octa-dev.js?v=202611190052"></script>
-<script src="assets/js/octa-clock.js?v=202611190052"></script>
+<script src="assets/js/octa-gate.js?v=202611190052" defer></script>
+<script src="assets/js/octa-auth.js?v=202611190052" defer></script>
+<script src="assets/js/octa-stats.js?v=202611190052" defer></script>
+<script src="assets/js/octa-core.js?v=202611190052" defer></script>
+<script src="assets/js/octa-sidebar.js?v=202611190052" defer></script>
+<script src="assets/js/octa-dev.js?v=202611190052" defer></script>
+<script src="assets/js/octa-clock.js?v=202611190052" defer></script>
 <!-- 🌍 ماسح الأسواق غير المصرية (سعودي/إمارات/أمريكا) — للفلتر -->
 <!-- 🏷️ خريطة القطاعات المشتركة (التطبيق + الصفحة العامة) -->
-<script src="assets/js/octa-sectors.js?v=202611190052"></script>
-<script src="assets/js/octa-mk-scan.js?v=202611190052"></script>
+<script src="assets/js/octa-sectors.js?v=202611190052" defer></script>
+<script src="assets/js/octa-mk-scan.js?v=202611190052" defer></script>
 <!-- 🔥 لوحة المتحرّكين — نفس الكود في الصفحة العامة والتطبيق -->
-<script src="assets/js/octa-movers.js?v=202611190052"></script>
-<script src="assets/js/octa-screener.js?v=202611190052"></script>
-<script src="assets/js/octa-index-intel.js?v=202611190052"></script>
-<script src="assets/js/octa-usd-intel.js?v=202611190052"></script>
-<script src="assets/js/octa-pages.js?v=202611190052"></script>
-<script src="assets/js/octa-app.js?v=202611190052"></script>
-<script src="assets/js/octa-us-intel.js?v=202611190052"></script>
+<script src="assets/js/octa-movers.js?v=202611190052" defer></script>
+<script src="assets/js/octa-screener.js?v=202611190052" defer></script>
+<script src="assets/js/octa-index-intel.js?v=202611190052" defer></script>
+<script src="assets/js/octa-usd-intel.js?v=202611190052" defer></script>
+<script src="assets/js/octa-pages.js?v=202611190052" defer></script>
+<script src="assets/js/octa-app.js?v=202611190052" defer></script>
+<script src="assets/js/octa-us-intel.js?v=202611190052" defer></script>
 <!-- ⭐ ٦ نوفمبر ٢٠٢٦ — سياق السوق (مصر/أمريكا) + أذرع السوق الأمريكي -->
-<script src="assets/js/octa-us-arms.js?v=202611190052"></script>
-<script src="assets/js/octa-ctx.js?v=202611190052"></script>
+<script src="assets/js/octa-us-arms.js?v=202611190052" defer></script>
+<script src="assets/js/octa-ctx.js?v=202611190052" defer></script>
 <!-- ⭐ ٦ نوفمبر ٢٠٢٦ — فحص التحديث (التطبيق المثبّت كان بيعرض نسخة قديمة) -->
-<script src="assets/js/octa-update.js?v=202611190052"></script>
-<script src="assets/js/octa-back.js?v=202611190052"></script>
-<script src="assets/js/octa-filters.js?v=202611190052"></script>
+<script src="assets/js/octa-update.js?v=202611190052" defer></script>
+<script src="assets/js/octa-back.js?v=202611190052" defer></script>
+<script src="assets/js/octa-filters.js?v=202611190052" defer></script>
 <!-- 📈 ١٤ نوفمبر ٢٠٢٦ — المُصفّي الفني (الذراع الفني + تبويب الفلاتر).
      لازم بعد octa-filters.js (بيستخدم أدواته) وبعد octa-pages.js (الذراع). -->
-<script src="assets/js/octa-techfilter.js?v=202611190052"></script>
+<script src="assets/js/octa-techfilter.js?v=202611190052" defer></script>
 
 <!-- ❓ شرح تبويبات الصف التاني (؟) — لازم بعد octa-filters.js عشان
      fzRenderTabs/fzGo يبقوا موجودين وقت الـhook. الـmount بيعيد نفسه
@@ -2359,38 +2359,38 @@ window.addEventListener('error', function (e) {
 <!-- 🐙 19 أكتوبر 2026 — tv-shim.js = مصدر الرسومات الوحيد في الموقع.
      شارت TradingView واحد للفلتر والذهب وصفحة الشارت وتحليل السهم.
      اتشال: octa-chart.js · octa-chart-v2.js (الشارت canvas القديم). -->
-<script src="assets/js/tv-shim.js?v=202611190052"></script>
-<script src="assets/js/octa-gold.js?v=202611190052"></script>
-<script src="assets/js/octa-gold-savings.js?v=202611190052"></script>
-<script src="assets/js/octa-gold-egy.js?v=202611190052"></script>
-<script src="assets/js/octa-copy.js?v=202611190052"></script>
-<script src="assets/js/octa-opps.js?v=202611190052"></script>
-<script src="assets/js/octa-alpha.js?v=202611190052"></script>
-<script src="assets/js/octa-opps-copy.js?v=202611190052"></script>
-<script src="assets/js/octa-watch.js?v=202611190052"></script>
-<script src="assets/js/octa-decide.js?v=202611190052"></script>
-<script src="assets/js/octa-settings.js?v=202611190052"></script>
-<script src="assets/js/octa-csp.js?v=202611190052"></script>
-<script src="assets/js/octa-armsfilter.js?v=202611190052"></script>
+<script src="assets/js/tv-shim.js?v=202611190052" defer></script>
+<script src="assets/js/octa-gold.js?v=202611190052" defer></script>
+<script src="assets/js/octa-gold-savings.js?v=202611190052" defer></script>
+<script src="assets/js/octa-gold-egy.js?v=202611190052" defer></script>
+<script src="assets/js/octa-copy.js?v=202611190052" defer></script>
+<script src="assets/js/octa-opps.js?v=202611190052" defer></script>
+<script src="assets/js/octa-alpha.js?v=202611190052" defer></script>
+<script src="assets/js/octa-opps-copy.js?v=202611190052" defer></script>
+<script src="assets/js/octa-watch.js?v=202611190052" defer></script>
+<script src="assets/js/octa-decide.js?v=202611190052" defer></script>
+<script src="assets/js/octa-settings.js?v=202611190052" defer></script>
+<script src="assets/js/octa-csp.js?v=202611190052" defer></script>
+<script src="assets/js/octa-armsfilter.js?v=202611190052" defer></script>
 
 <!-- 💰 Smart Money (22 أكتوبر 2026) — المحرك النقي + صفحة الفلتر.
      لازم بعد tv-shim.js عشان الشارت (OCTA_TV.mount) يكون موجود. -->
-<script src="assets/js/octa-egx-names.js?v=202611190052"></script>
-<script src="assets/js/octa-radar.js?v=202611190052"></script>
-<script src="assets/js/octa-radar-explain.js?v=202611190052"></script>
-<script src="assets/js/octa-radar-ref.js?v=202611190052"></script>
-<script src="assets/js/octa-radar-ui.js?v=202611190052"></script>
-<script src="assets/js/octa-smartmoney.js?v=202611190052"></script>
-<script src="assets/js/octa-money.js?v=202611190052"></script>
+<script src="assets/js/octa-egx-names.js?v=202611190052" defer></script>
+<script src="assets/js/octa-radar.js?v=202611190052" defer></script>
+<script src="assets/js/octa-radar-explain.js?v=202611190052" defer></script>
+<script src="assets/js/octa-radar-ref.js?v=202611190052" defer></script>
+<script src="assets/js/octa-radar-ui.js?v=202611190052" defer></script>
+<script src="assets/js/octa-smartmoney.js?v=202611190052" defer></script>
+<script src="assets/js/octa-money.js?v=202611190052" defer></script>
 <!-- 🧩 «نماذجي» — صفحة أنماط الكسر (٢٨ أكتوبر ٢٠٢٦) -->
-<script src="assets/js/octa-chartkit.js?v=202611190052"></script>
-<script src="assets/js/octa-sr.js?v=202611190052"></script>
-<script src="assets/js/octa-setups.js?v=202611190052"></script>
-<script src="assets/js/octa-zones.js?v=202611190052"></script>
-<script src="assets/js/octa-studio.js?v=202611190052"></script>
+<script src="assets/js/octa-chartkit.js?v=202611190052" defer></script>
+<script src="assets/js/octa-sr.js?v=202611190052" defer></script>
+<script src="assets/js/octa-setups.js?v=202611190052" defer></script>
+<script src="assets/js/octa-zones.js?v=202611190052" defer></script>
+<script src="assets/js/octa-studio.js?v=202611190052" defer></script>
 <!-- 🎯 «التحديات» — تحدي اليوم + لوحة المتصدرين (٢٨ أكتوبر ٢٠٢٦) -->
-<script src="assets/js/octa-challenges.js?v=202611190052"></script>
-<script src="assets/js/na-axis.js?v=202611190052"></script>
+<script src="assets/js/octa-challenges.js?v=202611190052" defer></script>
+<script src="assets/js/na-axis.js?v=202611190052" defer></script>
 <!-- 🛠️ أدوات المطوّر — بتظهر بالمصادفة ولا ما فيش زرار عادي -->
 <div class="octa-devbar">
   <button class="dev-hidden-gate" onclick="OCTADev.toggle()"
@@ -2501,7 +2501,7 @@ window.addEventListener('error', function (e) {
   later(tick, 2000);
 })();
 </script>
-<script src="assets/js/octa-sw.js?v=202611190052"></script>
+<script src="assets/js/octa-sw.js?v=202611190052" defer></script>
 
   <!-- ══════════════════════════════════════════════════════════════
        ⭐⭐⭐ كارت القرار — لازم يكون **خارج** أي .page (٩ نوفمبر ٢٠٢٦)

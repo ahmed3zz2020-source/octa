@@ -31,10 +31,14 @@ function naMatLabel(m) {
 }
 
 function naAxisColor(v) {
-  if (v >= 78) return '#16c79a';
-  if (v >= 62) return '#d4af37';
-  if (v >= 45) return '#ff9f43';
-  return '#8b9eb0';
+  /* ⛔⛔ ٢٦ أكتوبر ٢٠٢٦ (R26 · UX) — الألوان بقت من الـtokens
+     📌 السبب: الألوان الثابتة كانت بتبان خفيفة جداً في النهاري
+        (الذهبي ٣٫٠١ على خلفية فاتحة ⇒ نص غير مقروء).
+     📌 ✅ الحل: متغيّرات CSS ⇒ بتتبدّل مع السمة وتفضل مقروءة. */
+  if (v >= 78) return 'var(--up2)';
+  if (v >= 62) return 'var(--gold)';
+  if (v >= 45) return 'var(--warn)';
+  return 'var(--muted)';
 }
 
 /* ⭐⭐ عنوان الخبر ونصّه (١٤ نوفمبر ٢٠٢٦ — طلب المالك)
