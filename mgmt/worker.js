@@ -416,7 +416,15 @@ const ERR_AUTH = "لازم تسجيل دخول";
 
 /* 🛡️ الجولة ١٨ — الأصول العامة (من غير جلسة).
    ⛔ مافيش هنا غير صفحة الدخول — ⛔ مافيش أي صفحة فيها بيانات. */
-const PUBLIC_FILES = new Set(["/login.html", "/icons/favicon.png"]);
+/* 🛡️🛡️ الجولة ٢٥ (R25 · المرحلة ٣) — صفحات الدخول **كل** مساراتها ⭐
+   📌 السبب ⭐: راوتر الأصول (html_handling) بيعيد توجيه `/login.html` ⭐
+      ⇒ `/login.html/` ⭐ ⇒ ⛔ والعامل مش بيعدّيه public ⭐ ⇒ ⛔ حلقة تحويل ⭐
+      ⇒ ⛔ المالك مش بيقدر يدخل اللوحة ⭐.
+   ✅ الحل ⭐: كل صيغ المسار public ⭐ (مع/بدون لاحقة / · وبالنقطتين ⭐). */
+const PUBLIC_FILES = new Set([
+  "/login.html", "/login.html/", "/login", "/login/",
+  "/icons/favicon.png",
+]);
 
 /* 🛡️ الجولة ١٨ — مسارات الـAPI المفتوحة (من غير جلسة) — مافيش بيانات شخصية */
 const PUBLIC_API = new Set(["/api/login", "/api/logout", "/api/session", "/api/health"]);

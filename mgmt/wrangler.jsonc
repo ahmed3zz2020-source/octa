@@ -7,7 +7,12 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "run_worker_first": true
+    "run_worker_first": true,
+    // 🛡️ الجولة ٢٥ (R25) — ⛔ html_handling التلقائي بيعيد توجيه
+    //    `/login.html` ⇒ `/login.html/` ⭐ ⇒ ⛔ صفحة الدخول بتعمل حلقة ⭐.
+    //    ⭐ `none` = بيرد على المسار كما هو ⭐ (زي إعدادات الموقع الرئيسي ⭐).
+    "html_handling": "none",
+    "not_found_handling": "none"
   },
   // 🛡️🛡️ الجولة ٢٥ (R25 · R24-I10) — تصريح بيئة الإنتاج ⭐
   // 📌 `APP_ENV=production` ⭐ ⇒ ⛔ **fail-closed** ⭐:
