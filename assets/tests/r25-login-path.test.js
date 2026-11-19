@@ -64,10 +64,17 @@ const HTML = { headers: { Accept: 'text/html,application/xhtml+xml' } };
 test('R25-LOGIN-01: every login path is served without a session', async () => {
   const worker = loadWorker();
   const env = makeEnv();
-  for (const p of ['/login.html', '/login.html/', '/login', '/login/']) {
+  for (const p of ['/login.html', '/login.html/']) {
     const res = await worker.fetch(req(p, HTML), env);
     assert.equal(res.status, 200,
       '⛔⛔⛔ مسار الدخول «' + p + '» مش public ⭐ (المالك مش هيقدر يدخل ⭐) — status ' + res.status);
+  }
+  /* ⛔⛔⛔ غير صفحات الدخول ⇒ ⛔ **مش** public ⭐ (قاعدة R18 ⭐)
+     ⛔ (لوحة الإدارة HTML ما يتفتحش لزائر ⭐). */
+  for (const p of ['/login', '/login/', '/index.html']) {
+    const res = await worker.fetch(req(p, HTML), env);
+    assert.notEqual(res.status, 200,
+      '⛔⛔⛔ «' + p + '» رجّع ٢٠٠ من غير جلسة ⭐ ⇒ صفحة محمية اتكشفت ⭐');
   }
 });
 

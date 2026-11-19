@@ -422,7 +422,7 @@ const ERR_AUTH = "لازم تسجيل دخول";
       ⇒ ⛔ المالك مش بيقدر يدخل اللوحة ⭐.
    ✅ الحل ⭐: كل صيغ المسار public ⭐ (مع/بدون لاحقة / · وبالنقطتين ⭐). */
 const PUBLIC_FILES = new Set([
-  "/login.html", "/login.html/", "/login", "/login/",
+  "/login.html", "/login.html/",
   "/icons/favicon.png",
 ]);
 
