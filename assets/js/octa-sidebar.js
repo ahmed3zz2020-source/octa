@@ -113,14 +113,17 @@ let OPEN = localStorage.getItem('octa_sidebar') === '1';
  '<div class="sb-head">' +
  '<span class="sb-logo">🐙</span>' +
  '<div class="sb-brand"><b>OCTA</b><i>أخطبوط 5</i></div>' +
- '<button class="sb-x" onclick="sbToggle()">✕</button>' +
+ '<button class="sb-x" onclick="sbToggle()" aria-label="اقفل القائمة الجانبية" title="اقفل القائمة الجانبية">✕</button>' +
  '</div>' +
  /* ⭐⭐⭐ بحث في القائمة (١٠ نوفمبر ٢٠٢٦)
     📌 السبب: الشريط طويل (٢٤ زر) ⇒ المستخدم بيدوّر على الأداة ومش
        لاقيها (خصوصاً أداة جديدة). ⛔ البحث بيخفي غير المطابق فوراً.
-    📌 ⛔ مفيش فلترة للـDOM (الكود القديم كان بيحذف) ⇒ بنخفي بس. */
+    📌 ⛔ مفيش فلترة للـDOM (الكود القديم كان بيحذف) ⇒ بنخفي بس.
+    📌 ⛔⛔ ٢٦ أكتوبر ٢٠٢٦ (R26 · UX) — aria-label للبحث
+       (كان placeholder بس ⇒ قارئ الشاشة مالوش اسم واضح). */
  '<div class="sb-search">' +
  '<input type="search" id="sbSearch" placeholder="🔍 دوّر على أداة…" ' +
+ 'aria-label="دوّر على أداة في القائمة الجانبية" ' +
  'oninput="sbFilter(this.value)" autocomplete="off" />' +
  '</div>' +
  '<nav class="sb-nav" id="sbNav">' + html + '</nav>' +

@@ -3367,6 +3367,19 @@ function loadEngineTVWidgets(symbol) {
     document.querySelectorAll('script[data-engine-tv]').forEach(function (s) { try { gv.appendChild(s); } catch (e) { } });
   } catch (e) { }
 
+  /* ══════════════════════════════════════════════════════════════
+  ⛔⛔ ٢٦ أكتوبر ٢٠٢٦ (R26 · UX) — تحميل كسول لرسوم TradingView
+  ──────────────────────────────────────────────────────────────
+  📌 السبب: ٣ رسوم (نظرة عامة · تحليل فني · شارت متقدم) — كل واحد
+     سكربت خارجي + iframe — كانوا بيبدأوا تحميلهم **مع أول رسم**
+     ⇒ بيسرقوا وقت أول ظهور (LCP) ووقت التحميل كله.
+  📌 ✅ الحل: بنحمّلهم لما العنصر يقرب من الشاشة (rootMargin ٣٠٠ بكسل)
+     ⇒ نفس الشكل ونفس المكان، بس لما المستخدم接近 منهم.
+  📌 🛡️ أمان: لو الـIntersectionObserver مش موجود، أو العنصر مخفي
+     ((display:none) ⇒ مش هيتقاطع)، بنحمّلهم بعد ٦ ثواني على أي حال.
+  📌 ⛔ ممنوع نغيّر الشكل ولا نخفي الرسوم — نفس الـwidget بالظبط.
+  ══════════════════════════════════════════════════════════════ */
+  function injectEngineWidgets() {
   // Mini Symbol Overview widget (السعر + الشارت + التغير)
   setTimeout(() => injectEngineWidget('engine-tv-symbol-info', 'embed-widget-mini-symbol-overview.js', {
   symbol: tvSymbol, width: '100%', height: 180, locale: 'ar', dateRange: '1D',
@@ -3389,6 +3402,38 @@ function loadEngineTVWidgets(symbol) {
   'MASimple@tv-basicstudies', 'RSI@tv-basicstudies', 'MACD@tv-basicstudies'
   ]
   }, 'chart'), 250);
+  }
+
+  try {
+    var anchor = document.getElementById('engine-tv-symbol-info')
+      || document.getElementById('engine-tv-tech-analysis')
+      || document.getElementById('engine-tv-advanced-chart');
+    if (anchor && typeof IntersectionObserver === 'function') {
+      var fired = false;
+      var io = new IntersectionObserver(function (entries) {
+        for (var i = 0; i < entries.length; i++) {
+          if (entries[i] && entries[i].isIntersecting && !fired) {
+            fired = true;
+            try { io.disconnect(); } catch (e) { }
+            injectEngineWidgets();
+            return;
+          }
+        }
+      }, { rootMargin: '300px' });
+      io.observe(anchor);
+      /* 🛡️ شبكة أمان: لو العنصر مخفي مبيتقاطعش ⇒ بنحمّل بعد ٦ ثواني */
+      setTimeout(function () {
+        if (fired) return;
+        fired = true;
+        try { io.disconnect(); } catch (e) { }
+        injectEngineWidgets();
+      }, 6000);
+    } else {
+      injectEngineWidgets();
+    }
+  } catch (e) {
+    try { injectEngineWidgets(); } catch (x) { }
+  }
 }
 
 // خانة السعر — البيانات من TradingView widget (الـ widget بيظهر السعر الحقيقي)
@@ -3492,13 +3537,13 @@ function renderEngineBars(scores, finalScore, extra) {
   if (!d.sector) d.sector = '';
   if (d.reasons && !Array.isArray(d.reasons)) d.reasons = [];
   const DEC_MAP = {
-  'شراء': { icon: '✅', cls: '#16c79a' },
-  'إشارة إيجابية': { icon: '🟡', cls: '#f4d03f' },
-  'إشارة محايدة': { icon: '🔵', cls: '#4dabf7' },
-  'إشارة سلبية': { icon: '🔴', cls: '#ff8a80' },
-  'تجنب': { icon: '⛔', cls: '#ff5252' }
+  'شراء': { icon: '✅', cls: 'var(--up2)' },
+  'إشارة إيجابية': { icon: '🟡', cls: 'var(--gold2)' },
+  'إشارة محايدة': { icon: '🔵', cls: 'var(--sec2)' },
+  'إشارة سلبية': { icon: '🔴', cls: 'var(--dn4)' },
+  'تجنب': { icon: '⛔', cls: 'var(--dn2)' }
   };
-  const decMeta = DEC_MAP[d.decision] || { icon: '🐙', cls: '#d4af37' };
+  const decMeta = DEC_MAP[d.decision] || { icon: '🐙', cls: 'var(--gold)' };
 
   /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ الـreasons من الـAPI بتتحط في
      ⛌⛌⛌ innerHTML. الباك بيبنيها من أرقام محسوبة (آمنة دلوقتي)

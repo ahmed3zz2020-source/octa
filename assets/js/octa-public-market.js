@@ -194,7 +194,10 @@
     S.mk = mk; S.shown = 40; S.q = ''; S.sect = 'all'; S.chg = 'all';
     const qEl = $('pmQ'); if (qEl) qEl.value = '';
     Array.prototype.forEach.call(document.querySelectorAll('#pmMk button'), function (b) {
-      b.classList.toggle('on', b.getAttribute('data-mk') === mk);
+      const on = b.getAttribute('data-mk') === mk;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      b.setAttribute('tabindex', on ? '0' : '-1');
     });
     Array.prototype.forEach.call(document.querySelectorAll('.pm-chip'), function (b) {
       b.classList.toggle('on', b.getAttribute('data-chg') === 'all');
@@ -216,8 +219,14 @@
   function boot() {
     const mkWrap = $('pmMk');
     if (mkWrap) {
+      /* ⛔⛔ ٢٦ أكتوبر ٢٠٢٦ (R26 · UX) — aria للتبويبات
+         📌 السبب: الحاوية role="tablist" بس الأزرار من غير role="tab"
+            ⇒ قارئ الشاشة بيقول «زر» مش «تبويب» والاختيار مش معلن.
+         📌 ✅ الحل: role=tab + aria-selected + tabindex roving. */
       mkWrap.innerHTML = MK.map(m =>
-        '<button data-mk="' + m.id + '" class="' + (m.id === S.mk ? 'on' : '') + '">' +
+        '<button type="button" role="tab" data-mk="' + m.id + '" aria-selected="' +
+        (m.id === S.mk ? 'true' : 'false') + '" tabindex="' + (m.id === S.mk ? '0' : '-1') +
+        '" class="' + (m.id === S.mk ? 'on' : '') + '">' +
         m.i + ' ' + esc(m.n) + '</button>').join('');
       mkWrap.addEventListener('click', function (e) {
         const b = e.target.closest ? e.target.closest('button[data-mk]') : null;

@@ -3661,7 +3661,9 @@
   .bb-side.bull .bb-animal { filter: drop-shadow(0 0 14px rgba(34,197,94,.5)); }
   .bb-side.bear .bb-animal { filter: drop-shadow(0 0 14px rgba(239,68,68,.5)); }
   .bb-side.bull .bb-label { color: var(--up); }
-  .bb-side.bear .bb-label { color: #ef4444; }
+  /* ⛔ ٢٦ أكتوبر ٢٠٢٦ (R26 · UX) — لون نص من الـtokens
+     📌 السبب: #ef4444 ثابت ⇒ تباين ٣٫٦ على خلفية النهاري الفاتحة. */
+  .bb-side.bear .bb-label { color: var(--dn); }
   .bb-side.dim .bb-animal { opacity: .3; filter: grayscale(1); }
   .bb-side.dim .bb-label { color: var(--muted); opacity: .6; }
 
@@ -3676,13 +3678,13 @@
   .bb-gauge.neutral { border-color: var(--gold); background: rgba(212,175,55,.1); }
   .bb-gauge .g-v { font-size: 2.9rem; font-weight: 900; line-height: 1; }
   .bb-gauge.bull .g-v { color: var(--up); }
-  .bb-gauge.bear .g-v { color: #ef4444; }
+  .bb-gauge.bear .g-v { color: var(--dn); }
   .bb-gauge.neutral .g-v { color: var(--gold); }
   .bb-gauge .g-l { font-size: .66rem; color: var(--muted); margin-top: 5px; }
 
   .bb-verdict { font-size: 1.05rem; font-weight: 900; letter-spacing: .3px; }
   .bb-verdict.bull { color: var(--up); }
-  .bb-verdict.bear { color: #ef4444; }
+  .bb-verdict.bear { color: var(--dn); }
   .bb-verdict.neutral { color: var(--gold); }
   .bb-sub { font-size: .74rem; color: var(--muted); margin-top: 5px; }
   .bb-factors { display: flex; gap: 6px; justify-content: center; margin-top: 11px; flex-wrap: wrap; }
@@ -3691,7 +3693,7 @@
   background: var(--wash); color: var(--muted);
   }
   .bb-factors span b.pos { color: var(--up); }
-  .bb-factors span b.neg { color: #ef4444; }
+  .bb-factors span b.neg { color: var(--dn); }
 
   /* Global asset cards — SIMPLE colors only */
   .ga-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
@@ -3709,7 +3711,7 @@
   .ga.up  { border-color: rgba(34,197,94,.3); }
   .ga.down{ border-color: rgba(239,68,68,.3); }
   .ga.up  .ga-v, .ga.up  .ga-c { color: var(--up); }
-  .ga.down .ga-v, .ga.down .ga-c { color: #ef4444; }
+  .ga.down .ga-v, .ga.down .ga-c { color: var(--dn); }
   .ga.flat .ga-v, .ga.flat .ga-c { color: var(--muted); }
 
 
@@ -3726,7 +3728,7 @@
   .bbs-side.bull .bbs-animal { filter: drop-shadow(0 0 10px rgba(34,197,94,.45)); }
   .bbs-side.dim .bbs-animal { opacity: .28; filter: grayscale(1); }
   .bbs-txt { font-size: .62rem; font-weight: 900; letter-spacing: 1.4px; text-align: center; margin-top: 2px; }
-  .bbs-side.bear .bbs-txt { color: #ef4444; }
+  .bbs-side.bear .bbs-txt { color: var(--dn); }
   .bbs-side.bull .bbs-txt { color: var(--up); }
   .bbs-side.dim .bbs-txt { color: var(--muted); opacity: .6; }
 
@@ -3743,7 +3745,7 @@
   .bbs-info { text-align: right; }
   .bbs-v { font-size: .95rem; font-weight: 900; }
   .bbs-v.bull { color: var(--up); }
-  .bbs-v.bear { color: #ef4444; }
+  .bbs-v.bear { color: var(--dn); }
   .bbs-v.neutral { color: var(--gold); }
   .bbs-s { font-size: .68rem; color: var(--muted); margin-top: 1px; }
 
@@ -4427,24 +4429,27 @@ body.light .b-hold{background:rgba(154,123,24,.13);color:#7a5f0e}
   body.light .toolbar-wrap { background: #fff; border-top-color: var(--line); }
   body.light .tool-btn { background: #fff; border-color: var(--line); color: var(--txt); box-shadow: 0 1px 3px rgba(15,27,43,.05); }
   body.light .tool-btn:hover { background: #fffbeb; border-color: rgba(154,123,24,.5); }
-  body.light .tool-btn.active { background: linear-gradient(135deg,#b8912f,#d4af37); color: #fff; border-color: #b8912f; }
-
+  /* ⛔⛔ ٢٦ أكتوبر ٢٠٢٦ (R26 · UX) — نص أبيض على تدرّج ذهبي
+     📌 السبب: أبيض (#fff) على #b8912f ⇒ تباين ٢٫٢ ⇒ غير مقروء.
+     📌 ✅ الحل: نص غامق على نفس التدرّج (زي الثيم الداكن بالظبط). */
+  body.light .tool-btn.active { background: linear-gradient(135deg,#b8912f,#d4af37); color: #16202e; border-color: #b8912f; }
+  /* ⛔ نفس المشكلة في عدّاد الذراع النشط */
+  body.light .arm-btn.active .a-num { background:#d4af37; color:#16202e; }
   body.light .arm-btn { background:#fff; border-color:var(--line); color:#46586c; box-shadow:0 1px 3px rgba(15,27,43,.05); }
   body.light .arm-btn:hover { background:#fffbeb; border-color:rgba(154,123,24,.35); }
   body.light .arm-btn.active { background:linear-gradient(145deg,#fffbeb,#fff); border-color:#d4af37; color:#7a5f0e; box-shadow:0 2px 10px rgba(212,175,55,.2); }
-  body.light .arm-btn.active .a-num { background:#d4af37; color:#fff; }
   body.light .octa-clock { background:#fff; border-color:var(--line); color:var(--muted); }
-  body.light .octa-clock b { color:#8a6d12; }
-  body.light .theme-toggle { background:#fff; border-color:var(--line); color:#8a6d12; }
-  body.light .octa-wordmark .w2 { color:#6b7c90 !important; }
+  body.light .octa-clock b { color:#756009; }
+  body.light .theme-toggle { background:#fff; border-color:var(--line); color:#756009; }
+  body.light .octa-wordmark .w2 { color:#5b6b7d !important; }
   body.light .arm-hero .ah-q { color:#0f1b2b !important; }
-  body.light .arm-hero .ah-lead { color:#55657a !important; }
+  body.light .arm-hero .ah-lead { color:#526274 !important; }
   body.light .arm-hero { background: linear-gradient(135deg, rgba(212,175,55,.10), #fff 70%) !important; }
   body.light .arm-hero .ah-ico { opacity:.08; }
 
   /* الشريط العلوي القديم */
   body.light .top-bar { background: var(--wash) !important; border-bottom-color: var(--line) !important; }
-  body.light .logo-text { background: linear-gradient(135deg,#8a6d12,#b8912f,#8a6d12);
+  body.light .logo-text { background: linear-gradient(135deg,#5c460c,#6d5410,#5c460c);
   -webkit-background-clip: text; background-clip: text; }
 
   body.light .arm-hero, body.light .uc, body.light .arm-stats,
@@ -7879,3 +7884,79 @@ body.light .sc2-fix:hover {
    📌 الفحص: window.innerWidth لازم يساوي clientWidth (٣٩٠). */
 html { overflow-x: clip; }
 body { overflow-x: clip; }
+
+/* ══════════════════════════════════════════════════════════════
+  🎯 الجولة ٢٦ (R26 · UX) — أهداف اللمس + وضوح التركيز
+  ──────────────────────────────────────────────────────────────
+  📌 السبب: قياس حقيقي بـChromium على ٩ مقاسات ⇒ ٢٨–٣٦ عنصر
+     تفاعلي في الصفحة الرئيسية أصغر من ٤٤ بكسل (الحدّ اللي
+     معتمد في AGENTS.md §8 وقاعدة WCAG 2.5.5).
+  📌 الحل: min-height ٤٤ لكل عناصر التحكم المستقلة.
+     ⛔ الشكل مابيتغيّرش (نفس اللون والخط والحواف) — بس
+        الارتفاع بيوصل للحد الآمن مع العنصر.
+  📌 ⚠️ الروابط جوه النص (inline) استثناء معروف في WCAG 2.5.8.
+  ══════════════════════════════════════════════════════════════ */
+
+/* أزرار الشريط العلوي والأدوات */
+.tool-btn,
+.tb-btn,
+.arm-btn,
+.au-bar,
+.au-mkt,
+.theme-toggle,
+.sb-acc,
+.sb-bio,
+.sb-out,
+.sb-x,
+.edu-toggle,
+.oc-disc-toggle {
+  min-height: 44px;
+}
+
+/* أزرار الأيقونة (مربّعة)
+   ⛔ min-width + flex-shrink:0 ⇒ ما ينكمشش تحت ٤٤ في الشاشات الضيقة */
+.tb-btn,
+.theme-toggle,
+.sb-x {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* حقول البحث */
+.sb-search input,
+.ocm-slot-search .inp {
+  min-height: 44px;
+}
+
+/* ⛔⛔ وضوح التركيز — قاعدة عامة لكل عناصر التحكم
+   📌 السبب: بعض العناصر كانت بتلغي الـoutline خالص
+      ⇒ مستخدم لوحة المفاتيح مش بيعرف إنه واقف على إيه.
+   📌 الحل: حلقة تركيز ذهبية (نفس لون الهوية) لكل focus-visible. */
+.tool-btn:focus-visible,
+.tb-btn:focus-visible,
+.arm-btn:focus-visible,
+.au-bar:focus-visible,
+.au-mkt:focus-visible,
+.theme-toggle:focus-visible,
+.sb-acc:focus-visible,
+.sb-bio:focus-visible,
+.sb-out:focus-visible,
+.sb-x:focus-visible,
+.edu-toggle:focus-visible,
+.oc-disc-toggle:focus-visible,
+.sb-search input:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--gold2);
+  outline-offset: 2px;
+}
+
+/* ⛔ البحث في القائمة الجانبية كان بياخد outline:none ⇒ ضاع المؤشر */
+.sb-search input:focus { outline: 2px solid var(--gold2); outline-offset: 1px; }

@@ -693,7 +693,7 @@ async function cardEGX(code,row){
   const S = Math.round((_meta.score!=null) ? _meta.score : (intel.final_score||0));
   const _dec = _meta.decision || intel.decision || '';
   const [vt,vc]=verdictOf(S);
-  const color=S>=CFG.th.buy?'#16c79a':(S>=CFG.th.hold?'#d4af37':'#ff5252');
+  const color=S>=CFG.th.buy?'var(--up2)':(S>=CFG.th.hold?'var(--gold)':'var(--dn2)');
 
   const names={technical:'فني',fundamental:'أساسي',liquidity:'سيولة',news:'أخبار',
   sentiment:'معنويات',risk:'أمان خطر',portfolio:'محفظة'};
@@ -920,7 +920,7 @@ async function cardUS(code){
   const sc=scoreUSFull(d);
   const S=sc.total;
   const [vt,vc]=verdictOf(S);
-  const color=S>=CFG.th.buy?'#16c79a':(S>=CFG.th.hold?'#d4af37':'#ff5252');
+  const color=S>=CFG.th.buy?'var(--up2)':(S>=CFG.th.hold?'var(--gold)':'var(--dn2)');
   const names={technical:'فني',fundamental:'أساسي',valuation:'تقييم',liquidity:'سيولة',
   sentiment:'معنويات',risk:'مخاطرة'};
   let arms='';
@@ -1222,7 +1222,7 @@ function ringHTML(p,color){
   const R=50,C=2*Math.PI*R;
   return '<div class="mring"><svg width="118" height="118">'+
   '<circle cx="59" cy="59" r="'+R+'" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="10"/>'+
-  '<circle cx="59" cy="59" r="'+R+'" fill="none" stroke="'+color+'" stroke-width="10" stroke-linecap="round" '+
+  '<circle cx="59" cy="59" r="'+R+'" fill="none" style="stroke:'+color+'" stroke-width="10" stroke-linecap="round" '+
   'stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+(C*(1-p/100)).toFixed(1)+
   '" style="transition:stroke-dashoffset 1s"/></svg>'+
   '<div class="v"><b>'+p+'</b><span>OCTA /100</span></div></div>';
@@ -1601,15 +1601,15 @@ async function openStockModal(code) {
   const t = (tech && tech.technical) || {}, ex = (expl && expl.explanation) || {};
   const S = Math.round(intel.final_score || 0);
   const dec = intel.decision || '—';
-  const col = S >= CFG.th.buy ? '#16c79a' : (S >= CFG.th.hold ? '#d4af37' : '#ff5252');
-  const decCol = /تجميع|شراء/.test(dec) ? '#16c79a' : (/بيع|تجنّب/.test(dec) ? '#ff5252' : '#d4af37');
+  const col = S >= CFG.th.buy ? 'var(--up2)' : (S >= CFG.th.hold ? 'var(--gold)' : 'var(--dn2)');
+  const decCol = /تجميع|شراء/.test(dec) ? 'var(--up2)' : (/بيع|تجنّب/.test(dec) ? 'var(--dn2)' : 'var(--gold)');
   const chg = intel.change || 0;
   const AX = {technical:'فني',fundamental:'أساسي',liquidity:'سيولة',news:'أخبار',
   sentiment:'معنويات',risk:'أمان',portfolio:'محفظة'};
   let axHtml = '';
   for (const k of Object.keys(AX)) {
   const v = ax[k], val = v == null ? '—' : Math.round(v);
-  const c = v == null ? '#8b9eb0' : (v>=CFG.th.safe?'#16c79a':(v>=CFG.th.mid?'#d4af37':'#ff5252'));
+  const c = v == null ? 'var(--muted)' : (v>=CFG.th.safe?'var(--up2)':(v>=CFG.th.mid?'var(--gold)':'var(--dn2)'));
   axHtml += '<div class="dc-axis"><div class="da-n">' + AX[k] + '</div>' +
   '<div class="da-v" style="color:' + c + '">' + val + '</div>' +
   '<div class="da-bar"><i style="width:' + (v||0) + '%;background:' + c + '"></i></div></div>';
@@ -1641,7 +1641,7 @@ async function openStockModal(code) {
   'color:#0a1929;border:none;border-radius:12px;font-weight:900;font-size:.92rem;cursor:pointer">' +
   '📊 افتح التحليل الكامل (الرسم البياني + كل التفاصيل)</button>';
   } catch (e) {
-  body.innerHTML = '<div class="dc-loading" style="padding:40px;text-align:center;color:#ff5252">❌ ' + (e.message||'') + '</div>';
+  body.innerHTML = '<div class="dc-loading" style="padding:40px;text-align:center;color:var(--dn2)">❌ ' + (e.message||'') + '</div>';
   }
 }
 

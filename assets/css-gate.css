@@ -81,6 +81,11 @@ button { font-family: inherit; }
   border: 0;
   cursor: pointer;
   transition: color var(--t1);
+  /* ⛔ ٢٦ أكتوبر ٢٠٢٦ (R26 · UX) — هدف لمس ٤٤ بكسل
+     📌 السبب: الزر كان ٢٨ بكسل ارتفاعاً ⇒ أصغر من الحد الآمن. */
+  min-height: 44px;
+  min-width: 44px;
+  padding-inline: 8px;
 }
 .gt-top-b:hover { color: var(--gold); }
 .gt-top-b.bk { color: var(--gold); }

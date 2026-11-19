@@ -241,18 +241,26 @@
    const _RAW = ORIG_FETCH;
    window.OCTA_RAW_FETCH = function (url, opts) {
     const s = String(url || '');
+    /* ⛔⛔⛔ ٢٦ أكتوبر ٢٠٢٦ (R26 · UX) — إصلاح حرج
+    📌 السبب: جوه الـthen كان فيه `_RAW.apply(window, arguments)`
+    📌 ⇒ الـarguments بتاع الـthen نفسه (الحارس) مش بتاع الدالة
+    📌 ⇒ الطلب كان بيتبعت لـ «/[object Object]» ⇒ 404
+    📌 ⇒ البوابة كانت بتعتبر التوكن غلط ⇒ **بتمسح الجلسة**
+    📌    من localStorage ⇒ المستخدم بيتطرد من جلسته على كل فتح.
+    📌 ✅ الحل: نمسك الـarguments بتاع الدالة في متغيّر قبل الـthen. */
+    const _args = arguments;
     const g = _guardInstance();
     if (g && typeof g.check === 'function') {
      const v = g.check(s);
      if (v && v.ok === false) return _guardBlock(v);
-     return _RAW.apply(window, arguments);
+     return _RAW.apply(window, _args);
     }
     return _guardReady().then(function (gg) {
      if (gg && typeof gg.check === 'function') {
       const v = gg.check(s);
       if (v && v.ok === false) return _guardBlock(v);
      }
-     return _RAW.apply(window, arguments);
+     return _RAW.apply(window, _args);
     });
    };
   } catch (e) { }
