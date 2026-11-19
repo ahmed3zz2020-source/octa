@@ -1496,6 +1496,22 @@ async function handle(request, env, ctx) {
           النسخة القديمة فوراً ويحدّث في الخلفية — عشان المستخدم
           ما يستناش ٢٠ ثانية كل مرة. */
     /* ══════════════════════════════════════════════════════════════
+    /* 🧪 الجولة ٢٦ (R26 · البند ٤) — ⭐ API المعاينة الحقيقي ⭐
+       📌 لازم يكون **قبل** بوابة الـAPI ⭐ (وإلا بوابة الـworker هترفض
+       ⭐ جلسات المعاينة ⭐ ⇒ 401 على /api/portfolio و /api/alerts ⭐).
+       📌 المعاينة المعزولة بقت عندها API **حقيقي** ⭐: تسجيل ⭐ دخول ⭐
+       جلسات ⭐ أسعار ⭐ ترتيب ⭐ محفظة ⭐ تنبيهات ⭐ — كله على تخزين
+       المعاينة الخاص ⭐ وبسر جلسات المعاينة ⭐ ⇒ ⛔ صفر اتصال بالإنتاج ⭐.
+       📌 المسارات اللي الـAPI المحلي مش بيخدمها ⇒ ترجع للفرع اللي
+       تحت (503 صريح) ⭐ ⇒ ⛔ مافيش نجاح وهمي ⭐. */
+    if (url.pathname.startsWith('/api/') && env
+        && env.OCTA_PREVIEW_SELF_API === 'on') {
+      const previewResp = await handlePreviewApi({
+        request: request, env: env, ctx: ctx, url: url
+      });
+      if (previewResp) return previewResp;
+    }
+
     ⛔⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐⭐ بوابة الـAPI (في أول الـWorker!)
     ──────────────────────────────────────────────────────────────
     📌 لازم تكون **قبل** كل معالجات الـAPI الخاصة (dividends · news
@@ -2273,19 +2289,6 @@ async function handle(request, env, ctx) {
         console.warn('[HALAN-NEWS] fallback:', String(e && e.message || e));
         /* ⛔ fallback: نكمّل عادي للـAPI (أفضل من رد غلط) */
       }
-    }
-
-    /* 🧪 الجولة ٢٦ (R26 · البند ٤) — ⭐ API المعاينة الحقيقي ⭐
-       📌 المعاينة المعزولة بقت عندها API **حقيقي** ⭐: تسجيل ⭐ دخول ⭐
-       جلسات ⭐ أسعار ⭐ محفظة ⭐ تنبيهات ⭐ — كله على تخزين المعاينة
-       الخاص ⭐ وبسر جلسات المعاينة ⭐ ⇒ ⛔ صفر اتصال بالإنتاج ⭐.
-       📌 المسارات اللي الـAPI المحلي مش بيخدمها ⇒ ترجع للفرع اللي
-       تحت (503 صريح) ⭐ ⇒ ⛔ مافيش نجاح وهمي ⭐. */
-    if (url.pathname.startsWith('/api/')) {
-      const previewResp = await handlePreviewApi({
-        request: request, env: env, ctx: ctx, url: url
-      });
-      if (previewResp) return previewResp;
     }
 
     if (url.pathname.startsWith('/api/')) {

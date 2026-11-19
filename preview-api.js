@@ -457,6 +457,40 @@ async function handlePreviewApi(opts) {
     });
   }
 
+  /* ── ⑩ب الترتيب (من لقطة المعاينة) ⭐ — زي عقد الإنتاج ⭐ */
+  if (p === '/api/rank' && m === 'GET') {
+    /* ⛔ زي الإنتاج ⭐: بدون جلسة ⇒ 401 بجسم متطابق ⭐ */
+    const sess = await readSession(env, request);
+    if (!sess) {
+      return json({ ok: false, error: 'النسخة الكاملة محمية', count: 0,
+        results: [], filters: {}, _protected: true }, 401);
+    }
+    const snap = await kvGet(env, 'snap:quotes');
+    if (!snap) return json({ ok: false, error: 'لقطة الأسعار مش موجودة', why: 'snapshot_missing' }, 503);
+    const rows = (snap.markets || {}).egypt || {};
+    const limit = Math.max(1, Math.min(400, parseInt(url.searchParams.get('limit') || '20', 10) || 20));
+    const codesWanted = url.searchParams.get('codes');
+    let entries = Object.keys(rows);
+    if (codesWanted) {
+      const want = codesWanted.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+      entries = entries.filter(c => want.indexOf(c) >= 0);
+    }
+    const results = entries.slice(0, limit).map(c => {
+      const r = rows[c] || {};
+      return {
+        code: c,
+        price: (r.close === undefined ? null : r.close),
+        change: (r.change === undefined ? null : r.change),
+        volume: (r.volume === undefined ? null : r.volume),
+        market_cap_basic: (r.market_cap_basic === undefined ? null : r.market_cap_basic),
+        recommend: (r['Recommend.All'] === undefined ? null : r['Recommend.All'])
+      };
+    });
+    return json({ ok: true, count: results.length, results: results,
+      filters: {}, updated: snap.updated || nowSec(),
+      preview_note: 'معاينة معزولة ⭐ — الترتيب من لقطة المعاينة ⭐' });
+  }
+
   /* ── ⑪ المحفظة (لكل حساب لوحده) ⭐ */
   if (p === '/api/portfolio' && (m === 'GET' || m === 'POST')) {
     const sess = await readSession(env, request);
@@ -500,6 +534,9 @@ async function handlePreviewApi(opts) {
     await kvPut(env, key, { items: items });
     return json({ ok: true, created: true, alerts: items });
   }
+
+  /* ⛔ /api/health للـworker ⭐ (نسخة المعاينة المعزولة ⭐) ⭐ */
+  if (p === '/api/health') return null;
 
   /* ── مسارات المعاينة غير المغطّاة ⇒ رد صريح (مافيش 503 غامض) ⭐ */
   if (p.startsWith('/api/')) {

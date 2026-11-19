@@ -274,6 +274,33 @@ test('④ ⭐ الأسعار من لقطة المعاينة ⭐ (من غير ا�
   assert.ok(q.body.preview_note, 'لازم يبقى فيه بيان إن ده لقطة معاينة');
 });
 
+/* ── ④ب الترتيب ⭐ */
+test('④ب ⭐ الترتيب ⭐ — 401 للزائر ⭐ + نتائج للمسجّل ⭐', async () => {
+  const e = env();
+  const anon = await call(e, '/api/rank');
+  assert.strictEqual(anon.status, 401);
+  assert.strictEqual(anon.body._protected, true);
+
+  await e.PREVIEW_KV.put('snap:quotes', JSON.stringify({
+    updated: Math.floor(Date.now() / 1000),
+    markets: { egypt: { COMI: { close: 10.5, change: 1.2, volume: 100, 'Recommend.All': 0.1 } } }
+  }));
+
+  const email = 'r26.rank@example.com';
+  const device = 'device-gggg-4444';
+  const start = await call(e, '/api/auth/signup/start',
+    { method: 'POST', json: { name: 'س', email: email } });
+  const mk = await call(e, '/api/auth/signup/newpin', {
+    method: 'POST',
+    json: { email: email, code: start.body.preview_code, pin: '6666', device: device }
+  });
+  const r = await call(e, '/api/rank?limit=10', { headers: { Cookie: cookieOf(mk.res) } });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.count, 1);
+  assert.strictEqual(r.body.results[0].code, 'COMI');
+  assert.strictEqual(r.body.results[0].price, 10.5);
+});
+
 /* ── ⑤ المحفظة + التنبيهات ⭐ ── */
 test('⑤ ⭐ المحفظة معزولة بين الحسابات ⭐', async () => {
   const e = env();
