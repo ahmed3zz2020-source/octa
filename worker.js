@@ -109,6 +109,7 @@ const TRIES = 3;
 /* ⭐ محرك محور الأخبار (هالان) — نسخة مطابقة 1:1 من news_engine في الباك.
    📌 الاختبار: tools/test-halan-news.js ⇒ 182/182 مطابقة. */
 import { newsEngine, mergeEvents, eventsByCode, parseHalaText } from './halan-news.js';
+import { handlePreviewApi } from './preview-api.js';
 
 /* ══════════════════════════════════════════════════════════════
    ⭐ جسر سكانر TradingView — للفلتر (Smart Money)
@@ -1495,6 +1496,22 @@ async function handle(request, env, ctx) {
           النسخة القديمة فوراً ويحدّث في الخلفية — عشان المستخدم
           ما يستناش ٢٠ ثانية كل مرة. */
     /* ══════════════════════════════════════════════════════════════
+    /* 🧪 الجولة ٢٦ (R26 · البند ٤) — ⭐ API المعاينة الحقيقي ⭐
+       📌 لازم يكون **قبل** بوابة الـAPI ⭐ (وإلا بوابة الـworker هترفض
+       ⭐ جلسات المعاينة ⭐ ⇒ 401 على /api/portfolio و /api/alerts ⭐).
+       📌 المعاينة المعزولة بقت عندها API **حقيقي** ⭐: تسجيل ⭐ دخول ⭐
+       جلسات ⭐ أسعار ⭐ ترتيب ⭐ محفظة ⭐ تنبيهات ⭐ — كله على تخزين
+       المعاينة الخاص ⭐ وبسر جلسات المعاينة ⭐ ⇒ ⛔ صفر اتصال بالإنتاج ⭐.
+       📌 المسارات اللي الـAPI المحلي مش بيخدمها ⇒ ترجع للفرع اللي
+       تحت (503 صريح) ⭐ ⇒ ⛔ مافيش نجاح وهمي ⭐. */
+    if (url.pathname.startsWith('/api/') && env
+        && env.OCTA_PREVIEW_SELF_API === 'on') {
+      const previewResp = await handlePreviewApi({
+        request: request, env: env, ctx: ctx, url: url
+      });
+      if (previewResp) return previewResp;
+    }
+
     ⛔⛔⛔ ١٤ نوفمبر ٢٠٢٦ — ⭐⭐ بوابة الـAPI (في أول الـWorker!)
     ──────────────────────────────────────────────────────────────
     📌 لازم تكون **قبل** كل معالجات الـAPI الخاصة (dividends · news
