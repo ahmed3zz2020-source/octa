@@ -194,7 +194,7 @@ const AUDIT_SRC = String.raw`
     vh: window.innerHeight,
     dpr: window.devicePixelRatio,
     hScroll: { scrollWidth: 0, clientWidth: 0, bodyScrollWidth: 0, overflow: false, offenders: [] },
-    overlap: { count: 0, list: [] },
+    overlap: { count: 0, list: [], transient: 0, barPad: null },
     clipped: { count: 0, list: [] },
     smallTargets: { count: 0, standalone: 0, inline: 0, list: [] },
     contrast: { count: 0, checked: 0, gradient: 0, unmeasured: 0, list: [] },
@@ -248,9 +248,35 @@ const AUDIT_SRC = String.raw`
     if (cx >= 0 && cy >= 0 && cx < window.innerWidth && cy < window.innerHeight) {
       const hit = document.elementFromPoint(cx, cy);
       if (hit && hit !== a && !a.contains(hit) && !hit.contains(a)) {
-        out.overlap.count++;
-        if (out.overlap.list.length < MAX_LIST) {
-          out.overlap.list.push({ el: sel(a), blockedBy: sel(hit), x: cx, y: cy });
+        /* ⛔⛔ شريط التنبيه العابر (شريط التحديث) ⛔
+           📌 هو fixed ⇒ بيغطي جزء من المحتوى وهو ظاهر ⭐
+              ⇒ لكن المستخدم بيقدر يمرّر المحتوى تحته ⭐
+              ⇒ فالحغطية مش «تداخل» ⭐ ⇒ بنفحصها فحصاً صحيح:
+                 لازم يكون فيه حشو سفلي في الصفحة يغطّي
+                 ارتفاع الشريط ⭐ (وإلا المحتوى بيختفي تحتّه ⛔). */
+        const transient = (hit.id === 'octaUpdateBar') ||
+          (hit.closest && hit.closest('#octaUpdateBar'));
+        if (transient) {
+          out.overlap.transient++;
+          const bar = document.getElementById('octaUpdateBar');
+          const pad = parseFloat(window.getComputedStyle(document.body).paddingBottom) || 0;
+          const barH = bar ? bar.getBoundingClientRect().height : 0;
+          out.overlap.barPad = { pad: Math.round(pad), bar: Math.round(barH) };
+          if (pad + 2 < barH) {
+            out.overlap.count++;
+            if (out.overlap.list.length < MAX_LIST) {
+              out.overlap.list.push({
+                el: sel(a), blockedBy: 'شريط التحديث (fixed) · حشو سفلي ' +
+                  Math.round(pad) + ' < ارتفاع الشريط ' + Math.round(barH),
+                x: cx, y: cy
+              });
+            }
+          }
+        } else {
+          out.overlap.count++;
+          if (out.overlap.list.length < MAX_LIST) {
+            out.overlap.list.push({ el: sel(a), blockedBy: sel(hit), x: cx, y: cy });
+          }
         }
       }
     }

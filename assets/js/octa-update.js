@@ -45,6 +45,11 @@ function showBar(){
     bar.innerHTML = '<div class="octa-upd"><span>🆕 فيه نسخة جديدة من (OCTA)</span>' +
       '<button type="button" onclick="octaApplyUpdate()">تحديث دلوقتي</button></div>';
     document.body.appendChild(bar);
+    /* 📌 R26 · الشريط fixed بيغطي آخر المحتوى ⛔ (قياس بمتصفح حقيقي:
+       شريط التحديث كان بيغطي عنصر «BEAR» في 1440×900 ⭐)
+       ⇒ بنحجز مكان له في آخر الصفحة (حشو سفلي) ⭐
+       ⇒ كده آخر محتوى بيفضل قابل للقراءة والضغط ⭐. */
+    try { document.body.classList.add('has-upd-bar'); } catch (e) {}
   }catch(e){}
 }
 
