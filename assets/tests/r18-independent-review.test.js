@@ -61,15 +61,18 @@ test('R18-A01: جلسة الأدمن المنسوخة تُبطَل عند تسج
   assert.equal((await worker.fetch(req('/api/logout', { method: 'POST', headers }), env)).status, 200);
   assert.equal((await worker.fetch(req('/api/session', { headers }), env)).status, 401);
 
-  /* 🛡️ R25 (R24-I10) ⭐ — ⭐ case **جديد** ⭐: في الإنتاج ⭐ ⇒ ⛔ ٥٠٣ ⭐ */
+  /* 🛡️ R26 ⭐ — ⭐ العقد الجديد ⭐: في الإنتاج ⭐ بلا مصدر إبطال ⭐
+     ⭐ ⇒ ⛔ **الدخول** نفسه مقفول (٥٠٣ ⭐ + مافيش كوكي ⭐)
+     📌 قبل R26 ⭐ كان الخروج هو اللي بيرفض ⭐ ⇒ ⭐ session ممكنة تتissued ⭐ ⇒ ⭐ أضعف ⭐. */
   const workerProd = loadWorker();
   const envProd = Object.assign(makeEnv(workerProd), { APP_ENV: 'production' });
-  const cookieProd = await login(workerProd, envProd);
-  const outProd = await workerProd.fetch(req('/api/logout', {
-    method: 'POST', headers: { Cookie: cookieProd },
+  const loginProd = await workerProd.fetch(req('/api/login', {
+    method: 'POST', body: JSON.stringify({ password: envProd.APP_PASSWORD }),
   }), envProd);
-  assert.equal(outProd.status, 503,
-    '⛔⛔⛔ الإنتاج بدون مصدر مشترك ⇒ ⛔ لازم ٥٠٣ ⭐');
+  assert.equal(loginProd.status, 503,
+    '⛔⛔⛔ الإنتاج بدون مصدر مشترك ⇒ ⛔ الدخول لازم ٥٠٣ ⭐');
+  assert.equal(loginProd.headers.get('Set-Cookie'), null,
+    '⛔⛔⛔ الدخول المرفوض ⛔ ما يصدّرش كوكي ⭐');
 });
 
 // ── R18-A02: الأصول المحمية ما تن caches confirma ──────────────────────

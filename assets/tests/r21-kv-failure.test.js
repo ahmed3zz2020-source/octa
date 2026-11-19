@@ -78,6 +78,10 @@ function makeEnv(kv, doNs) {
     APP_PASSWORD: 'synthetic-password',
     SESSION_SECRET: 'synthetic-secret',
     OCTA_ADMIN_TOKEN: 'synthetic-token',
+    /* 🛡️ R26 ⭐ — ⭐ الاختبارات دي بتغطي **تعطّل الـKV** ⭐ كبديل للإبطال ⭐
+       📌 في الإنتاج ⭐ ⛔ الـKV لوحده **مش** دليل قبول ⭐ ⇒ ⛔ رفض ⭐.
+       ⭐ ⇒ الاختبار لازم يعمل في بيئة **غير إنتاج** ⭐ (وضع المعاينة ⭐). */
+    APP_ENV: 'preview',
     REVOKE_KV: kv || null,
     REVOKE_DO: doNs || null,
     ASSETS: { fetch: async () => new Response('synthetic shell',
@@ -230,6 +234,6 @@ test('R21-KV-08: /api/health reports whether revocation is strongly consistent',
   assert.equal(b.revoke_strong, true, '⛔ لازم يعلن إن الإبطال قوي ⭐');
   assert.equal(b.revoke_shared, true);
   assert.ok(Object.keys(b).every(k => ['ok', 'has_admin', 'has_password',
-    'revoke_shared', 'revoke_strong'].includes(k)),
+    'revoke_shared', 'revoke_strong', 'revocation_ready'].includes(k)),
     '⛔ health لازم يبقى booleans بس ⭐');
 });

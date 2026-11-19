@@ -109,6 +109,10 @@ function makeEnv(kv, doNs) {
     APP_PASSWORD: 'synthetic-password',
     SESSION_SECRET: 'synthetic-secret',
     OCTA_ADMIN_TOKEN: 'synthetic-token',
+    /* 🛡️ R26 ⭐ — ⭐ الاختبارات دي بتقيس **TTL علامة الـKV** ⭐
+       📌 في الإنتاج ⭐ ⛔ الـKV لوحده **مش** دليل قبول ⭐ ⇒ ⛔ رفض ⭐
+       ⭐ ⇒ لازم تعمل في بيئة **غير إنتاج** ⭐ (وضع المعاينة ⭐). */
+    APP_ENV: 'preview',
     REVOKE_KV: kv || null,
     REVOKE_DO: doNs || null,
     ASSETS: {

@@ -143,16 +143,17 @@ test('R20-F03: without KV the worker still works (single instance fallback)', as
   }), env);
   assert.equal(after.status, 401, 'الإبطال في الذاكرة لازم يشتغل');
 
-  /* 🛡️ R25 (R24-I10) ⭐ — ⭐ case **جديد** ⭐: نفس الحالة في الإنتاج ⭐
-     ⭐ ⇒ ⛔ fail-closed ⭐ (٥٠٣ ⭐) ⭐. */
+  /* 🛡️ R26 ⭐ — ⭐ العقد الجديد ⭐: في الإنتاج ⭐ بلا KV ⭐ (ولا DO ⭐)
+     ⭐ ⇒ ⛔ **الدخول** نفسه مقفول (٥٠٣ ⭐) ⭐ — مش الخروج بس ⭐. */
   const workerProd = loadWorker();
   const envProd = Object.assign(makeEnv(workerProd, null), { APP_ENV: 'production' });
-  const cookieProd = await login(workerProd, envProd);
-  const outProd = await workerProd.fetch(req('/api/logout', {
-    method: 'POST', headers: { Cookie: cookieProd },
+  const loginProd = await workerProd.fetch(req('/api/login', {
+    method: 'POST', body: JSON.stringify({ password: envProd.APP_PASSWORD }),
   }), envProd);
-  assert.equal(outProd.status, 503,
-    '⛔⛔⛔ الإنتاج بدون KV ⇒ ⛔ الخرج ما ينفعش يعلن نجاح ⭐');
+  assert.equal(loginProd.status, 503,
+    '⛔⛔⛔ الإنتاج بدون KV ⇒ ⛔ الدخول ما ينفعش يعلن نجاح ⭐');
+  assert.equal(loginProd.headers.get('Set-Cookie'), null,
+    '⛔⛔⛔ الدخول المرفوض ⛔ ما يصدّرش كوكي ⭐');
 });
 
 test('R20-F04: /api/health reports whether revocation is shared (booleans only)', async () => {
@@ -163,9 +164,11 @@ test('R20-F04: /api/health reports whether revocation is shared (booleans only)'
   const b = await res.json();
   assert.equal(b.revoke_shared, true, 'مع KV ⇒ الإedal مشترك');
   // ⭐ الجولة ٢١: زاد `revoke_strong` ⭐ (هل الإطلاع اتساق قوي ⭐)
+  // ⭐ الجولة ٢٦: زاد `revocation_ready` ⭐ (هل مصدر الإبطال جاهز ⭐)
   // ⭐ النية (booleans بس ⭐ مافيش أي اسم متغيّر ⭐) محفوظة ⭐
   assert.deepEqual(Object.keys(b).sort(),
-    ['has_admin', 'has_password', 'ok', 'revoke_shared', 'revoke_strong'],
+    ['has_admin', 'has_password', 'ok', 'revocation_ready',
+      'revoke_shared', 'revoke_strong'],
     '⛔ health لازم يبقى booleans بس — مافيش أي اسم متغيّر');
   for (const [k, v] of Object.entries(b)) {
     assert.equal(typeof v, 'boolean', '⛔ الحقل ' + k + ' لازم boolean ⭐');

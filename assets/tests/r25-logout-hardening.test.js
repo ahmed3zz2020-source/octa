@@ -85,6 +85,9 @@ function makeEnv(log, extra = {}) {
     APP_PASSWORD: 'synthetic-password',
     SESSION_SECRET: SECRET,
     OCTA_ADMIN_TOKEN: 'synthetic-token',
+    /* ⭐⭐⭐ الجولة ٢٦ (R26) ⭐ — ⭐ البيئة معلنة صراحة ⭐
+       ⭐ (⭐ الافتراضي في الكود = إنتاج ⭐ ⇒ fail-closed ⭐ ⇒ ⭐ الاختبار يعلن ⭐). */
+    APP_ENV: 'production',
     REVOKE_KV: log && log.kv ? log.kv : null,
     REVOKE_DO: log && log.doNs ? log.doNs : null,
     ASSETS: {
@@ -98,9 +101,17 @@ function req(p, opts = {}) {
   return new Request('https://mgmt.invalid' + p, opts);
 }
 
-function mintCookie(expMs, secret) {
+/* ⭐⭐⭐ الجولة ٢٦ (R26) — ⭐ التوقيع بقى يشمل **وسم الاعتماد** ⭐
+   📌 السبب ⭐: ⛔ تغيير كلمة المرور ⭐ كان **مش** بيبطل الجلسات القائمة ⭐.
+   📌 فاصيل: ⭐ نفس قاعدة الكود ⭐ (sign(exp + "." + tag) ⭐) ⭐. */
+function credentialTag(password) {
+  return nodeCrypto.createHash('sha256').update(String(password)).digest('hex').slice(0, 16);
+}
+
+function mintCookie(expMs, secret, password) {
   const exp = String(expMs);
-  const sig = nodeCrypto.createHmac('sha256', secret).update(exp).digest('hex');
+  const payload = password ? (exp + '.' + credentialTag(password)) : exp;
+  const sig = nodeCrypto.createHmac('sha256', secret).update(payload).digest('hex');
   return 'octa_mgmt_sess=' + encodeURIComponent(exp + '.' + sig);
 }
 
@@ -159,7 +170,10 @@ test('R25-I09-02: when the authoritative source confirms, the logout succeeds', 
 test('R25-I09-03: a KV-only success must never claim immediate revocation', async () => {
   const worker = loadWorker();
   const log = makeCallLog();
-  const env = makeEnv(log, { REVOKE_DO: null });
+  /* ⭐⭐⭐ الجولة ٢٦ (R26) ⭐ — ⭐ في الإنتاج ⭐ ⛔ الـKV لوحده مش مصدر قبول ⭐
+     ⭐ ⇒ ⭐ الاختبار ده بقى في **بيئة غير إنتاج** ⭐ (الوضع الوحيد اللي الـKV
+     ⭐   يقدر فيهما يثبت ⭐) ⭐ — ⭐ والقاعدة نفسها (مش إبطال فوري ⭐) بتفضل ⭐. */
+  const env = makeEnv(log, { REVOKE_DO: null, APP_ENV: 'preview' });
   const cookie = await login(worker, env);
 
   const out = await logout(worker, env, cookie);
@@ -177,7 +191,22 @@ test('R25-I10-01: in production with no shared revocation source it must fail cl
   const worker = loadWorker();
   const log = makeCallLog();
   const env = makeEnv(log, { REVOKE_KV: null, REVOKE_DO: null, APP_ENV: 'production' });
-  const cookie = await login(worker, env);
+  /* ⭐⭐⭐ الجولة ٢٦ (R26) ⭐ — ⭐ ⛔ الدخول نفسه مقفول ⭐
+     📌 السبب ⭐: ⛔ جلسة من غير مصدر إبطال ⇒ ⭐ ما تتبطلش عبر النسخ ⭐
+        ⇒ ⭐ ⭐ فجوة أمنية ⭐ ⭐ ⇒ ⭐ ⛔ ما نصدرهاش أصلاً ⭐.
+     📌 ده **أقوى** من العقد القديم ⭐ (القديم: الدخول ينجح ⭐ والخروج يفشل ⭐). */
+  const loginRes = await worker.fetch(req('/api/login', {
+    method: 'POST', body: JSON.stringify({ password: env.APP_PASSWORD }),
+  }), env);
+  assert.equal(loginRes.status, 503,
+    '\u26d4\u26d4\u26d4 لازم الدخول يفشل مغلق \u2b50 (مافيش مصدر إبطال \u2b50) \u2014 got ' + loginRes.status);
+  const setCookie = loginRes.headers.get('Set-Cookie') || '';
+  assert.ok(setCookie.indexOf('Max-Age=0') === -1 && !/octa_mgmt_sess=[^;]+/.test(setCookie),
+    '\u26d4\u26d4\u26d4 مينفعش نصدر كوكي جلسة \u2b50 — ' + setCookie + ' \u2b50');
+  /* ⭐⭐⭐ الجولة ۲۶ (R26) ⭐ — ⭐ كوكي **سليم التوقيع** ⭐
+     ⭐ (مش مزوّر ⭐) ⭐ ⇒ ⭐ عشان نختبر مسار ⭐“مافيش مصدر” ⭐
+     ⭐ ولا مسار ⭐“كوكي زائف” ⭐. */
+  const cookie = mintCookie(Date.now() + 3600000, env.SESSION_SECRET, env.APP_PASSWORD);
 
   const out = await logout(worker, env, cookie);
   assert.notEqual(out.status, 200,
@@ -242,7 +271,7 @@ test('R25-I11-02: an EXPIRED cookie must not consume Durable Object or KV resour
   const worker = loadWorker();
   const log = makeCallLog();
   const env = makeEnv(log);
-  const expired = mintCookie(Date.now() - 1000, SECRET);
+  const expired = mintCookie(Date.now() - 1000, SECRET, env.APP_PASSWORD);
 
   const out = await logout(worker, env, expired);
   assert.equal(out.status, 200,

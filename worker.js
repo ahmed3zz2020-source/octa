@@ -1198,6 +1198,23 @@ const OCTA_SW_KILLER_JS = [
    📌 📌 ⛌⛌⛌ (الـworker بيرد الأول ⇒ هو اللي بيمسك الرد).
    📌 ✅ الحل: غلاف واحد على كل رد — مفيش استثناء ممكن ينسى.
    ══════════════════════════════════════════════════════════════ */
+/* \u2b50\u2b50\u2b50 \u0627\u0644\u062c\u0648\u0644\u0629 \u06f2\u06f6 (R26) \u2014 \u2b50 \u0643\u0634\u0641 \u0627\u0644\u0637\u0644\u0628 \u0645\u0646 \u0623\u0635\u0644 \u062e\u0627\u0631\u062c\u064a \u2b50 (CSRF \u2b50)
+   \U0001f4a8 \u0627\u0644\u0645\u062a\u0635\u0641\u062d \u0627\u0644\u0633\u0639\u0629 \u0628\u062a\u0628\u0639\u062a \u0647\u062f\u0631\u0627\u0621 \u201cSec-Fetch-Site\u201d \u2b50 \u0648\u201cOrigin\u201d \u2b50.
+   \U0001f4a8 \u0627\u0644\u0642\u0627\u0639\u062f\u0629 \u2b50: \u26d4 `cross-site` \u2b50 \u21d4 \u26d4 \u064a\u064f\u0631\u0641\u0636 \u2b50 (403 \u2b50) \u00b7 \u26d4 `same-origin`/`same-site`/`none` \u2b50 \u21d4 \u26d4 \u0645\u0633\u0645\u0648\u062d \u2b50 \u00b7 \u26d4 \u0645\u0641\u064a\u0634 \u0647\u064a\u062f\u0631\u0627\u062a \u2b50 \u21d4 \u26d4 \u0645\u0633\u0645\u0648\u062d \u2b50 (\u0639\u0645\u0648\u062f \u063a\u064a\u0631 \u0645\u062a\u0635\u0641\u062d \u2b50). */
+function isCrossSiteRequest(request, url) {
+  try {
+    const sfs = String(request.headers.get('Sec-Fetch-Site') || '').trim().toLowerCase();
+    if (sfs && sfs !== 'same-origin' && sfs !== 'same-site' && sfs !== 'none') return true;
+    const origin = String(request.headers.get('Origin') || '').trim();
+    if (origin) {
+      let o = null;
+      try { o = new URL(origin); } catch (e) { return true; }
+      if (!url || o.host !== url.host) return true;
+    }
+  } catch (e) { return false; }
+  return false;
+}
+
 export default {
   async fetch(request, env, ctx) {
     let res;
@@ -2318,6 +2335,19 @@ async function handle(request, env, ctx) {
          يتمسح فعلاً قبل ما الصفحة الجديدة تفتح. */
       if (url.pathname === '/api/auth/logout'
         && (request.method === 'GET' || request.method === 'POST')) {
+        /* \u2b50\u2b50\u2b50 \u0627\u0644\u062c\u0648\u0644\u0629 \u06f2\u06f6 (R26) \u2014 \u26d4 CSRF \u2b50
+           \U0001f4a8 \u0627\u0644\u0645\u0633\u0627\u0631 \u0628\u064a\u0642\u0628\u0644 GET \u0648 POST \u2b50 \u21d4 \u26d4 \u0637\u0644\u0628 \u0645\u0646 \u0645\u0648\u0642\u0639 \u062a\u0627\u0646\u064a \u064a\u0642\u062f\u0631 \u0627\u0644\u062e\u0631\u0648\u062c \u2b50
+           \u21d4 \u26d4 \u0635\u0644\u0627\u062d\u0629 \u0627\u0644\u062c\u0644\u0633\u0629 \u0645\u0639\u0644\u0648\u0642\u0629 \u0641\u0642\u0637 \u2b50 (\u26d4 \u0627\u0644\u0645\u0637\u0644\u0628 \u0645\u0631\u062a\u0628\u0639 \u0628\u0647 \u26d4 \u0645\u0639\u0644\u0648\u0642\u0629 \u0623\u0635\u0644\u0627\u062d\u0627\u064b \u2b50).
+           \u2705 \u0627\u0644\u062d\u0644 \u2b50: \u2b50 \u0637\u0644\u0628 \u0645\u0646 \u0623\u0635\u0644 \u062e\u0627\u0631\u062c\u064a \u2b50 \u21d4 \u26d4 403 \u2b50 (\u0648\u0645\u0641\u064a\u0634 \u0646\u062f\u0627\u0621 \u0644\u0644\u062a\u062e\u0632\u064a\u0646 \u2b50). */
+        if (isCrossSiteRequest(request, url)) {
+          return new Response(JSON.stringify({
+            ok: false, revoked: false, error: 'cross_site_blocked',
+            why: '\u0637\u0644\u0628 \u0645\u0646 \u0623\u0635\u0644 \u062e\u0627\u0631\u062c\u064a \u2014 \u0627\u062a\u0631\u0641\u0636'
+          }), {
+            status: 403,
+            headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
+          });
+        }
         /* 🐞🛡️ ١٥ نوفمبر ٢٠٢٦ (دفعة الأمان ٠٢ · المراجعة الأمنية) — ⛔⛔⛔ ⬇️
            📌 ⬇️ ⛔ كان: الرد يتحرّك فوراً ⬇️ ⬇️ ⬇️
            📌 ⬇️ ⛔ والإبطال (token_epoch) بيحصل في **الخلفية** ⬇️ ⬇️ ⬇️

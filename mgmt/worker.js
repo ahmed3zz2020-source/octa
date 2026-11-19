@@ -118,13 +118,15 @@ function cookieShape(raw) {
 }
 
 /* ⭐ تحقق كامل ⭐: الشكل ⭐ ثم التوقيع ⭐ ثم الانتهاء ⭐ */
-async function verifyCookie(raw, secret) {
+async function verifyCookie(raw, secret, env) {
   const shape = cookieShape(raw);
   if (!shape.ok) return shape;
   if (!secret) return { ok: false, reason: "no-secret" };
   let expect = "";
   try {
-    expect = await sign(shape.exp, secret);
+    /* ⭐⭐⭐ الجولة ٢٦ (R26) ⭐ — ⭐ نفس حمولة التوقيع ⭐ (exp + وسم الاعتماد ⭐)
+       ⭐ ⇒ ⭐ تغيير كلمة المرور ⭐ ⛔ يبطل الكوكي ⭐ ⭐. */
+    expect = await sign(shape.exp + "." + (await credentialTag(env)), secret);
   } catch (e) {
     return { ok: false, reason: "sign-failed" };
   }
@@ -141,8 +143,14 @@ async function verifyCookie(raw, secret) {
       + ⭐ اختبار حارس يقرأ الإعدادات ⭐ (r25-prod-config-guard.test.js ⭐). */
 function isProductionEnv(env) {
   const flag = String((env && (env.APP_ENV || env.OCTA_ENV)) || "").trim().toLowerCase();
-  if (flag === "production" || flag === "prod") return true;
-  if (flag) return false;
+  /* ⭐⭐⭐ الجولة ٢٦ (R26) — ⭐⭐⭐ أي بيئة **غير معروفة** ⭐ ⇒ ⭐ إنتاج ⭐ (fail-closed ⭐)
+     📌 قبل ⭐: ⛔ أي قيمة تانية ⭐ (حتى غلطة إملائية ⭐ زي "productionn" ⭐)
+        ⇒ ⭐ ⛔ كانت بتعتبر بيئة غير إنتاج ⭐ ⇒ ⭐ ⭐ انفتاح ⭐ ⭐ (بدون مصدر إبطال ⭐).
+     ✅ الحل ⭐: ⭐ قائمة بيضاء صريحة ⭐ لبيئات التطوير ⭐ فقط ⭐
+        ⇒ ⭐ أي قيمة تانية ⭐ ⇒ ⭐ إنتاج ⭐ ⇒ ⭐ ⛔ مافيش جلسة من غير مصدر ⭐. */
+  const NON_PRODUCTION = new Set(["", "dev", "development", "preview", "test",
+    "testing", "local", "localhost"]);
+  if (NON_PRODUCTION.has(flag)) return flag ? false : true;  /* ⭐ مفيش قيمة ⇒ إنتاج ⭐ */
   return true;
 }
 
@@ -372,6 +380,11 @@ async function kvIsRevoked(env, raw) {
    📌 الترتيب ⭐: الـDO (المصدر القوي ⭐) الأول ⭐ ثم الـKV (شاهد ⭐). */
 async function sharedRevokeState(env, raw) {
   if (!env || !raw) return false;
+  /* ⭐⭐⭐ الجولة ٢٦ (R26) — ⭐ في الإنتاج ⭐ مصدر واحد بس بيشوف الإبطال ⭐:
+     ⭐ الـDurable Object ⭐ (قراءة بعد كتابة ⭐ ⇒ مافيش نافذة ⭐).
+     ⭐ ⛔ الـKV لوحده ⭐ ⇒ ⭐ قراءته ممكن تكون قديمة ⭐ ⇒ ⭐ جلسة متبطل ترجع تُقبل ⭐
+     ⭐ ⇒ ⭐ في الإنتاج ⭐ ⛔ الـKV **يرفض** ⭐ بس **ما بيقدرش يقبل** ⭐. */
+  const prod = isProductionEnv(env);
   if (env.REVOKE_DO) {
     /* ⛔ خطأ / رد مش مفهوم ⇒ `null` ⇒ ⛔ **fail-closed** ⭐ (مش 200 أبدًا ⭐) */
     const d = await doIsRevoked(env, raw);
@@ -388,9 +401,52 @@ async function sharedRevokeState(env, raw) {
   if (env.REVOKE_KV) {
     const k = await kvIsRevoked(env, raw);
     if (k === null) return null;      // ⛔ ما فيش دليل ⇒ نرفض ⭐
+    /* ⛔⛔⛔ الجولة ٢٦ (R26) ⭐ — ⭐ في الإنتاج ⭐ ⛔ الـKV لوحده مش دليل قبول ⭐
+       📌 السبب ⭐: ⛔ قراءة الـKV **ممكن تكون قديمة** ⭐ (اتساق متأخر ⭐)
+          ⇒ ⛔ جلسة اتبطلت على نسخة تانية ممكن ترجع تُقبل هنا ⭐.
+       ✅ الحل ⭐: ⭐ في الإنتاج ⭐ ⇒ ⭐ الـDO هو المرجع ⭐ ⇒ ⭐ مافيش DO ⭐ ⇒ `null` ⭐
+          (fail-closed ⭐ ⭐ —Fail-closed ⭐) ⭐.
+       📌 خارج الإنتاج ⭐ ⇒ ⭐ السلوك القديم ⭐ (وضع النسخة الواحدة ⭐ وموثّق ⭐). */
+    if (prod) return null;            // ⛔ fail-closed ⭐ (مافيش مصدر قوي ⭐)
     return k;
   }
+  /* ⛔⛔⛔ الجولة ٢٦ (R26) ⭐ — ⭐ مافيش مخزن مشترك إطلاقاً ⭐
+     📌 قبل ⭐: ⭐ `false` ⭐ ⇒ ⭐ ⇒ ⭐ الجلسة بتُقبل ⭐ ⇒ ⭐ ⭐ انفتاح أمني ⭐ ⭐
+        (الجلسة issued في ذاكرة نسخة واحدة ⭐ ⇒ ⭐ مافيش إبطال عبر النسخ ⭐).
+     ✅ الحل ⭐: ⭐ في الإنتاج ⭐ ⇒ ⭐ `null` ⭐ (fail-closed ⭐ ⇒ ⭐ مافيش قبول ⭐)
+        ⭐ وخارج الإنتاج ⭐ ⇒ ⭐ الذاكرة الواحدة ⭐ (موثّق في /api/health ⭐). */
+  if (prod) return null;              // ⛔ fail-closed ⭐
   return false;                       // ⛔ مافيش مخزن مشترك ⭐ (ذاكرة ⭐)
+}
+
+/* ⭐⭐⭐ الجولة ٢٦ (R26) — ⭐ جاهزية مصدر الإبطال ⭐
+   📌 في الإنتاج ⭐ ⇒ ⭐ لازم الـDO ⭐ (المصدر القوي ⭐) موجود ⭐
+      ⭐ ⇒ ⭐ من غيره ⭐ ⛔ ما نصدرش جلسة ⭐ ولا نقبل جلسة ⭐. */
+function sessionStorageReady(env) {
+  if (!env) return false;
+  /* ⭐⭐⭐ الجولة ۲۶ (R26) ⭐ — ⭐ في الإنتاج ⭐ ⭐ ⛔ لازم الدو ⭐ (المصدر القوي ⭐) ⭐
+     ⭐ ⭐ ⭐ وخارج الإنتاج ⭐ ⇔ ⭐ ذاكرة النسخة الواحدة ⭐ (موثقّ ⭐ ومافيش أسرار حقيقي في الإطلاق ⭐). */
+  if (isProductionEnv(env)) return !!env.REVOKE_DO;
+  return true;
+}
+
+/* ⭐⭐⭐ الجولة ٢٦ (R26) — ⭐ كشف الطلب من أصل خارجي ⭐ (CSRF ⭐)
+   📌 المتصفحات الحديثة بتبعث `Sec-Fetch-Site` ⭐ و`Origin` ⭐.
+   📌 القاعدة ⭐: ⛔ `cross-site` ⭐ ⇒ ⛔ يُرفض ⭐ (403 ⭐).
+   📌 مفيش هيدرات ⭐ (client مش متصفح ⭐) ⭐ ⇒ ⭐ مسموح ⭐ (مش هجوم ⭐).
+   📌 `same-origin` / `same-site` / `none` ⭐ ⇒ ⭐ مسموح ⭐. */
+function isCrossSiteRequest(request, url) {
+  try {
+    const sfs = String(request.headers.get("Sec-Fetch-Site") || "").trim().toLowerCase();
+    if (sfs && sfs !== "same-origin" && sfs !== "same-site" && sfs !== "none") return true;
+    const origin = String(request.headers.get("Origin") || "").trim();
+    if (origin) {
+      let o = null;
+      try { o = new URL(origin); } catch (e) { return true; }
+      if (!url || o.host !== url.host) return true;
+    }
+  } catch (e) { return false; }
+  return false;
 }
 
 function revokeSession(raw) {
@@ -496,9 +552,20 @@ function json(data, status = 200, extraHeaders = {}) {
 }
 
 /* ── كوكي الجلسة ── */
-async function makeSession(secret) {
+/* ⭐⭐⭐ الجولة ٢٦ (R26) — ⭐ وسم الاعتماد ⭐
+   📌 السبب ⭐: ⛔ تغيير كلمة المرور ⭐ كان **مش** بيبطل الجلسات القائمة ⭐
+      (⭐ الجلسة مربوطة بسر التوقيع ⭐ بس ⭐ ⭐ ⇒ أي جلسة قديمة كانت بتفضل صالحة ⭐ ⭐).
+   ✅ الحل ⭐: ⭐ التوقيع يشمل بصمة كلمة المرور ⭐ ⇒ ⭐ تغييرها ⭐ ⛔ يبطل كل الجلسات ⭐
+      (⭐ من غير ما نلمس SESSION_SECRET ⭐ ⭐ — وده بيبطل الكل ⭐). */
+async function credentialTag(env) {
+  const pw = String((env && env.APP_PASSWORD) || "");
+  if (!pw) return "";
+  try { return (await sha256(pw)).slice(0, 16); } catch (e) { return ""; }
+}
+
+async function makeSession(secret, env) {
   const exp = String(Date.now() + SESSION_TTL * 1000);
-  const sig = await sign(exp, secret);
+  const sig = await sign(exp + "." + (await credentialTag(env)), secret);
   return `${exp}.${sig}`;
 }
 
@@ -519,7 +586,9 @@ async function validSession(req, secret, env) {
   const sig = raw.slice(dot + 1);
   if (!/^\d+$/.test(exp)) return false;             // ⛔ شكل غير صالح ⭐
   if (Number(exp) < Date.now()) return false;       // ⛔ جلسة منتهية ⭐
-  const expect = await sign(exp, secret);
+  /* ⭐⭐⭐ الجولة ٢٦ (R26) ⭐ — التوقيع يشمل وسم الاعتماد ⭐
+     ⭐ ⇒ ⭐ تغيير كلمة المرور ⭐ ⛔ يرفض كل الجلسات القديمة ⭐. */
+  const expect = await sign(exp + "." + (await credentialTag(env)), secret);
   if (!timingSafeEqual(sig, expect)) return false;  // ⛔ توقيع غلط ⭐
   /* ⛔ دلوقتي بس ⇒ نتفرج على الإبطال ⭐ */
   /* 🛡️ الجولة ١٩ (R18-A01) — جلسة مُبطلة من جهة السيرفر ⇒ مرفوضة */
@@ -551,7 +620,7 @@ async function sessionRenewHeader(req, secret, env) {
   const exp = Number(raw.slice(0, dot));
   if (!exp || !isFinite(exp)) return {};
   if (exp - Date.now() > RENEW_BEFORE * 1000) return {};
-  const sess = await makeSession(secret);
+  const sess = await makeSession(secret, env);
   return {
     "Set-Cookie": `${COOKIE}=${encodeURIComponent(sess)}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL}`,
   };
@@ -737,7 +806,20 @@ export default {
           return json({ ok: false, error: "كلمة المرور غلط" }, 401);
         }
         attempts.delete(ip);
-        const sess = await makeSession(env.SESSION_SECRET);
+        /* ⭐⭐⭐ الجولة ٢٦ (R26) — ⛔ في الإنتاج ⭐ ما نصدرش جلسة ⭐
+           📌 السبب ⭐: ⛔ جلسة من غير مصدر إبطال مشترك ⭐ = ⭐ جلسة ما تتبطالش ⭐
+              عبر النسخ ⭐ ⇒ ⭐ ⭐ انفتاح أمني ⭐ ⭐.
+           📌 خارج الإنتاج ⭐ ⇒ ⭐ مسموح ⭐ (وضع التطوير ⭐ وموثّق ⭐). */
+        if (!sessionStorageReady(env)) {
+          console.error("[octa-mgmt] login: revocation source not ready",
+            { production: isProductionEnv(env) });
+          return json({
+            ok: false,
+            error: "مصدر الإبطال غير متاح — الدخول مقفول مؤقتاً",
+            revocation_source: "unavailable",
+          }, 503);
+        }
+        const sess = await makeSession(env.SESSION_SECRET, env);
         return json({ ok: true }, 200, {
           "Set-Cookie": `${COOKIE}=${encodeURIComponent(sess)}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL}`,
         });
@@ -745,13 +827,21 @@ export default {
 
       /* ── خروج ── */
       if (path === "/api/logout" && request.method === "POST") {
+        /* ⭐⭐⭐ الجولة ٢٦ (R26) — ⛔ CSRF ⭐
+           📌 المسار بيقبل POST ⭐ ⇒ ⛔ طلب من موقع تاني ممكن يخلّي المستخدم يخرج ⭐
+              (و ⛔ مع SameSite=Strict ⭐ المتصفح مش بيبعت الكوكي ⭐ ⇒ ⭐ الأثر محدود ⭐
+              ⭐ بس ⭐ ⭐ الخطأ ده ⭐ ⭐ بنقفله ⭐ ⭐).
+           ✅ الحل ⭐: ⭐ طلب من أصل خارجي ⭐ ⛔ 403 ⭐ (ومفيش نداءات للتخزين ⭐). */
+        if (isCrossSiteRequest(request, url)) {
+          return json({ ok: false, error: "طلب من أصل خارجي — اترفض" }, 403);
+        }
         const _clear = {
           "Set-Cookie": `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`,
         };
         const _raw = parseCookies(request)[COOKIE];
         /* 🛡️🛡️ R25 (R24-I11) — التحقق **قبل** أي نداء للتخزين ⭐
            ⛔ كوكي مزوّر/مشوّه ⇒ ⛔ صفر نداءات ⭐ (لا استنزاف ⭐ ولا نمو ⭐). */
-        const _check = await verifyCookie(_raw, env.SESSION_SECRET);
+        const _check = await verifyCookie(_raw, env.SESSION_SECRET, env);
         if (_raw && !_check.ok) {
           console.error("[octa-mgmt] logout: cookie rejected before storage",
             { reason: _check.reason });
@@ -858,6 +948,10 @@ export default {
              ⛔ `false` ⇒ الإبطال في الذاكرة بس ⇒ نسخة واحدة ⭐ */
           revoke_shared: !!(env.REVOKE_DO || env.REVOKE_KV),
           revoke_strong: !!env.REVOKE_DO,
+          /* ⭐⭐⭐ الجولة ٢٦ (R26) ⭐ — ⭐ جاهزية مصدر الإبطال ⭐
+             ⭐ `revocation_ready` ⭐ = ⭐ في الإنتاج ⭐ لازم الـDO ⭐ موجود ⭐
+             ⭐ (⭐ من غيره ⭐ ⛔ مافيش قبول جلسة ⭐ ⛔). */
+          revocation_ready: sessionStorageReady(env),
         });
       }
 

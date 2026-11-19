@@ -30,6 +30,8 @@ const assert = require('node:assert/strict');
 
 const ROOT = process.env.OCTA_FE_ROOT || path.resolve(__dirname, '..', '..');
 const SECRET = 'synthetic-secret';
+/* 🛡️ R26 ⭐ — نفس كلمة المرور اللي في `makeEnv` ⭐ (لازم يطابقوا ⭐) */
+const PASSWORD = 'synthetic-password';
 
 function loadWorker() {
   const src = fs.readFileSync(path.join(ROOT, 'mgmt/worker.js'), 'utf8')
@@ -72,8 +74,11 @@ function makeCallLog() {
 
 function makeEnv(kv, doNs) {
   return {
-    APP_PASSWORD: 'synthetic-password',
+    APP_PASSWORD: PASSWORD,
     SESSION_SECRET: SECRET,
+    /* 🛡️ R26 ⭐ — ⭐ «الـKV لوحده» ⭐ كبديل ⭐ = ⭐ وضع **غير إنتاج** ⭐ فقط ⭐
+       📌 في الإنتاج ⭐ ⛔ الـKV **مش** دليل قبول ⭐ ⇒ ⛔ الجلسة تُرفض ⭐. */
+    APP_ENV: 'preview',
     OCTA_ADMIN_TOKEN: 'synthetic-token',
     REVOKE_KV: kv || null,
     REVOKE_DO: doNs || null,
@@ -88,10 +93,19 @@ function req(p, opts = {}) {
   return new Request('https://mgmt.invalid' + p, opts);
 }
 
-/* ⭐ كوكي صحيح ⭐ (exp بالمللي + توقيع HMAC ⭐) */
-function mintCookie(expMs, secret) {
+/* ⭐ كوكي صحيح ⭐ (exp بالمللي + توقيع HMAC ⭐)
+   🛡️ R26 ⭐ — ⭐ حمولة التوقيع بقت: `exp + "." + credentialTag` ⭐
+   📌 `credentialTag` = sha256(كلمة المرور) مقصوص ١٦ hex ⭐
+      ⇒ ⭐ تغيير كلمة المرور ⭐ ⛔ يبطل كل الجلسات ⭐.
+   ⭐⇒ الاختبار لازم **يعيد بناء** التوقيع بنفس القاعدة ⭐ (مش تتخمين ⭐). */
+function credentialTag(password) {
+  return nodeCrypto.createHash('sha256').update(String(password)).digest('hex').slice(0, 16);
+}
+
+function mintCookie(expMs, secret, password) {
   const exp = String(expMs);
-  const sig = nodeCrypto.createHmac('sha256', secret).update(exp).digest('hex');
+  const payload = exp + '.' + credentialTag(password);
+  const sig = nodeCrypto.createHmac('sha256', secret).update(payload).digest('hex');
   return 'octa_mgmt_sess=' + encodeURIComponent(exp + '.' + sig);
 }
 
@@ -128,7 +142,7 @@ test('R24-I06-02: an EXPIRED cookie never reaches the storage (zero calls)', asy
   const env = makeEnv(log.kv, log.doNs);
 
   /* ⛔ توقيع صحيح ⭐ بس الوقت خلص ⭐ */
-  const expired = mintCookie(Date.now() - 1000, SECRET);
+  const expired = mintCookie(Date.now() - 1000, SECRET, PASSWORD);
 
   const st = await sessionStatus(worker, env, expired);
   assert.equal(st, 401, '⛔ لازم ترفض ⭐');
@@ -158,7 +172,7 @@ test('R24-I06-04: a valid cookie hits the DO first, then the KV witness', async 
   const worker = loadWorker();
   const log = makeCallLog();
   const env = makeEnv(log.kv, log.doNs);
-  const cookie = mintCookie(Date.now() + 3600000, SECRET);
+  const cookie = mintCookie(Date.now() + 3600000, SECRET, PASSWORD);
 
   const st = await sessionStatus(worker, env, cookie);
   assert.equal(st, 200, '⛔ جلسة صحيحة ⇒ ٢٠٠ ⭐');
@@ -178,7 +192,7 @@ test('R24-I06-05: without the DO the KV witness is the only call', async () => {
   const worker = loadWorker();
   const log = makeCallLog();
   const env = makeEnv(log.kv, null);
-  const cookie = mintCookie(Date.now() + 3600000, SECRET);
+  const cookie = mintCookie(Date.now() + 3600000, SECRET, PASSWORD);
 
   const st = await sessionStatus(worker, env, cookie);
   assert.equal(st, 200, '⛔ جلسة صحيحة ⇒ ٢٠٠ ⭐');

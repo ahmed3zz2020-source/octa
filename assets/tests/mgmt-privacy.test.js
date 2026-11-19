@@ -127,15 +127,17 @@ test('AZ35: نسخة الكوكي بعد الخروج ⇒ 401 (إبطال من �
   assert.equal((await worker.fetch(req('/api/logout', { method: 'POST', headers }), env)).status, 200);
   assert.equal((await worker.fetch(req('/api/session', { headers }), env)).status, 401);
 
-  /* 🛡️🛡️ R25 (R24-I10) ⭐ — ⭐ case **جديد** ⭐ (مفيش assertion اتضعّف ⭐):
+  /* 🛡️🛡️ R26 ⭐ — ⭐ العقد الجديد ⭐ (مفيش assertion اتضعّف ⭐ ⭐ بل اتقوّى ⭐):
      ⭐ في الإنتاج ⭐ + مافيش مصدر إبطال مشترك ⭐ ⇒ ⛔ **fail-closed** ⭐
-     ⭐ (الذاكرة المحلية مش حماية كافية عبر نسخ الـWorker ⭐). */
+     📌 R26 ⭐: ⛔ القفل بقى عند **الدخول نفسه** ⭐ (مش عند الخروج ⭐)
+        ⇒ ⭐ أضعف ⭐ ⇒ ⭐ مافيش كوكي بيتصدر أصلاً ⭐. */
   const workerProd = loadWorker();
   const envProd = Object.assign(makeEnv(), { APP_ENV: 'production' });
-  const cookieProd = await login(workerProd, envProd);
-  const outProd = await workerProd.fetch(req('/api/logout', {
-    method: 'POST', headers: { Cookie: cookieProd },
+  const loginProd = await workerProd.fetch(req('/api/login', {
+    method: 'POST', body: JSON.stringify({ password: envProd.APP_PASSWORD }),
   }), envProd);
-  assert.equal(outProd.status, 503,
-    '⛔⛔⛔ الإنتاج بدون مصدر إبطال مشترك ⇒ ⛔ لازم ٥٠٣ (fail-closed ⭐) ⭐');
+  assert.equal(loginProd.status, 503,
+    '⛔⛔⛔ الإنتاج بدون مصدر إبطال مشترك ⇒ ⛔ الدخول لازم ٥٠٣ (fail-closed ⭐) ⭐');
+  assert.equal(loginProd.headers.get('Set-Cookie'), null,
+    '⛔⛔⛔ الدخول المرفوض ⛔ ما يصدّرش كوكي ⭐');
 });

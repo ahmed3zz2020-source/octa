@@ -124,6 +124,10 @@ function makeEnv(kv, doNs) {
     APP_PASSWORD: 'synthetic-password',
     SESSION_SECRET: 'synthetic-secret',
     OCTA_ADMIN_TOKEN: 'synthetic-token',
+    /* 🛡️ R26 ⭐ — ⭐ الاختبارات دي بتغطي سلوك **الذاكرة الواحدة** ⭐
+       📌 في الإنتاج ⭐ ⛔ مافيش مصدر إبطال ⇒ ⛔ رفض ⭐ (fail-closed ⭐)
+       ⭐ ⇒ لازم تعمل في بيئة **غير إنتاج** ⭐ (وضع المعاينة ⭐). */
+    APP_ENV: 'preview',
     REVOKE_KV: kv || null,
     REVOKE_DO: doNs || null,
     ASSETS: {
@@ -281,17 +285,21 @@ test('R24-I04-06: a logout without a session is not a false failure', async () =
    ⑦ ⭐⭐ وضع الذاكرة وحدها ⭐⭐ ⇒ سلوك قديم متحافظ ⭐
    ═══════════════════════════════════════════════════════════════════════ */
 test('R24-I04-07: without a shared store the logout is fail-closed in production, memory-mode outside it', async () => {
-  /* 🛡️🛡️ R25 (R24-I10) ⭐ — العقد الجديد ⭐:
-     ⭐ في الإنتاج ⭐ + مافيش مصدر مشترك ⭐ ⇒ ⛔ **fail-closed** ⭐ (٥٠٣ ⭐)
-     ⭐ ⭐ (الذاكرة المحلية **مش** حماية كافية عبر نسخ الـWorker ⭐)
-     ⭐ وخارج الإنتاج ⭐ ⇒ سلوك الذاكرة القديم ⭐ (٢٠٠ ⭐) ⭐. */
+  /* 🛡️🛡️ R26 ⭐ — العقد الجديد ⭐:
+     ⭐ في الإنتاج ⭐ + مافيش مصدر مشترك ⭐ ⇒ ⛔ **fail-closed** ⭐
+     📌 R26 ⭐: ⛔ القفل بقى عند **الدخول** ⭐ ⇒ ⭐ ٥٠٣ و**مافيش كوكي** ⭐
+        (قبل R26 ⭐ كان الدخول ينجح والخروج هو اللي بيرفض ⭐ ⇒ ⭐ أضعف ⭐). */
   const workerProd = loadWorker();
   const envProd = Object.assign(makeEnv(null, null), { APP_ENV: 'production' });
-  const cookieProd = await login(workerProd, envProd);
-  const outProd = await logout(workerProd, envProd, cookieProd);
-  assert.equal(outProd.res.status, 503,
-    '⛔⛔⛔ الإنتاج بدون مصدر مشترك ⇒ ⛔ لازم ٥٠٣ (fail-closed ⭐) ⭐');
-  assert.equal(outProd.body.ok, false, '⛔ لازم ok=false ⭐');
+  const loginProd = await workerProd.fetch(req('/api/login', {
+    method: 'POST', body: JSON.stringify({ password: envProd.APP_PASSWORD }),
+  }), envProd);
+  assert.equal(loginProd.status, 503,
+    '⛔⛔⛔ الإنتاج بدون مصدر مشترك ⇒ ⛔ الدخول لازم ٥٠٣ (fail-closed ⭐) ⭐');
+  assert.equal(loginProd.headers.get('Set-Cookie'), null,
+    '⛔⛔⛔ الدخول المرفوض ⛔ ما يصدّرش كوكي ⭐');
+  const bodyProd = await loginProd.json();
+  assert.equal(bodyProd.ok, false, '⛔ لازم ok=false ⭐');
 
   const worker = loadWorker();
   const env = Object.assign(makeEnv(null, null), { APP_ENV: 'preview' });
