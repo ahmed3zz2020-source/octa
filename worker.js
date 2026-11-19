@@ -82,6 +82,11 @@ let API = API_DEFAULT;
    ✅ الحل: الـworker يحقن القائمة في الصفحة ⬇️
    ⛔ ⬇️ الإنتاج: من غير حقن ⇒ القائمة الافتراضية (الإنتاج) ⬇️ ⬇️ */
 function apiDirectList(env) {
+  /* ⭐ (R26) ⭐ المعاينة المعزولة بتقدّم الـAPI بنفسها ⭐
+     ⛔⇒ مافيش قائمة اتصال خارجي ⭐ (ولا نفق قديم ⭐)
+     ⛔⇒ القائمة القديمة كانت فيها نفق ميت ⭐ ⇒ الحارس بيقفل الطلب ⭐
+     ⭐⇒ نفس الأصل (نسبي ⭐) هو الصح ⭐. */
+  if (env && String(env.OCTA_PREVIEW_SELF_API || '') === 'on') return '';
   const raw = env && env.OCTA_API_DIRECT ? String(env.OCTA_API_DIRECT) : '';
   if (!raw) return '';
   const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
