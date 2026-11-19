@@ -194,7 +194,7 @@ const AUDIT_SRC = String.raw`
     vh: window.innerHeight,
     dpr: window.devicePixelRatio,
     hScroll: { scrollWidth: 0, clientWidth: 0, bodyScrollWidth: 0, overflow: false, offenders: [] },
-    overlap: { count: 0, list: [] },
+    overlap: { count: 0, list: [], transient: 0, barPad: null },
     clipped: { count: 0, list: [] },
     smallTargets: { count: 0, standalone: 0, inline: 0, list: [] },
     contrast: { count: 0, checked: 0, gradient: 0, unmeasured: 0, list: [] },
@@ -248,9 +248,35 @@ const AUDIT_SRC = String.raw`
     if (cx >= 0 && cy >= 0 && cx < window.innerWidth && cy < window.innerHeight) {
       const hit = document.elementFromPoint(cx, cy);
       if (hit && hit !== a && !a.contains(hit) && !hit.contains(a)) {
-        out.overlap.count++;
-        if (out.overlap.list.length < MAX_LIST) {
-          out.overlap.list.push({ el: sel(a), blockedBy: sel(hit), x: cx, y: cy });
+        /* ⛔⛔ شريط التنبيه العابر (شريط التحديث) ⛔
+           📌 هو fixed ⇒ بيغطي جزء من المحتوى وهو ظاهر ⭐
+              ⇒ لكن المستخدم بيقدر يمرّر المحتوى تحته ⭐
+              ⇒ فالحغطية مش «تداخل» ⭐ ⇒ بنفحصها فحصاً صحيح:
+                 لازم يكون فيه حشو سفلي في الصفحة يغطّي
+                 ارتفاع الشريط ⭐ (وإلا المحتوى بيختفي تحتّه ⛔). */
+        const transient = (hit.id === 'octaUpdateBar') ||
+          (hit.closest && hit.closest('#octaUpdateBar'));
+        if (transient) {
+          out.overlap.transient++;
+          const bar = document.getElementById('octaUpdateBar');
+          const pad = parseFloat(window.getComputedStyle(document.body).paddingBottom) || 0;
+          const barH = bar ? bar.getBoundingClientRect().height : 0;
+          out.overlap.barPad = { pad: Math.round(pad), bar: Math.round(barH) };
+          if (pad + 2 < barH) {
+            out.overlap.count++;
+            if (out.overlap.list.length < MAX_LIST) {
+              out.overlap.list.push({
+                el: sel(a), blockedBy: 'شريط التحديث (fixed) · حشو سفلي ' +
+                  Math.round(pad) + ' < ارتفاع الشريط ' + Math.round(barH),
+                x: cx, y: cy
+              });
+            }
+          }
+        } else {
+          out.overlap.count++;
+          if (out.overlap.list.length < MAX_LIST) {
+            out.overlap.list.push({ el: sel(a), blockedBy: sel(hit), x: cx, y: cy });
+          }
         }
       }
     }
@@ -326,22 +352,49 @@ const AUDIT_SRC = String.raw`
   out.smallTargets.count = out.smallTargets.standalone;
 
   /* ── ⑤ تباين الألوان ──────────────────────────────────── */
-  function effectiveBg(el) {
+  /* 📌 الخلفية الحقيقية = تركيب الطبقات (ألوان + تدرّجات) ⭐
+     📌 القاعدة: أقرب تدرّج ⇒ الخلفية الحقيقية هي تدرّجه ⭐
+        (ومرشّحات = كل ألوان التدرّج ⭐) ⇒ الأسوأ هو القياس ⭐. */
+  function bgLayers(el) {
+    const layers = [];
     let node = el;
-    let stack = [];
     while (node && node.nodeType === 1) {
       const st = window.getComputedStyle(node);
-      const c = parseColor(st.backgroundColor);
-      if (c && c.a > 0) {
-        stack.push(c);
-        if (c.a >= 0.95) break;
+      const clip = (st.webkitBackgroundClip || st.backgroundClip || '');
+      const stops = gradientStops(st.backgroundImage);
+      if (stops.length && clip !== 'text') {
+        layers.push({ kind: 'gradient', stops: stops });
+      } else {
+        const c = parseColor(st.backgroundColor);
+        if (c && c.a > 0) layers.push({ kind: 'color', color: c });
       }
       node = node.parentElement;
     }
-    if (!stack.length) stack.push({ r: 255, g: 255, b: 255, a: 1 });
-    let acc = stack[stack.length - 1];
-    for (let i = stack.length - 2; i >= 0; i--) acc = over(stack[i], acc);
-    return acc;
+    return layers.reverse();
+  }
+  function bgCandidates(el) {
+    const layers = bgLayers(el);
+    let gIndex = -1;
+    for (let i = layers.length - 1; i >= 0; i--) {
+      if (layers[i].kind === 'gradient') { gIndex = i; break; }
+    }
+    if (gIndex === -1) {
+      /* 📌 التركيب: من الأبعد للأقرب (الأقرب فوق) ⭐ */
+      let acc = { r: 255, g: 255, b: 255, a: 1 };
+      for (let i = 0; i < layers.length; i++) acc = over(layers[i].color, acc);
+      return [acc];
+    }
+    const above = layers.slice(gIndex + 1);
+    const below = layers.slice(0, gIndex);
+    let under = { r: 255, g: 255, b: 255, a: 1 };
+    for (let i = 0; i < below.length; i++) under = over(below[i].color, under);
+    const outs = [];
+    for (const s of layers[gIndex].stops) {
+      let acc = s.color;
+      for (let i = 0; i < above.length; i++) acc = over(above[i].color, acc);
+      outs.push(over(acc, under));
+    }
+    return outs;
   }
   for (let i = 0; i < all.length; i++) {
     const el = all[i];
@@ -349,33 +402,32 @@ const AUDIT_SRC = String.raw`
     if (txt.length < 2) continue;
     if (!isVisible(el)) continue;
     const st = window.getComputedStyle(el);
-    const bg = effectiveBg(el);
+    const clip = (st.webkitBackgroundClip || st.backgroundClip || '');
     const fs = parseFloat(st.fontSize) || 16;
     const fw = parseInt(st.fontWeight, 10) || 400;
     const large = fs >= 24 || (fs >= 18.66 && fw >= 700);
     const need = large ? 3 : 4.5;
-    let fg = parseColor(st.color);
-    let f = null, r = null;
-    if (fg && fg.a > 0) {
-      f = over(fg, bg);
-      r = ratio(f, bg);
+    const bgList = bgCandidates(el);
+    let fgList = null;
+    const stops = gradientStops(st.backgroundImage);
+    if (clip === 'text' && stops.length) {
+      /* 📌 النص بيتلوّن بتدرّجه (مقصوصة على النص) ⇒ لون النص = التدرّج ⭐ */
+      fgList = stops.map(function (s) { return s.color; });
+      out.contrast.gradient++;
     } else {
-      /* نص شفاف ⇒ غالباً تدرّج مقصوص على النص ⇒ نقيس التدرّج */
-      const stops = gradientStops(st.backgroundImage);
-      if (stops.length) {
-        let worst = null;
-        for (const s of stops) {
-          const c = over(s.color, bg);
-          const rr = ratio(c, bg);
-          if (!worst || rr < worst.ratio) worst = { color: c, ratio: rr };
-        }
-        f = worst.color; r = worst.ratio;
-        out.contrast.gradient++;
-      } else {
-        out.contrast.unmeasured++;
-        continue;
+      const fg = parseColor(st.color);
+      if (!fg || fg.a <= 0) { out.contrast.unmeasured++; continue; }
+      fgList = [fg];
+    }
+    let worst = null;
+    for (const f0 of fgList) {
+      for (const b of bgList) {
+        const fc = over(f0, b);
+        const rr = ratio(fc, b);
+        if (!worst || rr < worst.ratio) worst = { f: fc, b: b, ratio: rr };
       }
     }
+    const f = worst.f, r = worst.ratio, bg = worst.b;
     out.contrast.checked++;
     if (r < need) {
       out.contrast.count++;

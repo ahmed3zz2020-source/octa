@@ -1089,7 +1089,7 @@
   padding: 11px 15px; border-radius: 11px; background: var(--wash); border: 1px solid var(--line);
   }
   .oc-meta { margin-top: 13px; font-size: .72rem; color: var(--muted); }
-  body.light .oc-brand { background: linear-gradient(135deg,#8a6d12,#b8912f,#8a6d12);
+  body.light .oc-brand { background: linear-gradient(135deg,#5c460c,#6d5410,#5c460c);
   -webkit-background-clip: text; background-clip: text; }
   body.light .oc-own { background: #fffbeb; border-color: rgba(154,123,24,.45); color: var(--txt); }
   body.light .oc-own b { color: #8a6d12; }
@@ -1650,6 +1650,12 @@
   -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
   }
   .octa-wordmark .w2 { font-size: .62rem; color: var(--muted); letter-spacing: 1.2px; }
+  /* R26 · الوضع النهاري: تدرّج العلامة كان فاتح ⇒ نص غير مرئي على خلفية فاتحة
+     (نسبة 1.21:1) ⇒ تدرّج داكن يقيس 6.11:1 (متصفح حقيقي). */
+  body.light .octa-wordmark .w1 {
+    background: linear-gradient(135deg, #5c460c, #6d5410 60%, #5c460c);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
   .octa-brand-right { display: flex; align-items: center; gap: 10px; }
   .octa-clock {
   font-size: .74rem; color: var(--muted); text-align: left;
@@ -2307,9 +2313,12 @@
   body.m-tools-open .m-tools-btn::before { content: '✕ إغلاق'; }
 
 
-  /* ⭐ ٦ نوفمبر ٢٠٢٦ — شريط «فيه نسخة جديدة» (التطبيق المثبّت) */
+  /* ⭐ ٦ نوفمبر ٢٠٢٦ — شريط «فيه نسخة جديدة» (التطبيق المثبّت)
+     📌 R26: التدرّج كان فاتح ⇒ النص الأبيض كان تباينه ٢٫١٧:١ ⛔
+        (أقل من ٤٫٥ ⇒ معيار WCAG AA) ⇒ darkened the gradient so
+        the white text reaches ٥٫٢٩:١ ⭐ (measured in a real browser). */
   #octaUpdateBar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9999;
-    padding: 10px 14px; background: linear-gradient(135deg,#16c79a,#0e8f6e);
+    padding: 10px 14px; background: linear-gradient(135deg,#0f7a60,#0b6b52);
     box-shadow: 0 -6px 22px rgba(0,0,0,.35); }
   #octaUpdateBar .octa-upd { display: flex; align-items: center; justify-content: space-between;
     gap: 10px; max-width: 1400px; margin: 0 auto; color: #fff; font-weight: 800; font-size: .84rem; }
@@ -7960,3 +7969,28 @@ textarea:focus-visible {
 
 /* ⛔ البحث في القائمة الجانبية كان بياخد outline:none ⇒ ضاع المؤشر */
 .sb-search input:focus { outline: 2px solid var(--gold2); outline-offset: 1px; }
+
+/* ══════════════════════════════════════════════════════════════
+  🎯 R26 · أهداف اللمس (WCAG 2.5.8) — شريط التحديث
+  📌 السبب المقيس: زر «تحديث دلوقتي» كان 107×34 بكسل ⭐
+     ⇒ أقل من 44 بكسل ⇒ هدف لمس صغير ⛔ (قياس حقيقي بمتصفح
+     حقيقي على 360×640 ⭐).
+  📌 الحل: مساحة لمس لا تقل عن 44×44 ⭐ + حشوة مريحة ⭐.
+  ⛔ ممنوع تغيير نص الزر ولا سلوكه ⭐.
+  ══════════════════════════════════════════════════════════════ */
+#octaUpdateBar .octa-upd button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 10px 18px;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+/* ══════════════════════════════════════════════════════════════
+  🎯 R26 · شريط التحديث fixed بيغطي آخر المحتوى ⛔
+  📌 السبب المقيس: في 1440×900 الشريط كان بيغطي عنصر «BEAR»
+     ⇒ آخر المحتوى مش قابل للضغط ⛔.
+  📌 الحل: حشو سفلي في الصفحة يساوي ارتفاع الشريط ⭐
+     ⇒ آخر محتوى بيفضل ظاهر فوق الشريط ⭐.
+  ══════════════════════════════════════════════════════════════ */
+body.has-upd-bar { padding-bottom: 76px; }
