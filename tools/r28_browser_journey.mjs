@@ -107,21 +107,105 @@ const OVERFLOW_PROBE = `() => {
   console.log('═'.repeat(74));
 
   /* ── ① الدخول (لو اتعطى حساب صناعي) ─────────────────────────────── */
+  /* 📌 البوابة **مش** نموذج إيميل/باسورد ⭐
+     ⇒ الشاشة الأولى: «عندك حساب؟ ادخل» ⭐
+     ⇒ بعدها: **لوحة أرقام** (٤ أرقام) ⭐ ⇒ بتتبعت كـ{pin, device} ⭐
+     ⇒ ولو الجهاز جديد ⭐ ⇒ يطلب كود ⭐ ⇒ بعد الكود ⇒ «اختار ٤ أرقام» ⭐.
+     ⛔ أي أداة بتتوقّع input نصي ⭐ ⇒ بتسجّل دخولها **غلط** ⭐. */
+  const PREVIEW_KEY = process.env.PREVIEW_CONSOLE_KEY || '';
+  async function mailboxCode(mail) {
+    if (!PREVIEW_KEY) return '';
+    try {
+      const r = await fetch(BASE + '/api/preview/mailbox?email=' +
+        encodeURIComponent(mail), { headers: { 'X-Preview-Key': PREVIEW_KEY } });
+      if (!r.ok) return '';
+      const j = await r.json();
+      return String(j.code || '');
+    } catch (e) { return ''; }
+  }
+  /* ⭐ ضغط أرقام لوحة البوابة ⭐ */
+  async function typePad(digits) {
+    for (const d of String(digits).split('')) {
+      const k = await page.$(`.gt-key[data-k="${d}"]`);
+      if (!k) return false;
+      await k.click();
+      await page.waitForTimeout(140);
+    }
+    return true;
+  }
+
+  const gate = { pad: false, codeAsked: false, codeFilled: false, newpin: false, done: false };
+  const REGISTER = args.includes('--register');
   if (EMAIL && PIN) {
     await page.goto(BASE + '/gate.html', { waitUntil: 'domcontentloaded', timeout: 45000 });
-    await page.waitForTimeout(1500);
-    const emailSel = '#gtEmail, input[name=email], input[type=email]';
-    const pinSel = '#gtPin, input[name=pin], input[inputmode=numeric]';
-    const hasEmail = await page.$(emailSel);
-    if (hasEmail) {
-      await page.fill(emailSel, EMAIL);
-      await page.fill(pinSel, PIN);
-      const btn = await page.$('button[type=submit], #gtLogin, .gt-login');
-      if (btn) await btn.click();
+    await page.waitForTimeout(1400);
+    if (REGISTER) {
+      /* ⭐ التسجيل من المتصفح ⭐ — حساب صناعي جديد ⭐
+         📌 لازم التسجيل يبقى **من المتصفح** ⭐: الجهاز بيتسجّل على
+            الحساب وقت التأكيد ⭐ ⇒ والدخول لازم بنفس الجهاز ⭐. */
+      const reg = await page.$('#gtReg');
+      if (reg) { await reg.click(); await page.waitForTimeout(700); }
+      const nameIn = await page.$('#gtName');
+      const mailIn = await page.$('#gtMail');
+      if (!nameIn || !mailIn) {
+        rec('gate · شاشة التسجيل ظهرت', false, { name: !!nameIn, mail: !!mailIn });
+      } else {
+        await page.fill('#gtName', 'رحلة R28');
+        await page.fill('#gtMail', EMAIL);
+        await page.click('#gtDo');
+        await page.waitForTimeout(2200);
+        gate.codeAsked = !!(await page.$('#gtCodeIn'));
+        const code = await mailboxCode(EMAIL);
+        if (code) {
+          await page.fill('#gtCodeIn', code);
+          gate.codeFilled = true;
+          await page.waitForTimeout(1600);
+        }
+        /* ⭐ شاشة «اختار ٤ أرقام» ⭐ */
+        if (await page.$('#gtNpBack')) {
+          gate.newpin = true;
+          gate.pad = await typePad(PIN);
+          await page.waitForTimeout(3000);
+        }
+        /* ⭐ «ادخل دلوقتي» ⇒ شاشة الدخول ⇒ نفس الأرقام (نفس الجهاز ⭐) */
+        const now = await page.$('#gtNow');
+        if (now) { await now.click(); await page.waitForTimeout(900); }
+        if (await page.$('#gtPad')) {
+          gate.pad = gate.pad || (await typePad(PIN));
+          await page.waitForTimeout(4000);
+        }
+      }
+    } else {
+      /* ① الشاشة الأولى ⇒ «عندك حساب؟ ادخل» */
+      const lb = await page.$('#gtLogin');
+      if (lb) { await lb.click(); await page.waitForTimeout(800); }
+      /* ② لوحة الأرقام ⇒ ٤ ضغطات */
+      gate.pad = await typePad(PIN);
       await page.waitForTimeout(3500);
+      /* ③ لو طلب كود (جهاز جديد) ⇒ صندوق المعاينة ⇒ نكتبه */
+      if (await page.$('#gtCodeIn')) {
+        gate.codeAsked = true;
+        const code = await mailboxCode(EMAIL);
+        if (code) {
+          await page.fill('#gtCodeIn', code);
+          gate.codeFilled = true;
+          await page.waitForTimeout(1200);
+          /* ④ شاشة «اختار ٤ أرقام» ⇒ نفس الرقم (flow.keepPin) */
+          if (await page.$('#gtNpBack')) {
+            gate.newpin = true;
+            await typePad(PIN);
+            await page.waitForTimeout(4000);
+          }
+        }
+      }
     }
-    rec('gate · تسجيل الدخول بالحساب الصناعي', page.url().indexOf('gate') === -1,
-      { url: page.url().replace(BASE, '') });
+    await page.waitForTimeout(2500);
+    const gateUrl = page.url().replace(BASE, '');
+    gate.done = gateUrl.indexOf('gate') === -1;
+    rec('gate · الدخول (لوحة الأرقام ⭐ ثم التطبيق ⭐)',
+      (REGISTER ? (gate.codeFilled && gate.pad) : gate.pad) && gate.done,
+      { url: gateUrl, registered: REGISTER, codeAsked: gate.codeAsked,
+        codeFilled: gate.codeFilled, newpinAsked: gate.newpin });
   }
 
   /* ── ② أداة الذهب ───────────────────────────────────────────────── */
@@ -247,6 +331,7 @@ const OVERFLOW_PROBE = `() => {
   const payload = {
     base: BASE,
     at: new Date().toISOString(),
+    gate: gate,
     gold: gold,
     nav: nav,
     matrix: matrix,

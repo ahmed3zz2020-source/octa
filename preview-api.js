@@ -21,6 +21,9 @@
 const PREVIEW_COOKIE = 'octa_token';
 const SESSION_TTL_SEC = 7 * 24 * 3600;
 const CHALLENGE_TTL_SEC = 600;
+/* ⭐⭐⭐ (R28 · FINDING-08) ⭐⭐⭐ مهلة توكن الفتح ⭐ (10 دقايق ⭐)
+   📌 العقد مع الإنتاج ⭐: `verify` ⭐ ⇒ توكن فتح ⭐ ⇒ `newpin` ⭐. */
+const UNLOCK_TTL_SEC = 600;
 const LOCK_TTL_SEC = 15 * 60;
 const MAX_ATTEMPTS = 5;
 const PBKDF2_ROUNDS = 60000;
@@ -116,6 +119,8 @@ const acctKey = (uid) => 'acct:' + uid;
    ⭐ بيتقرأ بـ**مفتاح المعاينة** ⭐ بس ⭐ ⇒ ⛔ مافيش استحواذ ⭐. */
 const mailKey = (uid) => 'mail:' + uid;
 const chalKey = (uid) => 'chal:' + uid;
+/* ⭐⭐⭐ (R28 · FINDING-08) ⭐⭐⭐ توكن فتح الباسورد ⭐ (مرة واحدة ⭐) ⭐ */
+const unlockKey = (tok) => 'unlock:' + tok;
 const sessKey = (uid, sid) => 'sess:' + uid + ':' + sid;
 const lockKey = (kind, id) => 'lock:' + kind + ':' + id;
 
@@ -163,6 +168,42 @@ async function storeList(env, prefix) {
   const keys = r.keys;
   if (!Array.isArray(keys)) return null;
   return keys;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ⭐⭐⭐ (R28 · FINDING-08) ⭐⭐⭐ توكن فتح الباسورد ⭐⭐⭐
+   📌 عقد الإنتاج ⭐: `verify` ⭐ ⇒ `{unlock}` ⭐ ⇒ `newpin` ⭐
+      ⇒ `{new_pin}` + `Authorization: Bearer <unlock>` ⭐.
+   📌 ⛔ توكن واحد ⭐ · ⛔ عشوائي ⭐ · ⛔ مهلة ⭐ · ⛔ يُستعمل مرة ⭐
+      ⇒ ⛔ من غيره ⭐ ⇒ ⛔ 401 ⭐ (fail-closed ⭐).
+   ═══════════════════════════════════════════════════════════════════ */
+function bearerToken(request) {
+  const raw = String(request.headers.get('Authorization') || '').trim();
+  const m = /^Bearer\s+(.+)$/i.exec(raw);
+  return m ? m[1].trim() : '';
+}
+
+async function makeUnlock(env, uid, email, name) {
+  const tok = b64u(crypto.getRandomValues(new Uint8Array(32)));
+  const wrote = await storePut(env, unlockKey(tok), {
+    uid: uid, email: email, name: name || 'مستخدم',
+    exp: nowSec() + UNLOCK_TTL_SEC
+  }, UNLOCK_TTL_SEC + 60);
+  if (!wrote) return null;
+  return tok;
+}
+
+async function readUnlock(env, tok) {
+  if (!tok) return null;
+  const rec = await storeGet(env, unlockKey(tok));
+  if (!rec) return null;
+  if ((rec.exp || 0) <= nowSec()) { await storeDel(env, unlockKey(tok)); return null; }
+  return rec;
+}
+
+async function dropUnlock(env, tok) {
+  if (!tok) return false;
+  return await storeDel(env, unlockKey(tok));
 }
 /* ⭐ اللقطة ⭐ — **بتفضل في الـKV** ⭐ (بيانات قراءة ⭐ من أداة التغذية ⭐) */
 async function snapshotGet(env, key) {
@@ -382,22 +423,44 @@ async function handlePreviewApi(opts) {
       return json({ ok: false, error: 'الكود مش مظبوط أو خلص', why: chk.why },
         chk.why === 'too_many_tries' ? 429 : 400);
     }
+    /* ⭐⭐⭐ (R28 · FINDING-08) ⭐⭐⭐ عقد المعاينة = عقد الإنتاج ⭐⭐⭐
+       📌 قبل ⭐: `verify` ⭐ رجّع `{verified, needs_pin}` ⭐ و`newpin` ⭐
+          كان بيطلب `{email, code, pin}` ⭐ ⇒ ⭐ **مختلف عن التطبيق** ⭐
+          ⇒ ⛔ الواجهة الحقيقية (البوابة) ⭐ ما بتقدرش تكمّل ⭐
+             (هي بتبعت `{new_pin}` + توكن فتح ⭐).
+       ✅ دلوقتي ⭐: `verify` ⭐ بيرجّع **توكن فتح** ⭐ (زي الإنتاج ⭐)
+          ⇒ ⭐ `newpin` ⭐ بياخد `{new_pin}` + `Authorization: Bearer` ⭐.
+       ⛔ الكود الخام **لسه** مش بيرجع في الرد ⭐ (R26-I01 ⭐). */
+    const unlock = await makeUnlock(env, uid, email, chk.rec.name || 'مستخدم');
+    if (!unlock) {
+      return json({ ok: false, error: 'تعذّر تجهيز خطوة الباسورد',
+        why: 'unlock_issue_failed' }, 503);
+    }
     const acct = await storeGet(env, acctKey(uid));
     if (!acct) {
-      return json({ ok: true, verified: true, needs_pin: true,
+      return json({ ok: true, verified: true, needs_pin: true, unlock: unlock,
+        expires_in: UNLOCK_TTL_SEC,
         message: 'الكود اتأكد ⭐ — دلوقتي حطّ الباسورد من ٤ أرقام ⭐' });
     }
-    return json({ ok: true, verified: true, needs_pin: false,
+    return json({ ok: true, verified: true, needs_pin: false, unlock: unlock,
+      expires_in: UNLOCK_TTL_SEC,
       message: 'الحساب موجود ⭐ — كمّل بـchallenges ⭐' });
   }
 
   /* ── ③ التسجيل: newpin (باسورد جديد) ⭐ */
   if (p === '/api/auth/signup/newpin' && m === 'POST') {
-    const email = String(body.email || '').trim().toLowerCase().slice(0, 120);
-    const pin = String(body.pin || '').trim();
-    const uid = await uidOf(email);
-    const chk = await checkChallenge(env, uid, body.code);
-    if (!chk.ok) return json({ ok: false, error: 'الكود مش مظبوط أو خلص', why: chk.why }, 400);
+    /* ⭐⭐⭐ (R28 · FINDING-08) ⭐⭐⭐ توكن الفتح إجباري ⭐⭐⭐
+       📌 العقد مع الإنتاج ⭐: `{new_pin}` + `Authorization: Bearer <unlock>` ⭐
+          ⇒ ⛔ من غير توكن الفتح ⭐ ⇒ ⛔ 401 ⭐ (fail-closed ⭐). */
+    const tok = bearerToken(request);
+    const unl = tok ? await readUnlock(env, tok) : null;
+    if (!unl) {
+      return json({ ok: false, error: 'انتهت خطوة اختيار الباسورد',
+        why: 'unlock_expired' }, 401);
+    }
+    const uid = unl.uid;
+    const email = unl.email;
+    const pin = String(body.new_pin || body.pin || '').trim();
     if (!PIN_RE.test(pin)) {
       return json({ ok: false, error: 'الباسورد ٤ أرقام بالظبط', why: 'bad_pin' }, 400);
     }
@@ -415,15 +478,18 @@ async function handlePreviewApi(opts) {
       }, 409);
     }
     const acct = {
-      uid: uid, email: email, name: chk.rec.name || 'مستخدم',
+      uid: uid, email: email, name: unl.name || 'مستخدم',
       pin_salt: salt, pin_hash: hash, epoch: 1,
       devices: [], created_at: nowSec(), plan: 'preview'
     };
-    await storePut(env, acctKey(uid), acct);
-    await storeDel(env, chalKey(uid));
     const device = String(body.device || '').trim();
     if (device) acct.devices = [device];
-    if (device) await storePut(env, acctKey(uid), acct);
+    const wrote = await storePut(env, acctKey(uid), acct);
+    if (!wrote) {
+      return json({ ok: false, error: 'تعذّر حفظ الحساب', why: 'write_failed' }, 503);
+    }
+    await storeDel(env, chalKey(uid));
+    await dropUnlock(env, tok);
     /* ⭐ فهرس الباسورد ⭐ (قراءة قوية ⭐ — القوائم متأخرة ⭐) */
     try { await storePut(env, 'pinidx:' + await sha256hex(String(pin)), acctKey(uid)); } catch (e) { }
     const token = await issueSession(env, acct, device);
@@ -456,14 +522,24 @@ async function handlePreviewApi(opts) {
     const uid = await uidOf(email);
     const chk = await checkChallenge(env, uid, body.code);
     if (!chk.ok) return json({ ok: false, error: 'الكود مش مظبوط أو خلص', why: chk.why }, 400);
-    return json({ ok: true, verified: true });
+    /* ⭐⭐⭐ (R28 · FINDING-08) ⭐⭐⭐ توكن فتح ⭐ (زي الإنتاج ⭐) ⭐⭐⭐ */
+    const unlock = await makeUnlock(env, uid, email, chk.rec.name || 'مستخدم');
+    if (!unlock) {
+      return json({ ok: false, error: 'تعذّر تجهيز خطوة الباسورد',
+        why: 'unlock_issue_failed' }, 503);
+    }
+    return json({ ok: true, verified: true, unlock: unlock, expires_in: UNLOCK_TTL_SEC });
   }
   if (p === '/api/auth/pin/challenge/newpin' && m === 'POST') {
-    const email = String(body.email || '').trim().toLowerCase().slice(0, 120);
-    const pin = String(body.pin || '').trim();
-    const uid = await uidOf(email);
-    const chk = await checkChallenge(env, uid, body.code);
-    if (!chk.ok) return json({ ok: false, error: 'الكود مش مظبوط أو خلص', why: chk.why }, 400);
+    /* ⭐⭐⭐ (R28 · FINDING-08) ⭐⭐⭐ `{new_pin}` + توكن الفتح ⭐⭐⭐ */
+    const tok = bearerToken(request);
+    const unl = tok ? await readUnlock(env, tok) : null;
+    if (!unl) {
+      return json({ ok: false, error: 'انتهت خطوة اختيار الباسورد',
+        why: 'unlock_expired' }, 401);
+    }
+    const uid = unl.uid;
+    const pin = String(body.new_pin || body.pin || '').trim();
     if (!PIN_RE.test(pin)) return json({ ok: false, error: 'الباسورد ٤ أرقام بالظبط', why: 'bad_pin' }, 400);
     const acct = await storeGet(env, acctKey(uid));
     if (!acct) return json({ ok: false, error: 'مفيش حساب بالإيميل ده', why: 'no_account' }, 404);
@@ -471,8 +547,12 @@ async function handlePreviewApi(opts) {
     acct.pin_salt = salt;
     acct.pin_hash = await pbkdf2(pin, salt);
     acct.epoch = (acct.epoch || 1) + 1;         /* ⛔ إبطال كل الجلسات ⭐ */
-    await storePut(env, acctKey(uid), acct);
+    const wrote = await storePut(env, acctKey(uid), acct);
+    if (!wrote) {
+      return json({ ok: false, error: 'تعذّر حفظ الباسورد', why: 'write_failed' }, 503);
+    }
     await storeDel(env, chalKey(uid));
+    await dropUnlock(env, tok);
     return json({ ok: true, message: 'الباسورد اتغيّر ⭐ — لازم تعمل دخول تاني ⭐' });
   }
 

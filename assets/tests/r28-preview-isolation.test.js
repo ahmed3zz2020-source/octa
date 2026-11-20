@@ -161,11 +161,16 @@ async function signup(env, email, pin, device) {
   });
   const mb = await mailboxCode(env, email, CONSOLE_KEY);
   const code = (mb.body && mb.body.code) ? mb.body.code : '000000';
+  const ver = await call(env, '/api/auth/signup/verify', {
+    method: 'POST', json: { email: email, code: code },
+  });
+  const unlock = (ver.body && ver.body.unlock) ? ver.body.unlock : '';
   const mk = await call(env, '/api/auth/signup/newpin', {
     method: 'POST',
-    json: { email: email, code: code, pin: pin, device: device },
+    headers: { Authorization: 'Bearer ' + unlock },
+    json: { new_pin: pin, device: device },
   });
-  return { start: start, mailbox: mb, mk: mk, code: code };
+  return { start: start, mailbox: mb, verify: ver, mk: mk, code: code };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -222,9 +227,14 @@ test('R28-PR-04: an attacker without the console key cannot take over an account
   assert.equal(stolen.status, 401, '⛔⛔⛔Codes يمكن قراءتها ⭐');
   /* ⛔⇒ يقدر يطلب استرجاع ⭐ بس ⭐ مافيش كود ⭐ ⇒ ⛔ ما يقدرش ⭐ */
   const reset = await call(env, '/api/auth/pin/challenge/newpin', {
-    method: 'POST', json: { email: email, code: '123456', pin: '9999' },
+    method: 'POST', json: { new_pin: '9999' },
   });
-  assert.notEqual(reset.status, 200, '⛔⛔⛔ الاسترجاع نجح من غير كود ⭐');
+  assert.notEqual(reset.status, 200, 'reset without unlock must fail');
+  const reset2 = await call(env, '/api/auth/pin/challenge/newpin', {
+    method: 'POST', json: { email: email, code: '123456', new_pin: '9999' },
+  });
+  assert.notEqual(reset2.status, 200,
+    'reset with email+code but no unlock must fail');
 });
 
 test('R28-PR-05: the signup flow must NOT overwrite an existing account', async () => {
@@ -237,9 +247,13 @@ test('R28-PR-05: the signup flow must NOT overwrite an existing account', async 
     method: 'POST', json: { name: 'x', email: email },
   });
   const mb = await mailboxCode(env, email, CONSOLE_KEY);
+  const ver2 = await call(env, '/api/auth/signup/verify', {
+    method: 'POST', json: { email: email, code: mb.body.code },
+  });
   const again = await call(env, '/api/auth/signup/newpin', {
     method: 'POST',
-    json: { email: email, code: mb.body.code, pin: '9999', device: 'device-second-002' },
+    headers: { Authorization: 'Bearer ' + ((ver2.body && ver2.body.unlock) || '') },
+    json: { new_pin: '9999', device: 'device-second-002' },
   });
   assert.notEqual(again.status, 200,
     '⛔⛔⛔ الحساب اتكتب تاني ⭐ ⇒ ⛔ استحواذ ⭐');

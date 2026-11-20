@@ -116,6 +116,26 @@ async function call(e, path, opts) {
   return { status: res.status, body: body, res: res };
 }
 
+/* ⭐⭐⭐ (R28 · FINDING-08) ⭐⭐⭐ توكن الفتح ⭐ (عقد الإنتاج ⭐) ⭐
+   📌 عقد الإنتاج ⭐: `signup/verify` ⭐ ⇒ `{unlock}` ⭐
+      ⇒ `signup/newpin` ⭐ ⇒ `{new_pin}` + `Authorization: Bearer <unlock>` ⭐.
+   ⛔ من غير توكن الفتح ⭐ ⇒ ⛔ 401 ⭐ (fail-closed ⭐). */
+async function unlockOf(e, email, code) {
+  const v = await call(e, '/api/auth/signup/verify', {
+    method: 'POST',
+    json: { email: email, code: code || await codeFromMailbox(e, email) }
+  });
+  return (v.body && v.body.unlock) ? v.body.unlock : '';
+}
+async function signupWithPin(e, email, pin, device) {
+  const unlock = await unlockOf(e, email);
+  return await call(e, '/api/auth/signup/newpin', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + unlock },
+    json: { new_pin: pin, device: device }
+  });
+}
+
 function cookieOf(res) {
   const sc = res.headers.get('Set-Cookie') || '';
   return sc.split(';')[0];
@@ -174,10 +194,7 @@ test('② تسجيل كامل ⇒ حساب ⭐ جلسة ⭐ كوكي ⭐', async
     { method: 'POST', json: { email: email, code: '000000' } });
   assert.strictEqual(bad.status, 400, 'كود غلط لازم يترفض');
 
-  const mk = await call(e, '/api/auth/signup/newpin', {
-    method: 'POST',
-    json: { email: email, code: live, pin: '4321', device: 'device-aaaa-1234' }
-  });
+  const mk = await signupWithPin(e, email, '4321', 'device-aaaa-1234');
   assert.strictEqual(mk.status, 200);
   assert.ok(mk.body.token, 'لازم يطلع توكن');
   assert.ok(cookieOf(mk.res).startsWith('octa_token='), 'لازم يطلع كوكي الجلسة');
@@ -195,8 +212,10 @@ test('②ب باسورد مش ٤ أرقام ⇒ 400', async () => {
   const email = 'r26.bad@example.com';
   const start = await call(e, '/api/auth/signup/start',
     { method: 'POST', json: { name: 'x', email: email } });
+  const unlock = await unlockOf(e, email);
   const r = await call(e, '/api/auth/signup/newpin', {
-    method: 'POST', json: { email: email, code: await codeFromMailbox(e, email), pin: '12' }
+    method: 'POST', headers: { Authorization: 'Bearer ' + unlock },
+    json: { new_pin: '12' }
   });
   assert.strictEqual(r.status, 400);
 });
@@ -208,10 +227,7 @@ test('③ دخول بالباسورد + جهاز مسجّل ⇒ جلسة ⭐', a
   const device = 'device-bbbb-9876';
   const start = await call(e, '/api/auth/signup/start',
     { method: 'POST', json: { name: 'x', email: email } });
-  await call(e, '/api/auth/signup/newpin', {
-    method: 'POST',
-    json: { email: email, code: await codeFromMailbox(e, email), pin: '1111', device: device }
-  });
+  await signupWithPin(e, email, '1111', device);
 
   const okLogin = await call(e, '/api/auth/pin/login',
     { method: 'POST', json: { pin: '1111', device: device } });
@@ -233,10 +249,7 @@ test('③ دخول بالباسورد + جهاز مسجّل ⇒ جلسة ⭐', a
   const device2 = 'device-cccc-0000';
   const s2 = await call(e, '/api/auth/signup/start',
     { method: 'POST', json: { name: 'x', email: email2 } });
-  await call(e, '/api/auth/signup/newpin', {
-    method: 'POST',
-    json: { email: email2, code: await codeFromMailbox(e, email2), pin: '1111', device: device2 }
-  });
+  await signupWithPin(e, email2, '1111', device2);
   const right = await call(e, '/api/auth/pin/login',
     { method: 'POST', json: { pin: '1111', device: device2 } });
   assert.strictEqual(right.status, 200, 'لازم يدخل الحساب اللي جهازه مطابق ⭐');
@@ -258,10 +271,7 @@ test('③ب من أنا بالجلسة ⭐ — ومن غير جلسة ⇒ 401 �
   const device = 'device-dddd-1111';
   const start = await call(e, '/api/auth/signup/start',
     { method: 'POST', json: { name: 'س', email: email } });
-  const mk = await call(e, '/api/auth/signup/newpin', {
-    method: 'POST',
-    json: { email: email, code: await codeFromMailbox(e, email), pin: '2222', device: device }
-  });
+  const mk = await signupWithPin(e, email, '2222', device);
   const cookie = cookieOf(mk.res);
   const me = await call(e, '/api/auth/me', { headers: { Cookie: cookie } });
   assert.strictEqual(me.status, 200);
@@ -274,10 +284,7 @@ test('③ج ⭐ إبطال فوري ⭐ — بعد الخروج الجلسة ا�
   const device = 'device-eeee-2222';
   const start = await call(e, '/api/auth/signup/start',
     { method: 'POST', json: { name: 'س', email: email } });
-  const mk = await call(e, '/api/auth/signup/newpin', {
-    method: 'POST',
-    json: { email: email, code: await codeFromMailbox(e, email), pin: '3333', device: device }
-  });
+  const mk = await signupWithPin(e, email, '3333', device);
   const cookie = cookieOf(mk.res);
 
   const out = await call(e, '/api/auth/logout', { method: 'POST', headers: { Cookie: cookie } });
@@ -296,10 +303,7 @@ test('③د ⭐ تجديد الجلسة ⭐ — القديم يموت والجد
   const device = 'device-ffff-3333';
   const start = await call(e, '/api/auth/signup/start',
     { method: 'POST', json: { name: 'س', email: email } });
-  const mk = await call(e, '/api/auth/signup/newpin', {
-    method: 'POST',
-    json: { email: email, code: await codeFromMailbox(e, email), pin: '4444', device: device }
-  });
+  const mk = await signupWithPin(e, email, '4444', device);
   const cookie = cookieOf(mk.res);
   const ref = await call(e, '/api/auth/refresh', { method: 'POST', headers: { Cookie: cookie } });
   assert.strictEqual(ref.status, 200);
@@ -363,10 +367,7 @@ test('④ب ⭐ الترتيب ⭐ — 401 للزائر ⭐ + نتائج للم�
   const device = 'device-gggg-4444';
   const start = await call(e, '/api/auth/signup/start',
     { method: 'POST', json: { name: 'س', email: email } });
-  const mk = await call(e, '/api/auth/signup/newpin', {
-    method: 'POST',
-    json: { email: email, code: await codeFromMailbox(e, email), pin: '6666', device: device }
-  });
+  const mk = await signupWithPin(e, email, '6666', device);
   const r = await call(e, '/api/rank?limit=10', { headers: { Cookie: cookieOf(mk.res) } });
   assert.strictEqual(r.status, 200);
   assert.strictEqual(r.body.count, 1);
@@ -380,10 +381,7 @@ test('⑤ ⭐ المحفظة معزولة بين الحسابات ⭐', async ()
   const mkAcct = async (email, pin, device) => {
     const start = await call(e, '/api/auth/signup/start',
       { method: 'POST', json: { name: 'س', email: email } });
-    const mk = await call(e, '/api/auth/signup/newpin', {
-      method: 'POST',
-      json: { email: email, code: await codeFromMailbox(e, email), pin: pin, device: device }
-    });
+    const mk = await signupWithPin(e, email, pin, device);
     return cookieOf(mk.res);
   };
   const c1 = await mkAcct('a1@example.com', '1111', 'dev-aaaa-1111');
@@ -408,10 +406,7 @@ test('⑤ب ⭐ التنبيهات: منع التكرار ⭐ + عزل بين ا
   const e = env();
   const start = await call(e, '/api/auth/signup/start',
     { method: 'POST', json: { name: 'س', email: 'al@example.com' } });
-  const mk = await call(e, '/api/auth/signup/newpin', {
-    method: 'POST',
-    json: { email: 'al@example.com', code: await codeFromMailbox(e, 'al@example.com'), pin: '5555', device: 'dev-cccc-3333' }
-  });
+  const mk = await signupWithPin(e, 'al@example.com', '5555', 'dev-cccc-3333');
   const cookie = cookieOf(mk.res);
 
   const a1 = await call(e, '/api/alerts', {
