@@ -304,7 +304,7 @@ const BACKEND_READONLY_PREFIX = [
   '/api/indices/', '/api/opp/', '/api/opportunity/', '/api/strategy/',
   '/api/charts/', '/api/usd/', '/api/explain/', '/api/calendar',
 ];
-function isBackendReadOnly(path) {
+export function isBackendReadOnly(path) {
   if (BACKEND_READONLY_EXACT.has(path)) return true;
   for (const pre of BACKEND_READONLY_PREFIX) {
     if (path.indexOf(pre) === 0) return true;

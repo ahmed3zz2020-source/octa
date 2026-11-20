@@ -114,7 +114,7 @@ const TRIES = 3;
 /* ⭐ محرك محور الأخبار (هالان) — نسخة مطابقة 1:1 من news_engine في الباك.
    📌 الاختبار: tools/test-halan-news.js ⇒ 182/182 مطابقة. */
 import { newsEngine, mergeEvents, eventsByCode, parseHalaText } from './halan-news.js';
-import { handlePreviewApi } from './preview-api.js';
+import { handlePreviewApi, isBackendReadOnly } from './preview-api.js';
 /* ⭐⭐⭐ (R28) ⭐ مخزن المعاينة (Durable Object ⭐) ⭐
    📌 R26-I02 ⭐ ⇒ ⛔ إبطال الجلسات في الـKV مبيتنتشرش فوراً ⭐.
    📌 R26-I04 ⭐ ⇒ ⛔ الكتابات المتزامنة (المحفظة ⭐ / التنبيهات ⭐) بتضيع ⭐.
@@ -2328,8 +2328,14 @@ async function handle(request, env, ctx) {
           }
         });
       }
+      /* ⭐⭐⭐ (R28 · FINDING-07) ⭐⭐⭐ مسارات القراءة توصل للباك ⭐⭐⭐
+         ⑈ المعاينة تقول بالباك الحقيقي ⭐ (من معزولة) ⭐
+         ⑈ ⇒ ⛔ لا نقلا مراجعة إلى الإنتاج بالباك الحقيقي ⭐
+         ⑈ ⇒ ⭐ الحالة مالذاتت في المعاينة متصل ⭐ (⭐⭐ تقرير ⭐)
+         ⑈ ⛔ أي مسار غير محدد ⇒ ⛔ مافيش إنتاج ⭐ (fail-closed ⭐) */
       if (env && env.OCTA_PREVIEW_SELF_API === 'on'
-          && !url.pathname.startsWith('/api/opp/')) {
+          && !url.pathname.startsWith('/api/opp/')
+          && !isBackendReadOnly(url.pathname)) {
         /* ⭐⭐ المعاينة المعزولة — المسارات اللي محتاجة الباك الحيّ ⭐
            ⭐ (تسجيل الدخول ⭐ الأسعار ⭐ الاشتراكات ⭐) ⇔ متاحة بسرير مخالف ⭐
            ⇔ ⇔ الرد بصيغة مختلفة ⭐ وفيها خطوة المالك ⭐
