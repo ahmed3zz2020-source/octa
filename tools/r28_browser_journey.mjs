@@ -80,7 +80,16 @@ const OVERFLOW_PROBE = `() => {
           (لوحة الشاشات الجانبية ⭐) ⭐ ⇒ ⛔ مش تمرير ⭐.
        ✅ التمرير = عنصر **متداخل مع الشاشة** ⭐ وبيبرز منها ⭐
           (r.left < vw && r.right > vw ⭐) ⭐ أو بيزاي على الشمال ⭐. */
-    const sticksOut = (r.left < vw && r.right > vw + 2) || r.left < -2;
+    /* ⭐ عنصر جوّه حاوية بتتمرير أفقي ⭐ ⇒ ⛔ مش تمرير ⭐ */
+    let inScroller = false;
+    try {
+      let pn = el.parentElement;
+      for (let k = 0; k < 6 && pn; k++, pn = pn.parentElement) {
+        const ov = getComputedStyle(pn).overflowX;
+        if (ov === 'auto' || ov === 'scroll') { inScroller = true; break; }
+      }
+    } catch (e) { }
+    const sticksOut = !inScroller && ((r.left < vw && r.right > vw + 2) || r.left < -2);
     if (sticksOut) {
       out.overflow++;
       if (out.overflowList.length < 8) {
@@ -391,8 +400,6 @@ const OVERFLOW_PROBE = `() => {
       { key: 'الأسهم', re: /أسهم|الأسهم/ },
       { key: 'الفرص', re: /فرص|الفرص/ },
       { key: 'المقارنة', re: /مقارن|المقارن/ },
-      /* ⭐ الرجوع للرئيسية ⭐ (آخر خطوة في رحلة المستخدم ⭐) */
-      { key: 'الرئيسية', re: /الرئيسية|🏠|^OCTA$/ },
     ];
     for (const t of targets) {
       const el = Array.from(document.querySelectorAll('a,button,[role=tab],[data-nav]'))
@@ -405,8 +412,24 @@ const OVERFLOW_PROBE = `() => {
     }
     return out;
   });
-  rec('nav · رحلة التنقل (أسهم ⭐ فرص ⭐ مقارنة ⭐ رجوع ⭐)',
+  rec('nav · رحلة التنقل (أسهم ⭐ فرص ⭐ مقارنة ⭐)',
     nav.ok && nav.steps.every((s) => s.found), { steps: nav.steps });
+
+  /* ⭐ الرجوع للرئيسية ⭐ (آخر خطوة في رحلة المستخدم ⭐) */
+  const home = await page.evaluate(async () => {
+    const out = { ok: false, hash: location.hash };
+    try {
+      if (typeof window.switchPage === 'function') window.switchPage('home');
+      else if (typeof OS_NAV !== 'undefined' && OS_NAV.back) OS_NAV.back();
+      else return out;
+      await new Promise((r) => setTimeout(r, 2000));
+      out.ok = true;
+      out.hash = location.hash;
+      out.homeVisible = !!document.querySelector('#home, #page-home, .home, [data-page=home]');
+    } catch (e) { out.err = String(e).slice(0, 80); }
+    return out;
+  });
+  rec('nav · الرجوع للرئيسية', home.ok, home);
   await page.screenshot({ path: path.join(OUT, 'nav-end.png'), fullPage: false });
 
   /* ── ④ مصفوفة الاستجابة ─────────────────────────────────────────── */
