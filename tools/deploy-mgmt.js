@@ -160,7 +160,12 @@ async function loadBlake3() {
       { name: 'REVOKE_KV', type: 'kv_namespace', namespace_id: REVOKE_KV_ID },
       { name: 'REVOKE_DO', type: 'durable_object_namespace', namespace_id: REVOKE_DO_ID, class_name: DO_CLASS },
     ],
-    migrations: { v1: { new_sqlite_classes: [DO_CLASS] } },
+    /* ⭐⭐⭐ الـmigration ⭐⭐⭐
+       📌 ⛔ العامل الحي ⭐ عنده class بالفعل ⭐ (وسم v1 ⭐ موجود ⭐).
+       📌 ⛔ لو صرّحنا بالـmigration ⭐ ⇒ ⭐ Cloudflare يقارن ⭐
+          «got tag '' when expected tag is 'v1'» ⭐ ⇒ ⭐ يرفض ⭐.
+       ✅ الحل ⭐: ⭐ ما نصرّحش ⭐ ⭐ (الـclass موجود ⭐ ⇒ الـnamespace مربوط ⭐
+          ⇒ ⭐ ما فيش migration جديد ⭐ ⇒ ⭐ ما فيش تعارض ⭐). */
     assets: {
       jwt,
       config: {
