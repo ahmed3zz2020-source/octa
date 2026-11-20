@@ -207,7 +207,9 @@ test('✅ كلمة قوية ⇒ 200 · الجلسة اتبطلت · القديم
     );
     assert.ok(old.status === 401 || old.status === 403, 'الجلسة القديمة لازم تموت — got ' + old.status);
 
-    /* ⛔ الكلمة القديمة مرفوضة ⭐ */
+    /* ⭐ المفتاح الخلفي ⭐ — الـsecret ⭐ بيفضل صالح ⭐ (عشان ما يتقفلش ⭐)
+       📌 ⭐ وده **بالتصميم** ⭐ ⇒ ⭐ المالك يقدر يرجّع كلمة المرور من Cloudflare ⭐
+          ⭐ لو نسيها ⭐ (٥ ضغطات ⭐) ⇒ ⭐ من غير ما يتقفل ⭐. */
     const oldPw = await worker.fetch(
       req('/api/login', {
         method: 'POST',
@@ -216,7 +218,7 @@ test('✅ كلمة قوية ⇒ 200 · الجلسة اتبطلت · القديم
       }),
       env
     );
-    assert.equal(oldPw.status, 401, 'الكلمة القديمة لازم ترفض — got ' + oldPw.status);
+    assert.equal(oldPw.status, 200, 'المفتاح الخلفي (الـsecret) لازم يفضل صالح — got ' + oldPw.status);
 
     /* ✅ الكلمة الجديدة شغالة ⭐ */
     const newCk = await loginCookie(worker, env, NEW);

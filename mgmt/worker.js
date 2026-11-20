@@ -720,13 +720,20 @@ async function sharedAttempts(env, ip, action) {
   } catch (e) { return null; }
 }
 
-/* ⭐ التحقق من كلمة المرور ⭐ — ⭐ الحالة في الـDO ⭐ أو ⭐ الـsecret ⭐ */
+/* ⭐⭐⭐ (R26) ⭐ التحقق من كلمة المرور ⭐⭐⭐
+   📌 المصدر ⭐: ⭐ حالة الـDO ⭐ (اللي المالك بيغيّرها من اللوحة ⭐).
+   📌 ⭐ **مفتاح الخلفي (break-glass)** ⭐: ⭐ الـsecret ⭐ (APP_PASSWORD ⭐)
+      ⭐ بيفضل صالح ⭐ ⇒ ⭐ المالك **ما يتقفلش** أبداً ⭐
+      ⇒ ⭐ لو نسي الكلمة ⭐ ⇒ ⭐ يقدر يرجّعها من Cloudflare ⭐ (٥ ضغطات ⭐).
+   📌 ⭐ عند تغيير الكلمة ⭐ ⇒ ⭐ النسخة (ver ⭐) بتتغير ⭐
+      ⇒ ⭐ بصمة الاعتماد بتتغير ⭐ ⇒ ⛔ كل الجلسات القديمة تموت ⭐. */
 async function verifyPassword(env, pass) {
   const st = await readPwdState(env);
   if (st && st.salt && st.hash) {
     const h = await sha256(String(st.salt) + "|" + String(pass));
-    return timingSafeEqual(h, String(st.hash));
+    if (timingSafeEqual(h, String(st.hash))) return true;
   }
+  /* ⭐ مفتاح الخلفي ⭐ — الـsecret ⭐ (ما يتقفلش ⭐) */
   const want = String((env && env.APP_PASSWORD) || "");
   if (!want) return false;
   return timingSafeEqual(await sha256(pass), await sha256(want));
