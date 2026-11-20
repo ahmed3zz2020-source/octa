@@ -65,6 +65,14 @@ function makeCallLog(opts = {}) {
       async fetch(url, fopts) {
         const method = (fopts && fopts.method) || 'GET';
         calls.push({ kind: 'do-' + method.toLowerCase(), url: String(url), name: id.name });
+        /* ⭐⭐⭐ (R28) ⭐ \u062d\u0627\u0644\u0629 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 ⭐ (panel_state ⭐) ⭐
+           ⭐ \u0627\u0644\u0634\u0643\u0644 \u0627\u0644\u062d\u0642\u064a\u0642\u064a ⭐: {ok:true, pwd:null} ⭐ (\u0644\u0645\u0627 \u064a\u0643\u0646 \u062a\u063a\u064a\u0631) ⭐. */
+        if (String(id.name || '') === 'panel_state' && method === 'GET') {
+          if (opts.doReadFails) return new Response('down', { status: 500 });
+          const pwd = opts.pwdVer ? { ver: String(opts.pwdVer) } : null;
+          return new Response(JSON.stringify({ ok: true, pwd: pwd }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
         if (method === 'POST') {
           if (opts.doWriteFails) return new Response('down', { status: 500 });
           return new Response(JSON.stringify({ ok: true, revoked: true }),
@@ -137,10 +145,13 @@ function credentialTag(password, ver) {
 }
 
 function mintCookie(expMs, secret, password, ver) {
+  /* ⭐⭐⭐ (R28) ⭐ \u0627\u0644\u0634\u0643\u0644 \u0627\u0644\u062c\u062f\u064a\u062f ⭐ `exp.tag.sig` ⭐
+     ⭐ \u0627\u0644\u0648\u0633\u0645 \u0628\u0627\u0644\u0646\u0633\u062e\u0629 \u062f\u0627\u062e\u0644 \u0627\u0644\u062a\u0648\u0643\u0646 ⭐ (\u0645\u0627\u0641\u064a\u0634 \u0646\u062f\u0627\u0621\u0627\u062a \u062e\u0632\u0627\u0621\u064a\u0629) ⭐. */
   const exp = String(expMs);
-  const payload = password ? (exp + '.' + credentialTag(password, ver)) : exp;
+  const tag = credentialTag(password, ver);
+  const payload = exp + '.' + tag;
   const sig = nodeCrypto.createHmac('sha256', secret).update(payload).digest('hex');
-  return 'octa_mgmt_sess=' + encodeURIComponent(exp + '.' + sig);
+  return 'octa_mgmt_sess=' + encodeURIComponent(exp + '.' + tag + '.' + sig);
 }
 
 async function login(worker, env) {
@@ -227,10 +238,10 @@ test('R25-I10-01: in production with no shared revocation source it must fail cl
     method: 'POST', body: JSON.stringify({ password: env.APP_PASSWORD }),
   }), env);
   assert.equal(loginRes.status, 503,
-    '\u26d4\u26d4\u26d4 لازم الدخول يفشل مغلق \u2b50 (مافيش مصدر إبطال \u2b50) \u2014 got ' + loginRes.status);
+    '\u26d4\u26d4\u26d4 لازم الدخول يفشل مغلق ⭐ (مافيش مصدر إبطال ⭐) \u2014 got ' + loginRes.status);
   const setCookie = loginRes.headers.get('Set-Cookie') || '';
   assert.ok(setCookie.indexOf('Max-Age=0') === -1 && !/octa_mgmt_sess=[^;]+/.test(setCookie),
-    '\u26d4\u26d4\u26d4 مينفعش نصدر كوكي جلسة \u2b50 — ' + setCookie + ' \u2b50');
+    '\u26d4\u26d4\u26d4 مينفعش نصدر كوكي جلسة ⭐ — ' + setCookie + ' ⭐');
   /* ⭐⭐⭐ الجولة ۲۶ (R26) ⭐ — ⭐ كوكي **سليم التوقيع** ⭐
      ⭐ (مش مزوّر ⭐) ⭐ ⇒ ⭐ عشان نختبر مسار ⭐“مافيش مصدر” ⭐
      ⭐ ولا مسار ⭐“كوكي زائف” ⭐. */
@@ -292,7 +303,7 @@ test('R25-I11-01: a FORGED cookie must never reach the Durable Object or the KV'
     '⛔ كوكي مزوّر ⇒ ٤٠١ ⭐ — got ' + out.status);
   assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ كوكي مزوّر استهلك موارد الـDO/الـKV ⭐ (' +
     log.calls.map(c => c.kind).join(',') + ') ⭐ لازم صفر نداءات ⭐');
-  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) ⭐ \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });
 
 test('R25-I11-02: an EXPIRED cookie must not consume Durable Object or KV resources', async () => {
@@ -306,7 +317,7 @@ test('R25-I11-02: an EXPIRED cookie must not consume Durable Object or KV resour
     '⛔ جلسة منتهية ⇒ مفيش حاجة تتبطل ⭐ — got ' + out.status);
   assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ جلسة منتهية استهلكت التخزين ⭐ (' +
     log.calls.map(c => c.kind).join(',') + ') ⭐');
-  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) ⭐ \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
   assert.equal(out.body.revocation, 'not-needed',
     '⛔ لازم يعلن إن مفيش إبطال محتاج ⭐');
 });
@@ -319,7 +330,7 @@ test('R25-I11-03: a MALFORMED cookie must not reach the storage', async () => {
   const out = await logout(worker, env, 'octa_mgmt_sess=not-a-session');
   assert.equal(out.status, 401, '⛔ لازم ٤٠١ ⭐ — got ' + out.status);
   assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ كوكي مشوّه وصل التخزين ⭐');
-  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) ⭐ \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });
 
 test('R25-I11-04: a VALID cookie still revokes through the shared store', async () => {

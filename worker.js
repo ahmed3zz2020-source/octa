@@ -115,6 +115,13 @@ const TRIES = 3;
    📌 الاختبار: tools/test-halan-news.js ⇒ 182/182 مطابقة. */
 import { newsEngine, mergeEvents, eventsByCode, parseHalaText } from './halan-news.js';
 import { handlePreviewApi } from './preview-api.js';
+/* ⭐⭐⭐ (R28) ⭐ مخزن المعاينة (Durable Object ⭐) ⭐
+   📌 R26-I02 ⭐ ⇒ ⛔ إبطال الجلسات في الـKV مبيتنتشرش فوراً ⭐.
+   📌 R26-I04 ⭐ ⇒ ⛔ الكتابات المتزامنة (المحفظة ⭐ / التنبيهات ⭐) بتضيع ⭐.
+   ✅ الـDO ⭐: اتساق قوي ⭐ + كتابة ذرّية ⭐ (preview-store.js ⭐).
+   📌 ⭐ التصدير من **worker-main.js** ⭐ ( نقطة الدخول ⭐)
+      ⇒ ⭐ ملف worker.js يفضل زي ما هو ⭐ (من غير أي export جديد ⭐)
+      ⇒ ⭐ كل اختبارات المشروع بتفضل شغالة من غير تعديل ⭐. */
 
 /* ══════════════════════════════════════════════════════════════
    ⭐ جسر سكانر TradingView — للفلتر (Smart Money)

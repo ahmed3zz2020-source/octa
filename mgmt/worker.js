@@ -70,9 +70,8 @@ const REVOKE_PREFIX = "rev:";
    ⛔ الرجوع صفر ⭐ = ما فيش جلسة صالحة ⭐ ⇒ نستعمل الحد الأعلى ⭐. */
 function sessionExpiryMs(raw) {
   if (!raw) return 0;
-  const dot = raw.lastIndexOf(".");
-  if (dot < 1) return 0;
-  const exp = Number(raw.slice(0, dot));
+  /* ⭐⭐⭐ (R28) ⭐ الشكل `exp.tag.sig` ⭐ ⇒ ⭐ exp هو الجزء الأول ⭐ */
+  const exp = Number(String(raw).split(".")[0]);
   if (!isFinite(exp) || exp <= 0) return 0;
   return exp;
 }
@@ -107,14 +106,19 @@ function revokeTtlSeconds(raw, nowMs) {
    ⭐ مربوط بالاختبار: assets/tests/r25-logout-hardening.test.js ⭐ */
 function cookieShape(raw) {
   if (!raw) return { ok: false, reason: "missing" };
-  const dot = raw.lastIndexOf(".");
-  if (dot < 1) return { ok: false, reason: "shape" };
-  const exp = raw.slice(0, dot);
-  const sig = raw.slice(dot + 1);
+  /* ⭐⭐⭐ (R28) ⭐ الشكل الجديد ⭐ `exp.tag.sig` ⭐
+     📌 ⛔ الشكل القديم ⭐ (`exp.sig` ⭐) ⭐ ⇒ ⛔ مرفوض ⭐ (كل الجلسات القديمة تموت ⭐). */
+  const parts = String(raw).split(".");
+  if (parts.length !== 3) return { ok: false, reason: "shape" };
+  const exp = parts[0];
+  const tag = parts[1];
+  const sig = parts[2];
   if (!/^\d+$/.test(exp)) return { ok: false, reason: "shape" };
+  if (!/^[A-Za-z0-9_]*$/.test(tag)) return { ok: false, reason: "shape" };
+  if (!/^[0-9a-f]+$/.test(sig)) return { ok: false, reason: "shape" };
   const expMs = Number(exp);
   if (!isFinite(expMs) || expMs <= 0) return { ok: false, reason: "shape" };
-  return { ok: true, exp: exp, sig: sig, expMs: expMs };
+  return { ok: true, exp: exp, tag: tag, sig: sig, expMs: expMs };
 }
 
 /* ⭐ تحقق كامل ⭐: الشكل ⭐ ثم التوقيع ⭐ ثم الانتهاء ⭐ */
@@ -124,13 +128,18 @@ async function verifyCookie(raw, secret, env) {
   if (!secret) return { ok: false, reason: "no-secret" };
   let expect = "";
   try {
-    /* ⭐⭐⭐ الجولة ٢٦ (R26) ⭐ — ⭐ نفس حمولة التوقيع ⭐ (exp + وسم الاعتماد ⭐)
-       ⭐ ⇒ ⭐ تغيير كلمة المرور ⭐ ⛔ يبطل الكوكي ⭐ ⭐. */
-    expect = await sign(shape.exp + "." + (await credentialTag(env)), secret);
+    /* ⭐⭐⭐ (R28) ⭐ التوقيع على `exp + '.' + tag` ⭐ — التونكن نفسه ⭐
+       📌 ⇒ ⭐ **صفر نداءات تخزين** ⭐ للكوكي المزوّر ⭐ (لا DO ⭐ ولا KV ⭐)
+          ⇒ ⛔⛔⛔ مافيش استنزاف لموارد التخزين ⭐.
+       📌 النسخة (tag ⭐) بتتأكد **بعد** التوقيع ⭐ ⇒ ⛔ تغيير كلمة المرور ⭐
+          ⛔ يبطل الكوكي ⭐ (فوراً ⭐). */
+    expect = await sign(shape.exp + "." + shape.tag, secret);
   } catch (e) {
     return { ok: false, reason: "sign-failed" };
   }
   if (!timingSafeEqual(shape.sig, expect)) return { ok: false, reason: "signature" };
+  const currentTag = await credentialTag(env);
+  if (currentTag !== shape.tag) return { ok: false, reason: "credential-changed" };
   shape.expired = shape.expMs < Date.now();
   return shape;
 }
@@ -249,6 +258,10 @@ const DO_ATT_KEY = "login_attempts";
 const MAX_ATTEMPTS = 8;
 /* ⭐ اسم نسخة الـDO لحالة كلمة المرور ⭐ (مصدر واحد ⭐) */
 const DO_PWD_NAME = "panel_state";
+/* ⭐⭐⭐ (R28) ⭐ وسم الاعتماد المستحيل ⭐
+   📌 بيستخدمه ⭐ لو ⛔ تعذّرت قراءة نسخة كلمة المرور ⭐ (الـDO واقع ⭐).
+   📌 ⛔ أي وسم غير ده ⭐ ⛔ بيرفض كل الجلسات ⭐ (fail-closed ⭐). */
+const TAG_UNVERIFIED = "__unverified__";
 
 class RevokeDO {
   constructor(state, env) {
@@ -539,6 +552,17 @@ const ERR_AUTH = "لازم تسجيل دخول";
       ⇒ ⛔ بنرفضها ⭐ (الخطر الحقيقي ⭐: اللوحة فيها بيانات المساهمين ⭐).
    📌 الحد ⭐: ٨ خانات على الأقل ⭐ + (حرف ⭐ أو الرقم ⭐) ⭐.
    📌 ⭐ مفيش استثناء ⭐ (المالك طلب ٦ أرقام ⭐ ⇒ اترفض ⭐ بوضوح ⭐). */
+/* ⭐⭐⭐ (R28) ⭐ توليد كلمة مرور مؤقتة ⭐ (للاسترداد الطارئ ⭐)
+   📌 ٢٠ حرف ⭐ (حروف + أرقام ⭐) ⭐ ⇒ ⭐ عدّاد المحاولات مش بيساعد ⭐.
+   📌 ⭐ بتتعرض مرة واحدة ⭐ في رد الاسترداد ⭐ (بعدها مش مقروءة ⭐). */
+function generateTempPassword() {
+  const alphabet = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(20));
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) out += alphabet[bytes[i] % alphabet.length];
+  return out;
+}
+
 function passwordWeakness(pw) {
   const p = String(pw || "");
   if (!p) return { ok: false, why: "فاضية", level: "bad" };
@@ -573,7 +597,13 @@ const PUBLIC_FILES = new Set([
 ]);
 
 /* 🛡️ الجولة ١٨ — مسارات الـAPI المفتوحة (من غير جلسة) — مافيش بيانات شخصية */
-const PUBLIC_API = new Set(["/api/login", "/api/logout", "/api/session", "/api/health"]);
+/* ⭐⭐⭐ (R28) ⭐ مسار الاسترداد الطارئ ⭐ ⇒ ⭐ مفتوح ⭐ (هو بديل الدخول ⭐ مش مكمّل ⭐).
+   📌 لازم يتdeclared **قبل** PUBLIC_API ⭐ (ترتيب التعريف ⭐). */
+const PATH_PASSWORD_RECOVER = "/api/password/recover";
+const PUBLIC_API = new Set([
+  "/api/login", "/api/logout", "/api/session", "/api/health",
+  PATH_PASSWORD_RECOVER,
+]);
 /* ⭐ مسار تغيير كلمة المرور ⭐ — **مش** public ⭐ ⇒ لازم جلسة صالحة ⭐. */
 const PATH_PASSWORD_CHANGE = "/api/password/change";
 
@@ -655,14 +685,17 @@ async function credentialTag(env) {
      📌 ⛔ لو البصمة تعتمد على الـsecret بس ⭐ ⇒ ⛔ تغيير كلمة المرور
         من اللوحة ⭐ ⇒ ⛔ الجلسات القديمة تفضل صالحة ⭐ (ثغرة ⭐).
      ✅ الحل ⭐: البصمة = (هاش الـsecret ⭐ + النسخة ⭐) ⭐
-        ⇒ ⭐ تغيير ⭐ ⇒ ⭐ البصمة تتغير ⭐ ⇒ ⛔ كل الجلسات تموت ⭐. */
+        ⇒ ⭐ تغيير ⭐ ⇒ ⭐ البصمة تتغير ⭐ ⇒ ⛔ كل الجلسات تموت ⭐.
+     ⭐⭐⭐ (R28) ⭐ — ⛔⛔⛔ تعذّر قراءة النسخة ⭐ ⇒ ⛔⛔⛔ fail-closed ⭐
+        📌 قبل ⭐: القراءة كانت بفول-back على '0' ⭐ ⇒ ⛔ لو الـDO واقع ⭐
+           ⇒ ⭐ بصمة النسخة '0' ⭐ ⇒ ⭐ ⛔ جلسة قديمة (موقّعة بـ'0') بتعدّي ⭐.
+        ✅ دلوقتي ⭐: ⛔ تعذّر القراءة ⭐ ⇒ ⭐ وسم مستحيل ⭐ ⇒ ⛔ كل الجلسات مرفوضة ⭐. */
+  const st = await readPwdState(env);
+  if (!st.ok && st.reason === "read_failed") return TAG_UNVERIFIED;
   let ver = "0";
-  try {
-    const st = await readPwdState(env);
-    if (st && st.ver) ver = String(st.ver);
-  } catch (e) { /* fallback ⭐ */ }
+  if (st.ok && st.pwd && st.pwd.ver) ver = String(st.pwd.ver);
   if (!pw && ver === "0") return "";
-  try { return (await sha256(pw + "|" + ver)).slice(0, 16); } catch (e) { return ""; }
+  try { return (await sha256(pw + "|" + ver)).slice(0, 16); } catch (e) { return TAG_UNVERIFIED; }
 }
 
 /* ⭐⭐⭐ (R26) ⭐ حالة كلمة المرور ⭐ (في الـDO ⭐ — مش في الذاكرة ⭐)
@@ -671,18 +704,25 @@ async function credentialTag(env) {
    📌 المصدر ⭐: نفس الـDurable Object ⭐ ⇒ اتساق قوي ⭐.
    📌 ⭐ أول تشغيل ⭐ ⇒ ⛔ مافيش حالة ⭐ ⇒ ⛔ نستخدم الـsecret ⭐ (APP_PASSWORD ⭐).
    📌 ⭐ بعد أول تغيير ⭐ ⇒ ⭐ الحالة في الـDO هي المرجع ⭐.
-   📌 ⭐ النسخة ⭐ (ver ⭐) بتتضمن في بصمة الاعتماد ⭐ ⇒ ⭐ تغيير ⇒ ⛔ كل الجلسات تموت ⭐. */
+   📌 ⭐ النسخة ⭐ (ver ⭐) بتتضمن في بصمة الاعتماد ⭐ ⇒ ⭐ تغيير ⇒ ⛔ كل الجلسات تموت ⭐.
+   ⭐⭐⭐ (R28) ⭐ — النتيجة بقت **ثلاثية** ⭐ (مش "فارغ/غير فارغ" ⭐):
+      📌 `ok:true` ⭐ ⇒ فيه حالة كلمة مرور ⭐ (المرجع ⭐).
+      📌 `reason:"no_state"` ⭐ ⇒ ⛔ مافيش تغيير لسه ⭐ ⇒ الـsecret هو كلمة المرور ⭐.
+      📌 `reason:"not_configured"` ⭐ ⇒ ⛔ مافيش DO ⭐ ⇒ ⛔ التطبيق مش مهيّأ ⭐.
+      📌 `reason:"read_failed"` ⭐ ⇒ ⛔⛔⛔ **مش معروف** ⭐ ⇒ ⛔⛔⛔ fail-closed ⭐
+         (⛔ ممنوعTreat كـ"مافيش حالة" ⭐ ⇒ ⛔ ممنوع قبول الـsecret ⭐). */
 async function readPwdState(env) {
-  if (!env.REVOKE_DO) return null;
+  if (!env.REVOKE_DO) return { ok: false, reason: "not_configured" };
   try {
     const id = env.REVOKE_DO.idFromName(DO_PWD_NAME);
     const stub = env.REVOKE_DO.get(id);
     const res = await stub.fetch("https://pwd.internal/pwd");
-    if (!res || !res.ok) return null;
-    const body = await res.json();
-    if (!body || !body.ok || !body.pwd) return null;
-    return body.pwd;
-  } catch (e) { return null; }
+    if (!res || !res.ok) return { ok: false, reason: "read_failed" };
+    const body = await res.json().catch(() => null);
+    if (!body || body.ok !== true) return { ok: false, reason: "read_failed" };
+    if (!body.pwd) return { ok: false, reason: "no_state" };
+    return { ok: true, pwd: body.pwd };
+  } catch (e) { return { ok: false, reason: "read_failed" }; }
 }
 
 async function writePwdState(env, salt, hash, ver) {
@@ -726,23 +766,55 @@ async function sharedAttempts(env, ip, action) {
       ⭐ بيفضل صالح ⭐ ⇒ ⭐ المالك **ما يتقفلش** أبداً ⭐
       ⇒ ⭐ لو نسي الكلمة ⭐ ⇒ ⭐ يقدر يرجّعها من Cloudflare ⭐ (٥ ضغطات ⭐).
    📌 ⭐ عند تغيير الكلمة ⭐ ⇒ ⭐ النسخة (ver ⭐) بتتغير ⭐
-      ⇒ ⭐ بصمة الاعتماد بتتغير ⭐ ⇒ ⛔ كل الجلسات القديمة تموت ⭐. */
-async function verifyPassword(env, pass) {
+      ⇒ ⭐ بصمة الاعتماد بتتغير ⭐ ⇒ ⛔ كل الجلسات القديمة تموت ⭐.
+
+   ⭐⭐⭐ (R28) ⭐ — فصل التحقق إلى مسارين ⭐⭐⭐
+   📌 ⛔⛔⛔ العيب ⭐: `verifyPassword` ⭐ كان بيقبل الـsecret ⭐ (الكلمة القديمة ⭐)
+      ⭐ حتى بعد تغيير الكلمة من اللوحة ⭐ ⇒ ⭐ ⛔ ثغرة ⭐ (.
+      ⇒ ⭐ كمان ⭐ لو قراءة حالة الـDO فشلت ⭐ ⇒ ⭐ ⛔ الـsecret بيتقبل ⭐ ⭐.
+   ✅ الحل ⭐:
+      ① `verifyPanelPassword` ⭐ = ⭐ **كلمة مرور اللوحة فقط** ⭐.
+         ⛔ الـsecret **مش** مقبول هنا ⭐ (بعد أول تغيير ⭐).
+         ⛔ تعذّر قراءة الحالة ⭐ ⇒ ⭐ رجوع "state_unknown" ⭐ (مش "كلمة غلط" ⭐).
+      ② `verifyBreakGlass` ⭐ = ⭐ **مفتاح الاسترداد الطارئ** ⭐ (الـsecret ⭐).
+         ⛔ **مش** تسجيل دخول ⭐ ⇒ ⭐ مافيش جلسة ⭐ ⇒ ⭐ بي resetting بس ⭐. */
+async function verifyPanelPassword(env, pass) {
   const st = await readPwdState(env);
-  if (st && st.salt && st.hash) {
-    const h = await sha256(String(st.salt) + "|" + String(pass));
-    if (timingSafeEqual(h, String(st.hash))) return true;
+  if (st.ok && st.pwd && st.pwd.salt && st.pwd.hash) {
+    const h = await sha256(String(st.pwd.salt) + "|" + String(pass));
+    return timingSafeEqual(h, String(st.pwd.hash));
   }
-  /* ⭐ مفتاح الخلفي ⭐ — الـsecret ⭐ (ما يتقفلش ⭐) */
+  /* ⛔⛔⛔ (R28) ⭐ الحالة مش معروفة ⭐ ⇒ ⛔⛔⛔ fail-closed ⭐
+     📌 ممنوع ⭐ إن تعذّر القراءة يبقى سبب لقبول الـsecret ⭐. */
+  if (!st.ok && st.reason === "read_failed") return "state_unknown";
+  /* ⭐ أول تشغيل ⭐ (ما فيش حالة ⭐) ⭐ ⇒ ⭐ الـsecret هو كلمة المرور ⭐ */
   const want = String((env && env.APP_PASSWORD) || "");
   if (!want) return false;
-  return timingSafeEqual(await sha256(pass), await sha256(want));
+  return timingSafeEqual(await sha256(String(pass)), await sha256(want));
+}
+
+/* ⭐⭐⭐ (R28) ⭐ مفتاح الاسترداد الطارئ (break-glass) ⭐
+   📌 ⛔ **مش** تسجيل دخول ⭐ ⇒ ⛔ مافيش جلسة ⭐ ⇒ ⛔ مافيش دخول بالـsecret ⭐.
+   📌 بيستخدمه ⭐ مسار الاسترداد بس ⭐ (إعادة تعيين كلمة المرور ⭐). */
+async function verifyBreakGlass(env, secret) {
+  const want = String((env && env.APP_PASSWORD) || "");
+  if (!want) return false;
+  return timingSafeEqual(await sha256(String(secret || "")), await sha256(want));
 }
 
 async function makeSession(secret, env) {
   const exp = String(Date.now() + SESSION_TTL * 1000);
-  const sig = await sign(exp + "." + (await credentialTag(env)), secret);
-  return `${exp}.${sig}`;
+  /* ⭐⭐⭐ (R28) ⭐ التوكن **ذاتي التحقق** ⭐
+     📌 الشكل ⭐: `exp.tag.sig` ⭐ (التوقيع على `exp + '.' + tag` ⭐).
+     📌 السبب ⭐: ⭐ التوقيع بيتحقق **قبل** أي قراءة حالة ⭐ ⇒ ⭐ الكوكي المزوّر ⭐
+        ⇒ ⭐ **صفر نداءات** ⭐ (لا panel_state ⭐ ولا rev: ⭐ ولا KV ⭐)
+        ⇒ ⛔ مافيش استنزاف للموارد ⭐.
+     📌 النسخة ⭐ (tag ⭐) جواها التوكن ⭐ ⇒ ⭐ التحقق من تغيير كلمة المرور ⭐
+        بيفضل **فوري** ⭐ (من غير نافذة ⭐). */
+  const tag = await credentialTag(env);
+  const payload = exp + "." + tag;
+  const sig = await sign(payload, secret);
+  return `${payload}.${sig}`;
 }
 
 async function validSession(req, secret, env) {
@@ -755,17 +827,27 @@ async function validSession(req, secret, env) {
         ⇒ ⛔ أي كوكي مزوّر أو منتهٍ كان بيوصل للمخزن ⭐
         (استنزاف ⭐ + تسريب ⭐ + نافذة ⭐).
      ✅ دلوقتي: ⛔ نداء **غير مصرّح به** ما بيوصلش للتخزين **أصلاً** ⭐.
-     📌 ترتيب الخطوات ⭐: ① التوقيع ② الانتهاء ③ الإبطال ④ المخزن المشترك ⭐. */
-  const dot = raw.lastIndexOf(".");
-  if (dot < 1) return false;
-  const exp = raw.slice(0, dot);
-  const sig = raw.slice(dot + 1);
+     📌 ترتيب الخطوات ⭐: ① التوقيع ② الانتهاء ③ الإبطال ④ المخزن المشترك ⭐.
+     ⭐⭐⭐ (R28) ⭐ — الشكل الجديد ⭐ `exp.tag.sig` ⭐:
+        📌 ① التوقيع بيتحقق **بالتونكن نفسه** ⭐ ⇒ ⭐ **صفر نداءات** ⭐ للكوكي المزوّر ⭐
+           (⛔ مافيش panel_state ⭐ ⛔ مافيش rev: ⭐ ⛔ مافيش KV ⭐)
+           ⇒ ⛔⛔⛔ استنزاف الموارد مستحيل ⭐.
+        📌 ② بعد ما التوقيع صح ⭐ ⇒ ⭐ بس كده ⭐ بنقارن **نسخة كلمة المرور** ⭐
+           ⇒ ⭐ تغيير كلمة المرور ⭐ ⛔ يبطل كل الجلسات ⭐ (فوراً ⭐). */
+  const parts = raw.split(".");
+  if (parts.length !== 3) return false;              // ⛔ شكل قديم ⭐ ⇒ مرفوض ⭐
+  const exp = parts[0];
+  const tag = parts[1];
+  const sig = parts[2];
   if (!/^\d+$/.test(exp)) return false;             // ⛔ شكل غير صالح ⭐
   if (Number(exp) < Date.now()) return false;       // ⛔ جلسة منتهية ⭐
-  /* ⭐⭐⭐ الجولة ٢٦ (R26) ⭐ — التوقيع يشمل وسم الاعتماد ⭐
-     ⭐ ⇒ ⭐ تغيير كلمة المرور ⭐ ⛔ يرفض كل الجلسات القديمة ⭐. */
-  const expect = await sign(exp + "." + (await credentialTag(env)), secret);
+  /* ⛔⛔⛔ (R28) ⭐ التحقق من التوقيع **قبل** أي قراءة حالة ⭐ ⇒ ⛔ صفر نداءات ⭐ */
+  const expect = await sign(exp + "." + tag, secret);
   if (!timingSafeEqual(sig, expect)) return false;  // ⛔ توقيع غلط ⭐
+  /* ⭐⭐⭐ (R28) ⭐ مقارنة النسخة الحالية ⭐ (تغيير كلمة المرور ⭐ ⇒ إبطال فوري ⭐)
+     📌 ⛔ تعذّر قراءة النسخة ⭐ ⇒ ⭐ الوسم المستحيل ⭐ ⇒ ⛔ رفض ⭐ (fail-closed ⭐). */
+  const currentTag = await credentialTag(env);
+  if (currentTag !== tag) return false;             // ⛔ نسخة كلمة المرور اتغيّرت ⭐
   /* ⛔ دلوقتي بس ⇒ نتفرج على الإبطال ⭐ */
   /* 🛡️ الجولة ١٩ (R18-A01) — جلسة مُبطلة من جهة السيرفر ⇒ مرفوضة */
   if (isRevoked(raw)) return false;
@@ -793,7 +875,8 @@ async function sessionRenewHeader(req, secret, env) {
   if (state !== false) return {};   // true ⭐ = متبطل ⭐ · null ⭐ = مش معروف ⭐ ⇒ ⛔ مفيش تجديد ⭐
   const dot = raw.lastIndexOf(".");
   if (dot < 1) return {};
-  const exp = Number(raw.slice(0, dot));
+  /* ⭐⭐⭐ (R28) ⭐ الشكل الجديد ⭐ `exp.tag.sig` ⭐ ⇒ ⭐ exp هو الجزء الأول ⭐ */
+  const exp = Number(raw.split(".")[0]);
   if (!exp || !isFinite(exp)) return {};
   if (exp - Date.now() > RENEW_BEFORE * 1000) return {};
   const sess = await makeSession(secret, env);
@@ -975,10 +1058,30 @@ export default {
         let body = {};
         try { body = await request.json(); } catch (e) { /* body فاضي */ }
         const pass = String(body.password || "");
-        if (!String(env.APP_PASSWORD || "") && !(await readPwdState(env))) {
+        const st0 = await readPwdState(env);
+        if (!String(env.APP_PASSWORD || "") && !st0.ok && st0.reason === "not_configured") {
           return json({ ok: false, error: "التطبيق مش مهيّأ" }, 500);
         }
-        const ok = await verifyPassword(env, pass);
+        if (!st0.ok && st0.reason === "read_failed") {
+          /* ⛔⛔⛔ (R28) ⭐ تعذّر التحقق من نسخة كلمة المرور ⭐
+             ⛔⛔⛔ ممنوع ⭐ قبول الـsecret ⭐ هنا ⭐ ⇒ ⭐ fail-closed ⭐.
+             📌 المالك يقدر يستخدم ⭐ مسار الاسترداد الطارئ ⭐. */
+          console.error("[octa-mgmt] login: password state read failed");
+          return json({
+            ok: false,
+            error: "متعذر التحقق من كلمة المرور — استخدم الاسترداد الطارئ",
+            why: "state_unknown",
+          }, 503);
+        }
+        const ok = await verifyPanelPassword(env, pass);
+        if (ok === "state_unknown") {
+          console.error("[octa-mgmt] login: password state read failed (verify)");
+          return json({
+            ok: false,
+            error: "متعذر التحقق من كلمة المرور — استخدم الاسترداد الطارئ",
+            why: "state_unknown",
+          }, 503);
+        }
         if (!ok) {
           noteFail(ip);
           const sh = await sharedAttempts(env, ip, "fail");
@@ -1224,7 +1327,17 @@ export default {
         const cur = String(body.current || "");
         const next = String(body.next || "");
         /* ⭐ تأكيد الهوية ⭐ */
-        const okCur = await verifyPassword(env, cur);
+        const okCur = await verifyPanelPassword(env, cur);
+        if (okCur === "state_unknown") {
+          /* ⛔⛔⛔ (R28) ⭐ تعذّر قراءة نسخة كلمة المرور ⭐
+             ⛔⛔⛔ ممنوع ⭐ فول-back للـsecret ⭐ هنا ⭐ ⇒ ⭐ fail-closed ⭐. */
+          console.error("[octa-mgmt] password change: password state read failed");
+          return json({
+            ok: false,
+            error: "متعذر التحقق من كلمة المرور الحالية — استخدم الاسترداد الطارئ",
+            why: "state_unknown",
+          }, 503);
+        }
         if (!okCur) {
           noteFail(ip);
           const sh = await sharedAttempts(env, ip, "fail");
@@ -1238,12 +1351,13 @@ export default {
         if (!w.ok) {
           return json({ ok: false, error: "كلمة المرور الجديدة ضعيفة", why: w.why, level: w.level }, 400);
         }
-        /* ⭐ ⛔ لازم confirms ⭐ — ⛔ فول-back للمsecret ⭐
-           (لو الـDO ضاع ⇒ ⭐ نرجع للـsecret ⭐ ⇒ ⭐ اللوحة تفتح ⭐). */
+        /* ⭐ (R28) ⭐ فول-back للـsecret اتشال ⭐
+           📌 قبل ⭐: لو الـDO ضاع ⇒ ⭐ نرجع للـsecret ⭐ ⇒ ⭐ ⛔ تقبل ⭐.
+           ✅ دلوقتي ⭐: ⛔ لو الحالة مش معروفة ⭐ ⇒ ⭐ 503 ⭐ (فيها الاسترداد الطارئ ⭐). */
         const salt = (await sha256(next + "|" + Date.now())).slice(0, 24);
         const hash = await sha256(salt + "|" + next);
         const st = await readPwdState(env);
-        const ver = String((st && st.ver) ? st.ver : "0") + "." + Date.now();
+        const ver = String((st.ok && st.pwd && st.pwd.ver) ? st.pwd.ver : "0") + "." + Date.now();
         const wrote = await writePwdState(env, salt, hash, ver);
         if (!wrote) {
           console.error("[octa-mgmt] password change: state write failed");
@@ -1262,6 +1376,71 @@ export default {
           level: w.level,
           reauth: true,
         }, 200, { "Set-Cookie": `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0` });
+      }
+
+      /* ── ⭐⭐⭐ (R28) ⭐ الاسترداد الطارئ (break-glass) ⭐⭐⭐
+         📌 ⛔⛔⛔ **مش** تسجيل دخول ⭐ ⇒ ⛔ مافيش جلسة ⭐ ⇒ ⛔ مافيش دخول ⭐.
+         📌 الفكرة ⭐: ⭐ لو المالك نسي كلمة المرور ⭐ ⇒ ⭐ السر (APP_PASSWORD ⭐)
+            ⭐ يعمل **إعادة تعيين** ⭐ (مش دخول ⭐).
+         📌 ⛔ مهم ⭐: ⛔ الـsecret **مش** مقبول في `/api/login` ⭐ بعد أول تغيير ⭐. */
+      if (path === PATH_PASSWORD_RECOVER && request.method === "POST") {
+        /* ⛔ CSRF ⭐ — طلب من أصل خارجي ⇒ مرفوض ⭐ */
+        if (isCrossSiteRequest(request, url)) {
+          return json({ ok: false, error: "طلب من أصل خارجي — اترفض" }, 403);
+        }
+        if (!env.REVOKE_DO) {
+          return json({ ok: false, error: "الاسترداد مش مهيّأ — استخدم Cloudflare" }, 501);
+        }
+        let body = {};
+        try { body = await request.json(); } catch (e) { body = {}; }
+        const secret = String(body.secret || "");
+        const nextReq = String(body.new_password || "");
+        /* ⛔⛔⛔ المفتاح لازم يطابق ⭐ (timing-safe ⭐) ⭐ */
+        if (!(await verifyBreakGlass(env, secret))) {
+          noteFail(ip);
+          const sh = await sharedAttempts(env, ip, "fail");
+          if (sh && sh.locked) {
+            return json({ ok: false, error: "محاولات كتير. استنى ١٥ دقيقة." }, 429);
+          }
+          return json({ ok: false, error: "مفتاح الاسترداد غلط" }, 401);
+        }
+        /* ⭐ كلمة المرور الجديدة ⭐ — أو ⭐ مولّدة ⭐ (بتتعرض مرة واحدة ⭐) ⭐ */
+        let newPass = nextReq;
+        let generated = false;
+        if (!newPass) {
+          newPass = generateTempPassword();
+          generated = true;
+        }
+        const w = passwordWeakness(newPass);
+        if (!w.ok) {
+          return json({ ok: false, error: "كلمة المرور الجديدة ضعيفة", why: w.why, level: w.level }, 400);
+        }
+        const salt = (await sha256(newPass + "|" + Date.now())).slice(0, 24);
+        const hash = await sha256(salt + "|" + newPass);
+        const st = await readPwdState(env);
+        const ver = String((st.ok && st.pwd && st.pwd.ver) ? st.pwd.ver : "0") + ".r28." + Date.now();
+        const wrote = await writePwdState(env, salt, hash, ver);
+        if (!wrote) {
+          console.error("[octa-mgmt] password recover: state write failed");
+          return json({ ok: false, error: "الاسترداد فشل — التخزين مش متاح" }, 502);
+        }
+        /* ⛔ كل الجلسات القديمة تموت ⭐ (النسخة اتغيرت ⭐) ⭐ */
+        const raw = parseCookies(request)[COOKIE];
+        if (raw) {
+          revokeSession(raw);
+          await doRevoke(env, raw);
+          await kvRevoke(env, raw);
+        }
+        await sharedAttempts(env, ip, "ok");
+        const payload = {
+          ok: true,
+          message: "اتعمل استرداد — ادخل بالكلمة الجديدة",
+          level: w.level,
+          reauth: true,
+        };
+        /* ⭐ الكلمة المولّدة بتتبعت مرة واحدة ⭐ (في الرد ⭐) ⭐ */
+        if (generated) payload.temp_password = newPass;
+        return json(payload, 200, { "Set-Cookie": `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0` });
       }
 
       /* ── التمرير ── */

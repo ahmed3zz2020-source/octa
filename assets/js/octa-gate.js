@@ -402,7 +402,97 @@
  function originMsg(w) { return ORIGIN_FAULTS[w] || API_DOWN_MSG; }
 
  /* ok = true (أخضر) · false (أحمر) · 'hi' (عادي) */
- function say(t, ok) {
+  /* 🧪🧪 (R28 · R26-I01) ⭐ صندوق المعاينة ⭐
+ 📌 السرير بيتسفيل مع عمود البريد ⭐ (مافيش إيميل ⭐)
+ ⭐ ⇒ الكود متقفل ⭐ وبيتقرأ من الصندوق بمفتاح المعاينة ⭐.
+ ⛔ المتاحد بيتسفيل من localStorage ⭐ (مافيش عمود تعادة فقط ⭐). */
+ var PV_KEY_STORE = 'octa_preview_key';
+ function previewKey() {
+  try { return localStorage.getItem(PV_KEY_STORE) || ''; } catch (e) { return ''; }
+ }
+ function previewSaveKey(k) {
+  try { localStorage.setItem(PV_KEY_STORE, k); } catch (e) { }
+ }
+ function previewMailbox(email) {
+  var k = previewKey();
+  if (!k) { previewMailboxBox(email, '', ''); return; }
+  previewMailboxFetch(email, k);
+ }
+ function previewMailboxFetch(email, key) {
+  var u = apiBase() + '/api/preview/mailbox?email=' + encodeURIComponent(email);
+  fetch(u, { headers: { 'X-Preview-Key': key }, credentials: 'include' })
+  .then(function (r) {
+  return r.text().then(function (txt) {
+  var d = null; try { d = JSON.parse(txt); } catch (e) { d = null; }
+  return { s: r.status, d: d || {} };
+  });
+  })
+  .then(function (o) {
+  if (o.s === 200 && o.d && o.d.code) {
+  try {
+  var pin2 = document.getElementById('gtCodeIn');
+  if (pin2) {
+  pin2.value = String(o.d.code);
+  if (pin2.oninput) { pin2.oninput(); }
+  }
+  } catch (e) { }
+  var old = document.getElementById('gtPvBox');
+  if (old && old.parentNode) { old.parentNode.removeChild(old); }
+  say('🧪 كود المعاينة: ' + o.d.code + ' ⭐', true);
+  return;
+  }
+  previewMailboxBox(email, key, (o.d && o.d.error) ? o.d.error : 'الكود مش موجود');
+  })
+  .catch(function () { previewMailboxBox(email, key, 'مقدرناش نوصل'); });
+ }
+ function previewMailboxBox(email, key, msg) {
+  var host = formEl();
+  if (!host) return;
+  var old = document.getElementById('gtPvBox');
+  if (old && old.parentNode) { old.parentNode.removeChild(old); }
+  var d = document.createElement('div');
+  d.id = 'gtPvBox';
+  var t = document.createElement('div');
+  t.className = 'gt-txt left';
+  t.style.fontSize = '12px';
+  t.textContent = '🧪 معاينة: اكتب مفتاح المعاينة وأنا أجيبلك الكود ⭐';
+  var row = document.createElement('div');
+  row.style.display = 'flex';
+  row.style.gap = '8px';
+  row.style.marginTop = '8px';
+  var inp = document.createElement('input');
+  inp.id = 'gtPvKey';
+  inp.className = 'gt-in';
+  inp.type = 'password';
+  inp.dir = 'ltr';
+  inp.placeholder = 'مفتاح المعاينة';
+  inp.value = key || '';
+  var btn = document.createElement('button');
+  btn.id = 'gtPvGo';
+  btn.className = 'gt-go';
+  btn.type = 'button';
+  btn.textContent = 'جيب الكود';
+  row.appendChild(inp);
+  row.appendChild(btn);
+  d.appendChild(t);
+  d.appendChild(row);
+  if (msg) {
+  var m = document.createElement('div');
+  m.className = 'gt-msg';
+  m.style.marginTop = '6px';
+  m.textContent = msg;
+  d.appendChild(m);
+  }
+  host.appendChild(d);
+  btn.onclick = function () {
+  var v = (document.getElementById('gtPvKey').value || '').trim();
+  if (!v) { say('اكتب مفتاح المعاينة', false); return; }
+  previewSaveKey(v);
+  previewMailboxFetch(email, v);
+  };
+ }
+
+function say(t, ok) {
   /* ⭐ الرسالة لازم **تظهر دايماً**  مهما كانت الشاشة.
  ⛌ قبل كده  الشاشة اللي مافيش فيها `#gtMsg`  كانت
  بتبلع الرسالة في صمت  والمستخدم يدوس  ميفهمش.
@@ -1060,18 +1150,10 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  flow.email = mail;
  try { octaTrack('signup_start', 'gate', ''); } catch (e) { }
  codeEntry();
- /* 🧪 الجولة ٢٦ (R26 · البند ٤) — ⭐ المعاينة المعزولة ⭐
- 📌 المعاينة مافيش فيها بريد ⭐ ⇒ السيرفر بيرجّع الكود في الرد ⭐
- ⭐ ⇒ نعرضه ونحطّه في الخانة ⭐ عشان صاحب المشروع يكمّل من موبايله ⭐
- ⭐ (في الإنتاج الكود بيوصل على الإيميل ⭐ — والفرع ده مالوش effect ⭐). */
- var pv = (o.d || {}).preview_code;
- if (pv) {
- try {
-  var pin2 = document.getElementById('gtCodeIn');
-  if (pin2) { pin2.value = pv; }
- } catch (e) { }
- say('🧪 معاينة: الكود بتاعك هو ' + pv + ' ⭐ (مفيش بريد في المعاينة ⭐)', true);
- }
+ /* 🧪 الجولة ۲۸ (R28 · R26-I01) ⭐ صندوق المعاينة ⭐
+ 📌 الكود مابيشرشش في الرد ⭐ (الاستحواذ من الاستحواذ ⭐).
+ ⭐ بيجي الكود من الصندوق ⭐ بمفتاح المعاينة ⭐. */
+ if ((o.d || {}).preview_mailbox) { previewMailbox(mail); }
  return;
  }
  if (btn) { btn.disabled = false; btn.textContent = 'ابعت الكود'; }
@@ -1876,6 +1958,8 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  */
  s.mode = 'forgot';
  codeEntry();
+ /* 🧪 (R28 · R26-I01) ⭐ صندوق المعانينة ⭐ (كود الاسترجاع ⭐) ⭐ */
+ if ((o.d || {}).preview_mailbox) { previewMailbox(v); }
  return;
  }
  /* ⛔ 429 → الزر يفضل مقفول طول العدّاد (sayRate بيفتحه). */

@@ -20,6 +20,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const ROOT = path.join(__dirname, '..', '..');
+/* ⭐ (R28) ⭐ صنف الل​★DO الحقيقي ⭐ (مش نسخة مقلّدة ⭐) */
+const { PreviewStore } = require('../../preview-store.js');
 
 /* ⭐ KV مُصطنع ⭐ للمعاينة ⭐ (مفيش أي اتصال خارجي ⭐) */
 function fakeKV() {
@@ -39,6 +41,28 @@ function fakeKV() {
 }
 
 /* ⭐ ⛔ أي نداء خارجي ⭐ = فشل صريح ⭐ (مش صامت ⭐) */
+/* ⭐⭐⭐ (R28) ⭐ مخزن المعاينة ⭐ (Durable Object ⭐) — الكود الحقيقي ⭐ */
+function fakeDO() {
+  const map = new Map();
+  const storage = {
+    async get(k) { return map.has(k) ? map.get(k) : undefined; },
+    async put(k, v) { map.set(k, v); },
+    async delete(k) { map.delete(k); },
+    async list(opts) {
+      const prefix = (opts && opts.prefix) || '';
+      const keys = [];
+      for (const k of map.keys()) if (k.indexOf(prefix) === 0) keys.push({ name: k });
+      return { keys: keys };
+    },
+  };
+  const instance = new PreviewStore({ storage: storage }, {});
+  return {
+    map: map,
+    idFromName: (n) => ({ name: String(n) }),
+    get: (id) => ({ async fetch(url, opts) { return instance.fetch(new Request(url, opts)); } }),
+  };
+}
+
 function makeWorker(outbound) {
   const calls = outbound || [];
   const mod = { exports: {} };
@@ -81,7 +105,10 @@ function previewEnv(extra) {
     OCTA_PREVIEW_SELF_API: 'on',
     OCTA_FAIL_CLOSED: 'on',
     PREVIEW_KV: kv,
+    /* ⭐⭐⭐ (R28) ⭐ مخزن المعاينة ⭐ (Durable Object ⭐) ⭐ + مفتاح الصندوق ⭐ */
+    PREVIEW_STORE: fakeDO(),
     PREVIEW_SESSION_SECRET: 'synthetic-preview-secret',
+    PREVIEW_CONSOLE_KEY: 'synthetic-preview-console-key',
     ASSETS: {
       fetch: async () => {
         throw new Error('ASSETS must not be needed for the API routes');
@@ -118,15 +145,25 @@ test('R26-SA-01 · ⭐ /api/auth/me في المعاينة ⭐ بيتخدم مح�
 test('R26-SA-02 · ⭐ تسجيل المعاينة ⭐ بيتخدم محلي ⭐ (مش من الباك ⭐)', async () => {
   const calls = [];
   const w = makeWorker(calls);
+  /* ⭐ (R28) ⭐ نفس البيئة ⭐ (الـDO ⭐ واحد ⭐) ⭐ لا يكسر تقرير الصندوق في ثاني آخر ⭐ */
+  const env = previewEnv();
   const res = await w.fetch(req(ORIGIN + '/api/auth/signup/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: 'probe@example.test', name: 'probe' }),
-  }), previewEnv());
+  }), env);
   const j = await res.json();
   assert.equal(res.status, 200, '⛔ لازم ٢٠٠ ⭐ — got ' + res.status);
   assert.equal(j.ok, true);
-  assert.ok(j.preview_code, '⛔ المعاينة لازم ترجّع الكود ⭐ (مافيش بريد ⭐)');
+  assert.ok(!j.preview_code, '⛔⛔⛔ الكود ميبيشرش في الرد ⭐ (الاستحواذ إلى الصندوق ⭐)');
+  assert.equal(j.preview_mailbox, true, '⛔ لازم يلف الصندوق ⭐');
+  /* ⭐ الكود بييجي من الصندوق ⭐ (بمفتاح المعاينة ⭐) ⭐ */
+  const mb = await w.fetch(req(ORIGIN + '/api/preview/mailbox?email=probe@example.test', {
+    headers: { 'X-Preview-Key': 'synthetic-preview-console-key' },
+  }), env);
+  const mbj = await mb.json();
+  assert.equal(mbj.ok, true, '⛔ الصندوق مافتح⭐');
+  assert.ok(mbj.code && /^[0-9]{6}$/.test(mbj.code), '⛔ كود غلط ⭐');
   assert.equal(calls.length, 0,
     '⛔⛔⛔ المعاينة لازم ما تعملش أي اتصال خارجي ⭐ — ' + calls.join(',') + ' ⭐');
 });

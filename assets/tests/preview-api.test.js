@@ -41,8 +41,50 @@ function env(overrides) {
   return Object.assign({
     OCTA_PREVIEW_SELF_API: 'on',
     PREVIEW_KV: fakeKV(),
-    PREVIEW_SESSION_SECRET: 'test-secret-not-real'
+    PREVIEW_STORE: fakeDO(),
+    PREVIEW_SESSION_SECRET: 'test-secret-not-real',
+    PREVIEW_CONSOLE_KEY: 'test-preview-console-key'
   }, overrides || {});
+}
+
+/* ⭐⭐⭐ (R28) ⭐ مخزن المعاينة ⭐ (Durable Object ⭐) ⭐
+   ⭐ الكود الحقيقي بيُستخدم الكلاس الحقيقي ⭐
+   ⭐ لعند التحقق ⭐: انتساق قوي ⭐ (مافيش انتساق مقابر ⭐). */
+const { PreviewStore } = require('../../preview-store.js');
+
+function fakeDO() {
+  const map = new Map();
+  const storage = {
+    async get(k) { return map.has(k) ? map.get(k) : undefined; },
+    async put(k, v) { map.set(k, v); },
+    async delete(k) { map.delete(k); },
+    async list(opts) {
+      const prefix = (opts && opts.prefix) || '';
+      const keys = [];
+      for (const k of map.keys()) if (k.indexOf(prefix) === 0) keys.push({ name: k });
+      return { keys: keys };
+    },
+  };
+  const instance = new PreviewStore({ storage: storage }, {});
+  return {
+    map: map,
+    idFromName: (n) => ({ name: String(n) }),
+    get: (id) => ({
+      async fetch(url, opts) { return instance.fetch(new Request(url, opts)); },
+    }),
+  };
+}
+
+/* ⭐ (R28) ⭐ ملف المعاينة ⭐ — اقراء الكود من الصندوق ⭐
+   ⭐ مافيش إيميل في الرد ⭐ لا بيستطع الكود إلا فقط سرية. */
+async function codeFromMailbox(e, email) {
+  const r = await call(e, '/api/preview/mailbox?email=' + encodeURIComponent(email), {
+    headers: { 'X-Preview-Key': e.PREVIEW_CONSOLE_KEY },
+  });
+  if (!r.body || !r.body.code) {
+    throw new Error('mailbox: ' + JSON.stringify(r.body));
+  }
+  return r.body.code;
 }
 
 function req(path, opts) {
@@ -101,7 +143,8 @@ test('② تسجيل كامل ⇒ حساب ⭐ جلسة ⭐ كوكي ⭐', async
   const start = await call(e, '/api/auth/signup/start',
     { method: 'POST', json: { name: 'اختبار', email: email } });
   assert.strictEqual(start.status, 200);
-  assert.ok(start.body.preview_code, 'الكود لازم يوصل في المعاينة');
+  assert.ok(!start.body.preview_code, '⛔⛔⛔ الكود ميبيشرش في الرد ⭐');
+  const code0 = await codeFromMailbox(e, email);
   assert.strictEqual(start.body.sent, true);
 
   /* ⛔ رد موحّد Whether الإيميل مسجّل أو لأ ⭐ */
@@ -110,9 +153,9 @@ test('② تسجيل كامل ⇒ حساب ⭐ جلسة ⭐ كوكي ⭐', async
   assert.strictEqual(start2.body.sent, true);
   /* ⛔ آخر كود هو الساري ⭐ — والكود القديم لازم يبطل ⭐ */
   const stale = await call(e, '/api/auth/signup/verify',
-    { method: 'POST', json: { email: email, code: start.body.preview_code } });
+    { method: 'POST', json: { email: email, code: code0 } });
   assert.strictEqual(stale.status, 400, 'الكود القديم لازم يبطل ⭐');
-  const live = start2.body.preview_code;
+  const live = await codeFromMailbox(e, email);
 
   const verify = await call(e, '/api/auth/signup/verify',
     { method: 'POST', json: { email: email, code: live } });
@@ -131,8 +174,10 @@ test('② تسجيل كامل ⇒ حساب ⭐ جلسة ⭐ كوكي ⭐', async
   assert.ok(mk.body.token, 'لازم يطلع توكن');
   assert.ok(cookieOf(mk.res).startsWith('octa_token='), 'لازم يطلع كوكي الجلسة');
 
-  /* ⛔ الباسورد مش بيتبعتش خام في التخزين ⭐ */
-  const raw = JSON.stringify([...e.PREVIEW_KV.store.entries()]);
+  /* ⛔ الباسورد مش بيتبعتش خام في التخزين ⭐
+     ⭐ (R28) ⭐ التخزين بقي المخزن القوي ⭐ (لا ال​KV ⭐) ⭐ */
+  const raw = JSON.stringify([...e.PREVIEW_STORE.map.entries()])
+    + JSON.stringify([...e.PREVIEW_KV.store.entries()]);
   assert.ok(raw.indexOf('pin_hash') >= 0, 'الهاش لازم يكون موجود');
   assert.ok(raw.indexOf('4321') < 0, 'الباسورد الخام لازم مايتخزنش ⭐');
 });
@@ -143,7 +188,7 @@ test('②ب باسورد مش ٤ أرقام ⇒ 400', async () => {
   const start = await call(e, '/api/auth/signup/start',
     { method: 'POST', json: { name: 'x', email: email } });
   const r = await call(e, '/api/auth/signup/newpin', {
-    method: 'POST', json: { email: email, code: start.body.preview_code, pin: '12' }
+    method: 'POST', json: { email: email, code: await codeFromMailbox(e, email), pin: '12' }
   });
   assert.strictEqual(r.status, 400);
 });
@@ -157,7 +202,7 @@ test('③ دخول بالباسورد + جهاز مسجّل ⇒ جلسة ⭐', a
     { method: 'POST', json: { name: 'x', email: email } });
   await call(e, '/api/auth/signup/newpin', {
     method: 'POST',
-    json: { email: email, code: start.body.preview_code, pin: '1111', device: device }
+    json: { email: email, code: await codeFromMailbox(e, email), pin: '1111', device: device }
   });
 
   const okLogin = await call(e, '/api/auth/pin/login',
@@ -182,7 +227,7 @@ test('③ دخول بالباسورد + جهاز مسجّل ⇒ جلسة ⭐', a
     { method: 'POST', json: { name: 'x', email: email2 } });
   await call(e, '/api/auth/signup/newpin', {
     method: 'POST',
-    json: { email: email2, code: s2.body.preview_code, pin: '1111', device: device2 }
+    json: { email: email2, code: await codeFromMailbox(e, email2), pin: '1111', device: device2 }
   });
   const right = await call(e, '/api/auth/pin/login',
     { method: 'POST', json: { pin: '1111', device: device2 } });
@@ -207,7 +252,7 @@ test('③ب من أنا بالجلسة ⭐ — ومن غير جلسة ⇒ 401 �
     { method: 'POST', json: { name: 'س', email: email } });
   const mk = await call(e, '/api/auth/signup/newpin', {
     method: 'POST',
-    json: { email: email, code: start.body.preview_code, pin: '2222', device: device }
+    json: { email: email, code: await codeFromMailbox(e, email), pin: '2222', device: device }
   });
   const cookie = cookieOf(mk.res);
   const me = await call(e, '/api/auth/me', { headers: { Cookie: cookie } });
@@ -223,7 +268,7 @@ test('③ج ⭐ إبطال فوري ⭐ — بعد الخروج الجلسة ا�
     { method: 'POST', json: { name: 'س', email: email } });
   const mk = await call(e, '/api/auth/signup/newpin', {
     method: 'POST',
-    json: { email: email, code: start.body.preview_code, pin: '3333', device: device }
+    json: { email: email, code: await codeFromMailbox(e, email), pin: '3333', device: device }
   });
   const cookie = cookieOf(mk.res);
 
@@ -245,7 +290,7 @@ test('③د ⭐ تجديد الجلسة ⭐ — القديم يموت والجد
     { method: 'POST', json: { name: 'س', email: email } });
   const mk = await call(e, '/api/auth/signup/newpin', {
     method: 'POST',
-    json: { email: email, code: start.body.preview_code, pin: '4444', device: device }
+    json: { email: email, code: await codeFromMailbox(e, email), pin: '4444', device: device }
   });
   const cookie = cookieOf(mk.res);
   const ref = await call(e, '/api/auth/refresh', { method: 'POST', headers: { Cookie: cookie } });
@@ -312,7 +357,7 @@ test('④ب ⭐ الترتيب ⭐ — 401 للزائر ⭐ + نتائج للم�
     { method: 'POST', json: { name: 'س', email: email } });
   const mk = await call(e, '/api/auth/signup/newpin', {
     method: 'POST',
-    json: { email: email, code: start.body.preview_code, pin: '6666', device: device }
+    json: { email: email, code: await codeFromMailbox(e, email), pin: '6666', device: device }
   });
   const r = await call(e, '/api/rank?limit=10', { headers: { Cookie: cookieOf(mk.res) } });
   assert.strictEqual(r.status, 200);
@@ -329,7 +374,7 @@ test('⑤ ⭐ المحفظة معزولة بين الحسابات ⭐', async ()
       { method: 'POST', json: { name: 'س', email: email } });
     const mk = await call(e, '/api/auth/signup/newpin', {
       method: 'POST',
-      json: { email: email, code: start.body.preview_code, pin: pin, device: device }
+      json: { email: email, code: await codeFromMailbox(e, email), pin: pin, device: device }
     });
     return cookieOf(mk.res);
   };
@@ -357,7 +402,7 @@ test('⑤ب ⭐ التنبيهات: منع التكرار ⭐ + عزل بين ا
     { method: 'POST', json: { name: 'س', email: 'al@example.com' } });
   const mk = await call(e, '/api/auth/signup/newpin', {
     method: 'POST',
-    json: { email: 'al@example.com', code: start.body.preview_code, pin: '5555', device: 'dev-cccc-3333' }
+    json: { email: 'al@example.com', code: await codeFromMailbox(e, 'al@example.com'), pin: '5555', device: 'dev-cccc-3333' }
   });
   const cookie = cookieOf(mk.res);
 

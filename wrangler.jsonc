@@ -22,7 +22,9 @@
   "name": "octa-preview",
   "account_id": "74e046678adabf0706024b97b205882b",
   "compatibility_date": "2026-10-10",
-  "main": "worker.js",
+  /* ⭐⭐⭐ (R28) ⭐ نقطة الدخول ⭐ — فيها تصدير الـDurable Object ⭐
+     📌 worker.js ⭐ نفسه ما اتغيّرش ⭐ (من غير export جديد ⭐). */
+  "main": "worker-main.js",
   "assets": {
     "directory": "./dist",
     /* ⛔⛔⛔ ٢٥ أكتوبر ٢٠٢٦ — ⭐ لازم run_worker_first
@@ -49,12 +51,27 @@
   /* ⭐ ٩ نوفمبر ٢٠٢٦ — كاش هالان (بورصة مصر): الأحداث + عمق السوق.
      📌 قراءة بس من الموقع — الأسرار (توكن MCP) في عامل halan-feed بس. */
   "kv_namespaces": [
-    { "binding": "HALAN_KV", "id": "8c9beca8ef09451b9767819d3060fb55" }
+    /* ⭐⭐⭐ (R28 · R26-I05) ⭐ ⛔ المعاينة **مش** تشارك الإنتاج مساحة هالان ⭐ ⭐
+       📌 قبل ⭐: الـid نفس إنتاج ⭐ ⇒ ⭐ المعاينة والإنتاج على نفس البيانات ⭐.
+       ✅ دلوقتي ⭐: مساحة **خاصة بالمعاينة** ⭐ (نسخة مستقلة ⭐). */
+    { "binding": "HALAN_KV", "id": "24f90783bedf4291b57705bbb2f51a88" }
   ,
     {
       "binding": "PREVIEW_KV",
       "id": "68e1d82a57f94344a051bcfd9dfd81ed"
     }],
+  /* ⭐⭐⭐ (R28) ⭐ مخزن المعاينة (Durable Object ⭐) ⭐
+     📌 R26-I02 ⭐ ⇒ ⛔ إبطال الجلسات مبيتنتشرش فوراً في الـKV ⭐.
+     📌 R26-I04 ⭐ ⇒ ⛔ الكتابات المتزامنة (المحفظة ⭐ / التنبيهات ⭐) بتضيع ⭐.
+     ✅ الـDO ⭐: اتساق قوي ⭐ + كتابة ذرّية ⭐. */
+  "durable_objects": {
+    "bindings": [
+      { "name": "PREVIEW_STORE", "class_name": "PreviewStore" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["PreviewStore"] }
+  ],
   "vars": {
     /* 🛡️ الجولة ٢٥ (R25 · المرحلة ٤) ⭐ — ⭐ المعاينة المعزولة ⭐
        ⭐ بتخدم الـAPI من عندها ⭐ (مافيش نفق مؤقت ⭐ ⇒ مافيش 1016 ⭐)

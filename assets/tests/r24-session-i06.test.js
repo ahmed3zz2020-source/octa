@@ -62,6 +62,11 @@ function makeCallLog() {
       async fetch(url, opts) {
         const method = (opts && opts.method) || 'GET';
         calls.push({ kind: 'do-' + method.toLowerCase(), url: String(url), name: id.name });
+        /* ⭐⭐⭐ (R28) ⭐ حالة كلمة المرور ⭐ (panel_state ⭐) ⭐ */
+        if (String(id.name || '') === 'panel_state' && method === 'GET') {
+          return new Response(JSON.stringify({ ok: true, pwd: null }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
         if (method === 'POST') return new Response(JSON.stringify({ ok: true, revoked: true }),
           { status: 200, headers: { 'Content-Type': 'application/json' } });
         return new Response(JSON.stringify({ revoked: false }),
@@ -131,10 +136,13 @@ function credentialTag(password, ver) {
 }
 
 function mintCookie(expMs, secret, password, ver) {
+  /* ⭐⭐⭐ (R28) ⭐ \u0627\u0644\u0634\u0643\u0644 \u0627\u0644\u062c\u062f\u064a\u062f ⭐ `exp.tag.sig` ⭐
+     ⭐ \u0627\u0644\u0648\u0633\u0645 \u0628\u0627\u0644\u0646\u0633\u062e\u0629 \u062f\u0627\u062e\u0644 \u0627\u0644\u062a\u0648\u0643\u0646 ⭐ (\u0645\u0627\u0641\u064a\u0634 \u0646\u062f\u0627\u0621\u0627\u062a \u062e\u0632\u0627\u0621\u064a\u0629) ⭐. */
   const exp = String(expMs);
-  const payload = exp + '.' + credentialTag(password, ver);
+  const tag = credentialTag(password, ver);
+  const payload = exp + '.' + tag;
   const sig = nodeCrypto.createHmac('sha256', secret).update(payload).digest('hex');
-  return 'octa_mgmt_sess=' + encodeURIComponent(exp + '.' + sig);
+  return 'octa_mgmt_sess=' + encodeURIComponent(exp + '.' + tag + '.' + sig);
 }
 
 async function sessionStatus(worker, env, cookie) {
@@ -158,7 +166,7 @@ test('R24-I06-01: a FORGED cookie never reaches the storage (zero calls)', async
   assert.equal(st, 401, '⛔ لازم ترفض ⭐');
   assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ كوكي مزوّر وصل التخزين ⭐ ⭐ (' +
     log.calls.map(c => c.kind).join(',') + ') ⭐ لازم صفر نداءات ⭐');
-  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) ⭐ \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -176,7 +184,7 @@ test('R24-I06-02: an EXPIRED cookie never reaches the storage (zero calls)', asy
   assert.equal(st, 401, '⛔ لازم ترفض ⭐');
   assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ كوكي منتهي وصل التخزين ⭐ ⭐ (' +
     log.calls.map(c => c.kind).join(',') + ') ⭐');
-  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) ⭐ \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -190,7 +198,7 @@ test('R24-I06-03: a MALFORMED cookie never reaches the storage (zero calls)', as
   const st = await sessionStatus(worker, env, 'octa_mgmt_sess=not-a-session');
   assert.equal(st, 401, '⛔ لازم ترفض ⭐');
   assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ كوكي مشوّه وصل التخزين ⭐ ⭐');
-  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) ⭐ \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -243,5 +251,5 @@ test('R24-I06-06: a forged cookie is refused on a protected API too', async () =
   }), env);
   assert.equal(res.status, 401, '⛔ لازم ٤٠١ ⭐');
   assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ كوكي مزوّر وصل التخزين من مسار محمي ⭐ ⭐');
-  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) ⭐ \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });

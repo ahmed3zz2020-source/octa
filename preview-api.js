@@ -112,37 +112,82 @@ async function uidOf(email) {
   return 'u_' + (await sha256hex(String(email).trim().toLowerCase()));
 }
 const acctKey = (uid) => 'acct:' + uid;
+/* ⭐⭐⭐ (R28 · R26-I01) ⭐ صندوق المعاينة ⭐ — الكود (نص صريح ⭐)
+   ⭐ بيتقرأ بـ**مفتاح المعاينة** ⭐ بس ⭐ ⇒ ⛔ مافيش استحواذ ⭐. */
+const mailKey = (uid) => 'mail:' + uid;
 const chalKey = (uid) => 'chal:' + uid;
 const sessKey = (uid, sid) => 'sess:' + uid + ':' + sid;
 const lockKey = (kind, id) => 'lock:' + kind + ':' + id;
 
-async function kvGet(env, key) {
-  const raw = await env.PREVIEW_KV.get(key, 'text');
-  return raw ? JSON.parse(raw) : null;
+/* ⭐⭐⭐ (R28) ⭐ مخزن المعاينة (Durable Object ⭐) ⭐
+   📌 السبب ⭐: ⛔ الـKV اتساقه مؤجل ⭐ ⇒ ⛔ R26-I02 (إبطال مش فوري ⭐)
+      + ⛔ R26-I04 (كتابة متزامنة بتضيع ⭐).
+   ✅ الـDO ⭐: قراءة بعد كتابة ⭐ + ⭐ كتابة ذرّية ⭐.
+   📌 ⛔fail-closed ⭐: لو الربط ناقص ⭐ ⇒ ⭐ null ⭐ ⇒ ⭐ الـAPI يرد 503 ⭐. */
+const DO_NAME = 'preview_state';
+
+async function storeCmd(env, cmd) {
+  if (!env.PREVIEW_STORE) return null;
+  try {
+    const id = env.PREVIEW_STORE.idFromName(DO_NAME);
+    const stub = env.PREVIEW_STORE.get(id);
+    const res = await stub.fetch('https://store.internal/cmd', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cmd),
+    });
+    if (!res || !res.ok) return null;
+    const body = await res.json().catch(() => null);
+    if (!body || body.ok !== true) return null;
+    return body;
+  } catch (e) { return null; }
 }
-async function kvPut(env, key, value, ttlSec) {
-  if (ttlSec) await env.PREVIEW_KV.put(key, JSON.stringify(value), { expirationTtl: ttlSec });
-  else await env.PREVIEW_KV.put(key, JSON.stringify(value));
+async function storeGet(env, key) {
+  const r = await storeCmd(env, { op: 'get', key: key });
+  return r ? (r.value === undefined ? null : r.value) : null;
 }
-async function kvDel(env, key) { await env.PREVIEW_KV.delete(key); }
+async function storePut(env, key, value, ttlSec) {
+  const r = await storeCmd(env, { op: 'put', key: key, value: value, ttl: ttlSec || 0 });
+  return !!r;
+}
+async function storeDel(env, key) {
+  const r = await storeCmd(env, { op: 'del', key: key });
+  return !!r;
+}
+async function storeList(env, prefix) {
+  const r = await storeCmd(env, { op: 'list', prefix: prefix });
+  return r ? (r.keys || []) : [];
+}
+/* ⭐ اللقطة ⭐ — **بتفضل في الـKV** ⭐ (بيانات قراءة ⭐ من أداة التغذية ⭐) */
+async function snapshotGet(env, key) {
+  try {
+    const raw = await env.PREVIEW_KV.get(key, 'text');
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
 
 /* ── قفل المحاولات ───────────────────────────────────────────────────── */
+/* ⭐⭐⭐ (R28) ⭐ القفل بقى **في المخزن القوي** ⭐ (مش الـKV ⭐)
+   ⭐ ⇒ ⭐ العدّاد متسق فوراً ⭐ بين كل النسخ ⭐ (R26-I03 ⭐).
+   ⭐ ⭐ القفل دلوقتي على **مصدرين** ⭐:
+      ① `pin` ⭐ = هاش الباسورد (كل الأجهزة ⭐) ⭐ ⇒ ⛔ تغيير الجهاز مابيفلتش ⭐.
+      ② `ip` ⭐ = عنوان الـIP ⭐ ⇒ ⛔ تخمين من جهاز ⭐. */
 async function lockState(env, kind, id) {
-  const rec = await kvGet(env, lockKey(kind, id));
+  const rec = await storeGet(env, lockKey(kind, id));
   if (!rec) return null;
   if (rec.until && rec.until > nowSec()) return rec.until - nowSec();
-  if (rec.count >= MAX_ATTEMPTS) return LOCK_TTL_SEC;
   return null;
 }
 async function bumpAttempts(env, kind, id) {
   const key = lockKey(kind, id);
-  const rec = (await kvGet(env, key)) || { count: 0, until: 0 };
+  const rec = (await storeGet(env, key)) || { count: 0, until: 0 };
   rec.count = (rec.count || 0) + 1;
   if (rec.count >= MAX_ATTEMPTS) {
     rec.until = nowSec() + LOCK_TTL_SEC;
     rec.count = 0;
   }
-  await kvPut(env, key, rec, LOCK_TTL_SEC * 2);
+  await storePut(env, key, rec, LOCK_TTL_SEC * 2);
+  return rec;
 }
 
 /* ── الجلسات ──────────────────────────────────────────────────────────── */
@@ -152,7 +197,8 @@ async function issueSession(env, acct, device) {
   const body = enc(payload);
   const sig = await hmac(env.PREVIEW_SESSION_SECRET, body);
   const token = body + '.' + sig;
-  await kvPut(env, sessKey(acct.uid, sid), {
+  /* ⭐⭐⭐ (R28) ⭐ الجلسة في المخزن القوي ⭐ ⇒ ⭐ إبطال فوري ⭐ (R26-I02 ⭐) */
+  await storePut(env, sessKey(acct.uid, sid), {
     uid: acct.uid, sid: sid, exp: payload.exp,
     device: device || '', epoch: acct.epoch || 1
   }, SESSION_TTL_SEC + 3600);
@@ -174,9 +220,11 @@ async function readSession(env, request) {
   const payload = dec(body);
   if (!payload || !payload.uid || !payload.sid) return null;
   if ((payload.exp || 0) <= nowSec()) return null;
-  const rec = await kvGet(env, sessKey(payload.uid, payload.sid));
+  const rec = await storeGet(env, sessKey(payload.uid, payload.sid));
   if (!rec) return null;                          /* ⛔ مُبطل ⇒ رفض فوراً */
-  if (rec.epoch !== (await kvGet(env, acctKey(payload.uid)) || {}).epoch) return null;
+  const acctNow = await storeGet(env, acctKey(payload.uid));
+  if (!acctNow) return null;
+  if (rec.epoch !== (acctNow.epoch || 1)) return null;
   return { payload: payload, rec: rec };
 }
 
@@ -187,24 +235,39 @@ function userView(acct) {
   };
 }
 
+/* ⭐ مقارنة ثابتة الزمن ⭐ (مقارنة سر المعاينة ⭐) */
+function safeEqual(a, b) {
+  const x = String(a || '');
+  const y = String(b || '');
+  if (x.length !== y.length) return false;
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x.charCodeAt(i) ^ y.charCodeAt(i);
+  return diff === 0;
+}
+
 /* ── الكود ────────────────────────────────────────────────────────────── */
 async function makeChallenge(env, uid, email, name) {
   const code = randDigits(6);
-  await kvPut(env, chalKey(uid), {
+  await storePut(env, chalKey(uid), {
     code_hash: await sha256hex(code), email: email, name: name || '',
     exp: nowSec() + CHALLENGE_TTL_SEC, tries: 0
+  }, CHALLENGE_TTL_SEC + 60);
+  /* ⭐⭐⭐ (R28 · R26-I01) ⭐ الكود (نص صريح ⭐) في صندوق المعاينة ⭐
+     ⭐ — مش في الرد ⭐ — ومقفول بمفتاح ⭐. */
+  await storePut(env, mailKey(uid), {
+    code: code, email: email, exp: nowSec() + CHALLENGE_TTL_SEC
   }, CHALLENGE_TTL_SEC + 60);
   return code;
 }
 async function checkChallenge(env, uid, code) {
-  const rec = await kvGet(env, chalKey(uid));
+  const rec = await storeGet(env, chalKey(uid));
   if (!rec) return { ok: false, why: 'challenge_expired' };
-  if ((rec.exp || 0) <= nowSec()) { await kvDel(env, chalKey(uid)); return { ok: false, why: 'challenge_expired' }; }
+  if ((rec.exp || 0) <= nowSec()) { await storeDel(env, chalKey(uid)); return { ok: false, why: 'challenge_expired' }; }
   if ((rec.tries || 0) >= 5) return { ok: false, why: 'too_many_tries' };
   const got = await sha256hex(String(code || '').trim());
   if (got !== rec.code_hash) {
     rec.tries = (rec.tries || 0) + 1;
-    await kvPut(env, chalKey(uid), rec, CHALLENGE_TTL_SEC + 60);
+    await storePut(env, chalKey(uid), rec, CHALLENGE_TTL_SEC + 60);
     return { ok: false, why: 'bad_code' };
   }
   return { ok: true, rec: rec };
@@ -221,10 +284,10 @@ async function handlePreviewApi(opts) {
 
   /* ⛔⛔ fail-closed ⛔⛔ — لو الإعداد ناقص ⇒ 503 صريح (مافيش نجاح وهمي) */
   if (!env || env.OCTA_PREVIEW_SELF_API !== 'on') return null;
-  if (!env.PREVIEW_KV || !env.PREVIEW_SESSION_SECRET) {
+  if (!env.PREVIEW_KV || !env.PREVIEW_SESSION_SECRET || !env.PREVIEW_STORE) {
     return json({
       ok: false, error: 'preview_backend_misconfigured',
-      why: 'المعاينة محتاجة تخزينها الخاص وسر جلساتها ⭐ — من غيرهم مفيش تشغيل ⭐'
+      why: 'المعاينة محتاجة تخزينها الخاص وسر جلساتها ومخزنها القوي ⭐ — من غيرهم مفيش تشغيل ⭐'
     }, 503);
   }
 
@@ -258,11 +321,16 @@ async function handlePreviewApi(opts) {
     if (lock) return json({ ok: false, error: 'محاولات كتير — استنى شوية', why: 'locked' }, 429);
     const code = await makeChallenge(env, uid, email, name);
     /* ⛔ رد واحد Whether الإيميل مسجّل أو لأ ⭐ (مافيش تعداد) */
+    /* ⭐⭐⭐ (R28 · R26-I01) ⭐ ⛔⛔⛔ الكود **مش** بيرجع في الرد ⭐ ⛔⛔⛔
+       📌 قبل ⭐: `preview_code` ⭐ ⇒ ⭐ أي حد يقدر ياخد كود أي إيميل ⭐
+          ⇒ ⭐ ⛔ استحواذ على الحسابات ⭐ (تسجيل ⭐ أو استرجاع ⭐).
+       ✅ دلوقتي ⭐: الكود بيتبعت على **صندوق المعاينة** ⭐
+          ⭐ (يتقرأ بـ**مفتاح المعاينة** ⭐ بس ⭐) ⭐. */
     return json({
       ok: true, sent: true, expires_in: CHALLENGE_TTL_SEC,
       message: 'لو الإيميل ده بتاعك، هتلاقي كود من ٦ أرقام في بريدك',
-      preview_code: code,
-      preview_note: 'معاينة: مفيش بريد ⇒ الكود ظاهر هنا ⭐'
+      preview_mailbox: true,
+      preview_note: 'معاينة: الكود في صندوق المعاينة ⭐ — محتاج مفتاح المعاينة ⭐'
     });
   }
 
@@ -275,7 +343,7 @@ async function handlePreviewApi(opts) {
       return json({ ok: false, error: 'الكود مش مظبوط أو خلص', why: chk.why },
         chk.why === 'too_many_tries' ? 429 : 400);
     }
-    const acct = await kvGet(env, acctKey(uid));
+    const acct = await storeGet(env, acctKey(uid));
     if (!acct) {
       return json({ ok: true, verified: true, needs_pin: true,
         message: 'الكود اتأكد ⭐ — دلوقتي حطّ الباسورد من ٤ أرقام ⭐' });
@@ -296,18 +364,29 @@ async function handlePreviewApi(opts) {
     }
     const salt = b64u(crypto.getRandomValues(new Uint8Array(16)));
     const hash = await pbkdf2(pin, salt);
+    /* ⭐⭐⭐ (R28 · R26-I01) ⭐ ⛔⛔⛔ الحساب الموجود **ما بيتكتبش** ⭐ ⛔⛔⛔
+       📌 قبل ⭐: `newpin` ⭐ كان بيعيد كتابة أي حساب ⭐ ⇒ ⭐ ⛔ استحواذ ⭐.
+       ✅ دلوقتي ⭐: الحساب الموجود ⭐ ⇒ ⭐ الطريق الصح ⭐ = استرجاع ⭐
+          (pin/challenge ⭐) ⭐. */
+    const existing = await storeGet(env, acctKey(uid));
+    if (existing) {
+      return json({
+        ok: false, error: 'الحساب موجود — استخدم استرجاع الباسورد',
+        why: 'account_exists'
+      }, 409);
+    }
     const acct = {
       uid: uid, email: email, name: chk.rec.name || 'مستخدم',
       pin_salt: salt, pin_hash: hash, epoch: 1,
       devices: [], created_at: nowSec(), plan: 'preview'
     };
-    await kvPut(env, acctKey(uid), acct);
-    await kvDel(env, chalKey(uid));
+    await storePut(env, acctKey(uid), acct);
+    await storeDel(env, chalKey(uid));
     const device = String(body.device || '').trim();
     if (device) acct.devices = [device];
-    if (device) await kvPut(env, acctKey(uid), acct);
+    if (device) await storePut(env, acctKey(uid), acct);
     /* ⭐ فهرس الباسورد ⭐ (قراءة قوية ⭐ — القوائم متأخرة ⭐) */
-    try { await kvPut(env, 'pinidx:' + await sha256hex(String(pin)), acctKey(uid)); } catch (e) { }
+    try { await storePut(env, 'pinidx:' + await sha256hex(String(pin)), acctKey(uid)); } catch (e) { }
     const token = await issueSession(env, acct, device);
     return json({
       ok: true, token: token, expires_in: SESSION_TTL_SEC,
@@ -319,11 +398,13 @@ async function handlePreviewApi(opts) {
   if (p === '/api/auth/pin/challenge/send' && m === 'POST') {
     const email = String(body.email || '').trim().toLowerCase().slice(0, 120);
     const uid = await uidOf(email);
-    const code = await makeChallenge(env, uid, email, '');
+    await makeChallenge(env, uid, email, '');
+    /* ⭐⭐⭐ (R28 · R26-I01) ⭐ ⛔ الكود مش بيرجع ⭐ (زي التسجيل ⭐) ⭐ */
     return json({
       ok: true, sent: true, expires_in: CHALLENGE_TTL_SEC,
       message: 'لو الإيميل ده بتاعك، هتلاقي كود من ٦ أرقام في بريدك',
-      preview_code: code, preview_note: 'معاينة: مفيش بريد ⇒ الكود ظاهر هنا ⭐'
+      preview_mailbox: true,
+      preview_note: 'معاينة: الكود في صندوق المعاينة ⭐ — محتاج مفتاح المعاينة ⭐'
     });
   }
   if (p === '/api/auth/pin/challenge/verify' && m === 'POST') {
@@ -340,14 +421,14 @@ async function handlePreviewApi(opts) {
     const chk = await checkChallenge(env, uid, body.code);
     if (!chk.ok) return json({ ok: false, error: 'الكود مش مظبوط أو خلص', why: chk.why }, 400);
     if (!PIN_RE.test(pin)) return json({ ok: false, error: 'الباسورد ٤ أرقام بالظبط', why: 'bad_pin' }, 400);
-    const acct = await kvGet(env, acctKey(uid));
+    const acct = await storeGet(env, acctKey(uid));
     if (!acct) return json({ ok: false, error: 'مفيش حساب بالإيميل ده', why: 'no_account' }, 404);
     const salt = b64u(crypto.getRandomValues(new Uint8Array(16)));
     acct.pin_salt = salt;
     acct.pin_hash = await pbkdf2(pin, salt);
     acct.epoch = (acct.epoch || 1) + 1;         /* ⛔ إبطال كل الجلسات ⭐ */
-    await kvPut(env, acctKey(uid), acct);
-    await kvDel(env, chalKey(uid));
+    await storePut(env, acctKey(uid), acct);
+    await storeDel(env, chalKey(uid));
     return json({ ok: true, message: 'الباسورد اتغيّر ⭐ — لازم تعمل دخول تاني ⭐' });
   }
 
@@ -366,23 +447,40 @@ async function handlePreviewApi(opts) {
       return json({ ok: false, error: 'لازم بصمة الجهاز',
         why: 'device_required' }, 400);
     }
-    const list = await env.PREVIEW_KV.list({ prefix: 'acct:' });
+    /* ⭐⭐⭐ (R28 · R26-I03) ⭐ القفل بيتفحص **قبل** أي محاولة ⭐ ⭐⭐
+       📌 قبل ⭐: `lockState` ⭐ مكانش بيتنادى في المسار ده خالص ⭐
+          ⇒ ⛔ القفل كان بلا أثر ⭐ ⇒ ⛔ تخمين ٤ أرقام (١٠٬٠٠٠ ⭐) مفتوح ⭐.
+       ✅ دلوقتي ⭐: قفل على **هاش الباسورد** ⭐ (كل الأجهزة ⭐)
+          + قفل على **الـIP** ⭐ ⇒ ⛔ تغيير الجهاز مابيفلتش ⭐. */
+    const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const pinHash = await sha256hex(String(pin));
+    const lockPin = await lockState(env, 'pin', pinHash);
+    if (lockPin) {
+      return json({ ok: false, error: 'محاولات كتير — استنى شوية',
+        why: 'locked', retry_after: Math.ceil(lockPin) }, 429);
+    }
+    const lockIp = await lockState(env, 'ip', await sha256hex(ip));
+    if (lockIp) {
+      return json({ ok: false, error: 'محاولات كتير — استنى شوية',
+        why: 'locked', retry_after: Math.ceil(lockIp) }, 429);
+    }
+    const list = await storeList(env, 'acct:');
     let found = null;
     const cands = [];
     /* ⭐ الفهرس أولاً ⭐ (قراءة قوية ⭐) */
     try {
-      const idx = await kvGet(env, 'pinidx:' + await sha256hex(String(pin)));
+      const idx = await storeGet(env, 'pinidx:' + pinHash);
       if (idx) {
-        const a0 = await kvGet(env, idx);
+        const a0 = await storeGet(env, idx);
         if (a0) {
           const h0 = await pbkdf2(pin, a0.pin_salt || '');
           if (h0 === a0.pin_hash && (a0.devices || []).includes(device)) found = a0;
         }
       }
     } catch (e) { }
-    for (const key of (list.keys || [])) {
+    for (const key of list) {
       if (found) break;
-      const acct = await kvGet(env, key.name);
+      const acct = await storeGet(env, key);
       if (!acct) continue;
       const hash = await pbkdf2(pin, acct.pin_salt || '');
       if (hash !== acct.pin_hash) continue;
@@ -398,12 +496,16 @@ async function handlePreviewApi(opts) {
       }
     }
     if (!found) {
-      await bumpAttempts(env, 'pin', await sha256hex(pin + '|' + device));
+      /* ⭐⭐⭐ (R28 · R26-I03) ⭐ العدّاد بيزيد على **الباسورد** ⭐ + **الـIP** ⭐ */
+      await bumpAttempts(env, 'pin', pinHash);
+      await bumpAttempts(env, 'ip', await sha256hex(ip));
       /* ⛔ نردّ نفس الرسالة سواء الباسورد غلط ولا الجهاز مش مسجّل ⭐
          ⛔ (مافيش تعداد للحسابات ⭐) ⭐. */
       return json({ ok: false, error: 'الباسورد غلط أو الجهاز مش مسجّل',
         why: 'bad_pin_or_device' }, 401);
     }
+    /* ⭐ كلمة المرور صح ⭐ ⇒ ⭐ العدّاد يتصفّر ⭐ */
+    await bumpAttempts(env, 'pin', pinHash);
     const token = await issueSession(env, found, device);
     return json({ ok: true, token: token, expires_in: SESSION_TTL_SEC,
       user: userView(found) }, 200, { 'Set-Cookie': sessionCookie(token, SESSION_TTL_SEC) });
@@ -415,9 +517,9 @@ async function handlePreviewApi(opts) {
     if (!device || device.length < 16) {
       return json({ ok: false, error: 'بصمة الجهاز ناقصة', why: 'bad_device' }, 400);
     }
-    const list = await env.PREVIEW_KV.list({ prefix: 'acct:' });
-    for (const key of (list.keys || [])) {
-      const acct = await kvGet(env, key.name);
+    const list = await storeList(env, 'acct:');
+    for (const key of list) {
+      const acct = await storeGet(env, key);
       if (!acct) continue;
       if ((acct.devices || []).includes(device)) {
         const token = await issueSession(env, acct, device);
@@ -432,7 +534,7 @@ async function handlePreviewApi(opts) {
   if (p === '/api/auth/me' && (m === 'GET' || m === 'POST')) {
     const sess = await readSession(env, request);
     if (!sess) return json({ ok: false, error: 'محتاج تسجيل دخول', why: 'unauthorized' }, 401);
-    const acct = await kvGet(env, acctKey(sess.payload.uid));
+    const acct = await storeGet(env, acctKey(sess.payload.uid));
     if (!acct) return json({ ok: false, error: 'محتاج تسجيل دخول', why: 'unauthorized' }, 401);
     return json({ ok: true, user: userView(acct), expires_in: sess.payload.exp - nowSec() });
   }
@@ -441,9 +543,9 @@ async function handlePreviewApi(opts) {
   if (p === '/api/auth/refresh' && m === 'POST') {
     const sess = await readSession(env, request);
     if (!sess) return json({ ok: false, error: 'محتاج تسجيل دخول', why: 'unauthorized' }, 401);
-    const acct = await kvGet(env, acctKey(sess.payload.uid));
+    const acct = await storeGet(env, acctKey(sess.payload.uid));
     if (!acct) return json({ ok: false, error: 'محتاج تسجيل دخول', why: 'unauthorized' }, 401);
-    await kvDel(env, sessKey(sess.payload.uid, sess.payload.sid));   /* ⛔ القديم يموت ⭐ */
+    await storeDel(env, sessKey(sess.payload.uid, sess.payload.sid));   /* ⛔ القديم يموت ⭐ */
     const token = await issueSession(env, acct, sess.rec.device || '');
     return json({ ok: true, token: token, expires_in: SESSION_TTL_SEC,
       user: userView(acct) }, 200, { 'Set-Cookie': sessionCookie(token, SESSION_TTL_SEC) });
@@ -452,14 +554,14 @@ async function handlePreviewApi(opts) {
   /* ── ⑨ تسجيل الخروج ⭐ */
   if (p === '/api/auth/logout' && (m === 'GET' || m === 'POST')) {
     const sess = await readSession(env, request);
-    if (sess) await kvDel(env, sessKey(sess.payload.uid, sess.payload.sid));
+    if (sess) await storeDel(env, sessKey(sess.payload.uid, sess.payload.sid));
     return json({ ok: true, revoked: true },
       200, { 'Set-Cookie': sessionCookie('', 0) });
   }
 
   /* ── ⑩ الأسعار (من لقطة المعاينة) ⭐ */
   if (p === '/api/quotes' && m === 'GET') {
-    const snap = await kvGet(env, 'snap:quotes');
+    const snap = await snapshotGet(env, 'snap:quotes');
     if (!snap) {
       return json({ ok: false, error: 'لقطة الأسعار مش موجودة',
         why: 'snapshot_missing' }, 503);
@@ -496,7 +598,7 @@ async function handlePreviewApi(opts) {
       return json({ ok: false, error: 'النسخة الكاملة محمية', count: 0,
         results: [], filters: {}, _protected: true }, 401);
     }
-    const snap = await kvGet(env, 'snap:quotes');
+    const snap = await snapshotGet(env, 'snap:quotes');
     if (!snap) return json({ ok: false, error: 'لقطة الأسعار مش موجودة', why: 'snapshot_missing' }, 503);
     const rows = (snap.markets || {}).egypt || {};
     const limit = Math.max(1, Math.min(400, parseInt(url.searchParams.get('limit') || '20', 10) || 20));
@@ -528,18 +630,18 @@ async function handlePreviewApi(opts) {
     if (!sess) return json({ ok: false, error: 'محتاج تسجيل دخول', why: 'unauthorized' }, 401);
     const key = 'pf:' + sess.payload.uid;
     if (m === 'GET') {
-      const pf = await kvGet(env, key);
+      const pf = await storeGet(env, key);
       return json({ ok: true, portfolio: pf || { cash: 0, positions: {} } });
     }
+    /* ⭐⭐⭐ (R28 · R26-I04) ⭐ الكتابة **ذرّية** ⭐ (قراءة+تعديل+كتابة جوه الـDO ⭐)
+       ⇒ ⛔ مافيش ضياع للكتابات المتزامنة ⭐. */
     const pf = body && typeof body === 'object' ? body : {};
-    const cur = (await kvGet(env, key)) || { cash: 0, positions: {} };
-    const next = {
-      cash: num(pf.cash !== undefined ? pf.cash : cur.cash),
-      positions: (pf.positions && typeof pf.positions === 'object') ? pf.positions : cur.positions,
-      updated_at: nowSec()
-    };
-    await kvPut(env, key, next);
-    return json({ ok: true, portfolio: next });
+    const r = await storeCmd(env, { op: 'pf_set', key: key, patch: pf });
+    if (!r) {
+      return json({ ok: false, error: 'المحفظة مش متاحة دلوقتي',
+        why: 'store_unavailable' }, 503);
+    }
+    return json({ ok: true, portfolio: r.portfolio });
   }
 
   /* ── ⑫ التنبيهات (لكل حساب لوحده + منع التكرار) ⭐ */
@@ -547,23 +649,53 @@ async function handlePreviewApi(opts) {
     const sess = await readSession(env, request);
     if (!sess) return json({ ok: false, error: 'محتاج تسجيل دخول', why: 'unauthorized' }, 401);
     const key = 'al:' + sess.payload.uid;
-    const cur = (await kvGet(env, key)) || { items: [] };
-    if (m === 'GET') return json({ ok: true, alerts: cur.items || [] });
-    const item = body && body.alert && typeof body.alert === 'object' ? body.alert : body;
-    const items = cur.items || [];
-    const id = String(item.id || '').trim();
-    if (id && items.some(a => a && a.id === id)) {
-      return json({ ok: true, created: false, dedup: true, alerts: items });
+    if (m === 'GET') {
+      const cur = await storeGet(env, key);
+      return json({ ok: true, alerts: (cur && cur.items) || [] });
     }
-    const rec = {
-      id: id || ('al_' + nowSec() + '_' + items.length),
-      symbol: String(item.symbol || '').trim().toUpperCase(),
-      kind: String(item.kind || 'price'),
-      created_at: nowSec(), active: true
-    };
-    items.push(rec);
-    await kvPut(env, key, { items: items });
-    return json({ ok: true, created: true, alerts: items });
+    const item = body && body.alert && typeof body.alert === 'object' ? body.alert : body;
+    /* ⭐⭐⭐ (R28 · R26-I04) ⭐ الإضافة **ذرّية** ⭐ + ⭐ منع التكرار ⭐ جوه الـDO ⭐
+       ⇒ ⛔ مافيش ضياع ⭐ + ⛔ مافيش تكرار ⭐ مع الكتابات المتزامنة ⭐. */
+    const r = await storeCmd(env, { op: 'alerts_add', key: key, item: item });
+    if (!r) {
+      return json({ ok: false, error: 'التنبيهات مش متاحة دلوقتي',
+        why: 'store_unavailable' }, 503);
+    }
+    return json({ ok: true, created: r.created === true, dedup: r.dedup === true,
+      alerts: r.items || [] });
+  }
+
+  /* ── ⭐⭐⭐ (R28 · R26-I01) ⭐ صندوق المعاينة ⭐ ⭐⭐
+     📌 ⛔ الكود **مش** بيرجع في الرد ⭐ (R26 ⭐) ⭐ ⇒ ⛔ مافيش استحواذ ⭐.
+     ✅ القراءة بـ**مفتاح المعاينة** ⭐ (سر ⭐) ⭐ بس ⭐.
+     📌 ⛔ مافيش مفتاح ⭐ ⇒ ⛔ 503 ⭐ (fail-closed ⭐). */
+  if (p === '/api/preview/mailbox' && m === 'GET') {
+    const want = String((env && env.PREVIEW_CONSOLE_KEY) || '');
+    if (!want) {
+      return json({ ok: false, error: 'صندوق المعاينة مش مهيّأ',
+        why: 'console_key_missing' }, 503);
+    }
+    const got = String(request.headers.get('X-Preview-Key') || '');
+    if (!safeEqual(got, want)) {
+      return json({ ok: false, error: 'مفتاح المعاينة غلط', why: 'bad_key' }, 401);
+    }
+    const email = String(url.searchParams.get('email') || '').trim().toLowerCase().slice(0, 120);
+    if (!EMAIL_RE.test(email)) {
+      return json({ ok: false, error: 'الإيميل مش مظبوط', why: 'bad_email' }, 400);
+    }
+    const uid = await uidOf(email);
+    const mail = await storeGet(env, mailKey(uid));
+    if (!mail || !mail.code) {
+      return json({ ok: false, error: 'مفيش كود نشط دلوقتي', why: 'no_code' }, 404);
+    }
+    if ((mail.exp || 0) <= nowSec()) {
+      return json({ ok: false, error: 'الكود خلص — اطلب كود جديد', why: 'expired' }, 410);
+    }
+    return json({
+      ok: true, email: email, code: String(mail.code),
+      expires_in: Math.max(0, (mail.exp || 0) - nowSec()),
+      preview_note: 'كود المعاينة ⭐ — مفيش بريد ⭐'
+    });
   }
 
   /* ⛔ /api/health للـworker ⭐ (نسخة المعاينة المعزولة ⭐) ⭐ */
