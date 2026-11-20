@@ -932,7 +932,35 @@ let SESSION_VERDICT_KEYS = [];
 /* 🛑 الحكم من صاحب الصلاحية (الباك — هو اللي عنده سر التوقيع)
    📌 بنطلب /api/auth/me بنفس بيانات الاعتماد ⇒ نفس الفيصل في الباك.
    ⛔ أي حالة مش «صالح» ⇒ مرفوض (fail-closed). */
-async function askSessionAuthority(cred, env) {
+async function askSessionAuthority(cred, env, url) {
+  /* ⭐⭐⭐ (R28 · FINDING-10) ⭐⭐⭐ المعاينة ⭐ ⇒ الحكم من المعاينة نفسها ⭐⭐⭐
+     📌 جلسة المعاينة ⭐ معزولة ⭐ (في DO المعاينة ⭐ بسر المعاينة ⭐)
+        ⇒ ⛔ الباك **مش عارفها** ⭐ ⇒ ⛔ العامل كان بيرجّع الصفحة العامة ⭐
+        ⇒ ⛔ التطبيق **مش داخل المعاينة** ⭐ (البوابة بتظهر على طول ⭐).
+     ✅ دلوقتي ⭐: في وضع المعاينة ⭐ ⇒ ⭐ نحكم على الجلسة **من المعاينة** ⭐
+        (نفس الـDO ⭐ ونفس السر ⭐) ⇒ ⭐ نفس النتيجة ⭐.
+     ⛔ الإنتاج ⭐: يفضل يسأل الباك ⭐ زي ما هو ⭐ (مافيش تغيير ⭐). */
+  if (env && env.OCTA_PREVIEW_SELF_API === 'on') {
+    try {
+      const h2 = new Headers();
+      h2.set('Accept', 'application/json');
+      if (cred.via === 'header') h2.set('Authorization', 'Bearer ' + cred.token);
+      else h2.set('Cookie', SESSION_COOKIE + '=' + cred.token);
+      const u2 = new URL((url && url.origin) || 'https://preview.local');
+      u2.pathname = '/api/auth/me';
+      const r2 = await handlePreviewApi({
+        request: new Request(u2.toString(), { method: 'GET', headers: h2 }),
+        env: env, url: u2
+      });
+      if (r2 && r2.status === 200) return { ok: true, state: 'valid', via: cred.via };
+      if (r2 && (r2.status === 401 || r2.status === 403)) {
+        return { ok: false, state: 'invalid', via: cred.via, why: 'http_' + r2.status };
+      }
+      return { ok: false, state: 'unknown', via: cred.via, why: 'preview_no_verdict' };
+    } catch (e) {
+      return { ok: false, state: 'unknown', via: cred.via, why: 'preview_error' };
+    }
+  }
   const target = API || API_DIRECT_FIRST;
   if (!target) return { ok: false, state: 'unknown', why: 'no_api' };
   try {
@@ -962,14 +990,14 @@ async function askSessionAuthority(cred, env) {
    📌 valid  = الباك أكّد إن الجلسة صالحة
    📌 invalid= الباك رفض الجلسة (كوكي مزيّف / منتهي / ملغى)
    📌 unknown= ماقدرناش نتحقق (الباك واقع) ⇒ fail-closed */
-async function verifySession(request, env, pathname) {
+async function verifySession(request, env, pathname, url) {
   const cred = sessionCredential(request, pathname);
   if (!cred) return { ok: false, state: 'anon', via: 'none' };
   const key = sessionHash(cred.token);
   const now = Date.now();
   const cached = SESSION_VERDICTS[key];
   if (cached && now < cached.until) return cached.verdict;
-  const v = await askSessionAuthority(cred, env);
+  const v = await askSessionAuthority(cred, env, url);
   const ttl = v.ok ? SESSION_OK_TTL_MS
     : (v.state === 'invalid' ? SESSION_NO_TTL_MS : 0);
   if (ttl > 0) {
@@ -985,10 +1013,10 @@ async function verifySession(request, env, pathname) {
 
 /* 🛑 حكم واحد لكل طلب (مش تكرار) — الـWeakMap بيتمسح لوحده */
 const SESSION_BY_REQUEST = new WeakMap();
-async function sessionVerdict(request, env, pathname) {
+async function sessionVerdict(request, env, pathname, url) {
   let p = SESSION_BY_REQUEST.get(request);
   if (!p) {
-    p = verifySession(request, env, pathname);
+    p = verifySession(request, env, pathname, url);
     SESSION_BY_REQUEST.set(request, p);
   }
   return p;
@@ -1560,7 +1588,7 @@ async function handle(request, env, ctx) {
           بيانات مستخدم بتتخدم من الـworker أصلاً). */
     if (url.pathname.startsWith('/api/') && request.method !== 'OPTIONS'
       && !isPublicApi(url.pathname)) {
-      const sess = await sessionVerdict(request, env, url.pathname);
+      const sess = await sessionVerdict(request, env, url.pathname, url);
       if (sess.state === 'anon' || sess.state === 'invalid') {
         const ah = {
           'Content-Type': 'application/json; charset=utf-8',
@@ -2677,7 +2705,7 @@ async function handle(request, env, ctx) {
        ⛌ صفحة البوابة نفسها متاحة دايماً على /gate.html. */
     const GATE_ON = !(env && env.OCTA_GATE === 'off');
     const isGatePage = GATE_ON && GATE_PAGES.indexOf(url.pathname) !== -1;
-    if (isGatePage && !(await sessionVerdict(request, env, url.pathname)).ok) {
+    if (isGatePage && !(await sessionVerdict(request, env, url.pathname, url)).ok) {
       /* ════════════════════════════════════════════════════════════
       🌍 ٩ نوفمبر ٢٠٢٦ — ⭐ الواجهة العامة = فلتر السوق
       ────────────────────────────────────────────────────────────────
@@ -2723,7 +2751,7 @@ async function handle(request, env, ctx) {
     📌 ⛌ ⛌ ⇒ والمستخدم المسجّل بياخد 404 على '/' ⇒ الموقع مش بيفتح!
     📌 ✅ الحل: نعمل fetch لـ'/index.html' مباشرة.
     */
-    if (url.pathname === '/' && (await sessionVerdict(request, env, url.pathname)).ok) {
+    if (url.pathname === '/' && (await sessionVerdict(request, env, url.pathname, url)).ok) {
       try {
         const idxUrl = new URL('/index.html', url);
         const idx = await env.ASSETS.fetch(new Request(idxUrl.toString(), request));
@@ -2800,7 +2828,7 @@ async function handle(request, env, ctx) {
     /* ⭐ 'watchlist' مش في السكربت ⇒ مسار ميت ⇒ شِلنّاه (مفيش صفحة watchlist). */
     if (SPA_ROUTES.indexOf(url.pathname) !== -1) {
       /* 🌍 الزائر المجهول على /markets ⇒ صفحة الفلتر العامة (مش التطبيق) */
-      if (!(await sessionVerdict(request, env, url.pathname)).ok
+      if (!(await sessionVerdict(request, env, url.pathname, url)).ok
         && (url.pathname === '/markets' || url.pathname === '/stocks')) {
         try {
           const pubUrl = new URL('/market.html', url);

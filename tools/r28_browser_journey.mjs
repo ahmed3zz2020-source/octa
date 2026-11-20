@@ -67,18 +67,44 @@ const EXEC = process.env.CHROMIUM_PATH ||
 const OVERFLOW_PROBE = `() => {
   const de = document.documentElement;
   const vw = de.clientWidth;
-  const out = { width: vw, scrollWidth: de.scrollWidth, overflow: 0, clipped: 0, smallTargets: 0, checked: 0 };
+  const out = { width: vw, scrollWidth: de.scrollWidth, overflow: 0, clipped: 0,
+    smallTargets: 0, checked: 0, overflowList: [], smallList: [] };
   const all = document.querySelectorAll('body *');
   for (const el of all) {
     if (!el.getBoundingClientRect) continue;
     const r = el.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) continue;
     out.checked++;
-    if (r.right > vw + 2 || r.left < -2) out.overflow++;
+    /* ⭐⭐⭐ تعريف التمرير ⭐⭐⭐
+       ⛔ عنصر **بره** الشاشة بالكامل (left >= vw ⭐) ⭐ = شريط جانبي مخفي ⭐
+          (لوحة الشاشات الجانبية ⭐) ⭐ ⇒ ⛔ مش تمرير ⭐.
+       ✅ التمرير = عنصر **متداخل مع الشاشة** ⭐ وبيبرز منها ⭐
+          (r.left < vw && r.right > vw ⭐) ⭐ أو بيزاي على الشمال ⭐. */
+    const sticksOut = (r.left < vw && r.right > vw + 2) || r.left < -2;
+    if (sticksOut) {
+      out.overflow++;
+      if (out.overflowList.length < 8) {
+        out.overflowList.push({
+          tag: el.tagName, id: el.id || '',
+          cls: String(el.className || '').slice(0, 40),
+          w: Math.round(r.width), left: Math.round(r.left), right: Math.round(r.right),
+        });
+      }
+    }
     const st = getComputedStyle(el);
     if (st.display === 'none' || st.visibility === 'hidden') continue;
     if (el.tagName === 'BUTTON' || el.tagName === 'A' || el.getAttribute('role') === 'button') {
-      if (r.height > 0 && r.height < 40 && r.width > 0 && r.width < 40) out.smallTargets++;
+      if (r.height > 0 && r.height < 40 && r.width > 0 && r.width < 40) {
+        out.smallTargets++;
+        if (out.smallList.length < 8) {
+          out.smallList.push({
+            tag: el.tagName, id: el.id || '',
+            cls: String(el.className || '').slice(0, 40),
+            w: Math.round(r.width), h: Math.round(r.height),
+            text: String(el.textContent || '').trim().slice(0, 24),
+          });
+        }
+      }
     }
   }
   return out;
@@ -202,6 +228,7 @@ const OVERFLOW_PROBE = `() => {
     const deadline = Date.now() + 90000;
     let typed = 0;
     let codeValue = '';
+    let gateUrl0 = '';
     while (Date.now() < deadline) {
       if (page.url().indexOf('gate') === -1) { gate.done = true; break; }
       const s = await screen();
@@ -261,6 +288,8 @@ const OVERFLOW_PROBE = `() => {
       }
       await page.waitForTimeout(500);
     }
+    /* ⭐⛔ التحويل ممكن يتأخر ⭐ ⇒ ننتظره قبل الحكم ⭐ */
+    if (gateUrl0.indexOf('gate') !== -1) await waitLeaveGate(15000);
     const gateUrl = page.url().replace(BASE, '');
     gate.done = gateUrl.indexOf('gate') === -1;
     rec('gate · الدخول (لوحة الأرقام ⭐ ثم التطبيق ⭐)',
@@ -277,12 +306,19 @@ const OVERFLOW_PROBE = `() => {
       shotBtn: false, chart: false, supportResistance: false, events: false,
       errorShown: false, body: '' };
     try {
-      if (typeof window.openGold === 'function') { window.openGold(); out.open = true; }
+      /* ⭐ اسم الدخول ⭐: openGoldIntel ⭐ (السرد ⭐) · openGoldSavings ⭐ (الادخار ⭐) */
+      var _gold = window.openGoldIntel || window.openGold;
+      if (typeof _gold === 'function') { _gold(); out.open = true; }
     } catch (e) { out.openErr = String(e).slice(0, 120); }
-    await new Promise((r) => setTimeout(r, 2500));
+    await new Promise((r) => setTimeout(r, 6000));
     const modal = document.getElementById('octa-gold-modal')
       || document.querySelector('.gmodal');
     if (!modal) return out;
+    /* ⭐ الشارت/البيانات بتيجي بعدين ⭐ ⇒ ننتظرها ⭐ */
+    for (let w = 0; w < 12; w++) {
+      if (modal.querySelector('iframe, .gchart, #gmv-chart')) break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
     out.tabs = Array.from(modal.querySelectorAll('#gtabs .gtab')).map((b) => b.textContent.trim());
     out.fullscreenBtn = !!modal.querySelector('#gfs-btn');
     out.picker = !!modal.querySelector('#gpick');
@@ -331,7 +367,10 @@ const OVERFLOW_PROBE = `() => {
   await page.route('**/api/gold/**', (route) => route.abort('failed'));
   await page.route('**/api/gold*', (route) => route.abort('failed'));
   const failCase = await page.evaluate(async () => {
-    try { if (typeof window.openGold === 'function') window.openGold(); } catch (e) { /* */ }
+    try {
+      var _g2 = window.openGoldIntel || window.openGold;
+      if (typeof _g2 === 'function') _g2();
+    } catch (e) { /* */ }
     await new Promise((r) => setTimeout(r, 3500));
     const modal = document.querySelector('.gmodal');
     if (!modal) return { shown: false, text: '' };
@@ -352,6 +391,8 @@ const OVERFLOW_PROBE = `() => {
       { key: 'الأسهم', re: /أسهم|الأسهم/ },
       { key: 'الفرص', re: /فرص|الفرص/ },
       { key: 'المقارنة', re: /مقارن|المقارن/ },
+      /* ⭐ الرجوع للرئيسية ⭐ (آخر خطوة في رحلة المستخدم ⭐) */
+      { key: 'الرئيسية', re: /الرئيسية|🏠|^OCTA$/ },
     ];
     for (const t of targets) {
       const el = Array.from(document.querySelectorAll('a,button,[role=tab],[data-nav]'))
@@ -364,7 +405,7 @@ const OVERFLOW_PROBE = `() => {
     }
     return out;
   });
-  rec('nav · رحلة التنقل (أسهم ⭐ فرص ⭐ مقارنة ⭐)',
+  rec('nav · رحلة التنقل (أسهم ⭐ فرص ⭐ مقارنة ⭐ رجوع ⭐)',
     nav.ok && nav.steps.every((s) => s.found), { steps: nav.steps });
   await page.screenshot({ path: path.join(OUT, 'nav-end.png'), fullPage: false });
 
