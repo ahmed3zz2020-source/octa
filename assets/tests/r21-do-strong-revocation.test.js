@@ -329,9 +329,22 @@ test('R22-DO-07: the DO id is a signed hash — never the raw cookie', async () 
 
   assert.ok(doNs.calls.length > 0, '⛔ لازم الـDO يكون هو اللي اتكلم ⭐');
   const raw = cookie.split('=')[1] || '';
+  /* ⭐⭐⭐ (R26) ⭐ الـDO بقى فيه أكتر من namespace ⭐:
+     ⭐ rev: ⭐ (إبطال الجلسة ⭐ — نسخة لكل جلسة ⭐)
+     ⭐ panel_state ⭐ (حالة كلمة المرور ⭐ — نسخة واحدة ⭐)
+     ⭐ att: ⭐ (عدّاد المحاولات ⭐ — نسخة لكل IP ⭐)
+     📌⇒ ⭐ التحقق محصور في namespace الإبطال ⭐ (rev: ⭐)
+     ⭐ والبقية لازم تكون من قائمة معروفة ⭐ (مافيش اسم غريب ⭐). */
+  const revCalls = doNs.calls.filter((c) => String(c.id || '').indexOf('rev:') === 0);
+  assert.ok(revCalls.length > 0,
+    '⛔ لازم يكون فيه نداء إبطال على namespace rev: ⭐');
   for (const c of doNs.calls) {
-    assert.ok(c.id.startsWith('rev:'), '⛔ اسم الـDO لازم يبقى تحت بادئة rev: ⭐');
+    const id = String(c.id || '');
+    const known = id.indexOf('rev:') === 0 || id === 'panel_state' || id.indexOf('att:') === 0;
+    assert.ok(known, '⛔ اسم الـDO مش معروف ⭐: ' + id);
+    assert.ok(id.indexOf(raw) === -1, '⛔ مافيش توكن خام في اسم الـDO ⭐');
+  }
+  for (const c of revCalls) {
     assert.match(c.id, /^rev:[0-9a-f]{64}$/, '⛔ اسم الـDO لازم يبقى هاش hex ⭐');
-    assert.ok(!c.id.includes(raw), '⛔ مافيش توكن خام في اسم الـDO ⭐');
   }
 });

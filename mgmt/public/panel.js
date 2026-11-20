@@ -704,6 +704,58 @@
   function refresh() { if (window.pull) window.pull(false); }
   function refreshAll() { refresh(); }
 
+  /* ⭐⭐⭐ (R26) ⭐ تغيير كلمة مرور اللوحة ⭐⭐⭐
+     📌 ⭐ المالك يختار الكلمة بنفسه ⭐ (من غير Cloudflare ⭐).
+     📌 ⛔ ٦ أرقام بس ⭐ ⇒ ⛔ السيرفر بيرفض ⭐ (مليون احتمال ⭐).
+     📌 ⛔ بعد النجاح ⭐ ⇒ ⭐ السيرفر بيبطل الجلسة ⭐ ⇒ ⭐ نرجع لصفحة الدخول ⭐. */
+  function bindPasswordSection() {
+    var btn = $('#pwSave');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var cur = ($('#pwCur') && $('#pwCur').value) || '';
+      var n1 = ($('#pwNew') && $('#pwNew').value) || '';
+      var n2 = ($('#pwNew2') && $('#pwNew2').value) || '';
+      var msg = $('#pwMsg');
+      function say(text, cls) {
+        if (!msg) return;
+        msg.textContent = text;
+        msg.className = 'pwmsg ' + (cls || '');
+      }
+      if (!cur) { say('اكتب كلمة المرور الحالية', 'bad'); return; }
+      if (!n1) { say('اكتب كلمة المرور الجديدة', 'bad'); return; }
+      if (n1 !== n2) { say('التأكيد مش مطابق', 'bad'); return; }
+      say('… جاري الحفظ', '');
+      btn.disabled = true;
+      fetch('/api/password/change', {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current: cur, next: n1 })
+      }).then(function (r) {
+        return r.text().then(function (t) {
+          var j = null;
+          try { j = JSON.parse(t); } catch (e) { j = null; }
+          return { status: r.status, json: j };
+        });
+      }).then(function (o) {
+        btn.disabled = false;
+        if (o.status === 200 && o.json && o.json.ok) {
+          say('اتغيّرت — هنتقل لصفحة الدخول', 'ok');
+          setTimeout(function () { location.replace('/login.html'); }, 1200);
+          return;
+        }
+        if (o.status === 401) { say('كلمة المرور الحالية غلط', 'bad'); return; }
+        if (o.status === 400 && o.json && o.json.why) { say(o.json.why, 'bad'); return; }
+        if (o.status === 429) { say('محاولات كتير. استنى ١٥ دقيقة.', 'bad'); return; }
+        say((o.json && o.json.error) ? String(o.json.error) : 'التغيير فشل', 'bad');
+      }).catch(function () {
+        btn.disabled = false;
+        say('التغيير فشل — الشبكة', 'bad');
+      });
+    });
+  }
+
   /* ══ ربط ══ */
   document.addEventListener('DOMContentLoaded', function () {
     var ok = $('#pmodalOk');
@@ -717,6 +769,7 @@
     if (x) x.addEventListener('click', closeModal);
     var m = $('#pmodal');
     if (m) m.addEventListener('click', function (e) { if (e.target === m) closeModal(); });
+    bindPasswordSection();
     renderAll();
   });
 

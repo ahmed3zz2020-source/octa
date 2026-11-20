@@ -1060,6 +1060,18 @@ var flow = { email: '', code: '', unlock: '', cd: 0, cdTimer: null, tries: 0,
  flow.email = mail;
  try { octaTrack('signup_start', 'gate', ''); } catch (e) { }
  codeEntry();
+ /* 🧪 الجولة ٢٦ (R26 · البند ٤) — ⭐ المعاينة المعزولة ⭐
+ 📌 المعاينة مافيش فيها بريد ⭐ ⇒ السيرفر بيرجّع الكود في الرد ⭐
+ ⭐ ⇒ نعرضه ونحطّه في الخانة ⭐ عشان صاحب المشروع يكمّل من موبايله ⭐
+ ⭐ (في الإنتاج الكود بيوصل على الإيميل ⭐ — والفرع ده مالوش effect ⭐). */
+ var pv = (o.d || {}).preview_code;
+ if (pv) {
+ try {
+  var pin2 = document.getElementById('gtCodeIn');
+  if (pin2) { pin2.value = pv; }
+ } catch (e) { }
+ say('🧪 معاينة: الكود بتاعك هو ' + pv + ' ⭐ (مفيش بريد في المعاينة ⭐)', true);
+ }
  return;
  }
  if (btn) { btn.disabled = false; btn.textContent = 'ابعت الكود'; }

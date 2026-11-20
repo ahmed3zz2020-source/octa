@@ -242,6 +242,13 @@ async function doIsRevoked(env, raw) {
      (الأسلوب الكلاسيكي `constructor(state, env)` مدعوم ⭐).
    ⛔ مافيش مورد اتعمل ⭐ (مافيش نشر ⭐) — التفعيل بنشر المالك ⭐. */
 const DO_REVOKE_KEY = "revoked";
+/* ⭐ (R26) ⭐ مفاتيح حالة كلمة المرور + عدّاد المحاولات ⭐ */
+const DO_PWD_KEY = "panel_pwd";
+const DO_ATT_KEY = "login_attempts";
+/* ⭐ الحد الأقصى للمحاولات ⭐ (مشترك بين النسخ ⭐) */
+const MAX_ATTEMPTS = 8;
+/* ⭐ اسم نسخة الـDO لحالة كلمة المرور ⭐ (مصدر واحد ⭐) */
+const DO_PWD_NAME = "panel_state";
 
 class RevokeDO {
   constructor(state, env) {
@@ -261,6 +268,63 @@ class RevokeDO {
       method = (request.method || "GET").toUpperCase();
     } catch (e) {
       return json({ ok: false, error: "bad-request" }, 400);
+    }
+
+    /* ⭐⭐⭐ (R26) ⭐ حالة كلمة المرور ⭐ (مشتركة ⭐ · اتساق قوي ⭐)
+       📌 السبب ⭐: ⛔ حالة كلمة المرور في ذاكرة الـisolate ⭐ ⇒ ⛔ كل نسخة لوحدها ⭐.
+       📌 عدّاد المحاولات ⭐: ⛔ في الذاكرة ⭐ ⇒ ⛔ القفل مش شغال ⭐ ⇒ ⛔ ٦ أرقام = مليون ⭐.
+       ✅ الحل ⭐: نفس الـDurable Object ⭐ ⇒ ⛔ مصدر واحد ⭐ ⇒ اتساق قوي ⭐. */
+    if (method === "GET" && path === "/pwd") {
+      try {
+        const rec = await this.state.storage.get(DO_PWD_KEY);
+        return json({ ok: true, pwd: rec || null });
+      } catch (e) {
+        return json({ ok: false, error: "storage-read-failed" }, 500);
+      }
+    }
+
+    if (method === "POST" && path === "/pwd") {
+      let body = {};
+      try { body = await request.json(); } catch (e) { body = {}; }
+      const salt = String((body && body.salt) || "");
+      const hash = String((body && body.hash) || "");
+      const ver = String((body && body.ver) || "");
+      if (!salt || !hash || !ver) {
+        return json({ ok: false, error: "bad-request" }, 400);
+      }
+      try {
+        /* ⭐ ⛔ مافيش انتهاء ⭐ — كلمة المرور تعيش ⭐ (وإلا ⇒ تفقد اللوحة ⭐) */
+        await this.state.storage.put(DO_PWD_KEY, { salt, hash, ver });
+        return json({ ok: true });
+      } catch (e) {
+        return json({ ok: false, error: "storage-write-failed" }, 500);
+      }
+    }
+
+    /* ⭐ عدّاد المحاولات ⭐ — مشترك بين كل النسخ ⭐ (حماية حقيقية ⭐) */
+    if (method === "POST" && path === "/attempts") {
+      let body = {};
+      try { body = await request.json(); } catch (e) { body = {}; }
+      const ip = String((body && body.ip) || "");
+      const action = String((body && body.action) || "fail");
+      if (!ip) return json({ ok: false, error: "bad-request" }, 400);
+      try {
+        const rec = (await this.state.storage.get(DO_ATT_KEY)) || { n: 0, t: Date.now() };
+        const now = Date.now();
+        /* ⭐ نافذة ١٥ دقيقة ⭐ */
+        if (!rec.t || (now - rec.t) > 15 * 60 * 1000) { rec.n = 0; rec.t = now; }
+        if (action === "ok") {
+          await this.state.storage.delete(DO_ATT_KEY);
+          return json({ ok: true, n: 0, locked: false });
+        }
+        rec.n = Number(rec.n || 0) + 1;
+        rec.t = now;
+        /* ⭐ صلاحية ⭐ — يتشال لوحده بعد النافذة ⭐ (تنظيف ⭐) */
+        await this.state.storage.put(DO_ATT_KEY, rec, { expirationTtl: 60 * 60 });
+        return json({ ok: true, n: rec.n, locked: rec.n >= MAX_ATTEMPTS });
+      } catch (e) {
+        return json({ ok: false, error: "storage-write-failed" }, 500);
+      }
     }
 
     /* ⭐ تسجيل الإبطال ⭐ (كتابة متزامنة ⭐) */
@@ -470,6 +534,32 @@ function isRevoked(raw) {
 const ERR_UPSTREAM = "تعذّر الوصول للسيرفر — جرّب تاني بعد شوية";
 const ERR_AUTH = "لازم تسجيل دخول";
 
+/* ⭐⭐⭐ (R26) ⭐ فحص قوة كلمة المرور ⭐
+   📌 القاعدة ⭐: ⛔ ٦ أرقام بس ⭐ = مليون احتمال ⭐ ⇒ ⛔ ضعيفة ⭐
+      ⇒ ⛔ بنرفضها ⭐ (الخطر الحقيقي ⭐: اللوحة فيها بيانات المساهمين ⭐).
+   📌 الحد ⭐: ٨ خانات على الأقل ⭐ + (حرف ⭐ أو الرقم ⭐) ⭐.
+   📌 ⭐ مفيش استثناء ⭐ (المالك طلب ٦ أرقام ⭐ ⇒ اترفض ⭐ بوضوح ⭐). */
+function passwordWeakness(pw) {
+  const p = String(pw || "");
+  if (!p) return { ok: false, why: "فاضية", level: "bad" };
+  if (p.length < 8) {
+    return {
+      ok: false,
+      why: "قصيرة جداً — ٨ خانات على الأقل (٦ أرقام = مليون احتمال، واللي بيكسرها كده)",
+      level: "bad",
+    };
+  }
+  const hasLetter = /[A-Za-z]/.test(p);
+  const hasDigit = /[0-9]/.test(p);
+  if (!hasLetter && !hasDigit) {
+    return { ok: false, why: "لازم فيها حروف أو أرقام", level: "bad" };
+  }
+  if (p.length < 10) {
+    return { ok: true, level: "weak", why: "مقبولة — بس ١٠ خانات أحسن" };
+  }
+  return { ok: true, level: "good", why: "قوية" };
+}
+
 /* 🛡️ الجولة ١٨ — الأصول العامة (من غير جلسة).
    ⛔ مافيش هنا غير صفحة الدخول — ⛔ مافيش أي صفحة فيها بيانات. */
 /* 🛡️🛡️ الجولة ٢٥ (R25 · المرحلة ٣) — صفحات الدخول **كل** مساراتها ⭐
@@ -484,6 +574,8 @@ const PUBLIC_FILES = new Set([
 
 /* 🛡️ الجولة ١٨ — مسارات الـAPI المفتوحة (من غير جلسة) — مافيش بيانات شخصية */
 const PUBLIC_API = new Set(["/api/login", "/api/logout", "/api/session", "/api/health"]);
+/* ⭐ مسار تغيير كلمة المرور ⭐ — **مش** public ⭐ ⇒ لازم جلسة صالحة ⭐. */
+const PATH_PASSWORD_CHANGE = "/api/password/change";
 
 /* 🛡️ الجولة ١٨ — القائمة البيضاء للتمرير.
    الشكل: method + نمط. ⛔ أي مسار برّه القائمة ⇒ 400 (منع SSRF). */
@@ -559,8 +651,92 @@ function json(data, status = 200, extraHeaders = {}) {
       (⭐ من غير ما نلمس SESSION_SECRET ⭐ ⭐ — وده بيبطل الكل ⭐). */
 async function credentialTag(env) {
   const pw = String((env && env.APP_PASSWORD) || "");
-  if (!pw) return "";
-  try { return (await sha256(pw)).slice(0, 16); } catch (e) { return ""; }
+  /* ⭐⭐⭐ (R26) ⭐ النسخة ⭐ — ⭐ تغيير كلمة المرور ⭐ ⛔ يبطل كل الجلسات ⭐
+     📌 ⛔ لو البصمة تعتمد على الـsecret بس ⭐ ⇒ ⛔ تغيير كلمة المرور
+        من اللوحة ⭐ ⇒ ⛔ الجلسات القديمة تفضل صالحة ⭐ (ثغرة ⭐).
+     ✅ الحل ⭐: البصمة = (هاش الـsecret ⭐ + النسخة ⭐) ⭐
+        ⇒ ⭐ تغيير ⭐ ⇒ ⭐ البصمة تتغير ⭐ ⇒ ⛔ كل الجلسات تموت ⭐. */
+  let ver = "0";
+  try {
+    const st = await readPwdState(env);
+    if (st && st.ver) ver = String(st.ver);
+  } catch (e) { /* fallback ⭐ */ }
+  if (!pw && ver === "0") return "";
+  try { return (await sha256(pw + "|" + ver)).slice(0, 16); } catch (e) { return ""; }
+}
+
+/* ⭐⭐⭐ (R26) ⭐ حالة كلمة المرور ⭐ (في الـDO ⭐ — مش في الذاكرة ⭐)
+   📌 ليه ⭐: ⛔ لو كانت في الذاكرة ⭐ ⇒ ⛔ كل نسخة من العامل ليها حالة ⭐
+      ⇒ ⛔ تغيير كلمة المرور من اللوحة ما بيأثرش على النسخ التانية ⭐.
+   📌 المصدر ⭐: نفس الـDurable Object ⭐ ⇒ اتساق قوي ⭐.
+   📌 ⭐ أول تشغيل ⭐ ⇒ ⛔ مافيش حالة ⭐ ⇒ ⛔ نستخدم الـsecret ⭐ (APP_PASSWORD ⭐).
+   📌 ⭐ بعد أول تغيير ⭐ ⇒ ⭐ الحالة في الـDO هي المرجع ⭐.
+   📌 ⭐ النسخة ⭐ (ver ⭐) بتتضمن في بصمة الاعتماد ⭐ ⇒ ⭐ تغيير ⇒ ⛔ كل الجلسات تموت ⭐. */
+async function readPwdState(env) {
+  if (!env.REVOKE_DO) return null;
+  try {
+    const id = env.REVOKE_DO.idFromName(DO_PWD_NAME);
+    const stub = env.REVOKE_DO.get(id);
+    const res = await stub.fetch("https://pwd.internal/pwd");
+    if (!res || !res.ok) return null;
+    const body = await res.json();
+    if (!body || !body.ok || !body.pwd) return null;
+    return body.pwd;
+  } catch (e) { return null; }
+}
+
+async function writePwdState(env, salt, hash, ver) {
+  if (!env.REVOKE_DO) return false;
+  try {
+    const id = env.REVOKE_DO.idFromName(DO_PWD_NAME);
+    const stub = env.REVOKE_DO.get(id);
+    const res = await stub.fetch("https://pwd.internal/pwd", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ salt, hash, ver }),
+    });
+    if (!res || !res.ok) return false;
+    const body = await res.json().catch(() => null);
+    return !!(body && body.ok === true);
+  } catch (e) { return false; }
+}
+
+/* ⭐ عدّاد المحاولات ⭐ — مشترك ⭐ (DO ⭐) ⭐
+   📌 ⛔ fallback للذاكرة ⭐ لو الـDO مش متاح ⭐ (بيبقى أضعف ⭐ بس ⛔ مش مفتوح ⭐). */
+async function sharedAttempts(env, ip, action) {
+  if (!env.REVOKE_DO || !ip) return null;
+  try {
+    const id = env.REVOKE_DO.idFromName("att:" + ip);
+    const stub = env.REVOKE_DO.get(id);
+    const res = await stub.fetch("https://att.internal/attempts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ip, action }),
+    });
+    if (!res || !res.ok) return null;
+    const body = await res.json().catch(() => null);
+    if (!body || body.ok !== true) return null;
+    return { n: Number(body.n || 0), locked: body.locked === true };
+  } catch (e) { return null; }
+}
+
+/* ⭐⭐⭐ (R26) ⭐ التحقق من كلمة المرور ⭐⭐⭐
+   📌 المصدر ⭐: ⭐ حالة الـDO ⭐ (اللي المالك بيغيّرها من اللوحة ⭐).
+   📌 ⭐ **مفتاح الخلفي (break-glass)** ⭐: ⭐ الـsecret ⭐ (APP_PASSWORD ⭐)
+      ⭐ بيفضل صالح ⭐ ⇒ ⭐ المالك **ما يتقفلش** أبداً ⭐
+      ⇒ ⭐ لو نسي الكلمة ⭐ ⇒ ⭐ يقدر يرجّعها من Cloudflare ⭐ (٥ ضغطات ⭐).
+   📌 ⭐ عند تغيير الكلمة ⭐ ⇒ ⭐ النسخة (ver ⭐) بتتغير ⭐
+      ⇒ ⭐ بصمة الاعتماد بتتغير ⭐ ⇒ ⛔ كل الجلسات القديمة تموت ⭐. */
+async function verifyPassword(env, pass) {
+  const st = await readPwdState(env);
+  if (st && st.salt && st.hash) {
+    const h = await sha256(String(st.salt) + "|" + String(pass));
+    if (timingSafeEqual(h, String(st.hash))) return true;
+  }
+  /* ⭐ مفتاح الخلفي ⭐ — الـsecret ⭐ (ما يتقفلش ⭐) */
+  const want = String((env && env.APP_PASSWORD) || "");
+  if (!want) return false;
+  return timingSafeEqual(await sha256(pass), await sha256(want));
 }
 
 async function makeSession(secret, env) {
@@ -792,20 +968,27 @@ export default {
 
       /* ── تسجيل الدخول ── */
       if (path === "/api/login" && request.method === "POST") {
-        if (tooMany(ip)) {
-          return json({ ok: false, error: "محاولات كتير. استنى ١٥ دقيقة." }, 429);
-        }
+        /* ⭐⭐⭐ (R26) ⭐ القفل **مشترك** بين النسخ ⭐
+           📌 ⛔ قبل ⭐: العدّاد في ذاكرة الـisolate ⭐ ⇒ ⛔ كل نسخة عدّاد ⭐
+              ⇒ ⛔ القفل عملياً مش شغال ⭐ ⇒ ⛔ تخمين ٦ أرقام سهل ⭐.
+           ✅ دلوقتي ⭐: العدّاد في الـDurable Object ⭐ ⇒ ⛔ مصدر واحد ⭐. */
         let body = {};
         try { body = await request.json(); } catch (e) { /* body فاضي */ }
         const pass = String(body.password || "");
-        const want = String(env.APP_PASSWORD || "");
-        if (!want) return json({ ok: false, error: "التطبيق مش مهيّأ" }, 500);
-        const ok = timingSafeEqual(await sha256(pass), await sha256(want));
+        if (!String(env.APP_PASSWORD || "") && !(await readPwdState(env))) {
+          return json({ ok: false, error: "التطبيق مش مهيّأ" }, 500);
+        }
+        const ok = await verifyPassword(env, pass);
         if (!ok) {
           noteFail(ip);
+          const sh = await sharedAttempts(env, ip, "fail");
+          if (sh && sh.locked) {
+            return json({ ok: false, error: "محاولات كتير. استنى ١٥ دقيقة." }, 429);
+          }
           return json({ ok: false, error: "كلمة المرور غلط" }, 401);
         }
         attempts.delete(ip);
+        await sharedAttempts(env, ip, "ok");
         /* ⭐⭐⭐ الجولة ٢٦ (R26) — ⛔ في الإنتاج ⭐ ما نصدرش جلسة ⭐
            📌 السبب ⭐: ⛔ جلسة من غير مصدر إبطال مشترك ⭐ = ⭐ جلسة ما تتبطالش ⭐
               عبر النسخ ⭐ ⇒ ⭐ ⭐ انفتاح أمني ⭐ ⭐.
@@ -1013,6 +1196,72 @@ export default {
           console.error("[octa-mgmt] alerts failed", { err: String(e && e.message || e) });
           return json({ ok: false, error: ERR_UPSTREAM }, 502);
         }
+      }
+
+      /* ── ⭐⭐⭐ (R26) تغيير كلمة مرور اللوحة ⭐⭐⭐ ──
+         📌 الهدف ⭐: المالك يغيّر كلمة مروره بنفسه ⭐ (من غير Cloudflare ⭐).
+         📌 الشروط ⭐ (كلها لازم ⭐):
+            ① جلسة صالحة ⭐ (المسار مش public ⭐ ⇒ محمي فوق ⭐)
+            ② كلمة المرور الحالية صحيحة ⭐ (تأكيد الهوية ⭐)
+            ③ الطلب مش من أصل خارجي ⭐ (CSRF ⭐)
+            ④ كلمة المرور الجديدة قوية ⭐ (فحص القوة ⭐)
+            ⑤ ⭐ مخزن الحالة جاهز ⭐ (DO ⭐) ⭐ ⇒ ⛔ fail-closed ⭐
+         📌 ⭐ بعد التغيير ⭐ ⇒ ⭐ النسخة (ver ⭐) بتتغير ⭐
+            ⇒ ⭐ بصمة الاعتماد بتتغير ⭐ ⇒ ⛔ كل الجلسات القديمة تموت ⭐.
+         📌 ⛔ مافيش سرّ في الكود ⭐ — ⭐ ولا توكن Cloudflare ⭐
+            (⛔ السرّ كله في الـDO ⭐ ⇒ ⛔ ما فيش حاجة تتسرّب ⭐). */
+      if (path === PATH_PASSWORD_CHANGE && request.method === "POST") {
+        /* ⛔ CSRF ⭐ — طلب من أصل خارجي ⇒ مرفوض ⭐ */
+        if (isCrossSiteRequest(request, url)) {
+          return json({ ok: false, error: "طلب من أصل خارجي — اترفض" }, 403);
+        }
+        /* ⛔ ⭐ مخزن الحالة لازم يكون جاهز ⭐ ⇒ ⛔ غير كده ⇒ fail-closed ⭐ */
+        if (!env.REVOKE_DO) {
+          return json({ ok: false, error: "التغيير مش مهيّأ — استخدم Cloudflare" }, 501);
+        }
+        let body = {};
+        try { body = await request.json(); } catch (e) { body = {}; }
+        const cur = String(body.current || "");
+        const next = String(body.next || "");
+        /* ⭐ تأكيد الهوية ⭐ */
+        const okCur = await verifyPassword(env, cur);
+        if (!okCur) {
+          noteFail(ip);
+          const sh = await sharedAttempts(env, ip, "fail");
+          if (sh && sh.locked) {
+            return json({ ok: false, error: "محاولات كتير. استنى ١٥ دقيقة." }, 429);
+          }
+          return json({ ok: false, error: "كلمة المرور الحالية غلط" }, 401);
+        }
+        /* ⭐ فحص القوة ⭐ — ⛔ ٦ أرقام بس مرفوضة ⭐ */
+        const w = passwordWeakness(next);
+        if (!w.ok) {
+          return json({ ok: false, error: "كلمة المرور الجديدة ضعيفة", why: w.why, level: w.level }, 400);
+        }
+        /* ⭐ ⛔ لازم confirms ⭐ — ⛔ فول-back للمsecret ⭐
+           (لو الـDO ضاع ⇒ ⭐ نرجع للـsecret ⭐ ⇒ ⭐ اللوحة تفتح ⭐). */
+        const salt = (await sha256(next + "|" + Date.now())).slice(0, 24);
+        const hash = await sha256(salt + "|" + next);
+        const st = await readPwdState(env);
+        const ver = String((st && st.ver) ? st.ver : "0") + "." + Date.now();
+        const wrote = await writePwdState(env, salt, hash, ver);
+        if (!wrote) {
+          console.error("[octa-mgmt] password change: state write failed");
+          return json({ ok: false, error: "التغيير فشل — كلمة المرور ما اتغيّرتش" }, 502);
+        }
+        /* ⭐ ⛔ إبطال الجلسة الحالية ⭐ (كل النسخ ⭐) ⭐ */
+        const raw = parseCookies(request)[COOKIE];
+        if (raw) {
+          revokeSession(raw);
+          await doRevoke(env, raw);
+          await kvRevoke(env, raw);
+        }
+        return json({
+          ok: true,
+          message: "اتغيّرت — ادخل من جديد بالكلمة الجديدة",
+          level: w.level,
+          reauth: true,
+        }, 200, { "Set-Cookie": `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0` });
       }
 
       /* ── التمرير ── */

@@ -80,6 +80,29 @@ function makeCallLog(opts = {}) {
   return { calls, kv, doNs };
 }
 
+/* ⭐⭐ (R26) ⭐ فصل namespaces ⭐⭐
+   📌 قاعدة الاعتماد بقت تعتمد على **نسخة كلمة المرور** ⭐ ⇒ ⭐ لازم نقرأ
+      حالة اللوحة (panel_state ⭐ — نسخة واحدة مشتركة ⭐) عشان نحسب الوسم ⭐.
+   ⛔ ده **مش** نداء الإبطال ⭐ (rev: ⭐ — نسخة لكل جلسة ⭐) ⭐
+      ⛔⇒ الكوكي المزوّر/المنتهي لازم ما يوصلش namespace الإبطال ⭐
+      ⛔⇒ وده بالظبط حاجب استنزاف الموارد ⭐. */
+function sessionStoreCalls(log) {
+  return log.calls.filter(function (c) {
+    if (c.kind === 'kv-get' || c.kind === 'kv-put' || c.kind === 'kv-del') return true;
+    if (c.kind === 'do-get' || c.kind === 'do-post') {
+      const n = String(c.name || '');
+      return n.indexOf('rev:') === 0 || n.indexOf('att:') === 0;
+    }
+    return false;
+  });
+}
+
+function panelStateOnly(log) {
+  return log.calls.every(function (c) {
+    return c.kind === 'do-get' && c.name === 'panel_state';
+  });
+}
+
 function makeEnv(log, extra = {}) {
   return Object.assign({
     APP_PASSWORD: 'synthetic-password',
@@ -104,13 +127,18 @@ function req(p, opts = {}) {
 /* ⭐⭐⭐ الجولة ٢٦ (R26) — ⭐ التوقيع بقى يشمل **وسم الاعتماد** ⭐
    📌 السبب ⭐: ⛔ تغيير كلمة المرور ⭐ كان **مش** بيبطل الجلسات القائمة ⭐.
    📌 فاصيل: ⭐ نفس قاعدة الكود ⭐ (sign(exp + "." + tag) ⭐) ⭐. */
-function credentialTag(password) {
-  return nodeCrypto.createHash('sha256').update(String(password)).digest('hex').slice(0, 16);
+function credentialTag(password, ver) {
+  /* (R26) نفس قاعدة الكود في mgmt/worker.js ⭐:
+     sha256(كلمة المرور + '|' + النسخة) مقصوص ١٦ hex.
+     النسخة (ver) بتتغير مع تغيير كلمة المرور ⇒ الجلسة القديمة تموت. */
+  const v = (ver === undefined || ver === null) ? '0' : String(ver);
+  return nodeCrypto.createHash('sha256')
+    .update(String(password) + '|' + v).digest('hex').slice(0, 16);
 }
 
-function mintCookie(expMs, secret, password) {
+function mintCookie(expMs, secret, password, ver) {
   const exp = String(expMs);
-  const payload = password ? (exp + '.' + credentialTag(password)) : exp;
+  const payload = password ? (exp + '.' + credentialTag(password, ver)) : exp;
   const sig = nodeCrypto.createHmac('sha256', secret).update(payload).digest('hex');
   return 'octa_mgmt_sess=' + encodeURIComponent(exp + '.' + sig);
 }
@@ -262,9 +290,9 @@ test('R25-I11-01: a FORGED cookie must never reach the Durable Object or the KV'
   const out = await logout(worker, env, forged);
   assert.equal(out.status, 401,
     '⛔ كوكي مزوّر ⇒ ٤٠١ ⭐ — got ' + out.status);
-  assert.equal(log.calls.length, 0,
-    '⛔⛔⛔ كوكي مزوّر استهلك موارد الـDO/الـKV ⭐ (' +
+  assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ كوكي مزوّر استهلك موارد الـDO/الـKV ⭐ (' +
     log.calls.map(c => c.kind).join(',') + ') ⭐ لازم صفر نداءات ⭐');
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });
 
 test('R25-I11-02: an EXPIRED cookie must not consume Durable Object or KV resources', async () => {
@@ -276,9 +304,9 @@ test('R25-I11-02: an EXPIRED cookie must not consume Durable Object or KV resour
   const out = await logout(worker, env, expired);
   assert.equal(out.status, 200,
     '⛔ جلسة منتهية ⇒ مفيش حاجة تتبطل ⭐ — got ' + out.status);
-  assert.equal(log.calls.length, 0,
-    '⛔⛔⛔ جلسة منتهية استهلكت التخزين ⭐ (' +
+  assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ جلسة منتهية استهلكت التخزين ⭐ (' +
     log.calls.map(c => c.kind).join(',') + ') ⭐');
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
   assert.equal(out.body.revocation, 'not-needed',
     '⛔ لازم يعلن إن مفيش إبطال محتاج ⭐');
 });
@@ -290,8 +318,8 @@ test('R25-I11-03: a MALFORMED cookie must not reach the storage', async () => {
 
   const out = await logout(worker, env, 'octa_mgmt_sess=not-a-session');
   assert.equal(out.status, 401, '⛔ لازم ٤٠١ ⭐ — got ' + out.status);
-  assert.equal(log.calls.length, 0,
-    '⛔⛔⛔ كوكي مشوّه وصل التخزين ⭐');
+  assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ كوكي مشوّه وصل التخزين ⭐');
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });
 
 test('R25-I11-04: a VALID cookie still revokes through the shared store', async () => {

@@ -95,6 +95,13 @@ button.sm{padding:6px 12px;font-size:12px}
 
 /* ── الأقسام ── */
 section{margin-top:34px}
+.pwlab{display:block;font-size:12px;font-weight:800;color:var(--dim);margin:12px 0 6px}
+.pwin{width:100%;background:var(--bg);border:1px solid var(--line2);color:var(--txt);
+  border-radius:10px;padding:12px 14px;font-size:15px;font-weight:700}
+.pwin:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.12)}
+.pwnote{font-size:11.5px;color:var(--dim2);margin:10px 0 14px;line-height:1.7}
+.pwmsg{font-size:12.5px;font-weight:700;min-height:20px;margin-top:10px}
+.pwmsg.ok{color:#4ade80}.pwmsg.bad{color:#f87171}
 .sec-hd{display:flex;align-items:center;gap:11px;margin-bottom:14px;flex-wrap:wrap}
 .sec-hd h2{font-size:17.5px;font-weight:900;position:relative;padding-right:15px}
 .sec-hd h2::before{
@@ -677,6 +684,25 @@ body[data-view="table"] #cardsBox{display:none!important}
     <span class="note">منبهات الأسعار وحالتها مقابل السعر الحالي</span>
   </div>
   <div id="alertsBox"></div>
+</section>
+
+<!-- ═══ ⭐ (R26) تغيير كلمة مرور اللوحة ═══ -->
+<section id="secPassword">
+  <div class="sec-hd">
+    <h2>🔐 تغيير كلمة مرور اللوحة</h2>
+    <span class="note">أنت بتختار الكلمة · بعد التغيير هتlogout وهتدخل من جديد</span>
+  </div>
+  <div class="card">
+    <label class="pwlab" for="pwCur">كلمة المرور الحالية</label>
+    <input class="pwin" id="pwCur" type="password" autocomplete="current-password" placeholder="••••••••">
+    <label class="pwlab" for="pwNew">كلمة المرور الجديدة</label>
+    <input class="pwin" id="pwNew" type="password" autocomplete="new-password" placeholder="٨ خانات على الأقل">
+    <label class="pwlab" for="pwNew2">تأكيد كلمة المرور الجديدة</label>
+    <input class="pwin" id="pwNew2" type="password" autocomplete="new-password" placeholder="••••••••">
+    <div class="pwnote" id="pwHint">٨ خانات على الأقل ·Letters or digits · 6 أرقام بس مرفوضة (مليون احتمال).</div>
+    <button class="pbtn primary" id="pwSave" type="button">احفظ كلمة المرور الجديدة</button>
+    <div class="pwmsg" id="pwMsg"></div>
+  </div>
 </section>
 
 <!-- ═══ نافذة التأكيد (كل إجراء تعديلي) ═══ -->

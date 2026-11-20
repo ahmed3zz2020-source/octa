@@ -306,6 +306,8 @@ async function handlePreviewApi(opts) {
     const device = String(body.device || '').trim();
     if (device) acct.devices = [device];
     if (device) await kvPut(env, acctKey(uid), acct);
+    /* ⭐ فهرس الباسورد ⭐ (قراءة قوية ⭐ — القوائم متأخرة ⭐) */
+    try { await kvPut(env, 'pinidx:' + await sha256hex(String(pin)), acctKey(uid)); } catch (e) { }
     const token = await issueSession(env, acct, device);
     return json({
       ok: true, token: token, expires_in: SESSION_TTL_SEC,
@@ -356,22 +358,51 @@ async function handlePreviewApi(opts) {
     if (!PIN_RE.test(pin)) {
       return json({ ok: false, error: 'الباسورد ٤ أرقام بالظبط', why: 'bad_pin' }, 400);
     }
+    /* ⛔⛔⛔ الجهاز **إلزامي** ⭐ (زي الإنتاج ⭐): الباسورد لوحده
+       ⛔ مش مفتاح ⭐ (٤ أرقام ⭐ ⇒ ١٠٬٠٠٠ احتمال ⭐) ⭐ ولا هو
+       ⛔ هو اللي بيميّز حسابين بنفس الباسورد ⭐ ⇒ لازم نطابق
+       ⛔ (الباسورد + الجهاز المسجّل) ⭐ مع بعض ⭐. */
+    if (!device || device.length < 8) {
+      return json({ ok: false, error: 'لازم بصمة الجهاز',
+        why: 'device_required' }, 400);
+    }
     const list = await env.PREVIEW_KV.list({ prefix: 'acct:' });
     let found = null;
+    const cands = [];
+    /* ⭐ الفهرس أولاً ⭐ (قراءة قوية ⭐) */
+    try {
+      const idx = await kvGet(env, 'pinidx:' + await sha256hex(String(pin)));
+      if (idx) {
+        const a0 = await kvGet(env, idx);
+        if (a0) {
+          const h0 = await pbkdf2(pin, a0.pin_salt || '');
+          if (h0 === a0.pin_hash && (a0.devices || []).includes(device)) found = a0;
+        }
+      }
+    } catch (e) { }
     for (const key of (list.keys || [])) {
+      if (found) break;
       const acct = await kvGet(env, key.name);
       if (!acct) continue;
       const hash = await pbkdf2(pin, acct.pin_salt || '');
-      if (hash === acct.pin_hash) { found = acct; break; }
+      if (hash !== acct.pin_hash) continue;
+      /* ⭐ (R26) ⭐ الحساب = (باسورد + جهاز مسجّل) ⭐
+         ⭐ (زي الإنتاج ⭐) + ⭐ فهرس PIN ⭐ (قراءة قوية ⭐
+         ⭐ بدل مسح الـKV ⭐ (القوائم متأخرة ⭐ ⇒ الدخول بي fallback ✗). */
+      cands.push(acct);
+    }
+    /* ⭐ أكتر من حساب بنفس الباسورد ⇒ لازم الجهاز يطابق ⭐ */
+    if (!found) {
+      for (const a of cands) {
+        if ((a.devices || []).includes(device)) { found = a; break; }
+      }
     }
     if (!found) {
-      await bumpAttempts(env, 'pin', await sha256hex(pin));
-      return json({ ok: false, error: 'الباسورد غلط', why: 'bad_pin' }, 401);
-    }
-    /* ⛔ الجهاز لازم يكون مسجّل على الحساب (زي الإنتاج) ⭐ */
-    if (device && !(found.devices || []).includes(device)) {
-      return json({ ok: false, error: 'لازم كود على الإيميل عشان الجهاز الجديد',
-        why: 'device_challenge_required' }, 403);
+      await bumpAttempts(env, 'pin', await sha256hex(pin + '|' + device));
+      /* ⛔ نردّ نفس الرسالة سواء الباسورد غلط ولا الجهاز مش مسجّل ⭐
+         ⛔ (مافيش تعداد للحسابات ⭐) ⭐. */
+      return json({ ok: false, error: 'الباسورد غلط أو الجهاز مش مسجّل',
+        why: 'bad_pin_or_device' }, 401);
     }
     const token = await issueSession(env, found, device);
     return json({ ok: true, token: token, expires_in: SESSION_TTL_SEC,
