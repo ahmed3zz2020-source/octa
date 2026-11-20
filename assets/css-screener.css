@@ -660,7 +660,11 @@ body.light .sv-wrap { border-color: #d8e0e8; }
 
 /* الزر نفسه: شفاف تماماً — مفيش إيموجي ولا نص */
 .dev-hidden-gate {
-  width: 22px; height: 22px;
+  /* ⭐⭐⭐ (R29 · FINDING-16) ⭐⭐⭐ هدف اللمس ⭐ ٤٠ بكسل ⭐
+     📌 السبب ⭐: ⛔ ٢٢ بكسل ⭐ ⇒ ⛔ هدف لمس أصغر من الحد ⭐
+        ⇒ ⛔ عيب واجهة حقيقي ⭐ (حتى لو شفاف ⭐).
+     ✅ دلوقتي ⭐: ⛔ ٤٠×٤٠ ⭐ ⇒ ⭐ ضمن الحد ⭐ ⭐ (والزرار شفاف ⭐ ⇒ مافيش تغيير شكلي ⭐). */
+  width: 40px; height: 40px;
   background: transparent;
   border: 0;
   cursor: pointer;

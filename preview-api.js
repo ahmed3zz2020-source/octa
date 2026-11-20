@@ -147,6 +147,27 @@ async function storeCmd(env, cmd) {
     return body;
   } catch (e) { return null; }
 }
+/* ⭐⭐⭐ (R29 · FINDING-11) ⭐⭐⭐ نداء خام ⭐⭐⭐
+   📌 `storeCmd` ⭐ بيرجّع null ⭐ لو الـbody مش ok ⭐ ⇒ ⛔ بنفقد سبب الرفض ⭐
+      (مثلاً «الحساب موجود» ⭐ ⇒ ⛔ مبيناش ⭐ ⇒ ⛔ 503 بدل 409 ⭐).
+   ✅ `storeCmdRaw` ⭐ بيرجّع الـbody كما هو ⭐ ⇒ ⭐ السبب بيفضل ظاهر ⭐. */
+async function storeCmdRaw(env, cmd) {
+  if (!env.PREVIEW_STORE) return null;
+  try {
+    const id = env.PREVIEW_STORE.idFromName(DO_NAME);
+    const stub = env.PREVIEW_STORE.get(id);
+    const res = await stub.fetch('https://store.internal/cmd', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cmd),
+    });
+    if (!res) return null;
+    const body = await res.json().catch(() => null);
+    if (!body) return null;
+    return body;
+  } catch (e) { return null; }
+}
+
 async function storeGet(env, key) {
   const r = await storeCmd(env, { op: 'get', key: key });
   return r ? (r.value === undefined ? null : r.value) : null;
@@ -158,6 +179,27 @@ async function storePut(env, key, value, ttlSec) {
 async function storeDel(env, key) {
   const r = await storeCmd(env, { op: 'del', key: key });
   return !!r;
+}
+/* ⭐⭐⭐ (R29 · FINDING-11) ⭐⭐⭐ استهلاك ذرّ ⭐⭐⭐
+   📌 قراءة + حذف **في عملية واحدة** ⭐ جوه الـDO ⭐
+      ⇒ ⛔ التوكن ما بيتUsedش مرتين ⭐ (حتى مع طلبين متزامنين ⭐).
+   📌 ⛔ الفشل ⭐ ⇒ ⛔ null ⭐ (مش قيمة فاضية ⭐ ⇒ ⛔ مفيش نجاح وهمي ⭐). */
+async function storeTake(env, key) {
+  const r = await storeCmd(env, { op: 'take', key: key });
+  if (!r) return null;
+  if (r.consumed !== true) return null;
+  return (r.value === undefined ? null : r.value);
+}
+/* ⭐⭐⭐ (R29 · FINDING-12) ⭐⭐⭐ تدوير ذرّ ⭐⭐⭐
+   📌 إبطال القديم + كتابة البديل **في عملية واحدة** ⭐
+      ⇒ ⛔ لو فشل ⭐ ⇒ ⛔ مافيش جلسة بديلة ⭐ (والقديم ماتتغيّرش ⭐)
+      ⇒ ⛔ بديل واحد بس ⭐. */
+async function storeRotate(env, oldKey, newKey, value, ttlSec) {
+  const r = await storeCmd(env, {
+    op: 'session_rotate', oldKey: oldKey, newKey: newKey,
+    value: value, ttl: ttlSec || 0,
+  });
+  return !!(r && r.rotated === true);
 }
 async function storeList(env, prefix) {
   const r = await storeCmd(env, { op: 'list', prefix: prefix });
@@ -194,17 +236,28 @@ async function makeUnlock(env, uid, email, name) {
 }
 
 async function readUnlock(env, tok) {
+  /* ⭐⭐⭐ (R29 · FINDING-11) ⭐⭐⭐ قراءة فقط ⭐⭐⭐
+     📌 الاستهلاك صار **ذرّي** في المسار اللي بيحتاجه ⭐ (`storeTake` ⭐)
+        ⇒ ⛔ القراءة هنا ما بتستهلكش ⭐ ⇒ ⛔ مافيش سباق ⭐
+        ⇒ ⛔ والتو-token ما بيتUsedش مرتين ⭐. */
   if (!tok) return null;
   const rec = await storeGet(env, unlockKey(tok));
   if (!rec) return null;
   if ((rec.exp || 0) <= nowSec()) { await storeDel(env, unlockKey(tok)); return null; }
   return rec;
 }
-
-async function dropUnlock(env, tok) {
-  if (!tok) return false;
-  return await storeDel(env, unlockKey(tok));
+/* ⭐⭐⭐ (R29 · FINDING-11) ⭐⭐⭐ استهلاك توكن الفتح ⭐⭐⭐
+   📌 ذرّي ⭐ (قراءة + حذف في عملية واحدة ⭐) ⇒ ⛔ توكن واحد ⭐. */
+async function consumeUnlock(env, tok) {
+  const rec = await storeTake(env, unlockKey(tok));
+  if (!rec) return null;
+  if ((rec.exp || 0) <= nowSec()) return null;
+  return rec;
 }
+
+/* ⭐⭐⭐ (R29 · FINDING-11) ⭐⭐⭐ الاستهلاك **ذرّي** ⭐ ⇒ ⛔ مافيش drop ⭐
+   📌 `consumeUnlock` ⭐ (قراءة + حذف في عملية واحدة ⭐) هي اللي بتستخدم ⭐
+      ⇒ ⛔ دالة الحذف المنفصلة بقت بلا فايدة ⭐ ⇒ ⛔ شيلناها ⭐ (كود ميت ⭐). */
 /* ⭐ اللقطة ⭐ — **بتفضل في الـKV** ⭐ (بيانات قراءة ⭐ من أداة التغذية ⭐) */
 async function snapshotGet(env, key) {
   try {
@@ -238,23 +291,33 @@ async function bumpAttempts(env, kind, id) {
 }
 
 /* ── الجلسات ──────────────────────────────────────────────────────────── */
-async function issueSession(env, acct, device) {
+/* ⭐⭐⭐ (R29 · FINDING-12) ⭐⭐⭐ تجهيز الجلسة (بلا كتابة ⭐) ⭐⭐⭐
+   📌 فصل ⭐: التوليد ⭐ (sid ⭐ + توقيع ⭐) ⭐ عن الكتابة ⭐
+      ⇒ ⭐ عشان التدوير يكون **عملية واحدة** ⭐ (إبطال + إصدار ⭐). */
+async function makeSessionToken(env, acct, device) {
   const sid = b64u(crypto.getRandomValues(new Uint8Array(18)));
   const payload = { uid: acct.uid, sid: sid, exp: nowSec() + SESSION_TTL_SEC };
   const body = enc(payload);
   const sig = await hmac(env.PREVIEW_SESSION_SECRET, body);
   const token = body + '.' + sig;
+  const rec = {
+    uid: acct.uid, sid: sid, exp: payload.exp,
+    device: device || '', epoch: acct.epoch || 1
+  };
+  return { token: token, sid: sid, rec: rec };
+}
+
+async function issueSession(env, acct, device) {
+  const made = await makeSessionToken(env, acct, device);
   /* ⭐⭐⭐ (R28) ⭐ الجلسة في المخزن القوي ⭐ ⇒ ⭐ إبطال فوري ⭐ (R26-I02 ⭐)
      ⭐⭐⭐ (R28 · FINDING-02) ⭐⭐⭐ ⛔ الكتابة لازم **تتأكد** ⭐⭐⭐
      📌 قبل ⭐: الكتابة كانت متجاهَلة ⭐ ⇒ ⭐ التوكن بيرجع ⭐
         ⇒ ⭐ لكن ما يتحفظش ⭐ ⇒ ⭐ ⛔ جلسة ميتة ⭐ (نجاح كاذب ⭐).
-     ✅ دلوقتي ⭐: ⛔ لو الكتابة فشلت ⭐ ⇒ ⛔ null ⭐ ⇒ ⛔ ما نصدرش توكن ⭐. */
-  const wrote = await storePut(env, sessKey(acct.uid, sid), {
-    uid: acct.uid, sid: sid, exp: payload.exp,
-    device: device || '', epoch: acct.epoch || 1
-  }, SESSION_TTL_SEC + 3600);
+     ✅ دلوقتي ⭐: ⛔ لو الكتابة فشلت ⭐ ⇒ ⭐ null ⭐ ⇒ ⭐ ما نصدرش توكن ⭐. */
+  const wrote = await storePut(env, sessKey(acct.uid, made.sid), made.rec,
+    SESSION_TTL_SEC + 3600);
   if (!wrote) return null;
-  return token;
+  return made.token;
 }
 
 async function readSession(env, request) {
@@ -305,15 +368,23 @@ function safeEqual(a, b) {
 /* ── الكود ────────────────────────────────────────────────────────────── */
 async function makeChallenge(env, uid, email, name) {
   const code = randDigits(6);
-  await storePut(env, chalKey(uid), {
-    code_hash: await sha256hex(code), email: email, name: name || '',
-    exp: nowSec() + CHALLENGE_TTL_SEC, tries: 0
-  }, CHALLENGE_TTL_SEC + 60);
-  /* ⭐⭐⭐ (R28 · R26-I01) ⭐ الكود (نص صريح ⭐) في صندوق المعاينة ⭐
-     ⭐ — مش في الرد ⭐ — ومقفول بمفتاح ⭐. */
-  await storePut(env, mailKey(uid), {
-    code: code, email: email, exp: nowSec() + CHALLENGE_TTL_SEC
-  }, CHALLENGE_TTL_SEC + 60);
+  /* ⭐⭐⭐ (R29 · FINDING-11) ⭐⭐⭐ كتابة الكود + صندوق البريد **في عملية واحدة** ⭐⭐⭐
+     📌 قبل ⭐: نداءان ⭐ ⇒ ⛔ لو التاني فشل ⭐ ⇒ ⛔ كود من غير صندوق ⭐
+        (ولا صندوق من غير كود ⭐) ⇒ ⛔ حالة نص-نص ⭐.
+     ✅ دلوقتي ⭐: `chal_make` ⭐ = نداء واحد ⭐ ⇒ ⛔ إما الاتنين أو ولا واحد ⭐. */
+  const codeHash = await sha256hex(code);
+  const r = await storeCmd(env, {
+    op: 'chal_make',
+    key: chalKey(uid),
+    mailKey: mailKey(uid),
+    chal: {
+      code_hash: codeHash, email: email, name: name || '',
+      exp: nowSec() + CHALLENGE_TTL_SEC, tries: 0
+    },
+    mail: { code: code, email: email, exp: nowSec() + CHALLENGE_TTL_SEC },
+    ttl: CHALLENGE_TTL_SEC + 60,
+  });
+  if (!r) return null;
   return code;
 }
 async function checkChallenge(env, uid, code) {
@@ -458,7 +529,12 @@ async function handlePreviewApi(opts) {
        📌 العقد مع الإنتاج ⭐: `{new_pin}` + `Authorization: Bearer <unlock>` ⭐
           ⇒ ⛔ من غير توكن الفتح ⭐ ⇒ ⛔ 401 ⭐ (fail-closed ⭐). */
     const tok = bearerToken(request);
-    const unl = tok ? await readUnlock(env, tok) : null;
+    /* ⭐⭐⭐ (R29 · FINDING-11) ⭐⭐⭐ الاستهلاك **ذرّي** ⭐⭐⭐
+       📌 قبل ⭐: قراءة ⭐ وبعدين حذف ⭐ ⇒ ⛔ طلبان متزامنان ⭐ ⇒ ⛔ توكن واحد
+          بيتUsed مرتين ⭐ ⇒ ⛔ حسابين بنفس الإيميل ⭐.
+       ✅ دلوقتي ⭐: `consumeUnlock` ⭐ = قراءة + حذف **في عملية واحدة** ⭐
+          ⇒ ⛔ واحد بس ياخد التوكن ⭐ ⇒ ⛔ التاني يفشل ⭐ (401 ⭐). */
+    const unl = tok ? await consumeUnlock(env, tok) : null;
     if (!unl) {
       return json({ ok: false, error: 'انتهت خطوة اختيار الباسورد',
         why: 'unlock_expired' }, 401);
@@ -474,14 +550,9 @@ async function handlePreviewApi(opts) {
     /* ⭐⭐⭐ (R28 · R26-I01) ⭐ ⛔⛔⛔ الحساب الموجود **ما بيتكتبش** ⭐ ⛔⛔⛔
        📌 قبل ⭐: `newpin` ⭐ كان بيعيد كتابة أي حساب ⭐ ⇒ ⭐ ⛔ استحواذ ⭐.
        ✅ دلوقتي ⭐: الحساب الموجود ⭐ ⇒ ⭐ الطريق الصح ⭐ = استرجاع ⭐
-          (pin/challenge ⭐) ⭐. */
-    const existing = await storeGet(env, acctKey(uid));
-    if (existing) {
-      return json({
-        ok: false, error: 'الحساب موجود — استخدم استرجاع الباسورد',
-        why: 'account_exists'
-      }, 409);
-    }
+          (pin/challenge ⭐) ⭐.
+       ⭐⭐⭐ (R29 · FINDING-11) ⭐⭐⭐ الإنشاء **ذرّي** ⭐⭐⭐
+          ⇒ ⛔ مايكتبش فوق حساب موجود ⭐ (قراءة + كتابة في عملية واحدة ⭐). */
     const acct = {
       uid: uid, email: email, name: unl.name || 'مستخدم',
       pin_salt: salt, pin_hash: hash, epoch: 1,
@@ -489,12 +560,24 @@ async function handlePreviewApi(opts) {
     };
     const device = String(body.device || '').trim();
     if (device) acct.devices = [device];
-    const wrote = await storePut(env, acctKey(uid), acct);
-    if (!wrote) {
+    const created = await storeCmdRaw(env, { op: 'acct_create', key: acctKey(uid), value: acct });
+    if (!created || created.ok !== true) {
+      if (created && created.error === 'account_exists') {
+        return json({
+          ok: false, error: 'الحساب موجود — استخدم استرجاع الباسورد',
+          why: 'account_exists'
+        }, 409);
+      }
+      /* ⛔ التعذّر ⭐ ⇒ ⛔ مافيش حساب ⭐ (مش نجاح وهمي ⭐) */
       return json({ ok: false, error: 'تعذّر حفظ الحساب', why: 'write_failed' }, 503);
     }
+    if (created.error === 'account_exists') {
+      return json({
+        ok: false, error: 'الحساب موجود — استخدم استرجاع الباسورد',
+        why: 'account_exists'
+      }, 409);
+    }
     await storeDel(env, chalKey(uid));
-    await dropUnlock(env, tok);
     /* ⭐ فهرس الباسورد ⭐ (قراءة قوية ⭐ — القوائم متأخرة ⭐) */
     try { await storePut(env, 'pinidx:' + await sha256hex(String(pin)), acctKey(uid)); } catch (e) { }
     const token = await issueSession(env, acct, device);
@@ -536,9 +619,11 @@ async function handlePreviewApi(opts) {
     return json({ ok: true, verified: true, unlock: unlock, expires_in: UNLOCK_TTL_SEC });
   }
   if (p === '/api/auth/pin/challenge/newpin' && m === 'POST') {
-    /* ⭐⭐⭐ (R28 · FINDING-08) ⭐⭐⭐ `{new_pin}` + توكن الفتح ⭐⭐⭐ */
+    /* ⭐⭐⭐ (R28 · FINDING-08) ⭐⭐⭐ `{new_pin}` + توكن الفتح ⭐⭐⭐
+       ⭐⭐⭐ (R29 · FINDING-11) ⭐⭐⭐ الاستهلاك **ذرّي** ⭐⭐⭐
+          ⇒ ⛔ التوكن ما بيتUsedش مرتين ⭐ (طلبان متزامنان ⭐). */
     const tok = bearerToken(request);
-    const unl = tok ? await readUnlock(env, tok) : null;
+    const unl = tok ? await consumeUnlock(env, tok) : null;
     if (!unl) {
       return json({ ok: false, error: 'انتهت خطوة اختيار الباسورد',
         why: 'unlock_expired' }, 401);
@@ -546,18 +631,25 @@ async function handlePreviewApi(opts) {
     const uid = unl.uid;
     const pin = String(body.new_pin || body.pin || '').trim();
     if (!PIN_RE.test(pin)) return json({ ok: false, error: 'الباسورد ٤ أرقام بالظبط', why: 'bad_pin' }, 400);
-    const acct = await storeGet(env, acctKey(uid));
-    if (!acct) return json({ ok: false, error: 'مفيش حساب بالإيميل ده', why: 'no_account' }, 404);
     const salt = b64u(crypto.getRandomValues(new Uint8Array(16)));
-    acct.pin_salt = salt;
-    acct.pin_hash = await pbkdf2(pin, salt);
-    acct.epoch = (acct.epoch || 1) + 1;         /* ⛔ إبطال كل الجلسات ⭐ */
-    const wrote = await storePut(env, acctKey(uid), acct);
-    if (!wrote) {
-      return json({ ok: false, error: 'تعذّر حفظ الباسورد', why: 'write_failed' }, 503);
+    const hash = await pbkdf2(pin, salt);
+    /* ⭐⭐⭐ (R29 · FINDING-11) ⭐⭐⭐ تحديث الباسورد **ذرّي** ⭐⭐⭐
+       📌 قبل ⭐: قراءة ⭐ + تعديل ⭐ + كتابة ⭐ (٣ نداءات ⭐) ⇒ ⛔ سباق ⭐:
+          ⭐ طلبين متزامنين ⭐ ⇒ ⭐ نسخة واحدة تكتب ⭐ والنسخة التانية تضيع ⭐.
+       ✅ دلوقتي ⭐: `acct_set_pin` ⭐ = قراءة + تعديل + كتابة **في عملية واحدة** ⭐
+          ⇒ ⛔ مافيش سباق ⭐ ⭐ والنسخة (epoch ⭐) بترتفع ⭐ ⇒ ⛔ كل الجلسات تموت ⭐. */
+    const r = await storeCmdRaw(env, {
+      op: 'acct_set_pin', key: acctKey(uid),
+      patch: { pin_salt: salt, pin_hash: hash },
+    });
+    if (!r || r.ok !== true) {
+      const why = (r && r.error === 'no_account') ? 'no_account' : 'write_failed';
+      const code = (why === 'no_account') ? 404 : 503;
+      return json({ ok: false,
+        error: (why === 'no_account') ? 'مفيش حساب بالإيميل ده' : 'تعذّر حفظ الباسورد',
+        why: why }, code);
     }
     await storeDel(env, chalKey(uid));
-    await dropUnlock(env, tok);
     return json({ ok: true, message: 'الباسورد اتغيّر ⭐ — لازم تعمل دخول تاني ⭐' });
   }
 
@@ -685,21 +777,22 @@ async function handlePreviewApi(opts) {
     if (!sess) return json({ ok: false, error: 'محتاج تسجيل دخول', why: 'unauthorized' }, 401);
     const acct = await storeGet(env, acctKey(sess.payload.uid));
     if (!acct) return json({ ok: false, error: 'محتاج تسجيل دخول', why: 'unauthorized' }, 401);
-    /* ⭐⭐⭐ (R28 · FINDING-02) ⭐⭐⭐ استبدال الجلسة = عملية **متسقة** ⭐⭐⭐
-       📌 قبل ⭐: `storeDel` ⭐ (القديم) ⭐ وبعدين `issueSession` ⭐ (الجديد) ⭐
-          ⇒ ⛔ لو الإصدار فشل ⭐ ⇒ ⭐ المستخدم بلا جلسة ⭐ (خسارة ⭐)
-          ⇒ ⛔ والقديم ⭐ كان بيرجع نجاح ⭐ حتى لو الكتابة ما تمّت ⭐.
-       ✅ الترتيب ⭐: ① **إبطال القديم** ⭐ (ويجب أن ينجح ⭐)
-          ② **إصدار الجديد** ⭐ (ويجب أن يُكتب في المخزن ⭐)
-          ⇒ ⛔ لو الإبطال فشل ⭐ ⇒ ⛔ مفيش جلسة بديلة ⭐ (والقديمة بتفضل زي ما هي ⭐).
-       ⭐ والكتابة لازم تتأكد ⭐ ⇒ ⛔ ما نرجّعش توكن مش محفوظ ⭐. */
-    const revoked = await storeDel(env, sessKey(sess.payload.uid, sess.payload.sid));
-    if (!revoked) {
-      /* ⛔ تعذّر الإبطال ⭐ ⇒ ⛔ refuse إصدار بديل ⭐ (fail-closed ⭐) */
-      return json({ ok: false, error: 'تعذّر إنهاء الجلسة القديمة',
-        why: 'revoke_failed' }, 503);
-    }
-    const token = await issueSession(env, acct, sess.rec.device || '');
+        /* ⭐⭐⭐ (R29 · FINDING-12) ⭐⭐⭐ التجديد = **عملية واحدة** ⭐⭐⭐
+           📌 قبل ⭐: حذف ⭐ وبعدين إصدار ⭐ (٢ نداءات ⭐) ⇒ ⛔ لو الإصدار فشل ⭐
+              ⇒ ⭐ القديم اتبطل ⭐ والجديد مالص ⭐ ⇒ ⭐ المستخدم بلا جلسة ⭐.
+           ✅ دلوقتي ⭐: `session_rotate` ⭐ = إبطال القديم + كتابة البديل
+              **في عملية واحدة** ⭐ ⇒ ⛔ بديل واحد بس ⭐
+              ⇒ ⛔ ولو فشل ⭐ ⇒ ⛔ **مافيش جلسة بديلة** ⭐ (fail-closed ⭐). */
+        const made = await makeSessionToken(env, acct, sess.rec.device || '');
+        const rotated = await storeRotate(env,
+          sessKey(sess.payload.uid, sess.payload.sid),
+          sessKey(acct.uid, made.sid), made.rec, SESSION_TTL_SEC + 3600);
+        if (!rotated) {
+          /* ⛔ تعذّر الإبطال/الإصدار ⭐ ⇒ ⛔ refuse إصدار بديل ⭐ (fail-closed ⭐) */
+          return json({ ok: false, error: 'تعذّر إنهاء الجلسة القديمة',
+            why: 'revoke_failed' }, 503);
+        }
+        const token = made.token;
     if (!token) {
       return json({ ok: false, error: 'تعذّر تجديد الجلسة',
         why: 'issue_failed' }, 503);

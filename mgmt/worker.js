@@ -695,6 +695,11 @@ async function credentialTagFromState(env, st) {
     ver = String((st.pwd && st.pwd.ver) || "0");
   } else if (st && st.reason === "no_state") {
     ver = "nostate";
+  } else if (st && st.reason === "incomplete") {
+    /* ⭐⭐⭐ (R29 · FINDING-13) ⭐⭐⭐ حالة اعتماد ناقصة ⭐ ⇒ ⛔ وسم مستحيل ⭐
+       📌 ⇒ ⛔ مافيش جلسة issued ⭐ (fail-closed ⭐) ⭐
+          ⭐ والمسار الوحيد ⭐ = الاسترداد الطارئ ⭐. */
+    return TAG_UNVERIFIED;
   } else if (st && st.reason === "not_configured") {
     /* ⭐ مافيش DO ⭐ ⇒ ⭐ **نمط المعاينة** ⭐ (إبطال بالـKV ⭐) ⭐
        📌 لازم الوسم يكون **ثابت ومتّسق** ⭐ ⇒ ⭐ لأن التحقق والإصدار
@@ -737,7 +742,17 @@ async function readPwdState(env) {
     const body = await res.json().catch(() => null);
     if (!body || body.ok !== true) return { ok: false, reason: "read_failed" };
     if (!body.pwd) return { ok: false, reason: "no_state" };
-    return { ok: true, pwd: body.pwd };
+    /* ⭐⭐⭐ (R29 · FINDING-13) ⭐⭐⭐ حالة اعتماد **موجودة وناقصة** ⭐⭐⭐
+       📌 السبب ⭐: ⛔ أي سجل ناقص ⭐ (salt/hash/ver ⭐ ناقصة ⭐)
+          كان بيتحسب «أول تشغيل» ⭐ ⇒ ⛔ الـsecret (APP_PASSWORD ⭐) بيتقبل ⭐
+          ⇒ ⛔ ⭐ مالك ⭐ اعتماده اتغيّر ⭐ ⭐ ⇒ ⛔ سرقة ⭐.
+       ✅ دلوقتي ⭐: ⛔ حالة ناقصة ⭐ ⇒ ⛔ رفض ⭐ (fail-closed ⭐)
+          ⇒ ⭐ والمسار الوحيد ⭐ = الاسترداد الطارئ ⭐ (السر ⭐). */
+    const pwd = body.pwd;
+    if (!pwd.salt || !pwd.hash || !pwd.ver) {
+      return { ok: false, reason: "incomplete", pwd: pwd };
+    }
+    return { ok: true, pwd: pwd };
   } catch (e) { return { ok: false, reason: "read_failed" }; }
 }
 
@@ -802,6 +817,14 @@ async function verifyPanelPasswordWithTag(env, pass) {
   const st = await readPwdState(env);
   if (!st.ok && st.reason === "read_failed") {
     return { status: "state_unknown" };
+  }
+  /* ⭐⭐⭐ (R29 · FINDING-13) ⭐⭐⭐ ⛔ الحالة الناقصة ⭐ ⇒ ⛔ رفض ⭐
+     📌 قبل ⭐: الحالة الناقصة ⭐ كانت بتنزل لـ«أول تشغيل» ⭐
+        ⇒ ⛔ الـsecret (APP_PASSWORD ⭐) كان بيتقبل ⭐ ⇒ ⛔ ⭐ دخول بإثارة ⭐ ⭐.
+     ✅ دلوقتي ⭐: ⛔ `state_unknown` ⭐ (503 ⭐ في مسار الدخول ⭐)
+        ⇒ ⭐ الاسترداد الطارئ ⭐ (السر ⭐) هو المسار الوحيد ⭐. */
+  if (!st.ok && st.reason === "incomplete") {
+    return { status: "state_unknown", why: "incomplete" };
   }
   /* ⭐ مافيش DO أصلاً ⭐ ⇒ ⭐ نمط المعاينة (إبطال بالـKV ⭐) ⭐
      📌 الـsecret هو المرجع ⭐ (سلوك R25/R26 ⭐) ⇒ ⭐ مافيش تعذّر ⭐
@@ -1122,6 +1145,15 @@ export default {
         const st0 = await readPwdState(env);
         if (!String(env.APP_PASSWORD || "") && !st0.ok && st0.reason === "not_configured") {
           return json({ ok: false, error: "التطبيق مش مهيّأ" }, 500);
+        }
+        /* ⭐⭐⭐ (R29 · FINDING-13) ⭐⭐⭐ ⛔ اعتماد إدارة موجود وناقص ⭐ ⇒ ⛔ رفض ⭐ */
+        if (!st0.ok && st0.reason === "incomplete") {
+          console.error("[octa-mgmt] login: credential state incomplete (rejected)");
+          return json({
+            ok: false,
+            error: "حالة الاعتماد ناقصة — استخدم الاسترداد الطارئ",
+            why: "state_unknown",
+          }, 503);
         }
         if (!st0.ok && st0.reason === "read_failed") {
           /* ⛔⛔⛔ (R28) ⭐ تعذّر التحقق من نسخة كلمة المرور ⭐

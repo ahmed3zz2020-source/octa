@@ -119,6 +119,31 @@ const OVERFLOW_PROBE = `() => {
   return out;
 }`;
 
+/* ⭐⭐⭐ (R29 · FINDING-14) ⭐⭐⭐ تنقيح سجل المتصفح ⭐⭐⭐
+   📌 السبب ⭐: ⛔ السجل كان بيخزّن **جسم الرد كامل** ⭐ ⇒ ⛔ توكن فتح ⭐
+      + ⛔ توكن جلسة ⭐ ⇒ ⛔ اعتماد صناعي **بيتسجّل في الدليل** ⭐.
+   ✅ دلوقتي ⭐: ⛔ الحقول المسموحة ⭐ بس ⭐ (قائمة صريحة ⭐)
+      ⇒ ⭐ و ⛔ أي نص طويل ⭐ (توكن ⭐) بيتنقّح ⭐ ⇒ ⭐ `***` ⭐. */
+const ALLOWED_KEYS = ['ok', 'error', 'why', 'code', 'count', 'source',
+  'updated', 'expires_in', 'hint', 'status', 'preview_note'];
+const LONG_SECRET = /[A-Za-z0-9_\-]{24,}/g;
+
+function redactBody(text) {
+  if (!text) return null;
+  let j = null;
+  try { j = JSON.parse(text); } catch (e) { j = null; }
+  if (j && typeof j === 'object' && !Array.isArray(j)) {
+    const out = {};
+    for (const k of ALLOWED_KEYS) {
+      if (!(k in j)) continue;
+      const v = j[k];
+      out[k] = (typeof v === 'string') ? v.slice(0, 140) : v;
+    }
+    return out;
+  }
+  return String(text).slice(0, 160).replace(LONG_SECRET, '***');
+}
+
 (async () => {
   const browser = await chromium.launch({
     executablePath: EXEC || undefined,
@@ -140,8 +165,8 @@ const OVERFLOW_PROBE = `() => {
   const apiLog = [];
   page.on('response', async (r) => {
     if (r.url().indexOf('/api/') < 0) return;
-    let body = '';
-    try { body = (await r.text()).slice(0, 200); } catch (e) { body = ''; }
+    let body = null;
+    try { body = redactBody(await r.text()); } catch (e) { body = null; }
     apiLog.push({ status: r.status(), path: r.url().replace(BASE, ''), body: body });
   });
 
@@ -334,7 +359,7 @@ const OVERFLOW_PROBE = `() => {
     out.shotBtn = !!modal.querySelector('#gshot button, #gshot');
     out.chart = !!modal.querySelector('iframe, .gchart, #gmv-chart');
     const txt = modal.innerText || '';
-    out.body = txt.slice(0, 900);
+    out.body = txt.slice(0, 900).replace(LONG_SECRET, '***');
     out.supportResistance = /دعم|مقاومة|support|resistance/i.test(txt);
     out.events = /أحداث|حدث|events/i.test(txt);
     out.errorShown = /تعذر|خطأ|مش متاح|فشل|error/i.test(txt);
@@ -364,6 +389,172 @@ const OVERFLOW_PROBE = `() => {
   });
   rec('gold · تبويب الادخار اشتغل', tab2.ok && String(tab2.text || '').length > 20);
   await page.screenshot({ path: path.join(OUT, 'gold-savings.png'), fullPage: false });
+
+
+  /* ── ②ب ⭐⭐⭐ (R29 · FINDING-16) ⭐⭐⭐ الذهب المصري ⭐⭐⭐
+     📌 السبب ⭐: مودال الذهب العام ⭐ بيعرض TradingView ⭐ (iframe ⭐)
+        ⇒ ⛔ في المعاينة المعزولة ⭐ مافيش مصدر ⭐ ⇒ ⛔ الشارت ميت ⭐.
+        ✅ دلوقتي ⭐: المودال المصري ⭐ (`openEgyGold` ⭐) ⭐ بيستكر الشارت خطي
+        من `/api/gold/history` ⭐ (بيانات فعلية ⭐ من الباك المعزول ⭐)
+        ⇒ ⭐ الفترات ⭐ + ⭐ التكبير ⭐ + ⭐ الدعم والمقاومة ⭐. */
+  const egy = await page.evaluate(async () => {
+    const out = { open: false, chart: false, chartNodes: 0, periods: [],
+      periodSwitch: false, zoom: false, zones: 0, factors: 0, decomp: 0,
+      price: '', error: '' };
+    try {
+      if (typeof window.openEgyGold === 'function') { window.openEgyGold(); out.open = true; }
+      else out.error = 'openEgyGold_missing';
+    } catch (e) { out.error = String(e).slice(0, 120); }
+    await new Promise((r) => setTimeout(r, 9000));
+    const modal = document.getElementById('egy-gold-modal');
+    if (!modal) return out;
+    const chart = modal.querySelector('#egchart');
+    out.chart = !!chart;
+    /* ⭐ الشارت مرسوم ⭐ ⇒ ⭐ فيه canvas ⭐ (lightweight-charts ⭐) */
+    out.chartNodes = chart ? chart.querySelectorAll('canvas').length : 0;
+    const priceEl = modal.querySelector('#egp-price');
+    out.price = priceEl ? String(priceEl.textContent || '').trim() : '';
+    out.periods = Array.from(modal.querySelectorAll('#egperiods .egper'))
+      .map((b) => String(b.textContent || '').trim()).filter(Boolean);
+    const zones = modal.querySelector('#egzones');
+    out.zones = zones ? zones.querySelectorAll('.egzone').length : 0;
+    const fac = modal.querySelector('#egfac');
+    out.factors = fac ? fac.textContent.trim().length : 0;
+    const dec = modal.querySelector('#egdec');
+    out.decomp = dec ? dec.textContent.trim().length : 0;
+    /* ⭐⭐⭐ تبديل الفترات ⭐⭐⭐ — نضغط فترة تانية ⭐ ونتأكد إن الشارت اتغيّر ⭐ */
+    const hashOf = (el) => {
+      if (!el) return '';
+      let h = 0;
+      const s = el.innerHTML || '';
+      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+      return String(h);
+    };
+    const before = hashOf(chart);
+    const btns = modal.querySelectorAll('#egperiods .egper');
+    if (btns.length > 1) {
+      btns[btns.length - 1].click();
+      await new Promise((r) => setTimeout(r, 2500));
+      out.periodSwitch = hashOf(chart) !== before;
+      const on = modal.querySelector('#egperiods .egper.is-on');
+      out.activePeriod = on ? String(on.textContent || '').trim() : '';
+    }
+    /* ⭐⭐⭐ التكبير ⭐⭐⭐ — عجلة فوق الشارت ⭐ ⇒ ⭐ الشارت يتغيّر ⭐ */
+    const zBefore = hashOf(chart);
+    if (chart) {
+      const r = chart.getBoundingClientRect();
+      chart.dispatchEvent(new WheelEvent('wheel', {
+        deltaY: -240, deltaX: 0, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+        bubbles: true, cancelable: true,
+      }));
+      await new Promise((rr) => setTimeout(rr, 2000));
+      out.zoom = hashOf(chart) !== zBefore;
+    }
+    return out;
+  });
+  rec('gold · المودال المصري اتفتح', egy.open, { error: egy.error });
+  rec('gold · الشارت الخطي مرسوم (بيانات فعلية ⭐)',
+    egy.chart && egy.chartNodes > 0, { canvas: egy.chartNodes, price: egy.price });
+  rec('gold · الفترات موجودة ⭐', (egy.periods || []).length >= 2, { periods: egy.periods });
+  rec('gold · تبديل الفترة ⭐ يعيد الرسم ⭐', egy.periodSwitch,
+    { active: egy.activePeriod || '' });
+  rec('gold · التكبير ⭐ (عجلة فوق الشارت ⭐)', egy.zoom, {});
+  rec('gold · مناطق الدعم والمقاومة ⭐', egy.zones >= 2, { zones: egy.zones });
+  rec('gold · العوامل ⭐', egy.factors > 20, { chars: egy.factors });
+  rec('gold · تفكيك التغيّر ⭐', egy.decomp > 20, { chars: egy.decomp });
+  await page.screenshot({ path: path.join(OUT, 'gold-egy.png'), fullPage: false });
+
+  /* ⭐⭐⭐ (R29) ⭐⭐⭐ أحداث الهيكل ⭐ + ⭐ ملء الشاشة ⭐⭐⭐ */
+  const deep = await page.evaluate(async () => {
+    const out = { events: 0, fullscreen: false, fsClass: '' };
+    const eg = document.getElementById('egy-gold-modal');
+    if (eg) { const c = eg.querySelector('[data-close]'); if (c) c.click(); }
+    await new Promise((r) => setTimeout(r, 600));
+    try {
+      if (typeof window.openGoldIntel === 'function') window.openGoldIntel();
+      else if (typeof window.openGold === 'function') window.openGold();
+    } catch (e) { }
+    await new Promise((r) => setTimeout(r, 8000));
+    const modal = document.querySelector('#octa-gold-modal') || document.querySelector('.gmodal');
+    if (!modal) return out;
+    const evs = modal.querySelectorAll('.gevs .gev');
+    out.events = evs.length;
+    /* ⭐ ملء الشاشة ⭐ */
+    const fs = modal.querySelector('#gfs-btn');
+    if (fs) {
+      try { fs.click(); } catch (e) { }
+      await new Promise((r) => setTimeout(r, 2500));
+      out.fsClass = document.body.className + ' | ' + (modal.className || '');
+      out.fullscreen = /fs|full/i.test(out.fsClass);
+    }
+    return out;
+  });
+  rec('gold · أحداث الهيكل ⭐ (بيانات فعلية ⭐)', deep.events > 0, { events: deep.events });
+  rec('gold · ملء الشاشة ⭐', deep.fullscreen, { cls: String(deep.fsClass).slice(0, 120) });
+  await page.screenshot({ path: path.join(OUT, 'gold-deep-events.png'), fullPage: false });
+
+
+  /* ── ②ج ⭐⭐⭐ (R29 · FINDING-16) ⭐⭐⭐ تجربة التطبيق بالحساب الصناعي ⭐⭐⭐
+     📌 المطلوب ⭐: الدخول ⭐ + السوق ⭐ + الفرص ⭐ + المحفظة ⭐
+        + التنبيهات ⭐ + الخروج ⭐ (كلها بحساب صناعي ⭐). */
+  const app = await page.evaluate(async () => {
+    const out = { pfWrite: 0, pfRead: 0, pfCash: null, alAdd: 0, alState: 0,
+      alCount: 0, logout: 0, meAfter: 0, armPortfolio: false, armOpp: false };
+    const j = async (u, o) => {
+      const r = await fetch(u, Object.assign({ credentials: 'include' }, o || {}));
+      let b = null;
+      try { b = await r.json(); } catch (e) { b = null; }
+      return { status: r.status, body: b };
+    };
+    /* ⭐ المحفظة ⭐ (كتابة + قراءة ⭐) */
+    const w = await j('/api/portfolio', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cash: 1000, positions: { COMI: 5 } }),
+    });
+    out.pfWrite = w.status;
+    const r = await j('/api/portfolio');
+    out.pfRead = r.status;
+    out.pfCash = (r.body && r.body.portfolio) ? r.body.portfolio.cash : null;
+    /* ⭐ التنبيهات ⭐ (إضافة + قراءة الحالة ⭐) */
+    const a = await j('/api/alerts', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: 'COMI', kind: 'price' }),
+    });
+    out.alAdd = a.status;
+    const st = await j('/api/alerts/state');
+    out.alState = st.status;
+    out.alCount = (st.body && st.body.state && st.body.state.items)
+      ? st.body.state.items.length : ((st.body && st.body.alerts) ? st.body.alerts.length : 0);
+    /* ⭐ الذراعان ⭐ (المحفظة + الفرص ⭐) في الواجهة ⭐ */
+    try {
+      if (typeof window.openArm === 'function') { window.openArm('portfolio'); await new Promise((x) => setTimeout(x, 1500)); }
+      out.armPortfolio = !!document.querySelector('#home-portfolio-list, [data-arm=portfolio].active');
+    } catch (e) { }
+    try {
+      if (typeof window.openArm === 'function') { window.openArm('opportunity'); await new Promise((x) => setTimeout(x, 1500)); }
+      out.armOpp = !!document.querySelector('[data-arm=opportunity].active');
+    } catch (e) { }
+    return out;
+  });
+  rec('app · المحفظة (كتابة ⭐ + قراءة ⭐)', app.pfWrite === 200 && app.pfRead === 200
+    && app.pfCash === 1000, { write: app.pfWrite, read: app.pfRead, cash: app.pfCash });
+  rec('app · التنبيهات (إضافة ⭐ + حالة ⭐)', app.alAdd === 200 && app.alState === 200
+    && app.alCount >= 1, { add: app.alAdd, state: app.alState, count: app.alCount });
+  rec('app · ذراع المحفظة ⭐', app.armPortfolio, {});
+  rec('app · ذراع الفرص ⭐', app.armOpp, {});
+
+  /* ⭐ الخروج ⭐ ⇒ ⭐ وبعده ⭐ `/api/auth/me` ⭐ لازم يبقى 401 ⭐ */
+  const out2 = await page.evaluate(async () => {
+    const res = { logout: 0, meAfter: 0 };
+    const r = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    res.logout = r.status;
+    const m = await fetch('/api/auth/me', { credentials: 'include' });
+    res.meAfter = m.status;
+    return res;
+  });
+  rec('app · الخروج ⭐', out2.logout === 200, { logout: out2.logout });
+  rec('app · بعد الخروج ⭐ مافيش جلسة ⭐ (401 ⭐)', out2.meAfter === 401,
+    { me: out2.meAfter });
 
   /* ⭐ فشل المصدر (فصل الـAPI) ⭐ */
   const failure = await page.evaluate(async () => {

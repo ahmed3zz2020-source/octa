@@ -26,6 +26,10 @@ const assert = require('node:assert/strict');
 const ROOT = process.env.OCTA_FE_ROOT || path.resolve(__dirname, '..', '..');
 const SECRET = 'synthetic-secret';
 const PASSWORD = 'synthetic-password';
+/* ⭐⭐⭐ (R29 · FINDING-13) ⭐⭐⭐ حالة الاعتماد الكاملة ⭐ */
+const PWD_SALT = 'synthetic-panel-salt';
+const PWD_HASH = nodeCrypto.createHash('sha256')
+  .update(PWD_SALT + '|' + PASSWORD).digest('hex');
 
 function loadWorker(file) {
   const src = fs.readFileSync(path.join(ROOT, file || 'mgmt/worker.js'), 'utf8')
@@ -81,15 +85,22 @@ function makeCallLog(opts = {}) {
         /* ⭐⭐⭐ (R26) ⭐ حالة كلمة المرور ⭐ (نسخة واحدة ⭐ — panel_state ⭐)
            📌 اختياري ⭐: لو الاختبار صرّح بنسخة ⭐ ⇒ نرجّعها ⭐
            ⭐ (ده اللي بيثبّت إن تدويرها ⛔ يبطل الجلسات ⭐). */
+        /* ⭐⭐⭐ (R29 · FINDING-13) ⭐⭐⭐ حالة الاعتماد **كاملة** ⭐
+           📌 السبب ⭐: ⛔ الموك كان بيرجّع `{ver}` ⭐ بس ⭐ ⇒ ⛔ حالة ناقصة ⭐
+              ⇒ ⛔ (بعد إصلاح FINDING-13 ⭐) ⛔ الدخول مرفوض ⭐ ⇒ ⛔ الاختبار وقع ⭐.
+           ✅ دلوقتي ⭐: ⛔ الموك بيرجّع الحالة **كاملة** ⭐ (salt ⭐ + hash ⭐ + ver ⭐)
+              ⭐ — زي ما الـDO الحقيقي بيكتب ⭐ (مشغة ⭐) ⭐. */
         if (opts.pwdVer && String(id.name || '') === 'panel_state') {
-          return new Response(JSON.stringify({ ok: true, pwd: { ver: String(opts.pwdVer) } }),
+          return new Response(JSON.stringify({ ok: true, pwd: {
+            salt: PWD_SALT, hash: PWD_HASH, ver: String(opts.pwdVer) } }),
             { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
         /* ⭐⭐⭐ (R28) ⭐ حالة كلمة المرور ⭐ (panel_state ⭐) ⭐
            ⭐ الشكل الحقيقي ⭐: {ok:true, pwd:null} ⭐ (لما يكن تغير) ⭐. */
         if (String(id.name || '') === 'panel_state' && method === 'GET') {
           if (opts.doReadFails) return new Response('down', { status: 500 });
-          const pwd = opts.pwdVer ? { ver: String(opts.pwdVer) } : null;
+          const pwd = opts.pwdVer
+            ? { salt: PWD_SALT, hash: PWD_HASH, ver: String(opts.pwdVer) } : null;
           return new Response(JSON.stringify({ ok: true, pwd: pwd }),
             { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
