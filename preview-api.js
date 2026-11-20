@@ -728,13 +728,22 @@ async function handlePreviewApi(opts) {
   }
 
   /* ── ⑫ التنبيهات (لكل حساب لوحده + منع التكرار) ⭐ */
-  if (p === '/api/alerts' && (m === 'GET' || m === 'POST')) {
+  /* ⭐⭐⭐ (R28) ⭐ مسارين ⭐: `/api/alerts` ⭐ (POST/GET ⭐) و`/api/alerts/state` ⭐ (GET ⭐)
+     📌 السبب ⭐: ⭐ الواجهة بتطلب `/api/alerts/state` ⭐ (قراءة الحالة ⭐)
+        ⇒ ⭐ وفي المعاينة كان بيرجع 501 ⭐ ⇒ ⭐ صفحة التنبيهات معطّلة ⭐. */
+  if ((p === '/api/alerts' || p === '/api/alerts/state')
+      && (m === 'GET' || (m === 'POST' && p === '/api/alerts'))) {
     const sess = await readSession(env, request);
     if (!sess) return json({ ok: false, error: 'محتاج تسجيل دخول', why: 'unauthorized' }, 401);
     const key = 'al:' + sess.payload.uid;
     if (m === 'GET') {
       const cur = await storeGet(env, key);
-      return json({ ok: true, alerts: (cur && cur.items) || [] });
+      const items = (cur && cur.items) || [];
+      if (p === '/api/alerts/state') {
+        return json({ ok: true, state: { items: items }, alerts: items,
+          count: items.length, updated: (cur && cur.updated_at) || nowSec() });
+      }
+      return json({ ok: true, alerts: items });
     }
     const item = body && body.alert && typeof body.alert === 'object' ? body.alert : body;
     /* ⭐⭐⭐ (R28 · R26-I04) ⭐ الإضافة **ذرّية** ⭐ + ⭐ منع التكرار ⭐ جوه الـDO ⭐
