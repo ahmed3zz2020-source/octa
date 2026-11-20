@@ -271,8 +271,8 @@ test('R28-P-05: a storage read failure must NOT let the password change fall bac
     current: OLD_SECRET_PASSWORD, next: NEW_PANEL_PASSWORD,
   });
   assert.notEqual(res.status, 200,
-    '\u26d4\u26d4\u26d4 \u0627\u0644\u062a\u063a\u064a\u0631 \u062a\u0645 \u0628\u0627\u0644\u0641\u0648\u0644-\u0628\u0627\u0643 \u0644\u0644\u0633\u0643\u0631\u062a \u2b50 \u2014 ' + res.status);
-  assert.ok(!pwdState.ver, '\u26d4\u26d4\u26d4 \u0627\u0644\u062d\u0627\u0644\u0629 \u0627\u062a\u0643\u062a\u0628\u062a \u0648\u0644\u0627 \u064a\u0642\u0628\u0644 \u0627\u0644\u0633\u0643\u0631\u062a \u2b50');
+    '⛔⛔⛔ التغير تم بالفول-باك للسكرت ⭐ — ' + res.status);
+  assert.ok(!pwdState.ver, '⛔⛔⛔ الحالة اتكتبت ولا يقبل السكرت ⭐');
 });
 
 test('R28-P-05b: with a valid session but a failing read the change must be refused', async () => {
@@ -297,7 +297,7 @@ test('R28-P-05b: with a valid session but a failing read the change must be refu
     headers: { 'Content-Type': 'application/json', Cookie: cookieValue(cookie) },
   }), env);
   assert.notEqual(res.status, 200,
-    '\u26d4\u26d4\u26d4 \u0627\u0644\u062a\u063a\u064a\u0631 \u062a\u0645 \u0648\u0641\u0642\u0647 \u0627\u0644\u0633\u0643\u0631\u062a \u2b50 \u2014 ' + res.status);
+    '⛔⛔⛔ التغير تم وفقه السكرت ⭐ — ' + res.status);
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -419,12 +419,12 @@ test('R28-P-11b: a shape-valid forged cookie must also cause ZERO storage calls'
   const worker = loadWorker();
   const log = { calls: [] };
   const { env } = makeEnv(log);
-  /* \u2b50 \u0643\u0648\u0643\u064a \u0632\u0648\u0651\u0631 \u0628\u0627\u0644\u0634\u0643\u0644 \u0627\u0644\u0633\u0631\u064a\u062d \u2b50 (exp \u0631\u0642\u0645\u064a \u2b50 + tag \u2b50 + sig \u2b50) */
+  /* ⭐ كوكي زوّر بالشكل السريح ⭐ (exp رقمي ⭐ + tag ⭐ + sig ⭐) */
   const forged = cookieValue('9999999999999.abc123def456abc7.00112233445566778899aabbccddeeff');
   const res = await getJson(worker, env, '/api/session', { headers: { Cookie: forged } });
-  assert.notEqual(res.status, 200, '\u26d4\u26d4\u26d4 \u0643\u0648\u0643\u064a \u0645\u0632\u0648\u0651\u0631 \u0627\u062a\u0642\u0628\u0644 \u2b50 \u2014 ' + res.status);
+  assert.notEqual(res.status, 200, '⛔⛔⛔ كوكي مزوّر اتقبل ⭐ — ' + res.status);
   assert.equal(log.calls.length, 0,
-    '\u26d4\u26d4\u26d4 \u0627\u0644\u0643\u0648\u0643\u064a \u0627\u0644\u0645\u0632\u0648\u0651\u0631 \u0633\u0628\u0628 \u0646\u062f\u0627\u0621\u0627\u062a \u062a\u062e\u0632\u064a\u0646 \u2b50 \u2014 ' + JSON.stringify(log.calls));
+    '⛔⛔⛔ الكوكي المزوّر سبب نداءات تخزين ⭐ — ' + JSON.stringify(log.calls));
 });
 
 test('R28-P-13: a legacy two-part session cookie must be refused', async () => {

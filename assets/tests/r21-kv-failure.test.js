@@ -65,6 +65,12 @@ function doShared() {
     get: (id) => ({
       async fetch(url, opts) {
         if (opts && opts.method === 'POST') { store.set(id.name, '1'); }
+        /* ⭐ (R28) ⭐ حالة كلمة المرور ⭐ (panel_state ⭐) ⭐ */
+        if (String(url || '').indexOf('/pwd') >= 0
+            && (opts && opts.method) === undefined) {
+          return new Response(JSON.stringify({ ok: true, pwd: null }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
         return new Response(JSON.stringify({ revoked: store.has(id.name) }),
           { headers: { 'Content-Type': 'application/json' } });
       },

@@ -88,7 +88,15 @@ function doWriteBroken() {
     idFromName: (n) => ({ name: n }),
     get: () => ({
       async fetch(url, opts) {
-        calls.push({ url: String(url), method: (opts && opts.method) || 'GET' });
+        const method = (opts && opts.method) || 'GET';
+        calls.push({ url: String(url), method: method });
+        /* ⭐ (R28) ⭐ القراءة تستصل واقعَ ⭐
+           ⭐ القراءة تقرا ⭐ (panel_state ⭐) ⭐ والقراءة تعطّل ⭐ */
+        if (String(url || '').indexOf('/pwd') >= 0 && method === 'GET') {
+          return new Response(JSON.stringify({ ok: true, pwd: null }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        /* ⛔ الكتابة بتفسر ⭐ (هي الإبطال المشارسة باطة ⭐) */
         return new Response(JSON.stringify({ ok: false, error: 'storage-write-failed' }),
           { status: 500, headers: { 'Content-Type': 'application/json' } });
       },
@@ -111,6 +119,12 @@ function doWriteSilent() {
             { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
         /* ⛔ القراءة بترجّع «مش متبطل» ⭐ ⇒ مافيش دليل ⭐ */
+        /* ⭐ (R28) ⭐ حالة كلمة المرور ⭐ (panel_state ⭐) ⭐ */
+        if (String(url || '').indexOf('/pwd') >= 0
+            && (opts && opts.method) === undefined) {
+          return new Response(JSON.stringify({ ok: true, pwd: null }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
         return new Response(JSON.stringify({ revoked: false }),
           { status: 200, headers: { 'Content-Type': 'application/json' } });
       },
@@ -254,6 +268,11 @@ test('R24-I04-05: a successful DO revocation is a real success', async () => {
       async fetch(url, opts) {
         doNs.calls.push({ url: String(url), method: (opts && opts.method) || 'GET' });
         const isPost = (opts && opts.method) === 'POST';
+        /* ⭐ (R28) ⭐ القراءة تكسط كلمة المرور ⭐ (panel_state ⭐) ⭐ */
+        if (String(url || '').indexOf('/pwd') >= 0 && !isPost) {
+          return new Response(JSON.stringify({ ok: true, pwd: null }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
         return new Response(JSON.stringify(isPost
           ? { ok: true, revoked: true } : { revoked: true }),
         { status: 200, headers: { 'Content-Type': 'application/json' } });

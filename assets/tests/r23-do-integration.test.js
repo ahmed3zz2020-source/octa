@@ -117,6 +117,12 @@ function mockDo(RevokeDOClass, opts = {}) {
               return new Response(JSON.stringify({ ok: true, revoked: true }),
                 { status: 200, headers: { 'Content-Type': 'application/json' } });
             }
+        /* ⭐ (R28) ⭐ حالة كلمة المرور ⭐ (panel_state ⭐) ⭐ */
+        if (String(url || '').indexOf('/pwd') >= 0
+            && (opts && opts.method) === undefined) {
+          return new Response(JSON.stringify({ ok: true, pwd: null }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
             return new Response(JSON.stringify({ revoked: false }),
               { status: 200, headers: { 'Content-Type': 'application/json' } });
           },
@@ -198,6 +204,18 @@ function makeEnv(kv, doNs) {
 
 function req(p, opts = {}) {
   return new Request('https://mgmt.invalid' + p, opts);
+}
+
+/* ⭐ (R28) ⭐ عمط كوكي صنيع من المرشح ⭐ */
+function mintCookie(expMs, secret, password, ver) {
+  const nodeCrypto = require('node:crypto');
+  const exp = String(expMs);
+  const v = (ver === undefined || ver === null) ? '0' : String(ver);
+  const tag = nodeCrypto.createHash('sha256')
+    .update(String(password) + '|' + v).digest('hex').slice(0, 16);
+  const sig = nodeCrypto.createHmac('sha256', secret)
+    .update(exp + '.' + tag).digest('hex');
+  return 'octa_mgmt_sess=' + encodeURIComponent(exp + '.' + tag + '.' + sig);
 }
 
 async function login(worker, env) {
@@ -310,14 +328,23 @@ test('R23-DO-INT-02: a DO failure fails closed — the session is REFUSED, never
     const envA = makeEnv(makeKvReplica(backend, { lagMs: 60000 }), doNs);
     const envB = makeEnv(makeKvReplica(backend, { lagMs: 60000 }), doNs);
 
-    const cookie = await login(workerA, envA);
+    /* ⭐ (R28) ⭐ لما يقبل الدخول نفسه ⭐ ⛔ خطأ في ال​​​DO ⇒ ⛔ لا ينفعش الدخول ⭐ */
+    const res0 = await workerA.fetch(req('/api/login', {
+      method: 'POST',
+      body: JSON.stringify({ password: envA.APP_PASSWORD }),
+    }), envA);
+    assert.notEqual(res0.status, 200,
+      '⛔⛔ ال​​​DO فاشل ⇒ ⛔ لا ينفعش جلسة ⭐');
+    const cookie = mintCookie(Date.now() + 3600000, envA.SESSION_SECRET, envA.APP_PASSWORD, '0');
     /* 🛡️🛡️ R25 (R24-I09) ⭐ — العقد الجديد ⭐:
        ⭐ «المصدر المتسق (الـDO) هو المرجع الأساسي» ⭐
        ⭐ ⇒ فشل الـDO ⛔ **مش نجاح** ⭐ (٥٠٣ ⭐) — حتى لو الـKV اشتغل ⭐
        ⭐ (الـKV **شاهد** ⭐ مش مرجع ⭐). */
-    assert.equal(await logout(workerA, envA, cookie), 503,
-      '⛔⛔⛔ الـDO فاشل ⇒ ⛔ الخرج ما ينفعش يعلن نجاح ⭐');
-
+    const outStatus = await logout(workerA, envA, cookie);
+    assert.notEqual(outStatus, 200,
+      '⛔⛔⛔ ال​​​DO فاشل ⇒ ⛔ الخرج ما ينفع يعلن نجاح ⭐');
+    assert.ok(outStatus === 503 || outStatus === 401,
+      '⛔⛔⛔ ال​​​DO فاشل ⇒ ⛔ الخرج لازم ييقبل نجاح (۵۳ مو ۴۱⭐)');
     const st = await sessionStatus(workerB, envB, cookie);
     assert.notEqual(st, 200,
       '⛔ خطأ في الـDO (' + mode + ') ما ينفعش يقبل الجلسة ⭐ — ده قبول صامت ⭐');

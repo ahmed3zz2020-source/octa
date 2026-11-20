@@ -73,6 +73,29 @@ function workerSource() {
 }
 
 /* ⭐ بيئة بلا أي وصول خارجي ⭐ (لازم أي نداء خارجي يفشل ⭐) */
+/* ⭐⭐⭐ (R28) ⭐ مخزن المعاينة (Durable Object ⭐) — الصنف الحقيقي ⭐ */
+function fakePreviewDO() {
+  const { PreviewStore } = require('../../preview-store.js');
+  const map = new Map();
+  const storage = {
+    async get(k) { return map.has(k) ? map.get(k) : undefined; },
+    async put(k, v) { map.set(k, v); },
+    async delete(k) { map.delete(k); },
+    async list(opts) {
+      const prefix = (opts && opts.prefix) || '';
+      const keys = [];
+      for (const k of map.keys()) if (k.indexOf(prefix) === 0) keys.push({ name: k });
+      return { keys: keys };
+    },
+  };
+  const instance = new PreviewStore({ storage: storage }, {});
+  return {
+    map: map,
+    idFromName: (n) => ({ name: String(n) }),
+    get: (id) => ({ async fetch(url, opts) { return instance.fetch(new Request(url, opts)); } }),
+  };
+}
+
 function previewEnv() {
   return {
     OCTA_PREVIEW_SELF_API: 'on',
@@ -83,7 +106,12 @@ function previewEnv() {
        ⇒ ⭐ الاختبار هنا بيفحص المعاينة **المُهيّأة** ⭐
        ⭐ وحالة الإعداد الناقص متغطية في اختبار مستقل ⭐. */
     PREVIEW_KV: fakePreviewKV(),
+    /* ⭐⭐⭐ (R28) ⭐ مخزن المعاينة القوي (Durable Object ⭐) ⭐
+       📌 R26-I02 ⭐ ⇒ ⛔ إبطال الجلسات في الـKV مبيتنتشرش فوراً ⭐.
+       📌 R26-I04 ⭐ ⇒ ⛔ الكتابات المتزامنة (المحفظة ⭐ / التنبيهات ⭐) بتضيع ⭐. */
+    PREVIEW_STORE: fakePreviewDO(),
     PREVIEW_SESSION_SECRET: 'synthetic-preview-secret',
+    PREVIEW_CONSOLE_KEY: 'synthetic-preview-console-key',
     ASSETS: {
       fetch: async () => {
         throw new Error('ASSETS fetch must not be needed for /api/health');

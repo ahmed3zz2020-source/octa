@@ -85,8 +85,8 @@ function makeCallLog(opts = {}) {
           return new Response(JSON.stringify({ ok: true, pwd: { ver: String(opts.pwdVer) } }),
             { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
-        /* ⭐⭐⭐ (R28) ⭐ \u062d\u0627\u0644\u0629 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 ⭐ (panel_state ⭐) ⭐
-           ⭐ \u0627\u0644\u0634\u0643\u0644 \u0627\u0644\u062d\u0642\u064a\u0642\u064a ⭐: {ok:true, pwd:null} ⭐ (\u0644\u0645\u0627 \u064a\u0643\u0646 \u062a\u063a\u064a\u0631) ⭐. */
+        /* ⭐⭐⭐ (R28) ⭐ حالة كلمة المرور ⭐ (panel_state ⭐) ⭐
+           ⭐ الشكل الحقيقي ⭐: {ok:true, pwd:null} ⭐ (لما يكن تغير) ⭐. */
         if (String(id.name || '') === 'panel_state' && method === 'GET') {
           if (opts.doReadFails) return new Response('down', { status: 500 });
           const pwd = opts.pwdVer ? { ver: String(opts.pwdVer) } : null;
@@ -164,8 +164,8 @@ function credentialTag(password, ver) {
 }
 
 function mintCookie(expMs, secret, password, ver) {
-  /* ⭐⭐⭐ (R28) ⭐ \u0627\u0644\u0634\u0643\u0644 \u0627\u0644\u062c\u062f\u064a\u062f ⭐ `exp.tag.sig` ⭐
-     ⭐ \u0627\u0644\u0648\u0633\u0645 \u0628\u0627\u0644\u0646\u0633\u062e\u0629 \u062f\u0627\u062e\u0644 \u0627\u0644\u062a\u0648\u0643\u0646 ⭐ (\u0645\u0627\u0641\u064a\u0634 \u0646\u062f\u0627\u0621\u0627\u062a \u062e\u0632\u0627\u0621\u064a\u0629) ⭐. */
+  /* ⭐⭐⭐ (R28) ⭐ الشكل الجديد ⭐ `exp.tag.sig` ⭐
+     ⭐ الوسم بالنسخة داخل التوكن ⭐ (مافيش نداءات خزاءية) ⭐. */
   const exp = String(expMs);
   const tag = credentialTag(password, ver);
   const payload = exp + '.' + tag;
@@ -422,7 +422,7 @@ test('R26-S-19: a forged cookie must not reach the storage and must be refused',
   const out = await logout(worker, env, forged);
   assert.equal(out.status, 401, '⛔ كوكي مزوّر ⭐ ⇒ ٤٠١ ⭐ — got ' + out.status);
   assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ الكوكي المزوّر استهلك التخزين ⭐');
-  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) ⭐ \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
+  assert.ok(panelStateOnly(log), '⛔⛔⛔ اتصلح غير حالة اللوحة (panel_state) ⭐ — ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });
 
 test('R26-S-20: an expired cookie must not reach the storage', async () => {
@@ -433,7 +433,7 @@ test('R26-S-20: an expired cookie must not reach the storage', async () => {
   const out = await logout(worker, env, expired);
   assert.equal(out.status, 200, '⛔ جلسة منتهية ⭐ ⇒ مفيش حاجة تتبطل ⭐ — got ' + out.status);
   assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ جلسة منتهية استهلكت التخزين ⭐');
-  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) ⭐ \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
+  assert.ok(panelStateOnly(log), '⛔⛔⛔ اتصلح غير حالة اللوحة (panel_state) ⭐ — ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });
 
 /* ═══════════════════════════════════════════════════════════════════════

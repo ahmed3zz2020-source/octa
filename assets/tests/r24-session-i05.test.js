@@ -82,6 +82,12 @@ function doShared() {
       async fetch(url, opts) {
         calls.push({ url: String(url), method: (opts && opts.method) || 'GET' });
         if ((opts && opts.method) === 'POST') { store.set(id.name, true); }
+        /* ⭐ (R28) ⭐ حالة كلمة المرور ⭐ (panel_state ⭐) ⭐ */
+        if (String(url || '').indexOf('/pwd') >= 0
+            && (opts && opts.method) === undefined) {
+          return new Response(JSON.stringify({ ok: true, pwd: null }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
         return new Response(JSON.stringify({ revoked: !!store.get(id.name) }),
           { headers: { 'Content-Type': 'application/json' } });
       },

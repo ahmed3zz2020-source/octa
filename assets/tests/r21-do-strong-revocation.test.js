@@ -134,6 +134,18 @@ function req(p, opts = {}) {
   return new Request('https://mgmt.invalid' + p, opts);
 }
 
+/* ⭐ (R28) ⭐ عمط كوكي صنيع من المرشح ⭐ */
+function mintCookie(expMs, secret, password, ver) {
+  const nodeCrypto = require('node:crypto');
+  const exp = String(expMs);
+  const v = (ver === undefined || ver === null) ? '0' : String(ver);
+  const tag = nodeCrypto.createHash('sha256')
+    .update(String(password) + '|' + v).digest('hex').slice(0, 16);
+  const sig = nodeCrypto.createHmac('sha256', secret)
+    .update(exp + '.' + tag).digest('hex');
+  return 'octa_mgmt_sess=' + encodeURIComponent(exp + '.' + tag + '.' + sig);
+}
+
 async function login(worker, env) {
   const res = await worker.fetch(req('/api/login', {
     method: 'POST',
@@ -228,7 +240,14 @@ test('R22-DO-03: a DO error fails closed (the session is REFUSED, never 200)', a
     const RevokeDO = loadRevokeDO();
     const doNs = mockDo(RevokeDO, { fail: mode });
     const env = makeEnv(fakeKV(), doNs);
-    const cookie = await login(worker, env);
+    /* ⭐ (R28) ⭐ لما يقبل الدخول نفسه ⭐ ⛔ خطأ في ال​​DO ⇒ ⛔ لا ينفعش الدخول ⭐ */
+    const res0 = await worker.fetch(req('/api/login', {
+      method: 'POST',
+      body: JSON.stringify({ password: env.APP_PASSWORD }),
+    }), env);
+    assert.notEqual(res0.status, 200,
+      '⛔⛔ خطأ في ال​​DO ما ينفعش يسلّم جلسة ⭐');
+    const cookie = mintCookie(Date.now() + 3600000, env.SESSION_SECRET, env.APP_PASSWORD, '0');
 
     const st = await sessionStatus(worker, env, cookie);
     assert.notEqual(st, 200,
