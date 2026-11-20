@@ -359,7 +359,7 @@ function redactBody(text) {
     out.shotBtn = !!modal.querySelector('#gshot button, #gshot');
     out.chart = !!modal.querySelector('iframe, .gchart, #gmv-chart');
     const txt = modal.innerText || '';
-    out.body = txt.slice(0, 900).replace(LONG_SECRET, '***');
+    out.body = txt.slice(0, 900).replace(/[A-Za-z0-9_\-]{24,}/g, '***');
     out.supportResistance = /دعم|مقاومة|support|resistance/i.test(txt);
     out.events = /أحداث|حدث|events/i.test(txt);
     out.errorShown = /تعذر|خطأ|مش متاح|فشل|error/i.test(txt);
@@ -423,12 +423,22 @@ function redactBody(text) {
     const dec = modal.querySelector('#egdec');
     out.decomp = dec ? dec.textContent.trim().length : 0;
     /* ⭐⭐⭐ تبديل الفترات ⭐⭐⭐ — نضغط فترة تانية ⭐ ونتأكد إن الشارت اتغيّر ⭐ */
+    /* ⭐⭐⭐ (R29 · FINDING-16) ⭐⭐⭐ بصمة **البكسل** ⭐⭐⭐
+       📌 السبب ⭐: ⛔ الرسم بيحصل على canvas ⭐ ⇒ ⛔ `innerHTML` ما بيتغيرش ⭐
+          ⇒ ⛔ المقارنة بالـHTML كانت دايماً «متساوية» ⭐ ⇒ ⛔ قياس كاذب ⭐.
+       ✅ دلوقتي ⭐: ⭐ عيّنة من بكسلات الـcanvas ⭐ ⇒ ⭐ المقارنة حقيقية ⭐. */
     const hashOf = (el) => {
       if (!el) return '';
-      let h = 0;
-      const s = el.innerHTML || '';
-      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-      return String(h);
+      let h = 0, n = 0;
+      const cs = el.querySelectorAll('canvas');
+      for (let ci = 0; ci < cs.length; ci++) {
+        try {
+          const ctx = cs[ci].getContext('2d');
+          const d = ctx.getImageData(0, 0, cs[ci].width, cs[ci].height).data;
+          for (let i = 0; i < d.length; i += 997) { h = (h * 31 + d[i]) | 0; n++; }
+        } catch (e) { }
+      }
+      return String(h) + ':' + n;
     };
     const before = hashOf(chart);
     const btns = modal.querySelectorAll('#egperiods .egper');
@@ -443,11 +453,16 @@ function redactBody(text) {
     const zBefore = hashOf(chart);
     if (chart) {
       const r = chart.getBoundingClientRect();
-      chart.dispatchEvent(new WheelEvent('wheel', {
-        deltaY: -240, deltaX: 0, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
-        bubbles: true, cancelable: true,
-      }));
-      await new Promise((rr) => setTimeout(rr, 2000));
+      const target = chart.querySelector('canvas') || chart;
+      /* ⭐ العجلة على الـcanvas ⭐ (الـchart library بيسمع على الـcanvas ⭐) ⭐ */
+      for (let k = 0; k < 3; k++) {
+        target.dispatchEvent(new WheelEvent('wheel', {
+          deltaY: -240, deltaX: 0, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+          bubbles: true, cancelable: true,
+        }));
+        await new Promise((rr) => setTimeout(rr, 700));
+      }
+      await new Promise((rr) => setTimeout(rr, 1500));
       out.zoom = hashOf(chart) !== zBefore;
     }
     return out;
@@ -474,18 +489,33 @@ function redactBody(text) {
       if (typeof window.openGoldIntel === 'function') window.openGoldIntel();
       else if (typeof window.openGold === 'function') window.openGold();
     } catch (e) { }
-    await new Promise((r) => setTimeout(r, 8000));
+    /* ⭐⭐⭐ (R29 · FINDING-16) ⭐⭐⭐ انتظار **بيانات** المسار ⭐⭐⭐
+       📌 السبب ⭐: ⛔ `/api/gold/deep` ⭐ بيحسب الإشارة ⭐ ⇒ ⛔ بياخد وقت ⭐
+          ⇒ ⛔ الانتظار الثابت قصير ⭐ ⇒ ⛔ القياس بيفشل ⭐ (مش عيب ⭐).
+       ✅ دلوقتي ⭐: ⛔ ننتظر لحد ما الأحداث **تظهر** ⭐ (أو نف time out ⭐). */
+    await new Promise((r) => setTimeout(r, 2000));
+    for (let w = 0; w < 40; w++) {
+      const m0 = document.querySelector('#octa-gold-modal') || document.querySelector('.gmodal');
+      if (m0 && m0.querySelectorAll('.gevs .gev').length) break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
     const modal = document.querySelector('#octa-gold-modal') || document.querySelector('.gmodal');
-    if (!modal) return out;
+    if (!modal) { out.modalMissing = true; return out; }
     const evs = modal.querySelectorAll('.gevs .gev');
     out.events = evs.length;
+    out.shiftText = (modal.innerText || '').slice(0, 200).replace(/[A-Za-z0-9_\-]{24,}/g, '***');
     /* ⭐ ملء الشاشة ⭐ */
     const fs = modal.querySelector('#gfs-btn');
     if (fs) {
       try { fs.click(); } catch (e) { }
-      await new Promise((r) => setTimeout(r, 2500));
-      out.fsClass = document.body.className + ' | ' + (modal.className || '');
-      out.fullscreen = /fs|full/i.test(out.fsClass);
+      await new Promise((r) => setTimeout(r, 3000));
+      /* ⭐⭐⭐ (R29) ⭐⭐⭐ صنف الـfullscreen الحقيقي ⭐
+         📌 `tv-shim.js` ⭐: `FS_CLASS='octa-tv-fs'` ⭐ على الحاوية ⭐
+            + `FS_BODY='octa-tv-fs-on'` ⭐ على الـbody ⭐. */
+      const hosts = Array.from(modal.querySelectorAll('.gchart, .gmodal, .gpanel'))
+        .map((e) => String(e.className || '')).join(' | ');
+      out.fsClass = String(document.body.className || '') + ' || ' + hosts;
+      out.fullscreen = /octa-tv-fs/.test(out.fsClass);
     }
     return out;
   });

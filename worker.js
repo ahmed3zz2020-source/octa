@@ -789,12 +789,30 @@ async function alphaSnapshot(url, request, env) {
   });
 }
 
-function buildHeaders(request, env) {
+function buildHeaders(request, env, path) {
   const h = new Headers();
   h.set('Accept', 'application/json');
   /* ⛔ التوكن —Authorization (الباك بيقراه) */
   const auth = request.headers.get('Authorization');
   if (auth) h.set('Authorization', auth);
+  /* ⭐⭐⭐ (R29 · FINDING-16) ⭐⭐⭐ جلسة الخدمة للمعاينة ⭐⭐⭐
+     📌 السبب ⭐: ⛔ جلسة المعاينة ⭐ (عندها في DO المعاينة ⭐) ⭐
+        ⭐ **مش** جلسة الباك ⭐ ⇒ ⛔ المسارات المقروءة ⭐ (الذهب ⭐ / التحليل ⭐)
+        ⭐ بترجع 401 ⭐ ⇒ ⛔ الشارت والبيانات مش بيوصلوا ⭐.
+     ✅ دلوقتي ⭐: ⭐ في وضع المعاينة ⭐ + ⭐ لمسار **قراءة** ⭐ ⭐
+        ⇒ ⭐ نلحق جلسة الخدمة ⭐ (حساب **صناعي** ⭐ في الـstaging المعزول ⭐)
+        ⇒ ⭐ المسارات المقروءة بتخدم ببيانات فعلية ⭐
+        ⭐ و ⛔ مسارات الكتابة ⭐ ما بتوصلش ⭐ (العزل محفوظ ⭐). */
+  if (env && env.OCTA_API_SERVICE_TOKEN && path
+      && String(env.OCTA_PREVIEW_SELF_API || '') === 'on'
+      && isBackendReadOnly(path)) {
+    /* ⭐⭐⭐ (R29 · FINDING-16) ⭐⭐⭐ ⛔ استبدال ⭐ مش إضافة ⭐⭐⭐
+       📌 السبب ⭐: ⛔ جلسة المعاينة ⭐ بتتبعت ⭐ ⇒ ⛔ الباك ما بيعرفهاش ⭐
+          ⇒ ⛔ 401 ⭐ ⇒ ⛔ البيانات المقروءة مابتوصلش ⭐.
+       ✅ دلوقتي ⭐: ⭐ في وضع المعاينة ⭐ ⭐ ⇒ ⭐ جلسة الخدمة **بتغلب** ⭐
+          ⇒ ⭐ (المسارات المقروءة ⭐ بس ⭐) ⭐ ⇒ ⭐ والكتابة ما بتوصلش ⭐. */
+    h.set('Authorization', 'Bearer ' + String(env.OCTA_API_SERVICE_TOKEN));
+  }
   /* ⛔ الكوكي — عشان الباك يقرأ الجلسة من الكوكي كمان */
   const ck = request.headers.get('Cookie');
   if (ck) h.set('Cookie', ck);
@@ -2571,7 +2589,7 @@ async function handle(request, env, ctx) {
       const target = API + url.pathname + url.search;
       const init = {
         method: request.method,
-        headers: buildHeaders(request, env)
+        headers: buildHeaders(request, env, url.pathname)
       };
       /* ⛔⛔ جسم الطلب — كان بيضيع خالص!
          ⛌ يعني كل POST (chat · analyze · charts · auth) كان
