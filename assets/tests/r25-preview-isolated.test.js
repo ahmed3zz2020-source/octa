@@ -27,7 +27,16 @@ const ROOT = process.env.OCTA_FE_ROOT || path.resolve(__dirname, '..', '..');
 
 /* ⭐ تحميل العامل (نفس أسلوب r25-login-path ⭐) */
 function loadWorker(srcText) {
-  /* ⭐ العامل فيه \`import\` واحد (محرك الأخبار) → نشيله وندينا عنه بمحرك اختياري فارغ في الاختيار ماليص للفحص صحيح. */
+  /* ⭐ العامل فيه \`import\` واحد (محرك الأخبار) → نشيله وندينا عنه بمحرك اختياري فارغ في الاختيار ماليص للفحص صحيح.
+     ⭐ (R26) العامل بقى فيه اعتماد تاني ⭐ (preview-api.js ⭐ — المعاينة المعزولة ⭐)
+     ⇒ لازم يتحمّل جوّه ⭐ وإلا المرجع يبقى مش معرّف ⭐ والرد 500 ⭐. */
+  const previewSrc = fs.readFileSync(path.join(ROOT, 'preview-api.js'), 'utf8')
+    .replace(/export\s+(function|const|let|var)\s+/g, '$1 ')
+    .replace(/export\s*\{[^}]*\}\s*;?/g, '')
+    .replace(/export\s+default\s+/g, '');
+  /* ⭐ نطاق منفصل ⭐ (IIFE ⭐) ⇒ ⛔ مافيش تعارض أسماء مع العامل ⭐ (`sessionCookie` ⭐). */
+  const previewMod = '(function(){\n' + previewSrc
+    + '\nreturn { handlePreviewApi: handlePreviewApi };\n})()';
   const src = srcText
     .replace(/^import\s+\{[^}]*\}\s+from\s+'[^']*';?$/gm, '')
     .replace(/^export\s*\{[^}]*\};?$/gm, '')
@@ -35,10 +44,28 @@ function loadWorker(srcText) {
   const mod = { exports: {} };
   const stub = { newsEngine: {}, mergeEvents: () => [], eventsByCode: () => [], parseHalaText: () => [] };
   const fn = new Function('module', 'exports', 'Request', 'Response',
-    'Headers', 'URL', 'crypto', 'newsEngine', 'mergeEvents', 'eventsByCode', 'parseHalaText', src);
+    'Headers', 'URL', 'crypto', 'newsEngine', 'mergeEvents', 'eventsByCode', 'parseHalaText',
+    'const handlePreviewApi = ' + previewMod + '.handlePreviewApi;\n' + src);
   fn(mod, mod.exports, Request, Response, Headers, URL, crypto,
     stub.newsEngine, stub.mergeEvents, stub.eventsByCode, stub.parseHalaText);
   return mod.exports;
+}
+
+/* ⭐⭐ KV اصطناعي ⭐ للمعاينة المعزولة ⭐ (مش إنتاج ⭐ — مفيش اتصال ⭐) */
+function fakePreviewKV() {
+  const store = new Map();
+  return {
+    store,
+    async get(key) { return store.has(key) ? store.get(key) : null; },
+    async put(key, value) { store.set(key, value); },
+    async delete(key) { store.delete(key); },
+    async list(opts) {
+      const prefix = (opts && opts.prefix) || '';
+      const keys = [];
+      for (const k of store.keys()) if (k.indexOf(prefix) === 0) keys.push(k);
+      return { keys, list_complete: true };
+    },
+  };
 }
 
 function workerSource() {
@@ -51,6 +78,12 @@ function previewEnv() {
     OCTA_PREVIEW_SELF_API: 'on',
     OCTA_OPP_SNAPSHOT: 'on',
     OCTA_FAIL_CLOSED: 'on',
+    /* ⭐ (R26) المعاينة المعزولة بقت عندها تخزينها الخاص وسر جلساتها ⭐
+       ⛔ من غيرهم ⇒ 503 صريح ⭐ (مافيش نجاح وهمي ⭐)
+       ⇒ ⭐ الاختبار هنا بيفحص المعاينة **المُهيّأة** ⭐
+       ⭐ وحالة الإعداد الناقص متغطية في اختبار مستقل ⭐. */
+    PREVIEW_KV: fakePreviewKV(),
+    PREVIEW_SESSION_SECRET: 'synthetic-preview-secret',
     ASSETS: {
       fetch: async () => {
         throw new Error('ASSETS fetch must not be needed for /api/health');
@@ -99,6 +132,22 @@ test('R25-PV-03 · المسارات التانية مش بتتردّ بالفح�
   const txt = await res.text();
   assert.ok(txt.indexOf('"source":"preview-isolated"') === -1,
     'only /api/health may use the local isolated answer');
+});
+
+/* ⭐⭐ (R26) المعاينة من غير تخزينها الخاص ⭐ ⇒ 503 صريح ⭐ (fail-closed ⭐)
+   📌 السبب ⭐: ⛔ المعاينة المعزولة صارت تقدّم الـAPI بنفسها ⭐
+      ⇒ ⛔ من غير الـKV الخاص والسر الخاص ⭐ ⇒ ⛔ مافيش تشغيل ⭐
+      ⇒ ⛔ ولازم يكون الرد واضح ⭐ (مش 200 وهمي ⭐). */
+test('R25-PV-08 · ⭐ المعاينة من غير تخزينها الخاص ⇒ 503 صريح (مافيش نجاح وهمي)', async () => {
+  const w = loadWorker(workerSource());
+  const env = previewEnv();
+  delete env.PREVIEW_KV;
+  const res = await w.fetch(new Request('https://octa-preview.ahmed3zz2020.workers.dev/api/health'),
+    env, { waitUntil() {}, passThroughOnException() {} });
+  assert.equal(res.status, 503, 'لازم 503 (مش 200 وهمي): ' + res.status);
+  const j = await res.json();
+  assert.equal(j.ok, false);
+  assert.equal(j.error, 'preview_backend_misconfigured');
 });
 
 test('R25-PV-04 · ⭐ عقد المعاينة: وجهة ثابتة ⭐ مش نفق ⭐ ومش الإنتاج', () => {

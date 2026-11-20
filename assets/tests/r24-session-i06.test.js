@@ -72,6 +72,29 @@ function makeCallLog() {
   return { calls, kv, doNs };
 }
 
+/* ⭐⭐ (R26) ⭐ فصل namespaces ⭐⭐
+   📌 قاعدة الاعتماد بقت تعتمد على **نسخة كلمة المرور** ⭐ ⇒ ⭐ لازم نقرأ
+      حالة اللوحة (panel_state ⭐ — نسخة واحدة مشتركة ⭐) عشان نحسب الوسم ⭐.
+   ⛔ ده **مش** نداء الإبطال ⭐ (rev: ⭐ — نسخة لكل جلسة ⭐) ⭐
+      ⛔⇒ الكوكي المزوّر/المنتهي لازم ما يوصلش namespace الإبطال ⭐
+      ⛔⇒ وده بالظبط حاجب استنزاف الموارد ⭐. */
+function sessionStoreCalls(log) {
+  return log.calls.filter(function (c) {
+    if (c.kind === 'kv-get' || c.kind === 'kv-put' || c.kind === 'kv-del') return true;
+    if (c.kind === 'do-get' || c.kind === 'do-post') {
+      const n = String(c.name || '');
+      return n.indexOf('rev:') === 0 || n.indexOf('att:') === 0;
+    }
+    return false;
+  });
+}
+
+function panelStateOnly(log) {
+  return log.calls.every(function (c) {
+    return c.kind === 'do-get' && c.name === 'panel_state';
+  });
+}
+
 function makeEnv(kv, doNs) {
   return {
     APP_PASSWORD: PASSWORD,
@@ -98,13 +121,18 @@ function req(p, opts = {}) {
    📌 `credentialTag` = sha256(كلمة المرور) مقصوص ١٦ hex ⭐
       ⇒ ⭐ تغيير كلمة المرور ⭐ ⛔ يبطل كل الجلسات ⭐.
    ⭐⇒ الاختبار لازم **يعيد بناء** التوقيع بنفس القاعدة ⭐ (مش تتخمين ⭐). */
-function credentialTag(password) {
-  return nodeCrypto.createHash('sha256').update(String(password)).digest('hex').slice(0, 16);
+function credentialTag(password, ver) {
+  /* (R26) نفس قاعدة الكود في mgmt/worker.js ⭐:
+     sha256(كلمة المرور + '|' + النسخة) مقصوص ١٦ hex.
+     النسخة (ver) بتتغير مع تغيير كلمة المرور ⇒ الجلسة القديمة تموت. */
+  const v = (ver === undefined || ver === null) ? '0' : String(ver);
+  return nodeCrypto.createHash('sha256')
+    .update(String(password) + '|' + v).digest('hex').slice(0, 16);
 }
 
-function mintCookie(expMs, secret, password) {
+function mintCookie(expMs, secret, password, ver) {
   const exp = String(expMs);
-  const payload = exp + '.' + credentialTag(password);
+  const payload = exp + '.' + credentialTag(password, ver);
   const sig = nodeCrypto.createHmac('sha256', secret).update(payload).digest('hex');
   return 'octa_mgmt_sess=' + encodeURIComponent(exp + '.' + sig);
 }
@@ -128,9 +156,9 @@ test('R24-I06-01: a FORGED cookie never reaches the storage (zero calls)', async
 
   const st = await sessionStatus(worker, env, forged);
   assert.equal(st, 401, '⛔ لازم ترفض ⭐');
-  assert.equal(log.calls.length, 0,
-    '⛔⛔⛔ كوكي مزوّر وصل التخزين ⭐ ⭐ (' +
+  assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ كوكي مزوّر وصل التخزين ⭐ ⭐ (' +
     log.calls.map(c => c.kind).join(',') + ') ⭐ لازم صفر نداءات ⭐');
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -146,9 +174,9 @@ test('R24-I06-02: an EXPIRED cookie never reaches the storage (zero calls)', asy
 
   const st = await sessionStatus(worker, env, expired);
   assert.equal(st, 401, '⛔ لازم ترفض ⭐');
-  assert.equal(log.calls.length, 0,
-    '⛔⛔⛔ كوكي منتهي وصل التخزين ⭐ ⭐ (' +
+  assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ كوكي منتهي وصل التخزين ⭐ ⭐ (' +
     log.calls.map(c => c.kind).join(',') + ') ⭐');
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -161,8 +189,8 @@ test('R24-I06-03: a MALFORMED cookie never reaches the storage (zero calls)', as
 
   const st = await sessionStatus(worker, env, 'octa_mgmt_sess=not-a-session');
   assert.equal(st, 401, '⛔ لازم ترفض ⭐');
-  assert.equal(log.calls.length, 0,
-    '⛔⛔⛔ كوكي مشوّه وصل التخزين ⭐ ⭐');
+  assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ كوكي مشوّه وصل التخزين ⭐ ⭐');
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -214,6 +242,6 @@ test('R24-I06-06: a forged cookie is refused on a protected API too', async () =
     headers: { Cookie: forged },
   }), env);
   assert.equal(res.status, 401, '⛔ لازم ٤٠١ ⭐');
-  assert.equal(log.calls.length, 0,
-    '⛔⛔⛔ كوكي مزوّر وصل التخزين من مسار محمي ⭐ ⭐');
+  assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ كوكي مزوّر وصل التخزين من مسار محمي ⭐ ⭐');
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });

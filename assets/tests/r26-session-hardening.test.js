@@ -78,10 +78,21 @@ function makeCallLog(opts = {}) {
         const method = (fopts && fopts.method) || 'GET';
         calls.push({ kind: 'do-' + method.toLowerCase(), url: String(url), name: id.name });
         if (opts.doReadFails) return new Response('down', { status: 500 });
+        /* ⭐⭐⭐ (R26) ⭐ حالة كلمة المرور ⭐ (نسخة واحدة ⭐ — panel_state ⭐)
+           📌 اختياري ⭐: لو الاختبار صرّح بنسخة ⭐ ⇒ نرجّعها ⭐
+           ⭐ (ده اللي بيثبّت إن تدويرها ⛔ يبطل الجلسات ⭐). */
+        if (opts.pwdVer && String(id.name || '') === 'panel_state') {
+          return new Response(JSON.stringify({ ok: true, pwd: { ver: String(opts.pwdVer) } }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
         if (method === 'POST') {
           if (opts.doWriteFails) return new Response('down', { status: 500 });
-          /* ⭐⭐⭐ بعد كتابة ناجحة ⭐ ⇔ ⭐⭐⭐ الإبطال متثبت ⭐ (قراءة بعد كتابة ⭐ ⇔ تأكيد ⭐) ⭐ */
-          doNs.state.revoked = true;
+          /* ⭐⭐⭐ بعد كتابة ناجحة ⭐ ⇔ ⭐⭐⭐ الإبطال متثبت ⭐ (قراءة بعد كتابة ⭐ ⇔ تأكيد ⭐) ⭐
+             ⭐ (R26) ⭐ الكتابة اللي تثبت الإبطال ⭐ هي اللي على namespace الإبطال ⭐
+             (rev: ⭐ — نسخة لكل جلسة ⭐) ⭐ بس ⭐.
+             ⛔ غيرها ⭐ (panel_state ⭐ = حالة كلمة المرور ⭐ · att: ⭐ = عدّاد المحاولات ⭐)
+             ⛔⇒ ⛔ ما فيش علاقة بالإبطال ⭐ ⇒ ⛔ ما يبقّيش يثبّته ⭐. */
+          if (String(id.name || '').indexOf('rev:') === 0) doNs.state.revoked = true;
           return new Response(JSON.stringify({ ok: true, revoked: true }),
             { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
@@ -91,6 +102,29 @@ function makeCallLog(opts = {}) {
     }),
   };
   return { calls, kv, doNs };
+}
+
+/* ⭐⭐ (R26) ⭐ فصل namespaces ⭐⭐
+   📌 قاعدة الاعتماد بقت تعتمد على **نسخة كلمة المرور** ⭐ ⇒ ⭐ لازم نقرأ
+      حالة اللوحة (panel_state ⭐ — نسخة واحدة مشتركة ⭐) عشان نحسب الوسم ⭐.
+   ⛔ ده **مش** نداء الإبطال ⭐ (rev: ⭐ — نسخة لكل جلسة ⭐) ⭐
+      ⛔⇒ الكوكي المزوّر/المنتهي لازم ما يوصلش namespace الإبطال ⭐
+      ⛔⇒ وده بالظبط حاجب استنزاف الموارد ⭐. */
+function sessionStoreCalls(log) {
+  return log.calls.filter(function (c) {
+    if (c.kind === 'kv-get' || c.kind === 'kv-put' || c.kind === 'kv-del') return true;
+    if (c.kind === 'do-get' || c.kind === 'do-post') {
+      const n = String(c.name || '');
+      return n.indexOf('rev:') === 0 || n.indexOf('att:') === 0;
+    }
+    return false;
+  });
+}
+
+function panelStateOnly(log) {
+  return log.calls.every(function (c) {
+    return c.kind === 'do-get' && c.name === 'panel_state';
+  });
 }
 
 function makeEnv(log, extra = {}) {
@@ -112,13 +146,18 @@ function req(p, opts = {}) {
   return new Request('https://mgmt.invalid' + p, opts);
 }
 
-function credentialTag(password) {
-  return nodeCrypto.createHash('sha256').update(String(password)).digest('hex').slice(0, 16);
+function credentialTag(password, ver) {
+  /* (R26) نفس قاعدة الكود في mgmt/worker.js ⭐:
+     sha256(كلمة المرور + '|' + النسخة) مقصوص ١٦ hex.
+     النسخة (ver) بتتغير مع تغيير كلمة المرور ⇒ الجلسة القديمة تموت. */
+  const v = (ver === undefined || ver === null) ? '0' : String(ver);
+  return nodeCrypto.createHash('sha256')
+    .update(String(password) + '|' + v).digest('hex').slice(0, 16);
 }
 
-function mintCookie(expMs, secret, password) {
+function mintCookie(expMs, secret, password, ver) {
   const exp = String(expMs);
-  const payload = password ? (exp + '.' + credentialTag(password)) : exp;
+  const payload = password ? (exp + '.' + credentialTag(password, ver)) : exp;
   const sig = nodeCrypto.createHmac('sha256', secret).update(payload).digest('hex');
   return 'octa_mgmt_sess=' + encodeURIComponent(exp + '.' + sig);
 }
@@ -369,7 +408,8 @@ test('R26-S-19: a forged cookie must not reach the storage and must be refused',
     String(Date.now() + 3600000) + '.' + 'f'.repeat(64));
   const out = await logout(worker, env, forged);
   assert.equal(out.status, 401, '⛔ كوكي مزوّر ⭐ ⇒ ٤٠١ ⭐ — got ' + out.status);
-  assert.equal(log.calls.length, 0, '⛔⛔⛔ الكوكي المزوّر استهلك التخزين ⭐');
+  assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ الكوكي المزوّر استهلك التخزين ⭐');
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });
 
 test('R26-S-20: an expired cookie must not reach the storage', async () => {
@@ -379,7 +419,8 @@ test('R26-S-20: an expired cookie must not reach the storage', async () => {
   const expired = mintCookie(Date.now() - 1000, env.SESSION_SECRET, env.APP_PASSWORD);
   const out = await logout(worker, env, expired);
   assert.equal(out.status, 200, '⛔ جلسة منتهية ⭐ ⇒ مفيش حاجة تتبطل ⭐ — got ' + out.status);
-  assert.equal(log.calls.length, 0, '⛔⛔⛔ جلسة منتهية استهلكت التخزين ⭐');
+  assert.equal(sessionStoreCalls(log).length, 0, '⛔⛔⛔ جلسة منتهية استهلكت التخزين ⭐');
+  assert.ok(panelStateOnly(log), '\u26d4\u26d4\u26d4 اتصلح غير حالة اللوحة (panel_state) \u2b50 \u2014 ' + log.calls.map(function (c) { return c.kind + ':' + (c.name || c.k || ''); }).join(','));
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -431,4 +472,38 @@ test('R26-S-24: outside production the KV-only session is accepted (the preview 
   const res = await worker.fetch(req('/api/session', { headers: { Cookie: cookie } }), env);
   assert.equal(res.status, 200,
     '⛔⛔ خارج الإنتاج ⭐ ⇒ ⭐ سلوك المعاينة لازم يفضل زي ما هو ⭐ — got ' + res.status);
+});
+
+/* ⭐⭐⭐ (R26) ⭐⭐⭐ تدوير كلمة المرور ⭐⭐⭐
+   📌 السبب ⭐: ⛔ تغيير كلمة المرور ⭐ كان **مش** بيبطل الجلسات القائمة ⭐
+      ⇒ ⛔ مينفعش نخلي جلسة قديمة صالحة ⭐.
+   ✅ الحل ⭐: ⭐ وسم الاعتماد (credentialTag ⭐) بقى فيه **نسخة** كلمة المرور ⭐
+      ⇒ ⭐ تغييرها ⭐ ⛔ التوقيع كله يتغيّر ⭐ ⇒ ⛔ كل الجلسات تموت ⭐. */
+test('R26-S-26: ⭐ تغيير كلمة المرور ⭐ ⛔ يبطل كل الجلسات القديمة ⭐', async () => {
+  const worker = loadWorker();
+  /* ⭐ نسخة ١ ⭐ */
+  const log1 = makeCallLog({ pwdVer: '1' });
+  const env1 = makeEnv(log1);
+  const cookie = (await login(worker, env1)).headers.get('Set-Cookie').split(';')[0];
+  const ok = await worker.fetch(req('/api/session', { headers: { Cookie: cookie } }), env1);
+  assert.equal(ok.status, 200, '⛔ الجلسة لازم تكون صالحة قبل التدوير ⭐ — got ' + ok.status);
+
+  /* ⭐ نسخة ٢ ⭐ (بعد تغيير كلمة المرور ⭐) ⇒ ⛔ نفس الكوكي لازم يترفض ⭐ */
+  const log2 = makeCallLog({ pwdVer: '2' });
+  const env2 = makeEnv(log2);
+  const after = await worker.fetch(req('/api/session', { headers: { Cookie: cookie } }), env2);
+  assert.equal(after.status, 401,
+    '⛔⛔⛔ بعد تغيير كلمة المرور ⭐ ⛔ الجلسة القديمة لازم تموت ⭐ — got ' + after.status);
+});
+
+test('R26-S-27: ⭐ نفس النسخة ⭐ ⇒ نفس الكوكي يفضل صالح ⭐ (مافيش إبطال عشوائي)', async () => {
+  const worker = loadWorker();
+  const log1 = makeCallLog({ pwdVer: '7' });
+  const env1 = makeEnv(log1);
+  const cookie = (await login(worker, env1)).headers.get('Set-Cookie').split(';')[0];
+  const log2 = makeCallLog({ pwdVer: '7' });
+  const env2 = makeEnv(log2);
+  const res = await worker.fetch(req('/api/session', { headers: { Cookie: cookie } }), env2);
+  assert.equal(res.status, 200,
+    '⛔ نفس النسخة ⭐ ⇒ ⭐ لازم تفضل صالحة ⭐ (وإلا ⇒ ⛔ إبطال عشوائي ⭐) — got ' + res.status);
 });

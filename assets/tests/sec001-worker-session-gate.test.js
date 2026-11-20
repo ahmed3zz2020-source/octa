@@ -33,11 +33,23 @@ function makeWorker(fetchMock) {
     .replace(/export\s+(function|const|let|var)\s+/g, '$1 ')
     .replace(/export\s*\{[^}]*\}\s*;?/g, '')
     .replace(/export\s+default\s+/g, '');
+  /* (R26) preview-api.js بقى اعتماد تاني للواجهة.
+     الملف بيتحمّل في نطاق منفصل (IIFE) عشان مافيش تعارض أسماء
+     مع العامل (sessionCookie موجود في الملفين).
+     بدون التحميل ده: المرجع مش معرّف والـworker بيرجع 500. */
+  const previewSrc = fs.readFileSync(path.join(ROOT, 'preview-api.js'), 'utf8')
+    .replace(/export\s+(function|const|let|var)\s+/g, '$1 ')
+    .replace(/export\s*\{[^}]*\}\s*;?/g, '')
+    .replace(/export\s+default\s+/g, '');
+  const previewMod = '(function(){\n' + previewSrc
+    + '\nreturn { handlePreviewApi: handlePreviewApi };\n})()';
   const body = SRC
-    .replace(/^\s*import\s+\{[^}]*\}\s+from\s+['"][^'"]+['"];?\s*$/m, '')
+    .replace(/^\s*import\s+\{[^}]*\}\s+from\s+['"][^'"]+['"];?\s*$/gm, '')
     .replace('export default', 'module.exports =');
   const fn = new Function('module', 'exports', 'Request', 'Response',
-    'Headers', 'URL', 'fetch', 'setTimeout', halanSrc + '\n' + body);
+    'Headers', 'URL', 'fetch', 'setTimeout',
+    'const handlePreviewApi = ' + previewMod + '.handlePreviewApi;\n'
+      + halanSrc + '\n' + body);
   fn(mod, mod.exports, Request, Response, Headers, URL,
     fetchMock || globalThis.fetch, globalThis.setTimeout);
   return mod.exports;

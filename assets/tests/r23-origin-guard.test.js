@@ -127,13 +127,21 @@ test('R23-G4 · ⛔ المعاينة من غير عقدة ⇒ fail closed', () =
   assert.equal(v.code, GUARD.CODES.CONFIG_MISSING);
 });
 
-test('R23-G4 · ⛔ المعاينة من غير وجهة ⇒ fail closed', () => {
-  /* ⭐ المقصود: مافيش وجهة في العقدة ⭐ ولا وجهة من العامل ⭐ */
+test('R23-G4 · ⭐ المعاينة من غير وجهة ⇒ نفس الأصل (مش ارتجاع للإنتاج)', () => {
+  /* (R26) المعاينة المعزولة بقت تقدّم الـAPI بنفسها ⇒ نفس الأصل.
+     ⛔⇒ مافيش وجهة خارجية ⇒ ⛔ مافيش خطر ⇒ مسموح ⭐ (مش مقفول ⭐).
+     📌 المعيار الحقيقي ⭐: ⛔ النتيجة ما تكونش أي وجهة خارجية ⭐
+        (خصوصاً ⛔ إنتاج ⭐ ولا ⛔ نفق ⭐) — والوجهة تفضل **نسبية** ⭐. */
   const cfg = JSON.parse(JSON.stringify(CONFIG));
   cfg.preview.apiBaseUrl = '';
   const v = GUARD.evaluateOrigin({ mode: 'preview', config: cfg, runtimeOrigin: '' });
-  assert.equal(v.ok, false);
-  assert.equal(v.code, GUARD.CODES.ORIGIN_MISSING);
+  assert.equal(v.ok, true, 'نفس الأصل لازم يمر: ' + v.code);
+  assert.equal(v.code, GUARD.CODES.OK);
+  assert.equal(String(v.origin || ''), '', 'الوجهة لازم تفضل نسبية (مافيش ارتجاع)');
+  assert.equal(GUARD.isProductionHost(GUARD.hostOf(v.origin || ''), cfg), false,
+    'ممنوع ترجع لوجهة إنتاج');
+  assert.equal(GUARD.isTunnelHost(GUARD.hostOf(v.origin || ''), cfg), false,
+    'ممنوع ترجع لنفق مؤقت');
 });
 
 test('R23-G4 · ⛔ عقدة بلا وجهة مثبّتة ⇔ وجهة من العامل مقبولة', () => {
