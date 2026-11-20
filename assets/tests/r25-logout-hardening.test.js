@@ -139,7 +139,7 @@ function credentialTag(password, ver) {
   /* (R26) نفس قاعدة الكود في mgmt/worker.js ⭐:
      sha256(كلمة المرور + '|' + النسخة) مقصوص ١٦ hex.
      النسخة (ver) بتتغير مع تغيير كلمة المرور ⇒ الجلسة القديمة تموت. */
-  const v = (ver === undefined || ver === null) ? '0' : String(ver);
+  const v = (ver === undefined || ver === null) ? 'nostate' : String(ver);
   return nodeCrypto.createHash('sha256')
     .update(String(password) + '|' + v).digest('hex').slice(0, 16);
 }
@@ -213,6 +213,7 @@ test('R25-I09-03: a KV-only success must never claim immediate revocation', asyn
      ⭐ ⇒ ⭐ الاختبار ده بقى في **بيئة غير إنتاج** ⭐ (الوضع الوحيد اللي الـKV
      ⭐   يقدر فيهما يثبت ⭐) ⭐ — ⭐ والقاعدة نفسها (مش إبطال فوري ⭐) بتفضل ⭐. */
   const env = makeEnv(log, { REVOKE_DO: null, APP_ENV: 'preview' });
+  /* ⭐⭐⭐ (R28 · FINDING-03) ⭐⭐⭐ مافيش DO ⭐ ⇒ وسم “nodostate” ⭐⭐⭐ */
   const cookie = await login(worker, env);
 
   const out = await logout(worker, env, cookie);
@@ -245,7 +246,8 @@ test('R25-I10-01: in production with no shared revocation source it must fail cl
   /* ⭐⭐⭐ الجولة ۲۶ (R26) ⭐ — ⭐ كوكي **سليم التوقيع** ⭐
      ⭐ (مش مزوّر ⭐) ⭐ ⇒ ⭐ عشان نختبر مسار ⭐“مافيش مصدر” ⭐
      ⭐ ولا مسار ⭐“كوكي زائف” ⭐. */
-  const cookie = mintCookie(Date.now() + 3600000, env.SESSION_SECRET, env.APP_PASSWORD);
+  const cookie = mintCookie(Date.now() + 3600000, env.SESSION_SECRET, env.APP_PASSWORD,
+    env.REVOKE_DO ? 'nostate' : 'nodostate');
 
   const out = await logout(worker, env, cookie);
   assert.notEqual(out.status, 200,
@@ -310,7 +312,8 @@ test('R25-I11-02: an EXPIRED cookie must not consume Durable Object or KV resour
   const worker = loadWorker();
   const log = makeCallLog();
   const env = makeEnv(log);
-  const expired = mintCookie(Date.now() - 1000, SECRET, env.APP_PASSWORD);
+  const expired = mintCookie(Date.now() - 1000, SECRET, env.APP_PASSWORD,
+    env.REVOKE_DO ? 'nostate' : 'nodostate');
 
   const out = await logout(worker, env, expired);
   assert.equal(out.status, 200,

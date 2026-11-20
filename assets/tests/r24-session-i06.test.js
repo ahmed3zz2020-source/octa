@@ -130,7 +130,7 @@ function credentialTag(password, ver) {
   /* (R26) نفس قاعدة الكود في mgmt/worker.js ⭐:
      sha256(كلمة المرور + '|' + النسخة) مقصوص ١٦ hex.
      النسخة (ver) بتتغير مع تغيير كلمة المرور ⇒ الجلسة القديمة تموت. */
-  const v = (ver === undefined || ver === null) ? '0' : String(ver);
+  const v = (ver === undefined || ver === null) ? 'nostate' : String(ver);
   return nodeCrypto.createHash('sha256')
     .update(String(password) + '|' + v).digest('hex').slice(0, 16);
 }
@@ -228,7 +228,8 @@ test('R24-I06-05: without the DO the KV witness is the only call', async () => {
   const worker = loadWorker();
   const log = makeCallLog();
   const env = makeEnv(log.kv, null);
-  const cookie = mintCookie(Date.now() + 3600000, SECRET, PASSWORD);
+  /* ⭐⭐⭐ (R28 · FINDING-03) ⭐⭐⭐ مافيش DO ⭐ ⇒ ⭐ وسم \"nodostate\" ⭐ ⭐⭐ */
+  const cookie = mintCookie(Date.now() + 3600000, SECRET, PASSWORD, 'nodostate');
 
   const st = await sessionStatus(worker, env, cookie);
   assert.equal(st, 200, '⛔ جلسة صحيحة ⇒ ٢٠٠ ⭐');

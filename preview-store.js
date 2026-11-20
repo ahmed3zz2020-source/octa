@@ -16,6 +16,9 @@
 
 const DO_NAME = 'preview_state';
 
+/* ⭐ الوقت بالثواني ⭐ (مصدر واحد ⭐) */
+function nowSec() { return Math.floor(Date.now() / 1000); }
+
 function jsonOut(obj, status) {
   return new Response(JSON.stringify(obj), {
     status: status || 200,
@@ -42,10 +45,25 @@ export class PreviewStore {
     try {
       if (op === 'get') {
         const v = await st.get(key);
+        /* ⭐ حذف السجلات المنتهية ⭐ — حماية من الاعتماد على TTL وحده ⭐
+           📌 الـDO بيحذف المنتهي تلقائيًا ⭐ (expirationTtl ⭐)
+              لكن أي سجل اتكتب بـttl=0 ⭐ وcarry حقل `exp` ⭐
+              ⇒ لازم ينحذف أول ما يتقضى ⭐. */
+        if (v && typeof v === 'object' && Number(v.exp || 0) > 0
+            && Number(v.exp) <= nowSec()) {
+          try { await st.delete(key); } catch (e) { }
+          return jsonOut({ ok: true, value: null, expired: true });
+        }
         return jsonOut({ ok: true, value: (v === undefined ? null : v) });
       }
       if (op === 'put') {
         const ttl = Number(cmd.ttl || 0);
+        /* ⭐ حدّ أدنى للـTTL ⭐ (عقد Cloudflare ⭐: 60 ثانية ⭐)
+           📌 TTL أقصر ⇒ الـDO بيرفضه ⇒ ⛔ خطأ صامت ⭐ ⇒
+              ⭐ من هنا نفحصه صريحًا ⭐. */
+        if (ttl > 0 && ttl < 60) {
+          return jsonOut({ ok: false, error: 'ttl_too_short' }, 400);
+        }
         const opts = ttl > 0 ? { expirationTtl: ttl } : undefined;
         await st.put(key, (cmd.value === undefined ? null : cmd.value), opts);
         return jsonOut({ ok: true });
@@ -55,14 +73,30 @@ export class PreviewStore {
         return jsonOut({ ok: true });
       }
       if (op === 'list') {
+        /* ⭐⭐⭐ (R28 · FINDING-01) ⭐⭐⭐ عقد Durable Objects الحقيقي ⭐⭐⭐
+           📌 `storage.list()` في Cloudflare بترجّع **Map** ⭐ (مفتاح ← قيمة) ⭐
+              ⭐ مش `{keys, cursor}` ⭐ (ده شكل Workers KV ⭐ / العقد القديم ⭐).
+           📌 الكود القديم ⭐ كان يقرأ `res.keys` ⭐ ⇒ ⛔ undefined ⭐
+              ⇒ ⛔ الاستثناء كان بيبتلع ⇒ ⛔ 500 storage_failed ⭐
+              ⇒ ⛔ ⇒ المسارات المعتمدة على العدّ كانت ميتة في الإنتاج ⭐.
+           ✅ دلوقتي ⭐: الشكل الأساسي = Map ⭐ + تحمّل الشكل القديم ⭐
+              (است compatiblity مع نشر مُزاح ⭐). */
+        const prefix = String(cmd.prefix || '');
+        const res = await st.list({ prefix: prefix });
         const out = [];
-        let cursor;
-        do {
-          const res = await st.list({ prefix: String(cmd.prefix || ''), cursor: cursor });
-          for (const k of res.keys) out.push(k.name);
-          cursor = res.cursor;
-        } while (cursor);
-        return jsonOut({ ok: true, keys: out });
+        if (res && typeof res.keys === 'function') {
+          /* ⭐ عقد DO الحقيقي ⭐ */
+          for (const k of res.keys()) out.push(String(k));
+        } else if (res && Array.isArray(res.keys)) {
+          /* ⭐ عقد قديم / Workers KV ⭐ (تحمّل ⭐) */
+          for (const k of res.keys) out.push(String(k && k.name !== undefined ? k.name : k));
+        } else if (res && typeof res.forEach === 'function') {
+          for (const k of res.keys()) out.push(String(k));
+        } else {
+          return jsonOut({ ok: false, error: 'bad_list_shape' }, 500);
+        }
+        out.sort();
+        return jsonOut({ ok: true, keys: out, count: out.length });
       }
       /* ⭐⭐⭐ (R28) ⭐ التنبيهات ⭐ — إضافة ذرّية ⭐ (R26-I04 ⭐) ⭐ */
       if (op === 'alerts_add') {

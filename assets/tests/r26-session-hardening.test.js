@@ -157,8 +157,12 @@ function req(p, opts = {}) {
 function credentialTag(password, ver) {
   /* (R26) نفس قاعدة الكود في mgmt/worker.js ⭐:
      sha256(كلمة المرور + '|' + النسخة) مقصوص ١٦ hex.
-     النسخة (ver) بتتغير مع تغيير كلمة المرور ⇒ الجلسة القديمة تموت. */
-  const v = (ver === undefined || ver === null) ? '0' : String(ver);
+     النسخة (ver) بتتغير مع تغيير كلمة المرور ⇒ الجلسة القديمة تموت.
+     ⭐⭐⭐ (R28 · FINDING-03) ⭐⭐⭐ وسم مختلِف لِحالة «ما فيش حالة» ⭐⭐⭐
+     📌 قبل ⭐: حالة «ما فيش حالة» ⭐ كان وسمها = sha256(secret|"0") ⭐
+        ⇒ ⭐ نفس وسم النسخة "0" ⭐ ⇒ ⛔ إحياء جلسة قديمة لو الحالة ضاعت ⭐.
+     📌 دلوقتي ⭐: «ما فيش حالة» ⭐ ⇒ وسم «nostate» ⭐ ⇒ ⛔ مافيش إحياء ⭐. */
+  const v = (ver === undefined || ver === null) ? 'nostate' : String(ver);
   return nodeCrypto.createHash('sha256')
     .update(String(password) + '|' + v).digest('hex').slice(0, 16);
 }
@@ -265,7 +269,8 @@ test('R26-S-07: with both stores missing in production the logout fails closed',
   const worker = loadWorker();
   const log = makeCallLog();
   const env = makeEnv(log, { REVOKE_DO: null, REVOKE_KV: null, APP_ENV: 'production' });
-  const cookie = mintCookie(Date.now() + 3600000, env.SESSION_SECRET, env.APP_PASSWORD);
+  /* ⭐⭐⭐ (R28 · FINDING-03) ⭐⭐⭐ مافيش DO ⭐ ⇒ وسم مختلف ⭐ (يوسم “nodostate” ⭐) ⭐⭐⭐ */
+  const cookie = mintCookie(Date.now() + 3600000, env.SESSION_SECRET, env.APP_PASSWORD, 'nodostate');
   const out = await logout(worker, env, cookie);
   assert.equal(out.status, 503, '⛔ لازم ٥٠٣ ⭐ — got ' + out.status);
   assert.equal(out.body.ok, false);
@@ -468,8 +473,9 @@ test('R26-S-23: in production a KV-only session is REFUSED even though the KV sa
   const worker = loadWorker();
   const log = makeCallLog();
   const env = makeEnv(log, { REVOKE_DO: null, APP_ENV: 'production' });
-  /* ⭐ كوكي صحيح ⭐ (توقيع سليم ⭐ + وسم اعتماد ⭐) ⭐ */
-  const cookie = mintCookie(Date.now() + 3600000, env.SESSION_SECRET, env.APP_PASSWORD);
+  /* ⭐ كوكي صحيح ⭐ (توقيع سليم ⭐ + وسم اعتماد ⭐) ⭐
+     ⭐⭐⭐ (R28 · FINDING-03) ⭐⭐⭐ مافيش DO ⭐ ⇒ وسم “nodostate” ⭐ */
+  const cookie = mintCookie(Date.now() + 3600000, env.SESSION_SECRET, env.APP_PASSWORD, 'nodostate');
   const res = await worker.fetch(req('/api/session', { headers: { Cookie: cookie } }), env);
   assert.equal(res.status, 401,
     '⛔⛔⛔ الـKV وحده ⭐ ⇒ ⛔ لازم يرفض (مش يقبل ⭐) — got ' + res.status);
@@ -481,7 +487,8 @@ test('R26-S-24: outside production the KV-only session is accepted (the preview 
   const worker = loadWorker();
   const log = makeCallLog();
   const env = makeEnv(log, { REVOKE_DO: null, APP_ENV: 'preview' });
-  const cookie = mintCookie(Date.now() + 3600000, env.SESSION_SECRET, env.APP_PASSWORD);
+  /* ⭐⭐⭐ (R28 · FINDING-03) ⭐⭐⭐ مافيش DO ⭐ ⇒ وسم “nodostate” ⭐ */
+  const cookie = mintCookie(Date.now() + 3600000, env.SESSION_SECRET, env.APP_PASSWORD, 'nodostate');
   const res = await worker.fetch(req('/api/session', { headers: { Cookie: cookie } }), env);
   assert.equal(res.status, 200,
     '⛔⛔ خارج الإنتاج ⭐ ⇒ ⭐ سلوك المعاينة لازم يفضل زي ما هو ⭐ — got ' + res.status);

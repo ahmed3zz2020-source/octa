@@ -156,7 +156,13 @@ async function storeDel(env, key) {
 }
 async function storeList(env, prefix) {
   const r = await storeCmd(env, { op: 'list', prefix: prefix });
-  return r ? (r.keys || []) : [];
+  /* ⭐⭐⭐ (R28 · FINDING-01) ⭐⭐⭐ ⛔ الفشل مايبش قائمة فارغة ⭐⭐⭐
+     ⑈ قبل مكانها كانت قائمة فارغة · ⛔ لمفرقتنا مع الخطا ⭐
+     → ⛔ المستخدم يفرّق بقائمة فارغة ⭐ و المعالجة لا تحتاج إطلاق الحساب⭐ */
+  if (!r) return null;
+  const keys = r.keys;
+  if (!Array.isArray(keys)) return null;
+  return keys;
 }
 /* ⭐ اللقطة ⭐ — **بتفضل في الـKV** ⭐ (بيانات قراءة ⭐ من أداة التغذية ⭐) */
 async function snapshotGet(env, key) {
@@ -197,11 +203,16 @@ async function issueSession(env, acct, device) {
   const body = enc(payload);
   const sig = await hmac(env.PREVIEW_SESSION_SECRET, body);
   const token = body + '.' + sig;
-  /* ⭐⭐⭐ (R28) ⭐ الجلسة في المخزن القوي ⭐ ⇒ ⭐ إبطال فوري ⭐ (R26-I02 ⭐) */
-  await storePut(env, sessKey(acct.uid, sid), {
+  /* ⭐⭐⭐ (R28) ⭐ الجلسة في المخزن القوي ⭐ ⇒ ⭐ إبطال فوري ⭐ (R26-I02 ⭐)
+     ⭐⭐⭐ (R28 · FINDING-02) ⭐⭐⭐ ⛔ الكتابة لازم **تتأكد** ⭐⭐⭐
+     📌 قبل ⭐: الكتابة كانت متجاهَلة ⭐ ⇒ ⭐ التوكن بيرجع ⭐
+        ⇒ ⭐ لكن ما يتحفظش ⭐ ⇒ ⭐ ⛔ جلسة ميتة ⭐ (نجاح كاذب ⭐).
+     ✅ دلوقتي ⭐: ⛔ لو الكتابة فشلت ⭐ ⇒ ⛔ null ⭐ ⇒ ⛔ ما نصدرش توكن ⭐. */
+  const wrote = await storePut(env, sessKey(acct.uid, sid), {
     uid: acct.uid, sid: sid, exp: payload.exp,
     device: device || '', epoch: acct.epoch || 1
   }, SESSION_TTL_SEC + 3600);
+  if (!wrote) return null;
   return token;
 }
 
@@ -388,6 +399,11 @@ async function handlePreviewApi(opts) {
     /* ⭐ فهرس الباسورد ⭐ (قراءة قوية ⭐ — القوائم متأخرة ⭐) */
     try { await storePut(env, 'pinidx:' + await sha256hex(String(pin)), acctKey(uid)); } catch (e) { }
     const token = await issueSession(env, acct, device);
+    /* ⭐⭐⭐ (R28 · FINDING-02) ⭐⭐⭐ ⛔ لا نصدر توكن غير محفوظ ⭐⭐⭐ */
+    if (!token) {
+      return json({ ok: false, error: 'تعذّر تسجيل الجلسة',
+        why: 'issue_failed' }, 503);
+    }
     return json({
       ok: true, token: token, expires_in: SESSION_TTL_SEC,
       user: userView(acct), message: 'الحابز اتعمل ⭐'
@@ -464,7 +480,9 @@ async function handlePreviewApi(opts) {
       return json({ ok: false, error: 'محاولات كتير — استنى شوية',
         why: 'locked', retry_after: Math.ceil(lockIp) }, 429);
     }
-    const list = await storeList(env, 'acct:');
+    const listRaw = await storeList(env, 'acct:');
+    /* ⭐ لميست يكون ⭐ → ⛔ مافيش اسحاني ⭐ (فاصل الفحص القوي بيستمر في المحفظة) ⭐ */
+    const list = Array.isArray(listRaw) ? listRaw : [];
     let found = null;
     const cands = [];
     /* ⭐ الفهرس أولاً ⭐ (قراءة قوية ⭐) */
@@ -507,6 +525,10 @@ async function handlePreviewApi(opts) {
     /* ⭐ كلمة المرور صح ⭐ ⇒ ⭐ العدّاد يتصفّر ⭐ */
     await bumpAttempts(env, 'pin', pinHash);
     const token = await issueSession(env, found, device);
+    if (!token) {
+      return json({ ok: false, error: 'تعذّر تسجيل الجلسة',
+        why: 'issue_failed' }, 503);
+    }
     return json({ ok: true, token: token, expires_in: SESSION_TTL_SEC,
       user: userView(found) }, 200, { 'Set-Cookie': sessionCookie(token, SESSION_TTL_SEC) });
   }
@@ -517,12 +539,17 @@ async function handlePreviewApi(opts) {
     if (!device || device.length < 16) {
       return json({ ok: false, error: 'بصمة الجهاز ناقصة', why: 'bad_device' }, 400);
     }
-    const list = await storeList(env, 'acct:');
+    const listRaw = await storeList(env, 'acct:');
+    const list = Array.isArray(listRaw) ? listRaw : [];
     for (const key of list) {
       const acct = await storeGet(env, key);
       if (!acct) continue;
       if ((acct.devices || []).includes(device)) {
         const token = await issueSession(env, acct, device);
+        if (!token) {
+          return json({ ok: false, error: 'تعذّر تسجيل الجلسة',
+            why: 'issue_failed' }, 503);
+        }
         return json({ ok: true, token: token, expires_in: SESSION_TTL_SEC,
           user: userView(acct) }, 200, { 'Set-Cookie': sessionCookie(token, SESSION_TTL_SEC) });
       }
@@ -545,8 +572,25 @@ async function handlePreviewApi(opts) {
     if (!sess) return json({ ok: false, error: 'محتاج تسجيل دخول', why: 'unauthorized' }, 401);
     const acct = await storeGet(env, acctKey(sess.payload.uid));
     if (!acct) return json({ ok: false, error: 'محتاج تسجيل دخول', why: 'unauthorized' }, 401);
-    await storeDel(env, sessKey(sess.payload.uid, sess.payload.sid));   /* ⛔ القديم يموت ⭐ */
+    /* ⭐⭐⭐ (R28 · FINDING-02) ⭐⭐⭐ استبدال الجلسة = عملية **متسقة** ⭐⭐⭐
+       📌 قبل ⭐: `storeDel` ⭐ (القديم) ⭐ وبعدين `issueSession` ⭐ (الجديد) ⭐
+          ⇒ ⛔ لو الإصدار فشل ⭐ ⇒ ⭐ المستخدم بلا جلسة ⭐ (خسارة ⭐)
+          ⇒ ⛔ واللي增发 ⭐ ⭐ كان بيرجع نجاح ⭐ حتى لو الكتابة ماfontsizeتش ⭐.
+       ✅ الترتيب ⭐: ① **إبطال القديم** ⭐ (ويجب أن ينجح ⭐)
+          ② **إصدار الجديد** ⭐ (ويجب أن يُكتب في المخزن ⭐)
+          ⇒ ⛔ لو الإبطال فشل ⭐ ⇒ ⛔ مفيش جلسة بديلة ⭐ (والقديمة بتفضل زي ما هي ⭐).
+       ⭐ والكتابة لازم تتأكد ⭐ ⇒ ⛔ ما نرجّعش توكن مش محفوظ ⭐. */
+    const revoked = await storeDel(env, sessKey(sess.payload.uid, sess.payload.sid));
+    if (!revoked) {
+      /* ⛔ تعذّر الإبطال ⭐ ⇒ ⛔ refuse إصدار بديل ⭐ (fail-closed ⭐) */
+      return json({ ok: false, error: 'تعذّر إنهاء الجلسة القديمة',
+        why: 'revoke_failed' }, 503);
+    }
     const token = await issueSession(env, acct, sess.rec.device || '');
+    if (!token) {
+      return json({ ok: false, error: 'تعذّر تجديد الجلسة',
+        why: 'issue_failed' }, 503);
+    }
     return json({ ok: true, token: token, expires_in: SESSION_TTL_SEC,
       user: userView(acct) }, 200, { 'Set-Cookie': sessionCookie(token, SESSION_TTL_SEC) });
   }
@@ -554,7 +598,18 @@ async function handlePreviewApi(opts) {
   /* ── ⑨ تسجيل الخروج ⭐ */
   if (p === '/api/auth/logout' && (m === 'GET' || m === 'POST')) {
     const sess = await readSession(env, request);
-    if (sess) await storeDel(env, sessKey(sess.payload.uid, sess.payload.sid));
+    /* ⭐⭐⭐ (R28 · FINDING-02) ⭐⭐⭐ نجاح الخروج = **إبطال مؤكد** ⭐⭐⭐
+       📌 قبل ⭐: الرد كان `revoked:true` ⭐ حتى لو الحذف فشل ⭐ ⇒ ⛔ كذب ⭐.
+       ✅ دلوقتي ⭐: ⛔ لو الإبطال فشل ⭐ ⇒ ⛔ 503 ⭐ (مافيش نجاح ⭐).
+       📌 مافيش جلسة ⭐ ⇒ ⛔ مافيش حاجة تُبطل ⭐ ⇒ ⛔ رفض ⭐ (401 ⭐). */
+    if (!sess) {
+      return json({ ok: false, error: 'محتاج تسجيل دخول', why: 'unauthorized' }, 401);
+    }
+    const revoked = await storeDel(env, sessKey(sess.payload.uid, sess.payload.sid));
+    if (!revoked) {
+      return json({ ok: false, error: 'تعذّر إنهاء الجلسة',
+        why: 'revoke_failed' }, 503);
+    }
     return json({ ok: true, revoked: true },
       200, { 'Set-Cookie': sessionCookie('', 0) });
   }

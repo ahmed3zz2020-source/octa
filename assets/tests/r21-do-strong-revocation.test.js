@@ -138,7 +138,7 @@ function req(p, opts = {}) {
 function mintCookie(expMs, secret, password, ver) {
   const nodeCrypto = require('node:crypto');
   const exp = String(expMs);
-  const v = (ver === undefined || ver === null) ? '0' : String(ver);
+  const v = (ver === undefined || ver === null) ? 'nostate' : String(ver);
   const tag = nodeCrypto.createHash('sha256')
     .update(String(password) + '|' + v).digest('hex').slice(0, 16);
   const sig = nodeCrypto.createHmac('sha256', secret)
@@ -247,7 +247,7 @@ test('R22-DO-03: a DO error fails closed (the session is REFUSED, never 200)', a
     }), env);
     assert.notEqual(res0.status, 200,
       '⛔⛔ خطأ في ال​​DO ما ينفعش يسلّم جلسة ⭐');
-    const cookie = mintCookie(Date.now() + 3600000, env.SESSION_SECRET, env.APP_PASSWORD, '0');
+    const cookie = mintCookie(Date.now() + 3600000, env.SESSION_SECRET, env.APP_PASSWORD, 'nostate');
 
     const st = await sessionStatus(worker, env, cookie);
     assert.notEqual(st, 200,

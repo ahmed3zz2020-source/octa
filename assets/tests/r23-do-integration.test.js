@@ -210,7 +210,7 @@ function req(p, opts = {}) {
 function mintCookie(expMs, secret, password, ver) {
   const nodeCrypto = require('node:crypto');
   const exp = String(expMs);
-  const v = (ver === undefined || ver === null) ? '0' : String(ver);
+  const v = (ver === undefined || ver === null) ? 'nostate' : String(ver);
   const tag = nodeCrypto.createHash('sha256')
     .update(String(password) + '|' + v).digest('hex').slice(0, 16);
   const sig = nodeCrypto.createHmac('sha256', secret)
@@ -335,7 +335,7 @@ test('R23-DO-INT-02: a DO failure fails closed — the session is REFUSED, never
     }), envA);
     assert.notEqual(res0.status, 200,
       '⛔⛔ ال​​​DO فاشل ⇒ ⛔ لا ينفعش جلسة ⭐');
-    const cookie = mintCookie(Date.now() + 3600000, envA.SESSION_SECRET, envA.APP_PASSWORD, '0');
+    const cookie = mintCookie(Date.now() + 3600000, envA.SESSION_SECRET, envA.APP_PASSWORD, 'nostate');
     /* 🛡️🛡️ R25 (R24-I09) ⭐ — العقد الجديد ⭐:
        ⭐ «المصدر المتسق (الـDO) هو المرجع الأساسي» ⭐
        ⭐ ⇒ فشل الـDO ⛔ **مش نجاح** ⭐ (٥٠٣ ⭐) — حتى لو الـKV اشتغل ⭐

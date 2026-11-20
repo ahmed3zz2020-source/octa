@@ -29,10 +29,15 @@ function fakeKV() {
       store.delete(key);
     },
     async list(opts) {
+      /* ⭐⭐⭐ (R28 · FINDING-01) ⭐⭐⭐ عقد Cloudflare Durable Objects ⭐⭐⭐
+         ⑈ العقد الحقيقيّ؟ `list()` ⭐ بترجّع **Map** ⭐ مش، {keys, cursor} ⭐
+         ⑈ الموك القديم كان يستخدم العيب ⭐ ولم يكشف العيب ⭐ */
       const prefix = (opts && opts.prefix) || '';
-      const keys = [];
-      for (const k of store.keys()) if (k.indexOf(prefix) === 0) keys.push({ name: k });
-      return { keys: keys };
+      const out = new Map();
+      for (const k of store.keys()) {
+        if (k.indexOf(prefix) === 0) out.set(k, store.get(k));
+      }
+      return out;
     }
   };
 }
@@ -59,11 +64,14 @@ function fakeDO() {
     async put(k, v) { map.set(k, v); },
     async delete(k) { map.delete(k); },
     async list(opts) {
+      /* ⭐⭐⭐ (R28 · FINDING-01) ⭐⭐⭐ عقد Cloudflare Durable Objects ⭐⭐⭐ */
       const prefix = (opts && opts.prefix) || '';
-      const keys = [];
-      for (const k of map.keys()) if (k.indexOf(prefix) === 0) keys.push({ name: k });
-      return { keys: keys };
-    },
+      const out = new Map();
+      for (const k of map.keys()) {
+        if (k.indexOf(prefix) === 0) out.set(k, map.get(k));
+      }
+      return out;
+    }
   };
   const instance = new PreviewStore({ storage: storage }, {});
   return {

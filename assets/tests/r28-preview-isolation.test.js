@@ -53,10 +53,14 @@ function fakeDO() {
       async put(k, v) { map.set(k, v); },
       async delete(k) { map.delete(k); },
       async list(opts) {
+        /* ⭐⭐⭐ (R28 · FINDING-01) ⭐⭐⭐ عقد Cloudflare Durable Objects ⭐⭐⭐
+           ⑈ `list()` ⭐ بترجّع **Map** ⭐ (مفتاح ← قيمة) ⭐ مش {keys, cursor} ⭐ */
         const prefix = (opts && opts.prefix) || '';
-        const keys = [];
-        for (const k of map.keys()) if (k.indexOf(prefix) === 0) keys.push({ name: k });
-        return { keys: keys };
+        const out = new Map();
+        for (const k of map.keys()) {
+          if (k.indexOf(prefix) === 0) out.set(k, map.get(k));
+        }
+        return out;
       },
     };
     const instance = new PreviewStore({ storage: storage }, {});

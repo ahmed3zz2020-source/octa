@@ -679,23 +679,39 @@ function json(data, status = 200, extraHeaders = {}) {
       (⭐ الجلسة مربوطة بسر التوقيع ⭐ بس ⭐ ⭐ ⇒ أي جلسة قديمة كانت بتفضل صالحة ⭐ ⭐).
    ✅ الحل ⭐: ⭐ التوقيع يشمل بصمة كلمة المرور ⭐ ⇒ ⭐ تغييرها ⭐ ⛔ يبطل كل الجلسات ⭐
       (⭐ من غير ما نلمس SESSION_SECRET ⭐ ⭐ — وده بيبطل الكل ⭐). */
-async function credentialTag(env) {
+async function credentialTagFromState(env, st) {
+  /* ⭐⭐⭐ (R28 · FINDING-03) ⭐⭐⭐ الوسم من **الحالة المقروءة** ⭐⭐⭐
+     📌 السبب ⭐: ⛔ قراءة الحالة مرتين ⭐ (تحقق ⭐ ثم وسم ⭐) ⇒ ⛔ نافذة سباق ⭐:
+        ⭐ لو كلمة المرور اتغيّرت بين القراءتين ⭐ ⇒ ⭐ الجلسة تُصدر بوسم **جديد** ⭐
+        ⇒ ⭐ والتوثيق كان بالكلمة **القديمة** ⭐ ⇒ ⛔ جلسة مصرَّح بها خطأ ⭐.
+     ✅ الحل ⭐: نحسب الوسم من نفس القراءة ⭐ ⇒ ⭐ نفس نسخة الاعتماد ⭐.
+     ⭐⭐⭐ تمييز الحالات ⭐⭐⭐ (كل حالة لها وسم مختلف ⭐):
+        · `no_state` ⭐ ⇒ وسم «nostate» ⭐ (مش النسخة "0" ⭐)
+          ⇒ ⛔⇒ الجلسة اللي اتصدرت قبل أول تغيير ⭐ ماتعيشش لو الحالة ضاعت ⭐.
+        · `not_configured` ⭐ / `read_failed` ⭐ ⇒ ⛔ وسم مستحيل ⭐ ⇒ ⛔ رفض ⭐. */
   const pw = String((env && env.APP_PASSWORD) || "");
-  /* ⭐⭐⭐ (R26) ⭐ النسخة ⭐ — ⭐ تغيير كلمة المرور ⭐ ⛔ يبطل كل الجلسات ⭐
-     📌 ⛔ لو البصمة تعتمد على الـsecret بس ⭐ ⇒ ⛔ تغيير كلمة المرور
-        من اللوحة ⭐ ⇒ ⛔ الجلسات القديمة تفضل صالحة ⭐ (ثغرة ⭐).
-     ✅ الحل ⭐: البصمة = (هاش الـsecret ⭐ + النسخة ⭐) ⭐
-        ⇒ ⭐ تغيير ⭐ ⇒ ⭐ البصمة تتغير ⭐ ⇒ ⛔ كل الجلسات تموت ⭐.
-     ⭐⭐⭐ (R28) ⭐ — ⛔⛔⛔ تعذّر قراءة النسخة ⭐ ⇒ ⛔⛔⛔ fail-closed ⭐
-        📌 قبل ⭐: القراءة كانت بفول-back على '0' ⭐ ⇒ ⛔ لو الـDO واقع ⭐
-           ⇒ ⭐ بصمة النسخة '0' ⭐ ⇒ ⭐ ⛔ جلسة قديمة (موقّعة بـ'0') بتعدّي ⭐.
-        ✅ دلوقتي ⭐: ⛔ تعذّر القراءة ⭐ ⇒ ⭐ وسم مستحيل ⭐ ⇒ ⛔ كل الجلسات مرفوضة ⭐. */
-  const st = await readPwdState(env);
-  if (!st.ok && st.reason === "read_failed") return TAG_UNVERIFIED;
-  let ver = "0";
-  if (st.ok && st.pwd && st.pwd.ver) ver = String(st.pwd.ver);
+  let ver;
+  if (st && st.ok) {
+    ver = String((st.pwd && st.pwd.ver) || "0");
+  } else if (st && st.reason === "no_state") {
+    ver = "nostate";
+  } else if (st && st.reason === "not_configured") {
+    /* ⭐ مافيش DO ⭐ ⇒ ⭐ **نمط المعاينة** ⭐ (إبطال بالـKV ⭐) ⭐
+       📌 لازم الوسم يكون **ثابت ومتّسق** ⭐ ⇒ ⭐ لأن التحقق والإصدار
+          لازم يتّفقوا ⭐ ⇒ ⭐ وسم مخصوص ⭐ (مش مستحيل ⭐ ⇒ مش بيقفل الـKV-only ⭐).
+       📌 وسم مستقل ⭐ ⇒ ⭐ ⛔ مافيش إحياء ⭐ لجلسة من مرحلة "ما فيش حالة" ⭐. */
+    ver = "nodostate";
+  } else {
+    /* ⭐ تعذّرت القراءة ⭐ ⇒ ⛔ وسم مستحيل ⭐ ⇒ ⛔ رفض ⭐ (fail-closed ⭐) */
+    return TAG_UNVERIFIED;
+  }
   if (!pw && ver === "0") return "";
   try { return (await sha256(pw + "|" + ver)).slice(0, 16); } catch (e) { return TAG_UNVERIFIED; }
+}
+
+async function credentialTag(env) {
+  const st = await readPwdState(env);
+  return credentialTagFromState(env, st);
 }
 
 /* ⭐⭐⭐ (R26) ⭐ حالة كلمة المرور ⭐ (في الـDO ⭐ — مش في الذاكرة ⭐)
@@ -778,19 +794,42 @@ async function sharedAttempts(env, ip, action) {
          ⛔ تعذّر قراءة الحالة ⭐ ⇒ ⭐ رجوع "state_unknown" ⭐ (مش "كلمة غلط" ⭐).
       ② `verifyBreakGlass` ⭐ = ⭐ **مفتاح الاسترداد الطارئ** ⭐ (الـsecret ⭐).
          ⛔ **مش** تسجيل دخول ⭐ ⇒ ⭐ مافيش جلسة ⭐ ⇒ ⭐ بي resetting بس ⭐. */
-async function verifyPanelPassword(env, pass) {
+async function verifyPanelPasswordWithTag(env, pass) {
+  /* ⭐⭐⭐ (R28 · FINDING-03) ⭐⭐⭐ قراءة واحدة ⭐ ⇒ تحقق + وسم ⭐
+     📌 السبب ⭐: ⛔ التحقق والوسم كانوا قراءتين منفصلتين ⭐ ⇒ ⛔ نافذة سباق ⭐.
+     ✅ الحل ⭐: نفس القراءة ⭐ ⇒ ⭐ نفس نسخة الاعتماد ⭐ ⇒ ⭐ الجلسة مربوطة بيها ⭐.
+     ⭐ الرجوع ⭐: {status:"ok", tag} · {status:"bad"} · {status:"state_unknown"} ⭐. */
   const st = await readPwdState(env);
+  if (!st.ok && st.reason === "read_failed") {
+    return { status: "state_unknown" };
+  }
+  /* ⭐ مافيش DO أصلاً ⭐ ⇒ ⭐ نمط المعاينة (إبطال بالـKV ⭐) ⭐
+     📌 الـsecret هو المرجع ⭐ (سلوك R25/R26 ⭐) ⇒ ⭐ مافيش تعذّر ⭐
+        ⇒ ⭐ عيب: كان بيرفض الدخول كله ⭐ ⇒ ⭐ سلوك R25-I09/R25-I10 اتكسر ⭐.
+     📌 الأمان محفوظ ⭐: في الإنتاج ⭐ ⇒ ⭐ `sessionStorageReady` ⭐ بيقفل الدخول ⭐
+        (مافيش مصدر إبطال ⭐ ⇒ ⛔ مفيش جلسة ⭐). */
   if (st.ok && st.pwd && st.pwd.salt && st.pwd.hash) {
     const h = await sha256(String(st.pwd.salt) + "|" + String(pass));
-    return timingSafeEqual(h, String(st.pwd.hash));
+    if (!timingSafeEqual(h, String(st.pwd.hash))) return { status: "bad" };
+    const tag = await credentialTagFromState(env, st);
+    if (!tag || tag === TAG_UNVERIFIED) return { status: "state_unknown" };
+    return { status: "ok", tag: tag };
   }
-  /* ⛔⛔⛔ (R28) ⭐ الحالة مش معروفة ⭐ ⇒ ⛔⛔⛔ fail-closed ⭐
-     📌 ممنوع ⭐ إن تعذّر القراءة يبقى سبب لقبول الـsecret ⭐. */
-  if (!st.ok && st.reason === "read_failed") return "state_unknown";
   /* ⭐ أول تشغيل ⭐ (ما فيش حالة ⭐) ⭐ ⇒ ⭐ الـsecret هو كلمة المرور ⭐ */
   const want = String((env && env.APP_PASSWORD) || "");
-  if (!want) return false;
-  return timingSafeEqual(await sha256(String(pass)), await sha256(want));
+  if (!want) return { status: "bad" };
+  if (!timingSafeEqual(await sha256(String(pass)), await sha256(want))) {
+    return { status: "bad" };
+  }
+  const tag = await credentialTagFromState(env, st);
+  if (!tag || tag === TAG_UNVERIFIED) return { status: "state_unknown" };
+  return { status: "ok", tag: tag };
+}
+
+async function verifyPanelPassword(env, pass) {
+  const r = await verifyPanelPasswordWithTag(env, pass);
+  if (r.status === "state_unknown") return "state_unknown";
+  return r.status === "ok";
 }
 
 /* ⭐⭐⭐ (R28) ⭐ مفتاح الاسترداد الطارئ (break-glass) ⭐
@@ -802,7 +841,15 @@ async function verifyBreakGlass(env, secret) {
   return timingSafeEqual(await sha256(String(secret || "")), await sha256(want));
 }
 
-async function makeSession(secret, env) {
+async function makeSession(secret, env, tagIn) {
+  /* ⭐⭐⭐ (R28 · FINDING-03) ⭐⭐⭐ ⛔ ترفض الإصدار بلا نسخة اعتماد مؤكَّدة ⭐⭐⭐
+     📌 قبل ⭐: الوسم كان بيتحسب جوّه ⭐ ⇒ ⭐ لو تعذّرت قراءة الحالة ⭐
+        ⇒ ⭐ الوسم = مستحيل ⭐ ⇒ ⭐ والتوقيع عليه ⭐ ⇒ ⭐ والجلسة كانت **صالحة** ⭐
+        (لأن المقارنة بين مستحيل ومستحيل بتتساوى ⭐) ⭐ ⇒ ⛔ issuance غير موثوق ⭐.
+     ✅ الحل ⭐: ⛔ الوسم لازم يكون **متسلَّم من الخارج** ⭐ (من نفس قراءة التحقق ⭐)
+        ⇒ ⭐ لو مش موجود ⭐ أو مستحيل ⭐ ⇒ ⛔ مفيش جلسة ⭐ (ترجع null ⭐). */
+  const tag = String(tagIn || "");
+  if (!tag || tag === TAG_UNVERIFIED) return null;
   const exp = String(Date.now() + SESSION_TTL * 1000);
   /* ⭐⭐⭐ (R28) ⭐ التوكن **ذاتي التحقق** ⭐
      📌 الشكل ⭐: `exp.tag.sig` ⭐ (التوقيع على `exp + '.' + tag` ⭐).
@@ -811,7 +858,6 @@ async function makeSession(secret, env) {
         ⇒ ⛔ مافيش استنزاف للموارد ⭐.
      📌 النسخة ⭐ (tag ⭐) جواها التوكن ⭐ ⇒ ⭐ التحقق من تغيير كلمة المرور ⭐
         بيفضل **فوري** ⭐ (من غير نافذة ⭐). */
-  const tag = await credentialTag(env);
   const payload = exp + "." + tag;
   const sig = await sign(payload, secret);
   return `${payload}.${sig}`;
@@ -845,8 +891,13 @@ async function validSession(req, secret, env) {
   const expect = await sign(exp + "." + tag, secret);
   if (!timingSafeEqual(sig, expect)) return false;  // ⛔ توقيع غلط ⭐
   /* ⭐⭐⭐ (R28) ⭐ مقارنة النسخة الحالية ⭐ (تغيير كلمة المرور ⭐ ⇒ إبطال فوري ⭐)
-     📌 ⛔ تعذّر قراءة النسخة ⭐ ⇒ ⭐ الوسم المستحيل ⭐ ⇒ ⛔ رفض ⭐ (fail-closed ⭐). */
+     📌 ⛔ تعذّر قراءة النسخة ⭐ ⇒ ⭐ الوسم المستحيل ⭐ ⇒ ⛔ رفض ⭐ (fail-closed ⭐).
+     ⭐⭐⭐ (R28 · FINDING-03) ⭐⭐⭐ ⛔ مقارنة "مستحيل" بـ"مستحيل" ⭐ ⛔ مرفوضة ⭐
+        📌 قبل ⭐: لو تعذّرت القراءة ⭐ ⇒ currentTag = مستحيل ⭐
+           ⇒ ⭐ والتوكن اللي اتصدر وهو مستحيل ⭐ ⇒ ⭐ متساويين ⭐ ⇒ ⭐ قبلت ⭐ ⛔.
+        ✅ دلوقتي ⭐: ⛔ لو الوسم الحالي مستحيل ⭐ ⇒ ⛔ رفض فوري ⭐ (مافيش مقارنة ⭐). */
   const currentTag = await credentialTag(env);
+  if (!currentTag || currentTag === TAG_UNVERIFIED) return false;  // ⛔ تعذّر التحقق ⭐
   if (currentTag !== tag) return false;             // ⛔ نسخة كلمة المرور اتغيّرت ⭐
   /* ⛔ دلوقتي بس ⇒ نتفرج على الإبطال ⭐ */
   /* 🛡️ الجولة ١٩ (R18-A01) — جلسة مُبطلة من جهة السيرفر ⇒ مرفوضة */
@@ -876,10 +927,20 @@ async function sessionRenewHeader(req, secret, env) {
   const dot = raw.lastIndexOf(".");
   if (dot < 1) return {};
   /* ⭐⭐⭐ (R28) ⭐ الشكل الجديد ⭐ `exp.tag.sig` ⭐ ⇒ ⭐ exp هو الجزء الأول ⭐ */
-  const exp = Number(raw.split(".")[0]);
+  const parts = raw.split(".");
+  const exp = Number(parts[0]);
   if (!exp || !isFinite(exp)) return {};
   if (exp - Date.now() > RENEW_BEFORE * 1000) return {};
-  const sess = await makeSession(secret, env);
+  /* ⭐⭐⭐ (R28 · FINDING-03) ⭐⭐⭐ التجديد لازم يكون بنفس نسخة الاعتماد ⭐⭐⭐
+     📌 قبل ⭐: `makeSession` ⭐ كانت بتحسب الوسم لحالها ⭐ ⇒ ⭐ نسخة مختلفة ⭐
+        ⇒ ⭐ جلسة جديدة بوسم غير المرجَّح ⭐ ⇒ ⛔ غير متسقة ⭐.
+     ✅ دلوقتي ⭐: نتحقق من النسخة الحالية ⭐ ⇒ ⭐ لو مستحيلة ⭐ ⇒ ⛔ مفيش تجديد ⭐
+        ⇒ ⭐ وإلا بنصدر بنفس الوسم اللي اتحقق منه ⭐. */
+  const currentTag = await credentialTag(env);
+  if (!currentTag || currentTag === TAG_UNVERIFIED) return {};
+  if (currentTag !== parts[1]) return {};
+  const sess = await makeSession(secret, env, currentTag);
+  if (!sess) return {};
   return {
     "Set-Cookie": `${COOKIE}=${encodeURIComponent(sess)}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL}`,
   };
@@ -1073,8 +1134,12 @@ export default {
             why: "state_unknown",
           }, 503);
         }
-        const ok = await verifyPanelPassword(env, pass);
-        if (ok === "state_unknown") {
+        /* ⭐⭐⭐ (R28 · FINDING-03) ⭐⭐⭐ قراءة واحدة ⭐ ⇒ تحقق + وسم ⭐
+           📌 السبب ⭐: ⛔ التحقق والوسم قراءتين ⭐ ⇒ ⛔ نافذة سباق ⭐
+              (جلسة مصرَّح بها بكلمة قديمة ⭐ + وسم جديد ⭐) ⭐.
+           ✅ دلوقتي ⭐: نفس القراءة ⭐ ⇒ ⭐ نفس نسخة الاعتماد ⭐. */
+        const vr = await verifyPanelPasswordWithTag(env, pass);
+        if (vr.status === "state_unknown") {
           console.error("[octa-mgmt] login: password state read failed (verify)");
           return json({
             ok: false,
@@ -1082,7 +1147,7 @@ export default {
             why: "state_unknown",
           }, 503);
         }
-        if (!ok) {
+        if (vr.status !== "ok") {
           noteFail(ip);
           const sh = await sharedAttempts(env, ip, "fail");
           if (sh && sh.locked) {
@@ -1105,7 +1170,17 @@ export default {
             revocation_source: "unavailable",
           }, 503);
         }
-        const sess = await makeSession(env.SESSION_SECRET, env);
+        /* ⭐⭐⭐ (R28 · FINDING-03) ⭐⭐⭐ الإصدار مرتبط بنسخة الاعتماد المتحقَّقة ⭐⭐⭐
+           📌 `makeSession` ⭐ ⛔ بترفض ⭐ لو مفيش وسم مؤكَّد ⭐ ⇒ ⛔ 503 ⭐. */
+        const sess = await makeSession(env.SESSION_SECRET, env, vr.tag);
+        if (!sess) {
+          console.error("[octa-mgmt] login: session issue refused (unverified tag)");
+          return json({
+            ok: false,
+            error: "متعذر التحقق من حالة الاعتماد — استخدم الاسترداد الطارئ",
+            why: "state_unknown",
+          }, 503);
+        }
         return json({ ok: true }, 200, {
           "Set-Cookie": `${COOKIE}=${encodeURIComponent(sess)}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL}`,
         });
