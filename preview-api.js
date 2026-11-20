@@ -258,7 +258,12 @@ async function issueSession(env, acct, device) {
 }
 
 async function readSession(env, request) {
-  const raw = readCookie(request, PREVIEW_COOKIE);
+  /* ⭐⭐⭐ (R28 · FINDING-09) ⭐⭐⭐ التوكن من الترويسة ⭐ (Bearer ⭐) ⭐
+     📌 التطبيق بيبعت الجلسة في `Authorization: Bearer` ⭐ (زي الإنتاج ⭐)
+        ⭐ والبوابة كمان ⭐ ⇒ ⛔ المعاينة كانت بتقرأ **الكوكي بس** ⭐
+        ⇒ ⛔ التطبيق ما يقدرش يوثّق نفسه ⭐ ⇒ ⛔ البوابة بتظهر دايماً ⭐.
+     ✅ دلوقتي ⭐: الكوكي ⭐ أو الترويسة ⭐ ⇒ نفس التوقيع ⭐ (HMAC ⭐). */
+  const raw = readCookie(request, PREVIEW_COOKIE) || bearerToken(request);
   if (!raw) return null;
   const dot = raw.lastIndexOf('.');
   if (dot < 1) return null;

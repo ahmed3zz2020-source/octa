@@ -101,6 +101,14 @@ const OVERFLOW_PROBE = `() => {
   const page = await ctx.newPage();
   const consoleErrors = [];
   page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(String(m.text()).slice(0, 160)); });
+  /* ⭐ سجل ردود الـAPI ⭐ (دليل ⭐ — بيكشف أي طلب رجّع 401/503 ⭐) */
+  const apiLog = [];
+  page.on('response', async (r) => {
+    if (r.url().indexOf('/api/') < 0) return;
+    let body = '';
+    try { body = (await r.text()).slice(0, 200); } catch (e) { body = ''; }
+    apiLog.push({ status: r.status(), path: r.url().replace(BASE, ''), body: body });
+  });
 
   console.log('═'.repeat(74));
   console.log('🌐 R28 · رحلة المتصفح الحقيقي — ' + BASE);
@@ -125,13 +133,42 @@ const OVERFLOW_PROBE = `() => {
   }
   /* ⭐ ضغط أرقام لوحة البوابة ⭐ */
   async function typePad(digits) {
+    /* ⭐ اللوحة بتعيد الرسم ⭐ وأزرارها بتتقفل أثناء الطلب ⭐
+       ⇒ ⛔ ضغطة واحدة ممكن تفشل ⭐ ⇒ نعيد المحاولة ⭐ */
     for (const d of String(digits).split('')) {
-      const k = await page.$(`.gt-key[data-k="${d}"]`);
-      if (!k) return false;
-      await k.click();
-      await page.waitForTimeout(140);
+      let hit = false;
+      for (let t = 0; t < 12 && !hit; t++) {
+        const k = await page.$(`.gt-key[data-k="${d}"]`);
+        if (k) {
+          try { await k.click({ timeout: 1200 }); hit = true; }
+          catch (e) { await page.waitForTimeout(250); }
+        } else {
+          await page.waitForTimeout(250);
+        }
+      }
+      await page.waitForTimeout(160);
     }
     return true;
+  }
+  /* ⭐ انتظار محدِّد ⭐ —/poll ⭐ (الانتظار الثابت بيسبّ أحياناً ⭐) */
+  async function waitFor(sel, ms) {
+    const limit = ms || 15000;
+    const step = 250;
+    for (let waited = 0; waited < limit; waited += step) {
+      const el = await page.$(sel);
+      if (el) return true;
+      await page.waitForTimeout(step);
+    }
+    return false;
+  }
+  /* ⭐ البوابة بتعمل تحويل ⭐ ⇒ ننتظر الـURL يخرج من gate.html ⭐ */
+  async function waitLeaveGate(ms) {
+    const limit = ms || 20000;
+    for (let waited = 0; waited < limit; waited += 300) {
+      if (page.url().indexOf('gate') === -1) return true;
+      await page.waitForTimeout(300);
+    }
+    return false;
   }
 
   const gate = { pad: false, codeAsked: false, codeFilled: false, newpin: false, done: false };
@@ -139,67 +176,91 @@ const OVERFLOW_PROBE = `() => {
   if (EMAIL && PIN) {
     await page.goto(BASE + '/gate.html', { waitUntil: 'domcontentloaded', timeout: 45000 });
     await page.waitForTimeout(1400);
-    if (REGISTER) {
-      /* ⭐ التسجيل من المتصفح ⭐ — حساب صناعي جديد ⭐
-         📌 لازم التسجيل يبقى **من المتصفح** ⭐: الجهاز بيتسجّل على
-            الحساب وقت التأكيد ⭐ ⇒ والدخول لازم بنفس الجهاز ⭐. */
-      const reg = await page.$('#gtReg');
-      if (reg) { await reg.click(); await page.waitForTimeout(700); }
-      const nameIn = await page.$('#gtName');
-      const mailIn = await page.$('#gtMail');
-      if (!nameIn || !mailIn) {
-        rec('gate · شاشة التسجيل ظهرت', false, { name: !!nameIn, mail: !!mailIn });
-      } else {
-        await page.fill('#gtName', 'رحلة R28');
-        await page.fill('#gtMail', EMAIL);
-        await page.click('#gtDo');
-        await page.waitForTimeout(2200);
-        gate.codeAsked = !!(await page.$('#gtCodeIn'));
-        const code = await mailboxCode(EMAIL);
-        if (code) {
-          await page.fill('#gtCodeIn', code);
-          gate.codeFilled = true;
-          await page.waitForTimeout(1600);
-        }
-        /* ⭐ شاشة «اختار ٤ أرقام» ⭐ */
-        if (await page.$('#gtNpBack')) {
-          gate.newpin = true;
-          gate.pad = await typePad(PIN);
-          await page.waitForTimeout(3000);
-        }
-        /* ⭐ «ادخل دلوقتي» ⇒ شاشة الدخول ⇒ نفس الأرقام (نفس الجهاز ⭐) */
-        const now = await page.$('#gtNow');
-        if (now) { await now.click(); await page.waitForTimeout(900); }
-        if (await page.$('#gtPad')) {
-          gate.pad = gate.pad || (await typePad(PIN));
-          await page.waitForTimeout(4000);
-        }
-      }
-    } else {
-      /* ① الشاشة الأولى ⇒ «عندك حساب؟ ادخل» */
-      const lb = await page.$('#gtLogin');
-      if (lb) { await lb.click(); await page.waitForTimeout(800); }
-      /* ② لوحة الأرقام ⇒ ٤ ضغطات */
-      gate.pad = await typePad(PIN);
-      await page.waitForTimeout(3500);
-      /* ③ لو طلب كود (جهاز جديد) ⇒ صندوق المعاينة ⇒ نكتبه */
-      if (await page.$('#gtCodeIn')) {
+    /* ⭐⭐⭐ آلة حالات ⭐⭐⭐ — البوابة فيها شاشات بتتبدّل ⭐
+       (تسجيل ⭐ ⇒ كود ⭐ ⇒ أرقام ⭐ ⇒ تم ⭐ ⇒ دخول ⭐ ⇒ التطبيق ⭐)
+       ⇒ ⛔ الانتظار الثابت بيفوّت ⭐ ⇒ نبص على الشاشة الحالية ⭐. */
+    /* ⭐ ضغطة آمنة ⭐ — البوابة بتعيد رسم الشاشة ⭐ ⇒ العنصر ممكن يdetach ⭐ */
+    const safeClick = async (sel) => {
+      try { await page.click(sel, { timeout: 3000 }); return true; }
+      catch (e) { return false; }
+    };
+    const safeFill = async (sel, val) => {
+      try { await page.fill(sel, val, { timeout: 3000 }); return true; }
+      catch (e) { return false; }
+    };
+    /* ⭐ البوابة بتعمل تحويل ⭐ ⇒ سياق التنفيذ ممكن يتمار ⭐ ⇒ ن catching ⭐ */
+    const has = async (sel) => {
+      try { return !!(await page.$(sel)); } catch (e) { return false; }
+    };
+    const screen = async () => ({
+      reg: await has('#gtReg'),
+      code: await has('#gtCodeIn'),
+      npin: await has('#gtNpBack'),
+      now: await has('#gtNow'),
+      pad: await has('#gtPad'),
+    });
+    const deadline = Date.now() + 90000;
+    let typed = 0;
+    let codeValue = '';
+    while (Date.now() < deadline) {
+      if (page.url().indexOf('gate') === -1) { gate.done = true; break; }
+      const s = await screen();
+      if (s.now) { await safeClick('#gtNow'); await page.waitForTimeout(700); continue; }
+      if (s.code) {
         gate.codeAsked = true;
-        const code = await mailboxCode(EMAIL);
-        if (code) {
-          await page.fill('#gtCodeIn', code);
-          gate.codeFilled = true;
-          await page.waitForTimeout(1200);
-          /* ④ شاشة «اختار ٤ أرقام» ⇒ نفس الرقم (flow.keepPin) */
-          if (await page.$('#gtNpBack')) {
-            gate.newpin = true;
-            await typePad(PIN);
-            await page.waitForTimeout(4000);
+        if (!gate.codeFilled) {
+          const code = await mailboxCode(EMAIL);
+          if (code) {
+            codeValue = code;
+            await safeFill('#gtCodeIn', code);
+            gate.codeFilled = true;
           }
         }
+        /* ⭐⭐⭐ لو الحقل ما اشتغلش ⭐ ⇒ نكتب الكود على اللوحة ⭐
+           ⛔ مهم ⭐: لازم نتأكد إننا **لسه على شاشة الكود** ⭐
+              ⇒ غير كده ⭐ نكتب الأرقام على **لوحة الباسورد** ⭐
+              ⇒ ⛔ والباسورد بيطلع غلط ⭐. */
+        if (gate.codeFilled && typed === 0) {
+          typed = 1;
+          await page.waitForTimeout(1500);
+          if (await has('#gtCodeIn')) { await typePad(codeValue); }
+        }
+        await page.waitForTimeout(500);
+        continue;
       }
+      if (s.npin) {
+        gate.newpin = true;
+        if (typed !== 2) { typed = 2; gate.pad = await typePad(PIN); }
+        await page.waitForTimeout(700);
+        continue;
+      }
+      if (s.pad) {
+        /* ⭐ شاشة الدخول ⭐ (pad ⭐ من غير شاشة الكود ⭐)
+           ⛔ لازم نضغط ⭐ — حتى لو ضغطنا قبل ⭐ (شاشة الباسورد ⭐) ⭐
+              ⇒ ⛔ short-circuit ⭐ كان بيمنع ضغطة الدخول ⭐. */
+        if (typed !== 3) { typed = 3; await typePad(PIN); gate.pad = true; }
+        await page.waitForTimeout(800);
+        continue;
+      }
+      if (s.reg && REGISTER) {
+        /* ⭐ الشاشة الأولى ⭐ ⇒ «إعمل حساب جديد» ⭐ */
+        await safeClick('#gtReg');
+        await page.waitForTimeout(700);
+        if (await has('#gtMail')) {
+          await safeFill('#gtName', 'رحلة R28');
+          await safeFill('#gtMail', EMAIL);
+          await safeClick('#gtDo');
+        }
+        await page.waitForTimeout(1200);
+        continue;
+      }
+      if (s.reg && !REGISTER) {
+        await safeClick('#gtLogin');
+        await page.waitForTimeout(800);
+        continue;
+      }
+      await page.waitForTimeout(500);
     }
-    await page.waitForTimeout(2500);
     const gateUrl = page.url().replace(BASE, '');
     gate.done = gateUrl.indexOf('gate') === -1;
     rec('gate · الدخول (لوحة الأرقام ⭐ ثم التطبيق ⭐)',
@@ -336,6 +397,7 @@ const OVERFLOW_PROBE = `() => {
     nav: nav,
     matrix: matrix,
     console_errors: consoleErrors.slice(0, 20),
+    api_log: apiLog.slice(0, 40),
     results: results,
     passed: results.filter((r) => r.ok).length,
     total: results.length,
@@ -343,7 +405,7 @@ const OVERFLOW_PROBE = `() => {
   fs.writeFileSync(path.join(OUT, 'browser-journey.json'),
     JSON.stringify(payload, null, 2), 'utf8');
   console.log('─'.repeat(74));
-  console.log('النتيجة: %d/%d' % (payload.passed, payload.total));
+  console.log(`النتيجة: ${payload.passed}/${payload.total}`);
   console.log('📄 ' + path.join(OUT, 'browser-journey.json'));
   await browser.close();
 })().catch((e) => {

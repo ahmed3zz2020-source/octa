@@ -573,3 +573,103 @@ test('FINDING-07 · مسار كتابة/إدارة غير مصرَّح ⇒ 501 (
     assert.equal(res.status, 501, 'المسار ' + p + ' ⇒ 501 ⭐');
   }
 });
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ⭐ FINDING-08 ⭐ — عقد المصادقة في المعاينة ⭐ (زي عقد التطبيق ⭐)
+   ═══════════════════════════════════════════════════════════════════════
+   📌 قبل ⭐: `signup/newpin` ⭐ كان بيطلب `{email, code, pin}` ⭐
+      ⭐ والتطبيق ⭐ بيبعت `{new_pin}` + `Authorization: Bearer <unlock>` ⭐
+      ⇒ ⛔ الواجهة الحقيقية ⭐ ما بتقدرش تكمّل signup ⭐ ولا استرجاع ⭐.
+   ✅ دلوقتي ⭐: `verify` ⭐ ⇒ `unlock` ⭐ ⇒ `newpin` ⭐ ⇒ جلسة ⭐.
+   ⛔ من غير توكن الفتح ⭐ ⇒ ⛔ 401 ⭐ (fail-closed ⭐).
+   ═══════════════════════════════════════════════════════════════════════ */
+async function previewSignup(env, doNs, email, pin, device) {
+  const start = await callApi(env, '/api/auth/signup/start', 'POST',
+    { name: 'r28', email: email });
+  assert.equal(start.status, 200);
+  let code = '';
+  for (const [k, v] of doNs.storage.map.entries()) {
+    if (k.indexOf('mail:') === 0 && v && v.email === email) code = String(v.code || '');
+  }
+  assert.ok(code, 'لازم يكون فيه كود في صندوق المعاينة ⭐');
+  const verify = await callApi(env, '/api/auth/signup/verify', 'POST',
+    { email: email, code: code });
+  return { start: start, verify: verify, code: code };
+}
+
+test('FINDING-08 · verify بيرجّع توكن فتح (عقد الإنتاج)', async () => {
+  const { env, doNs } = makePreviewEnv();
+  const s = await previewSignup(env, doNs, 'f08@example.test');
+  assert.equal(s.verify.status, 200);
+  assert.ok(s.verify.data.unlock, 'لازم يرجّع توكن فتح ⭐');
+  assert.ok(s.verify.data.expires_in > 0, 'لازم يبقى فيه مهلة ⭐');
+});
+
+test('FINDING-08 · newpin من غير توكن فتح ⇒ 401 (fail-closed)', async () => {
+  const { env, doNs } = makePreviewEnv();
+  await previewSignup(env, doNs, 'f08b@example.test');
+  const r = await callApi(env, '/api/auth/signup/newpin', 'POST',
+    { new_pin: '2468', device: 'device-f08b-0001' });
+  assert.equal(r.status, 401);
+  assert.equal(r.data.why, 'unlock_expired');
+});
+
+test('FINDING-08 · newpin بالقالب القديم (إيميل + كود) بلا توكن ⇒ 401', async () => {
+  const { env, doNs } = makePreviewEnv();
+  const s = await previewSignup(env, doNs, 'f08c@example.test');
+  const r = await callApi(env, '/api/auth/signup/newpin', 'POST',
+    { email: 'f08c@example.test', code: s.code, pin: '2468', device: 'device-f08c-0001' });
+  assert.equal(r.status, 401, '⛔⛔⛔ القالب القديم لازم يكون مقفول ⭐');
+});
+
+test('FINDING-08 · newpin بتوكن فتح + new_pin ⇒ حساب + جلسة', async () => {
+  const { env, doNs } = makePreviewEnv();
+  const s = await previewSignup(env, doNs, 'f08d@example.test');
+  const r = await callApi(env, '/api/auth/signup/newpin', 'POST',
+    { new_pin: '2468', device: 'device-f08d-0001' },
+    { Authorization: 'Bearer ' + s.verify.data.unlock });
+  assert.equal(r.status, 200);
+  assert.ok(r.data.token, 'لازم يطلع توكن جلسة ⭐');
+  const me = await callApi(env, '/api/auth/me', 'GET', undefined,
+    { Cookie: (r.headers.get('Set-Cookie') || '').split(';')[0] });
+  assert.equal(me.status, 200);
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ⭐ FINDING-09 ⭐ — جلسة المعاينة من الترويسة (Bearer) ⭐ زي الإنتاج ⭐
+   ═══════════════════════════════════════════════════════════════════════
+   📌 قبل ⭐: المعاينة كانت بتقرأ **الكوكي بس** ⭐ ⇒ ⛔ التطبيق ⭐
+      (بيبعت `Authorization: Bearer` ⭐) ⭐ ما يقدرش يوثّق نفسه ⭐
+      ⇒ ⛔ البوابة بتظهر على طول ⭐ ⇒ ⛔ المعاينة **مش قابلة للاستخدام** ⭐.
+   ═══════════════════════════════════════════════════════════════════════ */
+test('FINDING-09 · /api/auth/me بترويسة Bearer من غير كوكي ⇒ 200', async () => {
+  const { env, doNs } = makePreviewEnv();
+  const s = await previewSignup(env, doNs, 'f09@example.test');
+  const np = await callApi(env, '/api/auth/signup/newpin', 'POST',
+    { new_pin: '1357', device: 'device-f09-00001' },
+    { Authorization: 'Bearer ' + s.verify.data.unlock });
+  assert.equal(np.status, 200);
+  const token = np.data.token;
+  const me = await callApi(env, '/api/auth/me', 'GET', undefined,
+    { Authorization: 'Bearer ' + token });
+  assert.equal(me.status, 200, 'لازم التوكن من الترويسة يقبل ⭐');
+  assert.equal(me.data.user.email, 'f09@example.test');
+});
+
+test('FINDING-09 · توكن مزوّر في الترويسة ⇒ 401', async () => {
+  const { env } = makePreviewEnv();
+  const me = await callApi(env, '/api/auth/me', 'GET', undefined,
+    { Authorization: 'Bearer eyJ1aWQiOiJ4In0.forged' });
+  assert.equal(me.status, 401, '⛔⛔⛔ توكن مزوّر لازم يترفض ⭐');
+});
+
+test('FINDING-09 · الكوكي لسه شغّال (مفيش رجوع لورا)', async () => {
+  const { env, doNs } = makePreviewEnv();
+  const s = await previewSignup(env, doNs, 'f09b@example.test');
+  const np = await callApi(env, '/api/auth/signup/newpin', 'POST',
+    { new_pin: '8642', device: 'device-f09b-0001' },
+    { Authorization: 'Bearer ' + s.verify.data.unlock });
+  const cookie = (np.headers.get('Set-Cookie') || '').split(';')[0];
+  const me = await callApi(env, '/api/auth/me', 'GET', undefined, { Cookie: cookie });
+  assert.equal(me.status, 200);
+});
