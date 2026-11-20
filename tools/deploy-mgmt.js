@@ -76,6 +76,13 @@ async function api(pathname, opts = {}) {
 let blake3 = null;
 async function loadBlake3() {
   if (blake3) return blake3;
+  /* ⭐ R28 ⭐: مجلد node_modules المحلي ⭐ أولًا ⭐
+     📌 السبب ⭐: ذاكرة npm المؤقتة (_npx) مش موجودة في كل بيئة ⭐
+       ⇒ أداة النشر كانت بتطيح رغم إن الحزمة متاحة محليًا ⭐. */
+  const local = path.join(__dirname, '..', 'node_modules', 'blake3-wasm');
+  if (fs.existsSync(local)) {
+    try { blake3 = require(local); return blake3; } catch (e) { blake3 = null; }
+  }
   const roots = ['/workspace/.home/.npm/_npx', path.join(process.env.HOME || '/root', '.npm/_npx')];
   for (const r of roots) {
     if (!fs.existsSync(r)) continue;
