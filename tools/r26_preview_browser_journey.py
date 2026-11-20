@@ -111,12 +111,15 @@ def main():
             headers: {'Content-Type': 'application/json'}, credentials: 'include',
             body: JSON.stringify({email: email, code: code})});
           const vj = await v.json();
+          const dev = 'browser-device-' + Date.now() + '-' + email.length;
+          window.__r26Device = dev;
           const n = await fetch('/api/auth/signup/newpin', {method: 'POST',
             headers: {'Content-Type': 'application/json'}, credentials: 'include',
             body: JSON.stringify({email: email, code: code, pin: '2468',
-                                  device: 'browser-device-' + Date.now()})});
-          return {status: n.status, needs_pin: vj.needs_pin, code: code};
+                                  device: dev})});
+          return {status: n.status, needs_pin: vj.needs_pin, code: code, device: dev};
         }""", email)
+        device_used = signup.get("device") or ""
         ok(signup.get("status") == 200,
            "①ج اتعمل حساب تجريبي من جوّه المتصفح ⭐", signup.get("status"))
 
@@ -203,9 +206,9 @@ def main():
         again = page.evaluate("""async () => {
           const r = await fetch('/api/auth/pin/login', {method: 'POST',
             headers: {'Content-Type': 'application/json'}, credentials: 'include',
-            body: JSON.stringify({pin: '%s'})});
+            body: JSON.stringify({pin: '%s', device: '%s'})});
           return {status: r.status, body: await r.text()};
-        }""" % pin)
+        }""" % (pin, device_used))
         page.wait_for_timeout(1500)
         cookies3 = [c["name"] for c in ctx.cookies()]
         shot("14-login-again")

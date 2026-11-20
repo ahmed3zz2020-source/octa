@@ -19,6 +19,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { scan } = require('./lib/leakscan.js');
+/* ⭐ (R26) ⭐ موك الـDurable Object ⭐ (لازم ⭐ — العامل fail-closed ⭐) */
+const { makeDO, sessionCookie: buildSessionCookie } = require('./lib/domock.js');
 
 const MGMT = path.join(__dirname, '..');
 const WORKER = process.env.MGMT_WORKER || path.join(MGMT, 'worker.js');
@@ -46,6 +48,10 @@ function makeEnv() {
     SESSION_SECRET: SECRET,
     APP_PASSWORD: PASSWORD,
     OCTA_ADMIN_TOKEN: ADMIN_TOKEN,
+    /* ⭐ (R26) ⭐ الـDO ⭐ — العامل ⭐ fail-closed ⭐ ⇒ ⛔ من غيره ⛔ 503 ⭐ */
+    REVOKE_DO: makeDO(),
+    /* ⭐ بيئة اختبار ⭐ (مش إنتاج ⭐ ⇒ ⛔ ما فيش قفل على مصدر الإبطال ⭐) */
+    APP_ENV: 'test',
     ASSETS: {
       async fetch(req) {
         const u = new URL(req.url);
@@ -66,10 +72,11 @@ function makeEnv() {
   };
 }
 
+/* ⭐⭐⭐ (R26) ⭐ التوقيع بقى يشمل **بصمة الاعتماد** ⭐
+   📌 ⛔ قبل ⭐: التوقيع على `exp` بس ⭐ ⇒ ⛔ البصمة ما كانتش متحققة ⭐.
+   ✅ دلوقتي ⭐: `exp + "." + tag` ⭐ ⇒ ⭐ تغيير كلمة المرور ⭐ ⛔ يبطل الكل ⭐. */
 function sessionCookie(nowMs) {
-  const exp = String(nowMs + 3600 * 1000);
-  const sig = crypto.createHmac('sha256', SECRET).update(exp).digest('hex');
-  return 'octa_mgmt_sess=' + encodeURIComponent(exp + '.' + sig);
+  return buildSessionCookie(SECRET, PASSWORD, nowMs, '0');
 }
 
 function req(pathname, opts) {
