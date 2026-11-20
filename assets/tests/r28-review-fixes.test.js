@@ -538,3 +538,38 @@ test('FINDING-03 · لا إحياء لجلسة قديمة بعد ضياع حال
     { headers: { Cookie: 'octa_mgmt_sess=' + encodeURIComponent(cookie) } }), env);
   assert.notEqual(res.status, 200, 'الجلسة القديمة لازم ترفض بعد ضياع الحالة ⭐');
 });
+
+/* ══════════════════════════════════════════════════════════════════════
+   ⭐ FINDING-07 ⭐ — مسارات القراءة تروح للـbackend ⭐ (والحالة معزولة ⭐)
+   ══════════════════════════════════════════════════════════════════════ */
+test('FINDING-07 · مسار قراءة ⇒ يستمر للـbackend (مش 501)', async () => {
+  const { env } = makePreviewEnv();
+  const res = await handlePreviewApi({
+    request: new Request('https://preview.invalid/api/radar/universe'),
+    env: env, url: new URL('https://preview.invalid/api/radar/universe'),
+  });
+  assert.equal(res, null, 'لازم يستمر للـworker (⇒ للـbackend) ⭐');
+});
+
+test('FINDING-07 · مسارات الحالة تبقى في المعاينة (مافيش مرور)', async () => {
+  const { env } = makePreviewEnv();
+  for (const p of ['/api/portfolio', '/api/alerts/state', '/api/auth/me']) {
+    const res = await handlePreviewApi({
+      request: new Request('https://preview.invalid' + p),
+      env: env, url: new URL('https://preview.invalid' + p),
+    });
+    assert.ok(res !== null, 'المسار ' + p + ' لازم يبقى في المعاينة ⭐');
+  }
+});
+
+test('FINDING-07 · مسار كتابة/إدارة غير مصرَّح ⇒ 501 (مافيش إنترنت)', async () => {
+  const { env } = makePreviewEnv();
+  for (const p of ['/api/admin/users', '/api/billing/subscribe', '/api/auth/delete']) {
+    const res = await handlePreviewApi({
+      request: new Request('https://preview.invalid' + p, { method: 'POST' }),
+      env: env, url: new URL('https://preview.invalid' + p),
+    });
+    assert.ok(res, 'المسار ' + p + ' لازم يبقى مرفوض ⭐');
+    assert.equal(res.status, 501, 'المسار ' + p + ' ⇒ 501 ⭐');
+  }
+});

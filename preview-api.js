@@ -284,6 +284,34 @@ async function checkChallenge(env, uid, code) {
   return { ok: true, rec: rec };
 }
 
+/* ⭐⭐⭐ (R28 · FINDING-07) ⭐⭐⭐ المسارات اللي توصل للـbackend ⭐⭐⭐
+   📌 قائمة **قراءة فقط** ⭐ ⇒ ⭐ المعاينة ما تكتبش على الإنتاج ⭐ ⭐
+     📌 حالة المعاينة (الحسابات ⭐ والجلسات ⭐ والمحفظة ⭐ والتنبيهات ⭐)
+        ⇒ ⭐ باقية في المخزن القوي الخاص بالمعاينة ⭐ (مافيش اكتشاف ⭐).
+   📌 ⛔ أي مسار مش في القائمة ⭐ ⇒ ⛔ مافيش إنترنت ⭐ (fail-closed ⭐). */
+const BACKEND_READONLY_EXACT = new Set([
+  '/api/health', '/api/analyze', '/api/bench', '/api/strategies', '/api/rank',
+  '/api/ranking', '/api/stats', '/api/sector-stats', '/api/dividends',
+  '/api/zones', '/api/track', '/api/preflight', '/api/engine-weights',
+  '/api/tvquote', '/api/tvscan', '/api/tvlogo', '/api/tvcandles',
+  '/api/gold', '/api/opp/strategies', '/api/opp/summary',
+  '/api/opp/list', '/api/opp/detail', '/api/opp/explain',
+  '/api/indices/compare', '/api/charts/list', '/api/setups',
+]);
+const BACKEND_READONLY_PREFIX = [
+  '/api/gold/', '/api/candles/', '/api/tvlogo/', '/api/fundamental/',
+  '/api/technical/', '/api/risk/', '/api/alpha/', '/api/radar/',
+  '/api/indices/', '/api/opp/', '/api/opportunity/', '/api/strategy/',
+  '/api/charts/', '/api/usd/', '/api/explain/', '/api/calendar',
+];
+function isBackendReadOnly(path) {
+  if (BACKEND_READONLY_EXACT.has(path)) return true;
+  for (const pre of BACKEND_READONLY_PREFIX) {
+    if (path.indexOf(pre) === 0) return true;
+  }
+  return false;
+}
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PIN_RE = /^\d{4}$/;
 
@@ -758,6 +786,15 @@ async function handlePreviewApi(opts) {
 
   /* ── مسارات المعاينة غير المغطّاة ⇒ رد صريح (مافيش 503 غامض) ⭐ */
   if (p.startsWith('/api/')) {
+    /* ⭐⭐⭐ (R28 · FINDING-07) ⭐⭐⭐ مسارات الباك الحقيقي ⭐⭐⭐
+       📌 قبل ⭐: كل مسار غير مغطّى ⭐ ⇒ 501 ⭐ ⇒ ⭐ المعاينة كانت **معزولة عن البيانات** ⭐.
+       ✅ دلوقتي ⭐: مسارات **قراءة فقط** ⭐ ⇒ ⭐ تروح للـbackend الحقيقي ⭐
+          (عبر `OCTA_API_URL` ⭐ + `OCTA_PROXY_SECRET` ⭐) ⭐
+          ⇒ ⭐ والمعاينة تفضل معزولة في **الحالة** ⭐:
+             ⭐ الحسابات ⭐ والجلسات ⭐ والمحفظة ⭐ والتنبيهات ⭐
+             ⇒ ⭐ ما بتوصلش لاستدعاء بيكتب على الإنتاج ⭐.
+       ⛔ أي مسار تاني ⭐ ⇒ ⛔ مافيش إنترنت ⭐ (fail-closed ⭐). */
+    if (isBackendReadOnly(p)) return null;   /* ⭐ يستمر للـbackend الحقيقي ⭐ */
     return json({
       ok: false, error: 'preview_route_not_implemented',
       why: 'المسار ده مش متاح في المعاينة المعزولة ⭐',
