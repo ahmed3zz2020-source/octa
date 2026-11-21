@@ -162,7 +162,7 @@ async function mailboxCode(env, email) {
   return (r.body && r.body.code) ? r.body.code : '';
 }
 
-/* ⭐ تسجيل كامل ⭐ ⇒ ⭐账号 جاهز ⭐ (+باسورد ⭐) */
+/* ⭐ تسجيل كامل ⭐ ⇒ ⭐ الحساب جاهز ⭐ (+باسورد ⭐) */
 async function register(env, email, pin, device) {
   await call(env, '/api/auth/signup/start', { method: 'POST', json: { name: 'x', email: email } });
   const code = await mailboxCode(env, email);
