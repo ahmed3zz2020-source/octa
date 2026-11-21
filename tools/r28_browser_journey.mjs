@@ -322,8 +322,16 @@ function redactBody(text) {
       }
       await page.waitForTimeout(500);
     }
-    /* ⭐⛔ التحويل ممكن يتأخر ⭐ ⇒ ننتظره قبل الحكم ⭐ */
-    if (gateUrl0.indexOf('gate') !== -1) await waitLeaveGate(15000);
+    /* ⭐⭐⭐ (R29) ⭐⭐⭐ التحويل ممكن يتأخر ⭐⭐⭐
+       📌 السبب ⭐: ⛔ `gateUrl0` ⭐ كان معرّف **من غير ما يتعيّن** ⭐
+          ⇒ ⛔ `waitLeaveGate()` ⭐ ما كانتش بتتنفّذ ⭐ خالص ⭐
+          ⇒ ⛔ الحكم كان بيتعمل **قبل** التحويل ⭐ ⇒ ⛔ «البوابة ما خرجتش» ⭐
+          ⇒ ⛔ مع إن الجلسة اتعملت فعلاً ⭐ (الـ`/api/auth/me` رجّع 200 ⭐).
+       ✅ دلوقتي ⭐: ⛔ نسجّل عنوان البوابة **وقت الدخول** ⭐
+          ⇒ ⭐ لو فضلنا على `/gate.html` ⭐ ⇒ ⭐ ننتظر التحويل ⭐ (١٥ ثانية ⭐)
+          ⇒ ⭐ والحكم بيتم على العنوان **بعد** الانتظار ⭐. */
+    gateUrl0 = page.url();
+    if (gateUrl0.indexOf('gate') !== -1) await waitLeaveGate(20000);
     const gateUrl = page.url().replace(BASE, '');
     gate.done = gateUrl.indexOf('gate') === -1;
     rec('gate · الدخول (لوحة الأرقام ⭐ ثم التطبيق ⭐)',
@@ -485,6 +493,21 @@ function redactBody(text) {
     const eg = document.getElementById('egy-gold-modal');
     if (eg) { const c = eg.querySelector('[data-close]'); if (c) c.click(); }
     await new Promise((r) => setTimeout(r, 600));
+    /* ⭐⭐⭐ (R29) ⭐⭐⭐ نقفل مودال الذهب العام لو مفتوح ⭐⭐⭐
+       📌 السبب ⭐: ⛔ `openGold()` ⭐ في `octa-gold.js` ⭐ بتعمل
+          `if (OPEN) return;` ⭐ ⇒ ⛔ لو المودال مفتوح ⭐
+          ⇒ ⛔ الطلب الثاني **ما بيقدرش** يعيد الرسم ⭐
+          ⇒ ⛔ المودال بيفضل على تبويب «الادخار» ⭐
+          ⇒ ⛔ مافيش `.gevs .gev` ⭐ (الأحداث ⭐) ⭐
+          ⇒ ⛔ مافيش `.gchart` ⭐ (الشارت ⭐) ⭐ ⇒ ⛔ ملء الشاشة مالوش حاوية ⭐.
+       ✅ دلوقتي ⭐: نقفل المودال ⭐ ⇒ ⛔ `OPEN=false` ⭐ ⇒ ⛔ ونفتحه تاني ⭐
+          ⇒ ⭐ التبويب الافتراضي «السرد» ⭐ ⇒ ⭐ الأحداث ⭐ + ⭐ الشارت ⭐. */
+    const gm = document.getElementById('gmv');
+    if (gm) {
+      const gc = gm.querySelector('.gclose[data-close], [data-close]');
+      if (gc) gc.click();
+    }
+    await new Promise((r) => setTimeout(r, 900));
     try {
       if (typeof window.openGoldIntel === 'function') window.openGoldIntel();
       else if (typeof window.openGold === 'function') window.openGold();
@@ -495,11 +518,11 @@ function redactBody(text) {
        ✅ دلوقتي ⭐: ⛔ ننتظر لحد ما الأحداث **تظهر** ⭐ (أو نف time out ⭐). */
     await new Promise((r) => setTimeout(r, 2000));
     for (let w = 0; w < 40; w++) {
-      const m0 = document.querySelector('#octa-gold-modal') || document.querySelector('.gmodal');
+      const m0 = document.getElementById('gmv');
       if (m0 && m0.querySelectorAll('.gevs .gev').length) break;
       await new Promise((r) => setTimeout(r, 1000));
     }
-    const modal = document.querySelector('#octa-gold-modal') || document.querySelector('.gmodal');
+    const modal = document.getElementById('gmv');
     if (!modal) { out.modalMissing = true; return out; }
     const evs = modal.querySelectorAll('.gevs .gev');
     out.events = evs.length;
@@ -515,7 +538,12 @@ function redactBody(text) {
       const hosts = Array.from(modal.querySelectorAll('.gchart, .gmodal, .gpanel'))
         .map((e) => String(e.className || '')).join(' | ');
       out.fsClass = String(document.body.className || '') + ' || ' + hosts;
-      out.fullscreen = /octa-tv-fs/.test(out.fsClass);
+      /* ⭐⭐⭐ (R29) ⭐⭐⭐ صنف الـhost ⭐⭐⭐
+         📌 `tv-shim.js` ⭐: `FS_CLASS='octa-tv-fs'` ⭐ على الحاوية ⭐
+            + `FS_BODY='octa-tv-fs-on'` ⭐ على الـbody ⭐
+         ⇒ ⭐ نقيس الاتنين ⭐ (الـbody لوحده ممكن يتغيّر قبل الشارت ⭐). */
+      out.fullscreen = /octa-tv-fs/.test(out.fsClass)
+        && !!modal.querySelector('.gchart.octa-tv-fs, .gchart[class*="octa-tv-fs"]');
     }
     return out;
   });

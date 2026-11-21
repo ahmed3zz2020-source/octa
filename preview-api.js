@@ -289,6 +289,19 @@ async function bumpAttempts(env, kind, id) {
   await storePut(env, key, rec, LOCK_TTL_SEC * 2);
   return rec;
 }
+/* ⭐⭐⭐ (R29 · FINDING-20) ⭐⭐⭐ تصفير العدّاد ⭐⭐⭐
+   📌 السبب ⭐: ⛔ مسار **النجاح** ⭐ ⭐ كان بينادي `bumpAttempts` ⭐ ⭐
+      ⇒ ⛔ **يزوّد** ⭐ ⭐ العدّاد ⭐ ⭐ ⇒ ⛔ بعد ٥ محاولات **ناجحة** ⭐ ⭐
+      ⇒ ⛔ القفل بيتفعّل ⭐ ⭐ (١٥ دقيقة ⭐ ⭐) ⇒ ⛔ مستخدم شرعي ⭐
+      ⇒ ⛔ بيقفل **نفسه** ⭐ ⭐ ⇒ ⛔ وكمان ⭐ ⭐ الحسابات بتشارك نفس العدّاد ⭐ ⭐
+      (مفتاح العدّاد ⭐ = هاش الباسورد ⭐ ⭐) ⭐ ⭐ ⇒ ⛔ حساب ⭐ ⭐ بيقفل التاني ⭐ ⭐.
+   ✅ دلوقتي ⭐: ⭐ تصفير ⭐ ⭐ (حذف السجل ⭐ ⭐) ⭐ ⭐ بعد نجاح ⭐ ⭐.
+      ⭐ ⭐ والدليل ⭐ ⭐: ⭐ الـjourney ⭐ ⭐ رجّع 429 ⭐ ⭐ على محاولات ⭐ ⭐
+      ⭐ ⭐ ناجحة ⭐ ⭐ متتالية ⭐ ⭐ ⇒ ⭐ ⭐ قفل ذاتي ⭐ ⭐ لِمستخدم شرعي ⭐ ⭐. */
+async function resetAttempts(env, kind, id) {
+  await storeDel(env, lockKey(kind, id));
+  return true;
+}
 
 /* ── الجلسات ──────────────────────────────────────────────────────────── */
 /* ⭐⭐⭐ (R29 · FINDING-12) ⭐⭐⭐ تجهيز الجلسة (بلا كتابة ⭐) ⭐⭐⭐
@@ -727,8 +740,13 @@ async function handlePreviewApi(opts) {
       return json({ ok: false, error: 'الباسورد غلط أو الجهاز مش مسجّل',
         why: 'bad_pin_or_device' }, 401);
     }
-    /* ⭐ كلمة المرور صح ⭐ ⇒ ⭐ العدّاد يتصفّر ⭐ */
-    await bumpAttempts(env, 'pin', pinHash);
+    /* ⭐⭐⭐ (R29 · FINDING-20) ⭐⭐⭐ كلمة المرور صح ⭐ ⇒ ⭐ **العدّاد يتصفّر** ⭐⭐⭐
+       📌 قبل ⭐: ⛔ `bumpAttempts` ⭐ ⭐ ⭐ **يزوّد** ⭐ ⭐ ⭐ ⇒ ⛔ قفل ذاتي ⭐ ⭐
+          ⭐ ⭐ (٥ محاولات ناجحة ⭐ ⭐ ⇒ ١٥ دقيقة قفل ⭐ ⭐).
+       ✅ دلوقتي ⭐: ⭐ `resetAttempts` ⭐ ⭐ ⇒ ⭐ العدّاد **بيصفّر** ⭐ ⭐.
+       ⛔ عدّاد الـIP ⭐ ⭐ **مش** بنصفّره ⭐ ⭐ ⇒ ⭐ ده عدّاد المحاولات
+          ⭐ ⭐ **الفاشلة** ⭐ ⭐ (حماية من التخمين ⭐ ⭐). ⭐ */
+    await resetAttempts(env, 'pin', pinHash);
     const token = await issueSession(env, found, device);
     if (!token) {
       return json({ ok: false, error: 'تعذّر تسجيل الجلسة',
