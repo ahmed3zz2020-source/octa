@@ -38,6 +38,14 @@ const OUT = argOf('out', '/tmp/r28-journey');
 const EMAIL = argOf('email', '');
 const PIN = argOf('pin', '');
 const HEADED = args.includes('--headed');
+/* ⭐⭐⭐ (R32) ⭐⭐⭐ زرع **رقم جهاز** معروف ⭐ ⭐ (حساب اختبار ⭐ ⭐)
+   📌 ليه ⭐: ⭐ ⭐ رقم الجهاز ⭐ ⭐ (bioSecret ⭐ ⭐) ⭐ ⭐ عشوائي ⭐ ⭐ وبيتخزّن ⭐ ⭐
+      ⭐ ⭐ في localStorage ⭐ ⭐ ⇒ ⭐ ⭐ كل تشغيل ⭐ ⭐ = جهاز جديد ⭐ ⭐ ⇒ ⭐ ⭐ لازم
+      ⭐ ⭐ كود ⭐ ⭐ (مفتاح الصندوق ⭐ ⭐ مش متاح ⭐ ⭐) ⭐ ⭐.
+   ✅ الحل ⭐: ⭐ --device ⭐ ⭐ ⇒ ⭐ ⭐ نزرع الرقم ⭐ ⭐ ⇒ ⭐ ⭐ حساب الاختبار ⭐ ⭐
+      ⭐ ⭐ المسجّل ⭐ ⭐ يدخل ⭐ ⭐ **من غير كود** ⭐ ⭐.
+   ⛔ مافيش تغيير ⭐ ⭐ في ⭐ ⭐ أي تأكيد ⭐ ⭐ (الزرع ⭐ ⭐ قبل المسح ⭐ ⭐ بس ⭐ ⭐). */
+const DEVICE = argOf('device', '');
 
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -158,6 +166,16 @@ function redactBody(text) {
     userAgent: 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
       + '(KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36',
   });
+  /* ⭐⭐⭐ (R32) ⭐⭐⭐ زرع رقم الجهاز ⭐ ⭐ (قبل أي تنقّل ⭐ ⭐) ⭐ */
+  if (DEVICE) {
+    await ctx.addInitScript((dev) => {
+      try {
+        localStorage.setItem('octa_bio_key', dev);
+        document.cookie = 'octa_bio_ck=' + dev + '; path=/; max-age=31536000; SameSite=Lax';
+      } catch (e) { }
+    }, DEVICE);
+    console.log('🔑 رقم الجهاز اتزرع ⭐ (حساب اختبار ⭐)');
+  }
   const page = await ctx.newPage();
   const consoleErrors = [];
   page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(String(m.text()).slice(0, 160)); });
