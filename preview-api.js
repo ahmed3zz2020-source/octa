@@ -284,14 +284,18 @@ async function lockState(env, kind, id) {
 }
 async function bumpAttempts(env, kind, id) {
   const key = lockKey(kind, id);
-  const rec = (await storeGet(env, key)) || { count: 0, until: 0 };
-  rec.count = (rec.count || 0) + 1;
-  if (rec.count >= MAX_ATTEMPTS) {
-    rec.until = nowSec() + LOCK_TTL_SEC;
-    rec.count = 0;
-  }
-  await storePut(env, key, rec, LOCK_TTL_SEC * 2);
-  return rec;
+  /* ⭐⭐⭐ (R32) ⭐⭐⭐ الزيادة **ذرّية** ⭐⭐⭐
+     📌 قبل ⭐: ⛔ قراءة ⭐ + تعديل ⭐ + كتابة ⭐ ⭐ ⭐ في ٣ عمليات ⭐ ⭐ ⭐
+        ⭐ ⭐ ⇒ ⛔ طلبان متزامنان ⭐ ⭐ ⭐ بيضيع منهم زيادة ⭐ ⭐ ⭐
+        ⭐ ⭐ ⇒ ⛔ حدّ المحاولات ⭐ ⭐ ⭐ بيتخطّى ⭐ ⭐ ⭐ بالتوازي ⭐ ⭐ ⭐.
+     ✅ دلوقتي ⭐: ⭐ عملية واحدة ⭐ ⭐ ⭐ جوه الـDO ⭐ ⭐ ⭐ (op=lock_bump ⭐)
+        ⭐ ⭐ ⭐ ⇒ ⭐ مافيش lost update ⭐ ⭐ ⭐. */
+  const r = await storeCmd(env, {
+    op: 'lock_bump', key: key, max: MAX_ATTEMPTS,
+    lockTtl: LOCK_TTL_SEC, ttl: LOCK_TTL_SEC * 2
+  });
+  if (!r || !r.value) return { count: 0, until: 0 };
+  return r.value;
 }
 /* ⭐⭐⭐ (R29 · FINDING-20) ⭐⭐⭐ تصفير العدّاد ⭐⭐⭐
    📌 السبب ⭐: ⛔ مسار **النجاح** ⭐ ⭐ كان بينادي `bumpAttempts` ⭐ ⭐
@@ -768,7 +772,19 @@ async function handlePreviewApi(opts) {
        ✅ دلوقتي ⭐: ⭐ `resetAttempts` ⭐ ⭐ ⇒ ⭐ العدّاد **بيصفّر** ⭐ ⭐.
        ⛔ عدّاد الـIP ⭐ ⭐ **مش** بنصفّره ⭐ ⭐ ⇒ ⭐ ده عدّاد المحاولات
           ⭐ ⭐ **الفاشلة** ⭐ ⭐ (حماية من التخمين ⭐ ⭐). ⭐ */
+    /* ⭐⭐⭐ (R32) ⭐⭐⭐ تصفير **عدّاد الـIP** ⭐ ⭐ ⭐ كمان ⭐ ⭐ ⭐
+       📌 قبل ⭐: ⛔ العدّاد بينضّف ⭐ ⭐ ⭐ على **الباسورد** ⭐ ⭐ ⭐ بس ⭐ ⭐ ⭐
+          ⭐ ⭐ ⭐ ⇒ ⛔ عدّاد الـIP ⭐ ⭐ ⭐ بيفضل ⭐ ⭐ ⭐ من أول ٤ محاولات ⭐ ⭐ ⭐
+          ⭐ ⭐ ⭐ ⇒ ⛔ أول محاولة غلط ⭐ ⭐ ⭐ بعدها ⭐ ⭐ ⭐ ⇒ ⛔ قفل ١٥ دقيقة ⭐ ⭐ ⭐
+          ⭐ ⭐ ⭐ لمستخدم شرعي ⭐ ⭐ ⭐ دخل صح ⭐ ⭐ ⭐.
+       ✅ دلوقتي ⭐: ⭐ نصفّر **الاتنين** ⭐ ⭐ ⭐ (الباسورد ⭐ + الـIP ⭐) ⭐ ⭐ ⭐
+          ⭐ ⭐ ⭐ ⇒ ⭐ ⭐ نفس سلوك الإنتاج ⭐ ⭐ ⭐ (update_prices.py ⭐ ⭐ ⭐
+          ⭐ ⭐ ⭐ `_pin_window_reset(keys)` ⭐ ⭐ ⭐ بيمسح الباسورد ⭐ والـIP ⭐) ⭐ ⭐ ⭐.
+       📌 الحماية من التخمين ⭐ ⭐ ⭐ بتفضل شغالة ⭐ ⭐ ⭐: ⭐ العدّاد بيتزناد ⭐ ⭐ ⭐
+          ⭐ ⭐ ⭐ **فقط** ⭐ ⭐ ⭐ عند فشل ⭐ ⭐ ⭐ (والباسورد صح ⭐ ⭐ ⭐ +
+          ⭐ ⭐ ⭐ جهاز غريب ⭐ ⭐ ⭐ ⭐ ⇒ ⭐ ⭐ ⭐ صفر خصم ⭐ ⭐ ⭐ من R31 ⭐ ⭐ ⭐) ⭐ ⭐ ⭐. */
     await resetAttempts(env, 'pin', pinHash);
+    await resetAttempts(env, 'ip', await sha256hex(ip));
     /* ⭐⭐⭐ (R31) ⭐⭐⭐ إثوث البصمة ⭐⭐⭐ — **نفس الجهاز** ⭐ + وقت حديث ⭐
        📌 لازم البصمة (لو اتفتحت ⭐) ⇒ ⭐ لازم PIN صح ⭐ **على نفس الجهاز** ⭐
           ⭐ ⇒ ⭐ فبصمة الجهاز لوحدها ⭐ ⭐ مابتعملش جلسة ⭐ ⭐.

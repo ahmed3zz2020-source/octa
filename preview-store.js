@@ -143,6 +143,32 @@ export class PreviewStore {
         await st.delete(key);
         return jsonOut({ ok: true });
       }
+      /* ⭐⭐⭐ (R32) ⭐⭐⭐ زيادة العدّاد **ذرّية** ⭐⭐⭐
+         📌 العيب ⭐: ⛔ `bumpAttempts` ⭐ ⭐ كان **قراءة ⭐ + تعديل ⭐ + كتابة ⭐**
+            ⭐ ⭐ في **ثلاث** عمليات ⭐ ⭐ ⇒ ⛔ طلبان متزامنان ⭐ ⭐
+            ⭐ ⭐ بيقراو نفس العدد ⭐ ⭐ ⇒ ⛔ الزيادة بتضيع ⭐ ⭐
+            ⭐ ⭐ ⇒ ⛔ حدّ المحاولات (٥ ⭐ ⭐) ⭐ ⭐ بيتخطّى ⭐ ⭐ بالتوازي ⭐ ⭐.
+         ✅ الحل ⭐: ⭐ قراءة ⭐ + زيادة ⭐ + كتابة ⭐ في **عملية واحدة** ⭐
+            ⭐ ⭐ جوه الـDO ⭐ ⭐ ⇒ ⭐ الـDO بيمعالج الطلبات واحد واحد ⭐ ⭐
+            ⭐ ⭐ ⇒ ⭐ مافيش lost update ⭐ ⭐.
+         📌 القفل ⭐ ⭐ (٥ محاولات ⭐ ⭐ ⇒ ⭐ TTL ⭐ ⭐) ⭐ ⭐ بيتحسب **جوه** العملية ⭐ ⭐. */
+      if (op === 'lock_bump') {
+        const now = Number(cmd.now || 0) || nowSec();
+        const maxA = Number(cmd.max || 0) || 4;
+        const lockTtl = Number(cmd.lockTtl || 0) || 0;
+        const ttl = Number(cmd.ttl || 0) || 0;
+        const cur = (await st.get(key)) || { count: 0, until: 0 };
+        const rec = { count: Number(cur.count || 0) + 1, until: Number(cur.until || 0) };
+        let locked = false;
+        if (rec.count >= maxA) {
+          rec.until = now + lockTtl;
+          rec.count = 0;
+          locked = true;
+        }
+        const opts = ttl > 0 ? { expirationTtl: ttl } : undefined;
+        await st.put(key, rec, opts);
+        return jsonOut({ ok: true, value: rec, count: rec.count, locked: locked });
+      }
       /* ⭐⭐⭐ (R29 · FINDING-11) ⭐⭐⭐ استهلاك ذرّ ⭐⭐⭐
          📌 قراءة + حذف **في عملية واحدة** ⭐ ⇒ ⛔ التوكن ما بيتUsedش مرتين ⭐.
          📌 (الطلبان المتزامنان ⭐ ⇒ ⭐ واحد بس ياخده ⭐ ⇒ ⭐ التاني يفشل ⭐.) */
