@@ -238,11 +238,19 @@ test('③ دخول بالباسورد + جهاز مسجّل ⇒ جلسة ⭐', a
     { method: 'POST', json: { pin: '9999', device: device } });
   assert.strictEqual(wrong.status, 401);
 
-  /* ⛔ جهاز جديد ⇒ لازم كود (زي الإنتاج) ⭐ */
+  /* ⛔ جهاز جديد ⇒ لازم كود (زي الإنتاج) ⭐
+     ⭐⭐⭐ (R31) ⭐⭐⭐ السلوك اتغيّر ⭐⭐⭐ — قبل ⭐ ⭐: ⛔ الرد ⭐ ⭐ كان
+     ⭐ ⭐ `bad_pin_or_device` ⭐ ⭐ والعدّاد ⭐ ⭐ كان بيتخصم ⭐ ⭐ ⇒ ⛔ ⭐ ⭐
+     ⭐ ⭐ الباسورد **الصحيح** ⭐ ⭐ كان بيتحسب **محاولة فاشلة** ⭐ ⭐ ⇒ ⛔ ⭐ ⭐
+     ⭐ ⭐ ⭐ ⭐ قفل ذاتي ⭐ ⭐ ⭐ ⭐ (٥ محاولات ⭐ ⭐ ⇒ ⭐ ١٥ دقيقة ⭐ ⭐) ⭐ ⭐ ⭐ ⭐.
+     ✅ دلوقتي ⭐ ⭐ ⭐: ⭐ ⭐ الباسورد صح ⭐ ⭐ + جهاز مش مسجّل ⭐ ⭐ ⇒ ⭐ ⭐
+     ⭐ ⭐ `new_device` ⭐ ⭐ + `need_code` ⭐ ⭐ (زي الإنتاج ⭐ ⭐) ⭐ ⭐ ⭐ ⭐
+     ⭐ ⭐ ⇒ ⭐ ⭐ وصفر خصم ⭐ ⭐ في العدّاد ⭐ ⭐. */
   const newDev = await call(e, '/api/auth/pin/login',
     { method: 'POST', json: { pin: '1111', device: 'device-cccc-0000' } });
   assert.strictEqual(newDev.status, 401);
-  assert.strictEqual(newDev.body.why, 'bad_pin_or_device');
+  assert.strictEqual(newDev.body.why, 'new_device');
+  assert.strictEqual(newDev.body.need_code, true);
 
   /* ⛔⛔⛔ حسابين بنفس الباسورد ⭐ ⇒ لازم الجهاز يميّز ⭐ */
   const email2 = 'r26.login2@example.com';

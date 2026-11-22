@@ -202,6 +202,17 @@ export class PreviewStore {
         this.scheduleSweep();
         return jsonOut({ ok: true, value: next });
       }
+      /* ⭐⭐⭐ (R31) ⭐⭐⭐ إثوث الـPIN على الجهاز ⭐⭐⭐
+         📌 قراءة + تعديل + كتابة ⭐ في **عملية واحدة** ⭐ ⇒ ⭐ مافيش سباق ⭐.
+         ⛔ **بلا** رفع الـepoch ⭐ ⇒ ⭐ ⭐ الجلسات القائمة ما بتموتش ⭐ ⭐. */
+      if (op === 'acct_touch_pin') {
+        const cur = await st.get(key);
+        if (!cur) return jsonOut({ ok: false, error: 'no_account' }, 404);
+        const patch = (cmd.patch && typeof cmd.patch === 'object') ? cmd.patch : {};
+        const next = Object.assign({}, cur, patch);
+        await st.put(key, next);
+        return jsonOut({ ok: true, value: next });
+      }
       /* ⭐⭐⭐ (R29 · FINDING-12) ⭐⭐⭐ تدوير الجلسة ⭐⭐⭐
          📌 إبطال القديم + إصدار البديل **في عملية واحدة** ⭐ ⇒
             ⛔ لو الإبطال فشل ⭐ ⇒ ⛔ مافيش جلسة بديلة ⭐

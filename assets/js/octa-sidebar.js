@@ -291,6 +291,24 @@ let OPEN = localStorage.getItem('octa_sidebar') === '1';
  build();
  });
 
+ /* ⭐⭐⭐ (R31 · R30·FINDING-A11Y-3) ⭐⭐⭐ Escape يقفل القائمة الجانبية ⭐⭐⭐
+    📌 قبل ⭐: ⛔ مافيش أي مستمع ⭐ ⭐ لـ Escape ⭐ ⭐ ⇒ ⛔ مستخدم فتح
+       ⭐ ⭐ القائمة ⭐ ⭐ على الموبايل ⭐ ⭐ ⭐ مابيقدرش يقفلها ⭐ ⭐ ⭐
+       ⭐ ⭐ ⭐ غير بالزر ⭐ ⭐ ⭐ ⇒ ⛔ عيب وصولية حقيقي ⭐ ⭐ (كان مش مثبت ⭐
+       ⭐ ⭐ ⭐ لأن المُحدِّد في أداة القياس ⭐ ⭐ ⭐ مكانش بيلاقي الزر ⭐ ⭐ ⭐).
+    ✅ دلوقتي ⭐: ⭐ Escape ⭐ ⭐ ⭐ يقفلها ⭐ ⭐ ⭐ ⇒ ⭐ ⭐ ⭐ والزر ⭐ ⭐ ⭐ موجود ⭐ ⭐ ⭐
+       ⭐ ⭐ ⭐ (`.tb-btn` ⭐) ⭐ ⭐ ⭐ ⇒ ⭐ ⭐ ⭐ القياس يبقى **حقيقي** ⭐ ⭐ ⭐.
+    ⛔ مافيش تأثير على المودالات ⭐ (مستمعاتها مستقلة ⭐) ⭐. */
+ document.addEventListener('keydown', function (e) {
+  try {
+   if (!e || e.key !== 'Escape') return;
+   if (!OPEN) return;                 /* ⭐ القائمة مقفولة ⭐ ⇒ مافيش حاجة ⭐ */
+   OPEN = false;
+   try { localStorage.setItem('octa_sidebar', '0'); } catch (e) {}
+   syncOpen();
+  } catch (e) {}
+ });
+
  /* 🧭 كان غلاف على switchPage. دلوقتي hook — بيشتغل بعد ما
     الصفحة تتفعّل، ومش بيلمس window.switchPage خالص. */
  if (typeof OS_NAV !== 'undefined' && OS_NAV.on) {

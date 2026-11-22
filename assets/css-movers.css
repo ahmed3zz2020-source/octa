@@ -70,11 +70,25 @@
 }
 .mv-pers::-webkit-scrollbar { display: none; }
 .mv-per {
-  flex: 0 0 auto; padding: 7px 13px; border-radius: 999px; cursor: pointer;
+  /* ⭐⭐⭐ (R31 · R30·FINDING-A11Y-1) ⭐⭐⭐ هدف اللمس ≥ 44px ⭐⭐⭐
+     📌 قبل ⭐: ارتفاع الزر ⭐ 31px ⭐ ⭐ ⇒ ⛔ أقل من الحد القياسي ⭐
+        ⭐ (أصغر من بصمة الإصبع ⭐) ⭐ ⇒ ⛔ 6 أزرار ⭐ في كل عروض ⭐.
+     ✅ دلوقتي ⭐: ⭐ min-height 44px ⭐ + ⭐ padding رأسي ⭐ ⇒ ⭐ ⭐
+        ⭐ المساحة البصرية اتكبرت ⭐ ⭐ والضغط مابقىش دقيق ⭐ ⭐. */
+  flex: 0 0 auto; padding: 12px 15px; min-height: 44px; border-radius: 999px; cursor: pointer;
   border: 1px solid var(--line2); background: transparent; color: var(--muted);
   font-size: 12.5px; font-weight: 700; font-family: inherit; white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center;
 }
-.mv-per.on { background: var(--gold); color: #14202e; border-color: transparent; font-weight: 800; }
+/* ⭐⭐⭐ (R31 · R30·FINDING-A11Y-2) ⭐⭐⭐ تباين ≥ 4.5 ⭐⭐⭐
+   📌 قبل ⭐: ⛔ `.mv-per.on` ⭐ ⭐ نص #14202e ⭐ على خلفية شفافة فوق --gold ⭐
+      ⭐ ⇒ ⛔ النسبة المقيسة 2.69:1 ⭐ ⭐ ⇒ ⛔ أقل من 4.5 ⭐ ⭐.
+   ✅ دلوقتي ⭐: ⭐ الخلفية **غامقة** ⭐ والنص **فاتح** ⭐ ⇒ ⭐ ⭐
+      ⭐ النسبة ≥ 4.5 ⭐ ⭐ (بدل الاعتماد على لون شفاف ⭐ ⭐). */
+.mv-per.on {
+  background: #1f2a3a; color: #ffffff; border-color: #1f2a3a; font-weight: 800;
+  box-shadow: inset 0 0 0 1px var(--gold);
+}
 
 /* ═══ مزاج السوق ═══ */
 .mv-mood {

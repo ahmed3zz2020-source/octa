@@ -2585,6 +2585,25 @@ async function handle(request, env, ctx) {
          📌 ⬇️ ⛔ مافيش وجهة API ⇒ **ممنوع** نرجع للإنتاج ⬇️ ⬇️ ⬇️
          📌 ⬇️ ⛔ (المعاينة fail-closed) ⬇️ ⬇️ ⬇️
          📌 ⬇️ ⛔ نرجع 503 برسالة صريحة ⬇️ ⬇️ ⬇️ */
+      /* ⭐⭐⭐ (R31) ⭐⭐⭐ قفل الكتابة في جسر المعاينة ⭐⭐⭐
+         📌 ده الحارس **الثاني** ⭐ (الأول جوه preview-api.js ⭐) ⭐ ⇒ ⭐ عمق دفاعي ⭐.
+         📌 المعاينة المعزولة ⭐ ⭐ مالهاش أي كتابة ⭐ ⭐ ⇒ ⭐ أي POST/PUT/DELETE
+         ⭐ ⭐ بيعدّي لحد هنا ⭐ ⭐ = ⛔ ⛔ مرفوض ⭐ ⭐ (405 ⭐) ⭐ ⭐.
+         ⛔ الإنتاج ⭐: ⭐ الشرط مش متحقق ⭐ ⇒ ⭐ ⭐ الكتابة العادية شغالة ⭐ ⭐. */
+      if (env && env.OCTA_PREVIEW_SELF_API === 'on'
+        && request.method !== 'GET' && request.method !== 'HEAD'
+        && request.method !== 'OPTIONS') {
+        return new Response(JSON.stringify({
+          ok: false, error: 'preview_read_only', why: 'preview_write_blocked',
+          msg: 'المعاينة للقراءة بس — أي كتابة مرفوضة'
+        }), {
+          status: 405,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'no-store'
+          }
+        });
+      }
       if (!API) return apiUnavailable();
       const target = API + url.pathname + url.search;
       const init = {

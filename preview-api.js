@@ -27,6 +27,10 @@ const UNLOCK_TTL_SEC = 600;
 const LOCK_TTL_SEC = 15 * 60;
 const MAX_ATTEMPTS = 5;
 const PBKDF2_ROUNDS = 60000;
+/* ⭐⭐⭐ (R31) ⭐⭐⭐ نافذة إثوث البصمة ⭐⭐⭐ — زي الإنتاج بالظبط ⭐ (600 ثانية ⭐)
+   📌 البصمة (بصمة الجهاز) ⭐ **مش** إثبات ⭐ ⇒ ⭐ لازم PIN **على نفس الجهاز** ⭐
+      ⭐ وحديث ⭐ ⇒ ⭐ وعشان كده ⭐ ⭐ **مش** بنصدر جلسة بالبصمة وحدها ⭐ ⭐. */
+const FINGERPRINT_WINDOW_SEC = 600;
 
 /* ── أدوات ترميز ─────────────────────────────────────────────────────── */
 function b64u(bytes) {
@@ -710,7 +714,13 @@ async function handlePreviewApi(opts) {
         const a0 = await storeGet(env, idx);
         if (a0) {
           const h0 = await pbkdf2(pin, a0.pin_salt || '');
-          if (h0 === a0.pin_hash && (a0.devices || []).includes(device)) found = a0;
+          if (h0 === a0.pin_hash) {
+            if ((a0.devices || []).includes(device)) found = a0;
+            /* ⭐⭐⭐ (R31) ⭐⭐⭐ الباسورد **صح** ⭐ + الجهاز **مش مسجّل** ⭐
+               📌 لازم نعرف إن الباسورد صح ⭐ ⇒ ⭐ عشان **ماعندناش** نخصم من
+                  ⭐ العدّاد ⭐ (قفل ذاتي ⭐) ⭐ ⇒ ⭐ والقيم دي بتروح لكود الإيميل ⭐. */
+            else cands.push(a0);
+          }
         }
       }
     } catch (e) { }
@@ -732,6 +742,18 @@ async function handlePreviewApi(opts) {
       }
     }
     if (!found) {
+      /* ⭐⭐⭐ (R31) ⭐⭐⭐ عدّاد خاطئ ⭐⭐⭐ — الباسورد **صح** ⭐ + جهاز **مش مسجّل** ⭐
+         📌 قبل ⭐: ⛔ العدّاد كان بيزيد ⭐ ⇒ ⛔ بعد ٥ محاولات ⭐ قفل ١٥ دقيقة ⭐
+            ⭐ ⇒ ⛔ المستخدم الشرعي بيقفل **نفسه** ⭐ (نفس العيب اللي اتصلّح في
+            ⭐ الإنتاج ⭐ ⇒ المعاينة كانت لسه فيه ⭐).
+         ✅ دلوقتي ⭐: ⭐ «جهاز غير معروف» ⭐ = **مسار توثيق** ⭐ مش خطأ ⭐
+            ⭐ ⇒ ⭐ **صفر** خصم من العدّاد ⭐ ⇒ ⭐ والباقي ⭐ ⭐ يروح لكود الإيميل ⭐. */
+      if (cands.length > 0) {
+        /* ⛔ الباسورد صح ⭐ ⇒ ⛔ مافيش خصم ⭐ (زي الإنتاج ⭐) ⭐ */
+        return json({ ok: false,
+          error: 'دخول من جهاز جديد — هنطلب كود على الإيميل',
+          why: 'new_device', need_code: true, next: 'challenge/send' }, 401);
+      }
       /* ⭐⭐⭐ (R28 · R26-I03) ⭐ العدّاد بيزيد على **الباسورد** ⭐ + **الـIP** ⭐ */
       await bumpAttempts(env, 'pin', pinHash);
       await bumpAttempts(env, 'ip', await sha256hex(ip));
@@ -747,6 +769,20 @@ async function handlePreviewApi(opts) {
        ⛔ عدّاد الـIP ⭐ ⭐ **مش** بنصفّره ⭐ ⭐ ⇒ ⭐ ده عدّاد المحاولات
           ⭐ ⭐ **الفاشلة** ⭐ ⭐ (حماية من التخمين ⭐ ⭐). ⭐ */
     await resetAttempts(env, 'pin', pinHash);
+    /* ⭐⭐⭐ (R31) ⭐⭐⭐ إثوث البصمة ⭐⭐⭐ — **نفس الجهاز** ⭐ + وقت حديث ⭐
+       📌 لازم البصمة (لو اتفتحت ⭐) ⇒ ⭐ لازم PIN صح ⭐ **على نفس الجهاز** ⭐
+          ⭐ ⇒ ⭐ فبصمة الجهاز لوحدها ⭐ ⭐ مابتعملش جلسة ⭐ ⭐.
+       📌 الكتابة ذرّية ⭐ (عملية واحدة في الـDO ⭐) ⭐ + ⛔ فشلها = ٥٠٣ ⭐
+          ⭐ (مافيش نجاح وهمي ⭐) ⭐. */
+    const proof = await storeCmdRaw(env, {
+      op: 'acct_touch_pin', key: acctKey(found.uid),
+      patch: { pin_ok_at: nowSec(), pin_ok_dev: device }
+    });
+    if (!proof || proof.ok !== true) {
+      return json({ ok: false,
+        error: 'مقدرناش نحفظ حالة الجهاز دلوقتي — حاول تاني',
+        why: 'storage_unavailable' }, 503);
+    }
     const token = await issueSession(env, found, device);
     if (!token) {
       return json({ ok: false, error: 'تعذّر تسجيل الجلسة',
@@ -768,6 +804,20 @@ async function handlePreviewApi(opts) {
       const acct = await storeGet(env, key);
       if (!acct) continue;
       if ((acct.devices || []).includes(device)) {
+        /* ⭐⭐⭐ (R31) ⭐⭐⭐ ⛔ البصمة وحدها **مابتissuedش** جلسة ⭐⭐⭐
+           📌 قبل ⭐: ⛔ أي حد عنده **بصمة الجهاز** ⭐ ⭐ ⭐ ⇒ ⭐ ⭐ جلسة كاملة ⭐
+              ⭐ ⭐ indefinitely ⭐ ⭐ ⇒ ⭐ ⭐ ⛔ البصمة = مفتاح ⭐ ⭐ ⭐.
+           ✅ دلوقتي ⭐: ⭐ لازم ⭐ ⭐ **PIN صح على نفس الجهاز** ⭐ ⭐ وحديث ⭐ ⭐
+              ⭐ (نافذة ٦٠٠ ثانية ⭐ — زي الإنتاج ⭐) ⭐ ⇒ ⭐ ⛔ مافيش جلسة ⭐ ⭐. */
+        const pinAt = Number(acct.pin_ok_at || 0);
+        const pinDev = String(acct.pin_ok_dev || '');
+        const fresh = pinAt > 0 && (nowSec() - pinAt) <= FINGERPRINT_WINDOW_SEC;
+        const sameDev = !!pinDev && safeEqual(pinDev, device);
+        if (!fresh || !sameDev) {
+          return json({ ok: false,
+            error: 'لازم تتأكد بالرقم الأول (دخول بالبصمة = إعادة فتح)',
+            why: 'need_pin', next: 'pin/login' }, 401);
+        }
         const token = await issueSession(env, acct, device);
         if (!token) {
           return json({ ok: false, error: 'تعذّر تسجيل الجلسة',
@@ -999,7 +1049,19 @@ async function handlePreviewApi(opts) {
              ⭐ الحسابات ⭐ والجلسات ⭐ والمحفظة ⭐ والتنبيهات ⭐
              ⇒ ⭐ ما بتوصلش لاستدعاء بيكتب على الإنتاج ⭐.
        ⛔ أي مسار تاني ⭐ ⇒ ⛔ مافيش إنترنت ⭐ (fail-closed ⭐). */
-    if (isBackendReadOnly(p)) return null;   /* ⭐ يستمر للـbackend الحقيقي ⭐ */
+    /* ⭐⭐⭐ (R31) ⭐⭐⭐ قفل الكتابة في جسر المعاينة ⭐⭐⭐
+       📌 قبل ⭐: ⛔ `isBackendReadOnly` ⭐ كان بيشوف **المسار بس** ⭐
+          ⭐ ⇒ ⛔ POST/PUT/DELETE ⭐ على مسار قراءة ⭐ ⭐ كان بيكمّل ⭐
+          ⭐ ⭐ للباك الحقيقي ⭐ ⭐ ⇒ ⭐ ⭐ ⛔ المعاينة تكتب ⭐ ⭐.
+       ✅ دلوقتي ⭐: ⭐ أي طريقة كتابة ⭐ ⇒ ⭐ ⛔ 405 ⭐ ⭐ وما بتوصلش للباك ⭐ ⭐. */
+    if (isBackendReadOnly(p)) {
+      if (mutating) {
+        return json({ ok: false, error: 'preview_read_only',
+          why: 'preview_write_blocked',
+          msg: 'المعاينة للقراءة بس — أي كتابة مرفوضة' }, 405);
+      }
+      return null;   /* ⭐ يستمر للـbackend الحقيقي ⭐ (قراءة ⭐) */
+    }
     return json({
       ok: false, error: 'preview_route_not_implemented',
       why: 'المسار ده مش متاح في المعاينة المعزولة ⭐',
