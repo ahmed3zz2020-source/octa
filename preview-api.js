@@ -783,8 +783,6 @@ async function handlePreviewApi(opts) {
        📌 الحماية من التخمين ⭐ ⭐ ⭐ بتفضل شغالة ⭐ ⭐ ⭐: ⭐ العدّاد بيتزناد ⭐ ⭐ ⭐
           ⭐ ⭐ ⭐ **فقط** ⭐ ⭐ ⭐ عند فشل ⭐ ⭐ ⭐ (والباسورد صح ⭐ ⭐ ⭐ +
           ⭐ ⭐ ⭐ جهاز غريب ⭐ ⭐ ⭐ ⭐ ⇒ ⭐ ⭐ ⭐ صفر خصم ⭐ ⭐ ⭐ من R31 ⭐ ⭐ ⭐) ⭐ ⭐ ⭐. */
-    await resetAttempts(env, 'pin', pinHash);
-    await resetAttempts(env, 'ip', await sha256hex(ip));
     /* ⭐⭐⭐ (R31) ⭐⭐⭐ إثوث البصمة ⭐⭐⭐ — **نفس الجهاز** ⭐ + وقت حديث ⭐
        📌 لازم البصمة (لو اتفتحت ⭐) ⇒ ⭐ لازم PIN صح ⭐ **على نفس الجهاز** ⭐
           ⭐ ⇒ ⭐ فبصمة الجهاز لوحدها ⭐ ⭐ مابتعملش جلسة ⭐ ⭐.
@@ -804,6 +802,13 @@ async function handlePreviewApi(opts) {
       return json({ ok: false, error: 'تعذّر تسجيل الجلسة',
         why: 'issue_failed' }, 503);
     }
+    /* ⭐⭐⭐ (R32 · e) ⭐⭐⭐ تصفير ⭐⭐⭐ العدّاد ⭐⭐⭐ **بعد** ⭐⭐⭐ نجاح ⭐⭐⭐ حفظ ⭐⭐⭐ الجلسة ⭐⭐⭐ ⭐⭐⭐
+       📌 قبل ⭐: ⛔ العدّاد ⭐⭐ كان ⭐⭐ **بيتصفّر** ⭐⭐ **قبل** ⭐⭐ ما ⭐⭐ الجلسة ⭐⭐ تتحفظ ⭐⭐ ⭐
+          ⭐ ⭐ ⇒ ⭐ ⭐ لو ⭐ ⭐ حفظ ⭐ ⭐ الجلسة ⭐ ⭐ فشل ⭐ ⭐ ⇒ ⭐ ⭐ العدّاد ⭐ ⭐ اتصفّر ⭐ ⭐ ⭐
+          ⭐ ⭐ ⇒ ⭐ ⭐ ⭐⭐ ⭐ ⭐ ⇒ ⭐ ⭐ fail-closed ⭐ ⭐ ⭐.
+       ✅ دلوقتي ⭐: ⭐ التصفير ⭐⭐ **بعد** ⭐⭐ نجاح ⭐⭐ حفظ ⭐⭐ الجلسة ⭐⭐ ⭐ (نفس ⭐⭐ سلوك ⭐⭐ الإنتاج ⭐⭐ ⭐). */
+    await resetAttempts(env, 'pin', pinHash);
+    await resetAttempts(env, 'ip', await sha256hex(ip));
     return json({ ok: true, token: token, expires_in: SESSION_TTL_SEC,
       user: userView(found) }, 200, { 'Set-Cookie': sessionCookie(token, SESSION_TTL_SEC) });
   }
